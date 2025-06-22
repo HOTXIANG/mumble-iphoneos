@@ -24,7 +24,7 @@ fetch all submodules), because there are quite a few submodules.
 
 To fetch the repository:
 
-    $ git clone --recursive http://github.com/mumble-voip/mumble-iphoneos.git
+    $ git clone --recursive http://github.com/HOTXIANG/mumble-iphoneos.git
 
 Once this is done, you should be able to open up the Xcode
 project file for Mumble (Mumble.xcodeproj) in the root of
