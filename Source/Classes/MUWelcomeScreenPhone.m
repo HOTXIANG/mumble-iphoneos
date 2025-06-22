@@ -26,7 +26,8 @@
 @implementation MUWelcomeScreenPhone
 
 - (id) init {
-    if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
+    // 使用 InsetGrouped 样式以获得现代化的卡片式外观 (需要 iOS 13+)
+    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
         // ...
     }
     return self;
@@ -37,16 +38,11 @@
 
     self.navigationItem.title = @"Mumble";
     self.navigationController.toolbarHidden = YES;
-
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
-    if (@available(iOS 7, *)) {
-        self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
-        self.tableView.separatorInset = UIEdgeInsetsZero;
-    } else {
-        self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    }
+    // Set the background to the standard dark gray for dark mode.
+    self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
 
+    // InsetGrouped 样式也会自动处理分隔线。
     self.tableView.scrollEnabled = NO;
     
 #if MUMBLE_LAUNCH_IMAGE_CREATION != 1
@@ -71,7 +67,6 @@
     return 1;
 }
 
-// Customize the number of rows in the table view.
 - (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
 #if MUMBLE_LAUNCH_IMAGE_CREATION == 1
     return 1;
@@ -82,52 +77,96 @@
 }
 
 - (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    UIImage *img = [MUImage imageNamed:@"WelcomeScreenIcon"];
-    UIImageView *imgView = [[UIImageView alloc] initWithImage:img];
-    [imgView setContentMode:UIViewContentModeCenter];
-    [imgView setFrame:CGRectMake(0, 0, img.size.width, img.size.height)];
-    return imgView;
-}
+    if (section == 0) {
+        UIView *headerContainer = [[UIView alloc] init];
+        
+        UIImage *logoImage = [UIImage imageNamed:@"WelcomeScreenIcon"];
+        UIImageView *logoImageView = [[UIImageView alloc] initWithImage:logoImage];
+        logoImageView.contentMode = UIViewContentModeScaleAspectFit;
+        logoImageView.translatesAutoresizingMaskIntoConstraints = NO;
+        
+        UILabel *titleLabel = [[UILabel alloc] init];
+        titleLabel.text = @"Welcome to Mumble";
+        titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleLargeTitle];
+        titleLabel.textAlignment = NSTextAlignmentCenter;
+        titleLabel.adjustsFontForContentSizeCategory = YES;
+        titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-#if MUMBLE_LAUNCH_IMAGE_CREATION == 1
-    CGFloat statusBarAndTitleBarHeight = 64;
-    return [UIScreen mainScreen].bounds.size.height - statusBarAndTitleBarHeight;
-#endif
-    UIImage *img = [MUImage imageNamed:@"WelcomeScreenIcon"];
-    return img.size.height;
+        UILabel *subtitleLabel = [[UILabel alloc] init];
+        subtitleLabel.text = @"Low latency, high quality voice chat";
+        subtitleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+        subtitleLabel.textColor = [UIColor secondaryLabelColor];
+        subtitleLabel.textAlignment = NSTextAlignmentCenter;
+        subtitleLabel.adjustsFontForContentSizeCategory = YES;
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+        [headerContainer addSubview:logoImageView];
+        [headerContainer addSubview:titleLabel];
+        [headerContainer addSubview:subtitleLabel];
+        
+        [NSLayoutConstraint activateConstraints:@[
+            [logoImageView.topAnchor constraintEqualToAnchor:headerContainer.topAnchor constant:20],
+            [logoImageView.centerXAnchor constraintEqualToAnchor:headerContainer.centerXAnchor],
+            [logoImageView.heightAnchor constraintEqualToConstant:100],
+            [logoImageView.widthAnchor constraintEqualToConstant:100],
+
+            [titleLabel.topAnchor constraintEqualToAnchor:logoImageView.bottomAnchor constant:16],
+            [titleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.leadingAnchor],
+            [titleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.trailingAnchor],
+
+            [subtitleLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:8],
+            [subtitleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.leadingAnchor],
+            [subtitleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.trailingAnchor],
+            [subtitleLabel.bottomAnchor constraintEqualToAnchor:headerContainer.bottomAnchor constant:-20]
+        ]];
+        
+        return headerContainer;
+    }
+    return nil;
 }
 
 - (CGFloat) tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     return 44.0;
 }
 
-// Customize the appearance of table view cells.
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"welcomeItem"];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"welcomeItem"];
     }
     
-    cell.selectionStyle = UITableViewCellSelectionStyleGray;
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     
-    /* Servers section. */
+    NSString *text = @"";
+    NSString *symbolName = @"";
+    
     if (indexPath.section == 0) {
         if (indexPath.row == 0) {
-            cell.textLabel.text = NSLocalizedString(@"Public Servers", nil);
+            text = NSLocalizedString(@"Public Servers", nil);
+            symbolName = @"globe";
         } else if (indexPath.row == 1) {
-            cell.textLabel.text = NSLocalizedString(@"Favourite Servers", nil);
+            text = NSLocalizedString(@"Favourite Servers", nil);
+            symbolName = @"star.fill";
         } else if (indexPath.row == 2) {
-            cell.textLabel.text = NSLocalizedString(@"LAN Servers", nil);
+            text = NSLocalizedString(@"LAN Servers", nil);
+            symbolName = @"wifi";
         }
     }
 
-    [[cell textLabel] setHidden: NO];
+    if (@available(iOS 14.0, *)) {
+        UIListContentConfiguration *content = [cell defaultContentConfiguration];
+        content.text = text;
+        content.image = [UIImage systemImageNamed:symbolName];
+        cell.contentConfiguration = content;
+    } else {
+        // Fallback on earlier versions
+        cell.textLabel.text = text;
+        cell.imageView.image = [UIImage systemImageNamed:symbolName];
+    }
 
     return cell;
 }
 
-// Override to support row selection in the table view.
 - (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     /* Servers section. */
     if (indexPath.section == 0) {
@@ -142,6 +181,8 @@
             [self.navigationController pushViewController:lanList animated:YES];
         }
     }
+    // Deselect row for a cleaner transition
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
 - (void) aboutClicked:(id)sender {

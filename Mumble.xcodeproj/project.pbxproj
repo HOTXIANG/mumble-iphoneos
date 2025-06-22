@@ -177,6 +177,7 @@
 		28FAA35F14D74C1600F6D711 /* SmallMumbleIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 28FAA35D14D74C1600F6D711 /* SmallMumbleIcon.png */; };
 		28FAA36014D74C1600F6D711 /* SmallMumbleIcon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 28FAA35E14D74C1600F6D711 /* SmallMumbleIcon@2x.png */; };
 		28FAA36414D7551600F6D711 /* MKNumberBadgeView.m in Sources */ = {isa = PBXBuildFile; fileRef = 28FAA36314D7551600F6D711 /* MKNumberBadgeView.m */; };
+		F2BF1CDC2E089C7D00DEB23D /* Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2BF1CDB2E089C7D00DEB23D /* Bridge.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -516,6 +517,8 @@
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = Source/main.m; sourceTree = "<group>"; };
 		32CA4F630368D1EE00C91783 /* Mumble.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Mumble.pch; path = Source/Mumble.pch; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Source/Info.plist; plistStructureDefinitionIdentifier = "com.apple.xcode.plist.structure-definition.iphone.info-plist"; sourceTree = "<group>"; };
+		F2BF1CDA2E089C7D00DEB23D /* Mumble-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Mumble-Bridging-Header.h"; sourceTree = "<group>"; };
+		F2BF1CDB2E089C7D00DEB23D /* Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bridge.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -553,6 +556,7 @@
 				2861C25D116BE905002B8514 /* MUApplicationDelegate.h */,
 				2861C25E116BE905002B8514 /* MUApplicationDelegate.m */,
 				2861C25F116BE905002B8514 /* MUCountryServerListController.h */,
+				F2BF1CDB2E089C7D00DEB23D /* Bridge.swift */,
 				28C6EF0911BBF38100E426C8 /* MUCountryServerListController.m */,
 				2861C266116BE905002B8514 /* MUPublicServerList.h */,
 				2861C267116BE905002B8514 /* MUPublicServerList.m */,
@@ -631,6 +635,7 @@
 				2882858018CE40C80034F319 /* MUBackgroundView.m */,
 				28BE998318CFB96A00910551 /* MUHorizontalFlipTransitionDelegate.h */,
 				28BE998418CFB96A00910551 /* MUHorizontalFlipTransitionDelegate.m */,
+				F2BF1CDA2E089C7D00DEB23D /* Mumble-Bridging-Header.h */,
 			);
 			name = Classes;
 			path = Source/Classes;
@@ -1002,6 +1007,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastTestingUpgradeCheck = 0700;
 				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					1D6058900D05DD3D006BFB54 = {
+						LastSwiftMigration = 2600;
+					};
+				};
 			};
 			buildConfigurationList = C01FCF4E08A954540054247B /* Build configuration list for PBXProject "Mumble" */;
 			developmentRegion = en;
@@ -1270,6 +1280,7 @@
 				28942D7C12456F9200C63A07 /* MUCertificateCreationView.m in Sources */,
 				288B55E01252903300563A28 /* MUServerCertificateTrustViewController.m in Sources */,
 				289CBA18125693040015E58E /* MUServerViewController.m in Sources */,
+				F2BF1CDC2E089C7D00DEB23D /* Bridge.swift in Sources */,
 				2838EA0F129316C200035C5D /* MUCertificatePreferencesViewController.m in Sources */,
 				282F6A2513620BD5008F555B /* MUCertificateController.m in Sources */,
 				28F019911364585C00E402F6 /* MUServerCell.m in Sources */,
@@ -1368,9 +1379,15 @@
 		1D6058940D05DD3E006BFB54 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEVELOPMENT_TEAM = 5Q255DK223;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/Mumble-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -1378,9 +1395,14 @@
 		1D6058950D05DD3E006BFB54 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEVELOPMENT_TEAM = 5Q255DK223;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/Mumble-Bridging-Header.h";
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
@@ -1525,9 +1547,14 @@
 		2887C88A1454C4C2009B3576 /* AppStore */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEVELOPMENT_TEAM = 5Q255DK223;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/Mumble-Bridging-Header.h";
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = AppStore;
@@ -1545,9 +1572,14 @@
 		28BC1E7B1227155500C03FCF /* BetaDist */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEVELOPMENT_TEAM = 5Q255DK223;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/Mumble-Bridging-Header.h";
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = BetaDist;
