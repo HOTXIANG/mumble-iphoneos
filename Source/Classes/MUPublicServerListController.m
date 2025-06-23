@@ -17,10 +17,39 @@
 @implementation MUPublicServerListController
 
 - (id) init {
-    if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
+    // 使用 InsetGrouped 样式以与欢迎界面保持一致
+    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
         _serverList = [[MUPublicServerList alloc] init];
     }
     return self;
+}
+
+- (void) updateBackgroundColor {
+    if (@available(iOS 13.0, *)) {
+        // 深色模式使用深灰色，浅色模式使用系统默认
+        UIColor *backgroundColor = [UIColor systemGroupedBackgroundColor];
+        
+        // 如果是深色模式，使用自定义的深灰色
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色 #1C1C1E
+        }
+        
+        self.view.backgroundColor = backgroundColor;
+        self.tableView.backgroundColor = backgroundColor;
+    } else {
+        self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    }
+}
+
+- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self updateBackgroundColor];
+        }
+    }
 }
 
 - (void) viewWillAppear:(BOOL)animated {
@@ -28,13 +57,22 @@
 
     self.navigationItem.title = NSLocalizedString(@"Public Servers", nil);
     
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
+    // 设置背景色 - 与欢迎界面一致
+    [self updateBackgroundColor];
+    
+    // 移除旧的背景视图设置
+    // self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
         self.tableView.separatorInset = UIEdgeInsetsZero;
     } else {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    }
+
+    // 配置现代化的表格视图外观
+    if (@available(iOS 15.0, *)) {
+        self.tableView.sectionHeaderTopPadding = 0;
     }
 
     if (![_serverList isParsed]) {
@@ -92,6 +130,20 @@
     }
 
     [cell setAccessoryType:UITableViewCellAccessoryDisclosureIndicator];
+    
+    // 设置 cell 背景色以创建层次感
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            // 深色模式：使用比背景更亮的颜色
+            cell.backgroundColor = [UIColor colorWithRed:0.17 green:0.17 blue:0.18 alpha:1.0]; // #2C2C2E
+        } else {
+            // 浅色模式：使用标准的次级背景色
+            cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+        }
+    } else {
+        cell.backgroundColor = [UIColor whiteColor];
+    }
+    
     NSDictionary *countryInfo = [_serverList countryAtIndexPath:indexPath];
     cell.textLabel.text = [countryInfo objectForKey:@"name"];
     NSInteger numServers = [[countryInfo objectForKey:@"servers"] count];

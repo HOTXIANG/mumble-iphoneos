@@ -108,8 +108,20 @@
     [super viewWillAppear:animated];
     self.navigationItem.title = @"Mumble";
 
-    // Remove deprecated bar style to allow automatic light/dark mode adaptation
-    // self.navigationController.navigationBar.barStyle = UIBarStyleBlackOpaque;
+    // Modern navigation bar appearance for a seamless look
+    if (@available(iOS 13.0, *)) {
+        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+        // Configure the appearance to be transparent, allowing the background color to show through.
+        [appearance configureWithTransparentBackground];
+        // Set the background color to match the view's background.
+        appearance.backgroundColor = [UIColor systemGroupedBackgroundColor];
+        // Remove the shadow/separator line for a seamless transition.
+        appearance.shadowColor = nil;
+
+        self.navigationController.navigationBar.standardAppearance = appearance;
+        self.navigationController.navigationBar.scrollEdgeAppearance = appearance;
+        self.navigationController.navigationBar.compactAppearance = appearance;
+    }
 
     UIBarButtonItem *aboutBtn = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"About", nil) style:UIBarButtonItemStylePlain target:self action:@selector(aboutButtonClicked:)];
     self.navigationItem.rightBarButtonItem = aboutBtn;

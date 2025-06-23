@@ -51,7 +51,8 @@
 }
 
 - (id) initInEditMode:(BOOL)editMode withContentOfFavouriteServer:(MUFavouriteServer *)favServ {
-    if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
+    // 使用 InsetGrouped 样式以与欢迎界面保持一致
+    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
         _editMode = editMode;
         if (favServ) {
             _favourite = [favServ copy];
@@ -188,19 +189,57 @@
     return toInterfaceOrientation == UIInterfaceOrientationPortrait;
 }
 
+- (void) updateBackgroundColor {
+    if (@available(iOS 13.0, *)) {
+        // 深色模式使用深灰色，浅色模式使用系统默认
+        UIColor *backgroundColor = [UIColor systemGroupedBackgroundColor];
+        
+        // 如果是深色模式，使用自定义的深灰色
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色 #1C1C1E
+        }
+        
+        self.view.backgroundColor = backgroundColor;
+        self.tableView.backgroundColor = backgroundColor;
+    } else {
+        self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    }
+}
+
+// 正确的方式来监听主题变化
+- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self updateBackgroundColor];
+        }
+    }
+}
+
 #pragma mark -
 #pragma mark View lifecycle
 
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
+    // 设置背景色 - 与欢迎界面一致
+    [self updateBackgroundColor];
+    
+    // 移除旧的背景视图设置
+    // self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
         self.tableView.separatorInset = UIEdgeInsetsZero;
     } else {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    }
+
+    // 配置现代化的表格视图外观
+    if (@available(iOS 15.0, *)) {
+        self.tableView.sectionHeaderTopPadding = 0;
     }
 
     [[NSNotificationCenter defaultCenter] addObserver:self

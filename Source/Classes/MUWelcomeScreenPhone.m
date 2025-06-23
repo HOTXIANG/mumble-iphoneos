@@ -26,11 +26,71 @@
 @implementation MUWelcomeScreenPhone
 
 - (id) init {
-    // 使用 InsetGrouped 样式以获得现代化的卡片式外观 (需要 iOS 13+)
+    // 使用 InsetGrouped 样式以获得现代化的卡片式外观
     if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
-        // ...
+        // ...existing code...
     }
     return self;
+}
+
+- (void) viewDidLoad {
+    [super viewDidLoad];
+    
+    // 设置背景色 - 深色模式使用深灰色而不是纯黑色
+    [self updateBackgroundColor];
+}
+
+- (void) updateBackgroundColor {
+    if (@available(iOS 13.0, *)) {
+        // 深色模式使用深灰色，浅色模式使用系统默认
+        UIColor *backgroundColor = [UIColor systemGroupedBackgroundColor];
+        
+        // 如果是深色模式，使用自定义的深灰色
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色 #1C1C1E
+        }
+        
+        self.view.backgroundColor = backgroundColor;
+        self.tableView.backgroundColor = backgroundColor;
+    } else {
+        self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    }
+}
+
+// 正确的方式来监听主题变化
+- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self updateBackgroundColor];
+            [self updateNavigationBarAppearance];
+        }
+    }
+}
+
+- (void) updateNavigationBarAppearance {
+    if (@available(iOS 13.0, *)) {
+        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+        [appearance configureWithDefaultBackground];
+        
+        // 根据当前主题设置导航栏背景色
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            appearance.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+        } else {
+            appearance.backgroundColor = [UIColor systemGroupedBackgroundColor];
+        }
+        
+        // 移除阴影以获得无缝外观
+        appearance.shadowColor = nil;
+
+        self.navigationController.navigationBar.standardAppearance = appearance;
+        self.navigationController.navigationBar.scrollEdgeAppearance = appearance;
+        if (@available(iOS 15.0, *)) {
+            self.navigationController.navigationBar.compactScrollEdgeAppearance = appearance;
+        }
+    }
 }
 
 - (void) viewWillAppear:(BOOL)animated {
@@ -39,11 +99,26 @@
     self.navigationItem.title = @"Mumble";
     self.navigationController.toolbarHidden = YES;
     
-    // Set the background to the standard dark gray for dark mode.
-    self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    // 更新背景色
+    [self updateBackgroundColor];
 
-    // InsetGrouped 样式也会自动处理分隔线。
-    self.tableView.scrollEnabled = NO;
+    // 配置导航栏外观 - 禁用大标题以减少额头空间
+    [self updateNavigationBarAppearance];
+    
+    if (@available(iOS 13.0, *)) {
+        // 禁用大标题以减少额头空间
+        self.navigationController.navigationBar.prefersLargeTitles = NO;
+        self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+    }
+
+    // 启用滚动
+    self.tableView.scrollEnabled = YES;
+    self.tableView.showsVerticalScrollIndicator = NO;
+    
+    // 设置导航栏为紧凑模式
+    if (@available(iOS 11.0, *)) {
+        self.navigationController.navigationBar.prefersLargeTitles = NO;
+    }
     
 #if MUMBLE_LAUNCH_IMAGE_CREATION != 1
     UIBarButtonItem *about = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"About", nil)
@@ -64,7 +139,7 @@
 #pragma mark TableView
 
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView {
-    return 1;
+    return 2; // 一个用于logo，一个用于菜单项
 }
 
 - (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -72,12 +147,15 @@
     return 1;
 #endif
     if (section == 0)
-        return 3;
+        return 0; // Logo section 没有行
+    if (section == 1)
+        return 3; // 菜单项
     return 0;
 }
 
 - (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
     if (section == 0) {
+        // 创建一个紧凑的 Logo 头部
         UIView *headerContainer = [[UIView alloc] init];
         
         UIImage *logoImage = [UIImage imageNamed:@"WelcomeScreenIcon"];
@@ -87,37 +165,48 @@
         
         UILabel *titleLabel = [[UILabel alloc] init];
         titleLabel.text = @"Welcome to Mumble";
-        titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleLargeTitle];
+        titleLabel.font = [UIFont boldSystemFontOfSize:22]; // 稍微减小字体以节省空间
         titleLabel.textAlignment = NSTextAlignmentCenter;
-        titleLabel.adjustsFontForContentSizeCategory = YES;
         titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        titleLabel.numberOfLines = 1;
+        if (@available(iOS 13.0, *)) {
+            titleLabel.textColor = [UIColor labelColor];
+        }
 
         UILabel *subtitleLabel = [[UILabel alloc] init];
         subtitleLabel.text = @"Low latency, high quality voice chat";
-        subtitleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
-        subtitleLabel.textColor = [UIColor secondaryLabelColor];
+        subtitleLabel.font = [UIFont systemFontOfSize:15]; // 稍微减小字体以节省空间
+        if (@available(iOS 13.0, *)) {
+            subtitleLabel.textColor = [UIColor secondaryLabelColor];
+        } else {
+            subtitleLabel.textColor = [UIColor grayColor];
+        }
         subtitleLabel.textAlignment = NSTextAlignmentCenter;
-        subtitleLabel.adjustsFontForContentSizeCategory = YES;
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        subtitleLabel.numberOfLines = 2; // 允许副标题换行
+        subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
 
         [headerContainer addSubview:logoImageView];
         [headerContainer addSubview:titleLabel];
         [headerContainer addSubview:subtitleLabel];
         
         [NSLayoutConstraint activateConstraints:@[
+            // Logo 约束 - 减小顶部间距
             [logoImageView.topAnchor constraintEqualToAnchor:headerContainer.topAnchor constant:20],
             [logoImageView.centerXAnchor constraintEqualToAnchor:headerContainer.centerXAnchor],
-            [logoImageView.heightAnchor constraintEqualToConstant:100],
-            [logoImageView.widthAnchor constraintEqualToConstant:100],
+            [logoImageView.heightAnchor constraintEqualToConstant:50], // 进一步减小 logo 尺寸
+            [logoImageView.widthAnchor constraintEqualToConstant:50],
 
-            [titleLabel.topAnchor constraintEqualToAnchor:logoImageView.bottomAnchor constant:16],
-            [titleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.leadingAnchor],
-            [titleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.trailingAnchor],
+            // 标题约束 - 减小间距
+            [titleLabel.topAnchor constraintEqualToAnchor:logoImageView.bottomAnchor constant:12],
+            [titleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.leadingAnchor constant:16],
+            [titleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.trailingAnchor constant:-16],
 
-            [subtitleLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:8],
-            [subtitleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.leadingAnchor],
-            [subtitleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.trailingAnchor],
-            [subtitleLabel.bottomAnchor constraintEqualToAnchor:headerContainer.bottomAnchor constant:-20]
+            // 副标题约束 - 增加间距和底部空间
+            [subtitleLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:6],
+            [subtitleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.leadingAnchor constant:16],
+            [subtitleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.trailingAnchor constant:-16],
+            [subtitleLabel.bottomAnchor constraintLessThanOrEqualToAnchor:headerContainer.bottomAnchor constant:-20] // 确保有足够的底部空间
         ]];
         
         return headerContainer;
@@ -125,8 +214,22 @@
     return nil;
 }
 
+- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+    if (section == 0) {
+        return 160; // 增加头部高度以容纳副标题
+    }
+    return UITableViewAutomaticDimension;
+}
+
+- (NSString *) tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    if (section == 1) {
+        return NSLocalizedString(@"Connect to Server", nil);
+    }
+    return nil;
+}
+
 - (CGFloat) tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 44.0;
+    return 50.0; // 稍微增加行高以获得更好的触摸体验
 }
 
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -137,10 +240,23 @@
     
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     
+    // 设置 cell 背景色以创建层次感
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            // 深色模式：使用比背景更亮的颜色
+            cell.backgroundColor = [UIColor colorWithRed:0.17 green:0.17 blue:0.18 alpha:1.0]; // #2C2C2E
+        } else {
+            // 浅色模式：使用标准的次级背景色
+            cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+        }
+    } else {
+        cell.backgroundColor = [UIColor whiteColor];
+    }
+    
     NSString *text = @"";
     NSString *symbolName = @"";
     
-    if (indexPath.section == 0) {
+    if (indexPath.section == 1) {
         if (indexPath.row == 0) {
             text = NSLocalizedString(@"Public Servers", nil);
             symbolName = @"globe";
@@ -156,12 +272,22 @@
     if (@available(iOS 14.0, *)) {
         UIListContentConfiguration *content = [cell defaultContentConfiguration];
         content.text = text;
-        content.image = [UIImage systemImageNamed:symbolName];
+        content.textProperties.font = [UIFont systemFontOfSize:17];
+        if (@available(iOS 13.0, *)) {
+            UIImage *image = [UIImage systemImageNamed:symbolName];
+            content.image = [image imageWithConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightMedium]];
+            content.imageProperties.tintColor = [UIColor systemBlueColor];
+        }
         cell.contentConfiguration = content;
     } else {
         // Fallback on earlier versions
         cell.textLabel.text = text;
-        cell.imageView.image = [UIImage systemImageNamed:symbolName];
+        cell.textLabel.font = [UIFont systemFontOfSize:17];
+        if (@available(iOS 13.0, *)) {
+            UIImage *image = [UIImage systemImageNamed:symbolName];
+            cell.imageView.image = image;
+            cell.imageView.tintColor = [UIColor systemBlueColor];
+        }
     }
 
     return cell;
@@ -169,7 +295,7 @@
 
 - (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     /* Servers section. */
-    if (indexPath.section == 0) {
+    if (indexPath.section == 1) {
         if (indexPath.row == 0) {
             MUPublicServerListController *serverList = [[MUPublicServerListController alloc] init];
             [self.navigationController pushViewController:serverList animated:YES];

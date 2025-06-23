@@ -33,7 +33,8 @@ static NSInteger NetServiceAlphabeticalSort(id arg1, id arg2, void *reverse) {
 #pragma mark Initialization
 
 - (id) init {
-    if ((self = [super initWithStyle:UITableViewStylePlain])) {
+    // 使用 InsetGrouped 样式以与欢迎界面保持一致
+    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
         _browser = [[NSNetServiceBrowser alloc] init];
         [_browser setDelegate:self];
         [_browser scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSDefaultRunLoopMode];
@@ -43,15 +44,51 @@ static NSInteger NetServiceAlphabeticalSort(id arg1, id arg2, void *reverse) {
     return self;
 }
 
+- (void) updateBackgroundColor {
+    if (@available(iOS 13.0, *)) {
+        // 深色模式使用深灰色，浅色模式使用系统默认
+        UIColor *backgroundColor = [UIColor systemGroupedBackgroundColor];
+        
+        // 如果是深色模式，使用自定义的深灰色
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色 #1C1C1E
+        }
+        
+        self.view.backgroundColor = backgroundColor;
+        self.tableView.backgroundColor = backgroundColor;
+    } else {
+        self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    }
+}
+
+- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self updateBackgroundColor];
+        }
+    }
+}
+
 #pragma mark -
 
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:YES];
     [[self navigationItem] setTitle:NSLocalizedString(@"LAN Servers", nil)];
     
+    // 设置背景色 - 与其他界面一致
+    [self updateBackgroundColor];
+    
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
         self.tableView.separatorInset = UIEdgeInsetsZero;
+    }
+    
+    // 配置现代化的表格视图外观
+    if (@available(iOS 15.0, *)) {
+        self.tableView.sectionHeaderTopPadding = 0;
     }
 }
 
@@ -111,6 +148,9 @@ static NSInteger NetServiceAlphabeticalSort(id arg1, id arg2, void *reverse) {
     }
     [cell populateFromDisplayName:[netService name] hostName:[netService hostName] port:[NSString stringWithFormat:@"%li", (long)[netService port]]];
     cell.selectionStyle = UITableViewCellSelectionStyleGray;
+    
+    // MUServerCell 已经在其 layoutSubviews 方法中处理背景色
+    
     return (UITableViewCell *) cell;
 }
 
