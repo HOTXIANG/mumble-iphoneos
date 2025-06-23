@@ -74,6 +74,7 @@
     if (@available(iOS 13.0, *)) {
         if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
             [self updateBackgroundColor];
+            [self updateEmptyStateBackgroundColor]; // 更新空状态背景色
         }
     }
 }
@@ -120,6 +121,17 @@
 
 - (void) setupEmptyStateView {
     UIView *emptyView = [[UIView alloc] init];
+    
+    // 设置空状态视图背景色与整体背景一致
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            emptyView.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+        } else {
+            emptyView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+        }
+    } else {
+        emptyView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    }
     
     UIImageView *imageView = [[UIImageView alloc] init];
     if (@available(iOS 13.0, *)) {
@@ -178,6 +190,21 @@
     ]];
     
     self.tableView.backgroundView = emptyView;
+}
+
+// 更新空状态视图的背景色
+- (void) updateEmptyStateBackgroundColor {
+    if (self.tableView.backgroundView) {
+        if (@available(iOS 13.0, *)) {
+            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                self.tableView.backgroundView.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+            } else {
+                self.tableView.backgroundView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+            }
+        } else {
+            self.tableView.backgroundView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        }
+    }
 }
 
 - (void) updateEmptyStateVisibility {

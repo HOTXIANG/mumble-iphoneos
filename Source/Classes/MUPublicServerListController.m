@@ -107,7 +107,35 @@
 }
 
 - (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    return [MUTableViewHeaderLabel labelWithText:[_serverList continentNameAtIndex:section]];
+    MUTableViewHeaderLabel *label = [[MUTableViewHeaderLabel alloc] init];
+    
+    // 使用正确的方法名 - continentNameAtIndex 而不是 continentAtIndex
+    NSString *continentName = [_serverList continentNameAtIndex:section];
+    [label setText:continentName];
+    
+    // 设置文字颜色以适应主题
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            [label setTextColor:[UIColor secondaryLabelColor]]; // 深色模式使用次级标签颜色
+        } else {
+            [label setTextColor:[UIColor secondaryLabelColor]]; // 浅色模式也使用次级标签颜色（黑色系）
+        }
+    } else {
+        [label setTextColor:[UIColor blackColor]]; // iOS 12 及以下使用黑色
+    }
+    
+    // 设置背景色与整体背景一致
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            [label setBackgroundColor:[UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]];
+        } else {
+            [label setBackgroundColor:[UIColor systemGroupedBackgroundColor]];
+        }
+    } else {
+        [label setBackgroundColor:[UIColor groupTableViewBackgroundColor]];
+    }
+    
+    return label;
 }
 
 - (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
@@ -142,6 +170,12 @@
         }
     } else {
         cell.backgroundColor = [UIColor whiteColor];
+    }
+    
+    // 设置文字颜色以适应主题
+    if (@available(iOS 13.0, *)) {
+        cell.textLabel.textColor = [UIColor labelColor];
+        cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
     }
     
     NSDictionary *countryInfo = [_serverList countryAtIndexPath:indexPath];

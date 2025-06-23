@@ -154,6 +154,30 @@ static NSInteger NetServiceAlphabeticalSort(id arg1, id arg2, void *reverse) {
     return (UITableViewCell *) cell;
 }
 
+- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    if ([_netServices count] == 0) {
+        UILabel *label = [[UILabel alloc] init];
+        label.text = NSLocalizedString(@"No servers found", nil);
+        label.textAlignment = NSTextAlignmentCenter;
+        
+        // 设置文字和背景颜色
+        if (@available(iOS 13.0, *)) {
+            label.textColor = [UIColor secondaryLabelColor];
+            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                label.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+            } else {
+                label.backgroundColor = [UIColor systemGroupedBackgroundColor];
+            }
+        } else {
+            label.textColor = [UIColor grayColor];
+            label.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        }
+        
+        return label;
+    }
+    return nil;
+}
+
 #pragma mark -
 #pragma mark Selection
 

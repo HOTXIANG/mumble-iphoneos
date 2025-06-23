@@ -189,6 +189,29 @@
     return toInterfaceOrientation == UIInterfaceOrientationPortrait;
 }
 
+- (void) updateNavigationBarAppearance {
+    if (@available(iOS 13.0, *)) {
+        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+        [appearance configureWithDefaultBackground];
+        
+        // 根据当前主题设置导航栏背景色
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            appearance.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 与其他界面一致的深灰色
+        } else {
+            appearance.backgroundColor = [UIColor systemGroupedBackgroundColor];
+        }
+        
+        // 移除阴影以获得无缝外观
+        appearance.shadowColor = nil;
+
+        self.navigationController.navigationBar.standardAppearance = appearance;
+        self.navigationController.navigationBar.scrollEdgeAppearance = appearance;
+        if (@available(iOS 15.0, *)) {
+            self.navigationController.navigationBar.compactScrollEdgeAppearance = appearance;
+        }
+    }
+}
+
 - (void) updateBackgroundColor {
     if (@available(iOS 13.0, *)) {
         // 深色模式使用深灰色，浅色模式使用系统默认
@@ -214,6 +237,41 @@
     if (@available(iOS 13.0, *)) {
         if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
             [self updateBackgroundColor];
+            [self updateNavigationBarAppearance]; // 同时更新导航栏外观
+            [self updateCellAppearance]; // 更新 cell 外观
+        }
+    }
+}
+
+- (void) updateCellAppearance {
+    // 为所有输入框的 cell 设置与其他界面一致的背景色
+    NSArray *cells = @[_descriptionCell, _addressCell, _portCell, _usernameCell, _passwordCell];
+    
+    for (UITableViewCell *cell in cells) {
+        if (@available(iOS 13.0, *)) {
+            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                // 深色模式：使用比背景更亮的颜色
+                cell.backgroundColor = [UIColor colorWithRed:0.17 green:0.17 blue:0.18 alpha:1.0]; // #2C2C2E
+            } else {
+                // 浅色模式：使用标准的次级背景色
+                cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+            }
+        } else {
+            cell.backgroundColor = [UIColor whiteColor];
+        }
+    }
+    
+    // 更新文本框的外观
+    NSArray *textFields = @[_descriptionField, _addressField, _portField, _usernameField, _passwordField];
+    
+    for (UITextField *textField in textFields) {
+        if (@available(iOS 13.0, *)) {
+            textField.textColor = [UIColor labelColor];
+            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                textField.attributedPlaceholder = [[NSAttributedString alloc] 
+                    initWithString:textField.placeholder ?: @""
+                    attributes:@{NSForegroundColorAttributeName: [UIColor placeholderTextColor]}];
+            }
         }
     }
 }
@@ -221,11 +279,24 @@
 #pragma mark -
 #pragma mark View lifecycle
 
+- (void) viewDidLoad {
+    [super viewDidLoad];
+    
+    // 设置背景色 - 与其他界面一致
+    [self updateBackgroundColor];
+}
+
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     
     // 设置背景色 - 与欢迎界面一致
     [self updateBackgroundColor];
+    
+    // 设置导航栏外观 - 与其他界面一致
+    [self updateNavigationBarAppearance];
+    
+    // 更新 cell 外观
+    [self updateCellAppearance];
     
     // 移除旧的背景视图设置
     // self.tableView.backgroundView = [MUBackgroundView backgroundView];
@@ -291,20 +362,38 @@
 }
 
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = nil;
+    
     if ([indexPath section] == 0) {
         if ([indexPath row] == 0) {
-            return _descriptionCell;
+            cell = _descriptionCell;
         } else if ([indexPath row] == 1) {
-            return _addressCell;
+            cell = _addressCell;
         } else if ([indexPath row] == 2) {
-            return _portCell;
+            cell = _portCell;
         } else if ([indexPath row] == 3) {
-            return _usernameCell;
+            cell = _usernameCell;
         } else if ([indexPath row] == 4) {
-            return _passwordCell;
+            cell = _passwordCell;
         }
     }
-    return nil;
+    
+    // 确保 cell 有正确的背景色
+    if (cell) {
+        if (@available(iOS 13.0, *)) {
+            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                // 深色模式：使用比背景更亮的颜色
+                cell.backgroundColor = [UIColor colorWithRed:0.17 green:0.17 blue:0.18 alpha:1.0]; // #2C2C2E
+            } else {
+                // 浅色模式：使用标准的次级背景色
+                cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+            }
+        } else {
+            cell.backgroundColor = [UIColor whiteColor];
+        }
+    }
+    
+    return cell;
 }
 
 #pragma mark -

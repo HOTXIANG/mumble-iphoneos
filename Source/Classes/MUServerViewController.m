@@ -89,10 +89,30 @@
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     
+    // 设置现代化背景色
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            self.view.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+            self.tableView.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+        } else {
+            self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
+            self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+        }
+    }
+    
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
         self.tableView.separatorInset = UIEdgeInsetsZero;
     }
+    
+    // 调整 table view 的内容边距以适应底部控件
+    if (@available(iOS 11.0, *)) {
+        self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
+    
+    // 设置内容边距 - 只需要底部给麦克风控制留空间
+    self.tableView.contentInset = UIEdgeInsetsMake(0, 0, 80, 0);
+    self.tableView.scrollIndicatorInsets = self.tableView.contentInset;
     
     if (_viewMode == MUServerViewControllerViewModeServer) {
         [self rebuildModelArrayFromChannel:[_serverModel rootChannel]];

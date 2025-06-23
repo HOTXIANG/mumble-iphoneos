@@ -30,7 +30,8 @@
 #pragma mark Initialization
 
 - (id) init {
-    if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
+    // 使用 InsetGrouped 样式以与其他界面保持一致
+    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
         self.preferredContentSize = CGSizeMake(320, 480);
     }
     return self;
@@ -45,42 +46,57 @@
 #pragma mark -
 #pragma mark Looks
 
+- (void) updateBackgroundColor {
+    if (@available(iOS 13.0, *)) {
+        // 深色模式使用深灰色，浅色模式使用系统默认
+        UIColor *backgroundColor = [UIColor systemGroupedBackgroundColor];
+        
+        // 如果是深色模式，使用自定义的深灰色
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色 #1C1C1E
+        }
+        
+        self.view.backgroundColor = backgroundColor;
+        self.tableView.backgroundColor = backgroundColor;
+    } else {
+        self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    }
+}
+
+- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self updateBackgroundColor];
+        }
+    }
+}
+
+- (void) viewDidLoad {
+    [super viewDidLoad];
+    
+    // 设置背景色 - 与其他界面一致
+    [self updateBackgroundColor];
+    
+    // 配置现代化的表格视图外观
+    if (@available(iOS 15.0, *)) {
+        self.tableView.sectionHeaderTopPadding = 0;
+    }
+}
+
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-
-    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
-        self.navigationController.navigationBar.barStyle = UIBarStyleBlackOpaque;
-        [self.navigationController.navigationBar setBackgroundImage:[MUImage clearColorImage] forBarMetrics:UIBarMetricsDefault];
-        self.navigationController.navigationBar.translucent = YES;
-    }
     
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
+    self.navigationItem.title = NSLocalizedString(@"Preferences", nil);
     
-    if (@available(iOS 7, *)) {
-        self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
-        self.tableView.separatorInset = UIEdgeInsetsZero;
-    } else {
-        self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    }
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWasShown:)
-                                                 name:UIKeyboardDidShowNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(keyboardWillBeHidden:)
-                                                 name:UIKeyboardWillHideNotification object:nil];
-
-    self.title = NSLocalizedString(@"Preferences", nil);
-    [self.tableView reloadData];
+    // 更新背景色
+    [self updateBackgroundColor];
+    
+    // 移除旧的背景视图设置
+    // self.tableView.backgroundView = [MUBackgroundView backgroundView];
 }
-
-- (void) viewWillDisappear:(BOOL)animated {
-    [super viewWillDisappear:animated];
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-
-#pragma mark -
-#pragma mark Table view data source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
     return 2;
@@ -189,6 +205,17 @@
         }
     }
 
+    // 确保所有 cell 都有正确的背景色
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            cell.backgroundColor = [UIColor colorWithRed:0.17 green:0.17 blue:0.18 alpha:1.0]; // #2C2C2E
+        } else {
+            cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+        }
+    } else {
+        cell.backgroundColor = [UIColor whiteColor];
+    }
+    
     return cell;
 }
 

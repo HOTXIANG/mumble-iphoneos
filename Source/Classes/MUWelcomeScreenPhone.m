@@ -158,6 +158,17 @@
         // 创建一个紧凑的 Logo 头部
         UIView *headerContainer = [[UIView alloc] init];
         
+        // 设置 header 背景色与整体背景一致
+        if (@available(iOS 13.0, *)) {
+            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                headerContainer.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+            } else {
+                headerContainer.backgroundColor = [UIColor systemGroupedBackgroundColor];
+            }
+        } else {
+            headerContainer.backgroundColor = [UIColor groupTableViewBackgroundColor];
+        }
+        
         UIImage *logoImage = [UIImage imageNamed:@"WelcomeScreenIcon"];
         UIImageView *logoImageView = [[UIImageView alloc] initWithImage:logoImage];
         logoImageView.contentMode = UIViewContentModeScaleAspectFit;
@@ -165,7 +176,7 @@
         
         UILabel *titleLabel = [[UILabel alloc] init];
         titleLabel.text = @"Welcome to Mumble";
-        titleLabel.font = [UIFont boldSystemFontOfSize:22]; // 稍微减小字体以节省空间
+        titleLabel.font = [UIFont boldSystemFontOfSize:22];
         titleLabel.textAlignment = NSTextAlignmentCenter;
         titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         titleLabel.numberOfLines = 1;
@@ -175,7 +186,7 @@
 
         UILabel *subtitleLabel = [[UILabel alloc] init];
         subtitleLabel.text = @"Low latency, high quality voice chat";
-        subtitleLabel.font = [UIFont systemFontOfSize:15]; // 稍微减小字体以节省空间
+        subtitleLabel.font = [UIFont systemFontOfSize:15];
         if (@available(iOS 13.0, *)) {
             subtitleLabel.textColor = [UIColor secondaryLabelColor];
         } else {
@@ -183,7 +194,7 @@
         }
         subtitleLabel.textAlignment = NSTextAlignmentCenter;
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        subtitleLabel.numberOfLines = 2; // 允许副标题换行
+        subtitleLabel.numberOfLines = 2;
         subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
 
         [headerContainer addSubview:logoImageView];
