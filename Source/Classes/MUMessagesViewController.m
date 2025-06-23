@@ -90,43 +90,41 @@ static UIView *MUMessagesViewControllerFindUIView(UIView *rootView, NSString *pr
 
 - (void) drawRect:(CGRect)rect {
     rect = self.bounds;
-    CGFloat radius = 6.0f;
+    CGFloat radius = 12.0f; // 增加圆角半径
 
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextClearRect(context, rect);
 
     CGContextSetLineWidth(context, 1.0f);
 
-    if (self.highlighted)
-        [[UIColor lightGrayColor] setFill];
-    else
-        [[MUColor selectedTextColor] setFill];
+    UIColor *fillColor;
+    if (@available(iOS 13.0, *)) {
+        if (self.highlighted) {
+            fillColor = [UIColor tertiarySystemFillColor];
+        } else {
+            fillColor = [UIColor systemBlueColor];
+        }
+    } else {
+        if (self.highlighted) {
+            fillColor = [UIColor lightGrayColor];
+        } else {
+            fillColor = [UIColor colorWithRed:0.0 green:0.478 blue:1.0 alpha:1.0]; // 系统蓝色
+        }
+    }
     
-    CGContextBeginPath(context);
-    CGContextMoveToPoint(context, rect.origin.x, rect.origin.y + radius);
-    CGContextAddLineToPoint(context, rect.origin.x, rect.origin.y + rect.size.height - radius);
-    CGContextAddArc(context, rect.origin.x + radius, rect.origin.y + rect.size.height - radius, 
-                    radius, M_PI, M_PI / 2, 1); //STS fixed
-    CGContextAddLineToPoint(context, rect.origin.x + rect.size.width - radius, 
-                            rect.origin.y + rect.size.height);
-    CGContextAddArc(context, rect.origin.x + rect.size.width - radius, 
-                    rect.origin.y + rect.size.height - radius, radius, M_PI / 2, 0.0f, 1);
-    CGContextAddLineToPoint(context, rect.origin.x + rect.size.width, rect.origin.y + radius);
-    CGContextAddArc(context, rect.origin.x + rect.size.width - radius, rect.origin.y + radius, 
-                    radius, 0.0f, -M_PI / 2, 1);
-    CGContextAddLineToPoint(context, rect.origin.x + radius, rect.origin.y);
-    CGContextAddArc(context, rect.origin.x + radius, rect.origin.y + radius, radius, 
-                    -M_PI / 2, M_PI, 1);
-    CGContextClosePath(context);
+    [fillColor setFill];
     
-    CGContextFillPath(context);
+    // 使用 UIBezierPath 绘制更现代的圆角矩形
+    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:radius];
+    [path fill];
     
     rect.origin.x = radius;
     rect.size.width -= radius;
     
     [[UIColor whiteColor] set];
     [_str drawInRect:rect withAttributes:@{
-        NSFontAttributeName: [UIFont boldSystemFontOfSize:14.0f]
+        NSFontAttributeName: [UIFont boldSystemFontOfSize:14.0f],
+        NSForegroundColorAttributeName: [UIColor whiteColor]
     }];
 }
 
@@ -172,6 +170,80 @@ static UIView *MUMessagesViewControllerFindUIView(UIView *rootView, NSString *pr
     [_tableView reloadData];
 }
 
+- (void) updateBackgroundColors {
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            self.view.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+            if (_tableView) {
+                _tableView.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
+            }
+        } else {
+            self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
+            if (_tableView) {
+                _tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+            }
+        }
+    } else {
+        self.view.backgroundColor = [UIColor colorWithRed:0.95 green:0.95 blue:0.97 alpha:1.0];
+        if (_tableView) {
+            _tableView.backgroundColor = [UIColor colorWithRed:0.95 green:0.95 blue:0.97 alpha:1.0];
+        }
+    }
+}
+
+- (void) setupModernTextBar {
+    if (!_textBarView) {
+        return;
+    }
+    
+    if (@available(iOS 13.0, *)) {
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            _textBarView.backgroundColor = [UIColor colorWithRed:0.17 green:0.17 blue:0.18 alpha:1.0];
+        } else {
+            _textBarView.backgroundColor = [UIColor systemBackgroundColor];
+        }
+        
+        // 添加顶部分隔线
+        // 先移除之前的分隔线（如果存在）
+        for (UIView *subview in _textBarView.subviews) {
+            if ([subview isKindOfClass:[UIView class]] && subview.frame.size.height < 1.0) {
+                [subview removeFromSuperview];
+            }
+        }
+        
+        UIView *separatorLine = [[UIView alloc] initWithFrame:CGRectMake(0, 0, _textBarView.frame.size.width, 0.5)];
+        separatorLine.backgroundColor = [UIColor separatorColor];
+        separatorLine.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+        [_textBarView addSubview:separatorLine];
+        
+    } else {
+        // iOS 12 及以下版本
+        _textBarView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    }
+}
+
+// 添加主题变化监听
+- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self updateBackgroundColors];
+            [self setupModernTextBar];
+            
+            if (_textField) {
+                if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                    _textField.backgroundColor = [UIColor secondarySystemBackgroundColor];
+                    _textField.textColor = [UIColor labelColor];
+                } else {
+                    _textField.backgroundColor = [UIColor secondarySystemBackgroundColor];
+                    _textField.textColor = [UIColor labelColor];
+                }
+            }
+        }
+    }
+}
+
 #pragma mark - View lifecycle
 
 - (void) viewDidLoad {
@@ -182,31 +254,34 @@ static UIView *MUMessagesViewControllerFindUIView(UIView *rootView, NSString *pr
     MUMessageReceiverButton *receiverView = [[MUMessageReceiverButton alloc] initWithText:receiver];
     [receiverView addTarget:self action:@selector(showRecipientPicker:) forControlEvents:UIControlEventTouchUpInside];
 
-    if (@available(iOS 7, *)) {
-        CGRect paddedRect = CGRectMake(0, 0, CGRectGetWidth(receiverView.frame) + 12, CGRectGetHeight(receiverView.frame));
-        UIView *paddedView = [[UIView alloc] initWithFrame:paddedRect];
-        [paddedView addSubview:receiverView];
-        paddedRect.origin.x += 6;
-        [receiverView setFrame:paddedRect];
-        _textField.leftView = paddedView;
-    } else {
-        _textField.leftView = receiverView;
-    }
+    CGRect paddedRect = CGRectMake(0, 0, CGRectGetWidth(receiverView.frame) + 16, CGRectGetHeight(receiverView.frame));
+    UIView *paddedView = [[UIView alloc] initWithFrame:paddedRect];
+    [paddedView addSubview:receiverView];
+    paddedRect.origin.x += 8;
+    [receiverView setFrame:paddedRect];
+    _textField.leftView = paddedView;
 
+    // 现代化右侧图标
     UIImageView *imgView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:imageName]];
-    if (@available(iOS 7, *)) {
-        CGRect paddedFrame = CGRectMake(0, 0, CGRectGetWidth(imgView.frame) + 6, CGRectGetHeight(imgView.frame));
-        UIView *paddedView = [[UIView alloc] initWithFrame:paddedFrame];
-        [paddedView addSubview:imgView];
-        _textField.rightView = paddedView;
-    } else {
-        _textField.rightView = imgView;
+    if (@available(iOS 13.0, *)) {
+        imgView.tintColor = [UIColor secondaryLabelColor];
+        // 使用模板渲染模式以支持颜色变化
+        imgView.image = [imgView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
+    
+    CGRect paddedFrame = CGRectMake(0, 0, CGRectGetWidth(imgView.frame) + 12, CGRectGetHeight(imgView.frame));
+    UIView *paddedView2 = [[UIView alloc] initWithFrame:paddedFrame];
+    [paddedView2 addSubview:imgView];
+    imgView.frame = CGRectMake(6, 0, imgView.frame.size.width, imgView.frame.size.height);
+    _textField.rightView = paddedView2;
     _textField.rightViewMode = UITextFieldViewModeAlways;
 }
 
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    
+    // 初始化背景颜色
+    [self updateBackgroundColors];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShow:) name:UIKeyboardWillShowNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHide:) name:UIKeyboardWillHideNotification object:nil];
@@ -228,7 +303,9 @@ static UIView *MUMessagesViewControllerFindUIView(UIView *rootView, NSString *pr
     CGRect tableViewFrame = CGRectMake(0, 0, viewFrame.size.width, viewFrame.size.height-textBarHeight-bottomInset);
     _tableView = [[UITableView alloc] initWithFrame:tableViewFrame style:UITableViewStylePlain];
 
-    [_tableView setBackgroundView:[MUBackgroundView backgroundView]];
+    // 现代化背景设计
+    [self updateBackgroundColors];
+    
     [_tableView setSeparatorStyle:UITableViewCellSeparatorStyleNone];
     [_tableView setAutoresizingMask:UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleWidth];
     [_tableView setDelegate:self];
@@ -246,21 +323,32 @@ static UIView *MUMessagesViewControllerFindUIView(UIView *rootView, NSString *pr
     CGRect textBarFrame = CGRectMake(0, tableViewFrame.size.height, tableViewFrame.size.width, textBarHeight);
     _textBarView = [[UIView alloc] initWithFrame:textBarFrame];
     [_textBarView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin];
-    _textBarView.backgroundColor = [UIColor yellowColor];
+    
+    // 现代化文本输入栏设计
+    [self setupModernTextBar];
 
-    if (@available(iOS 7, *)) {
-        _textBarView.backgroundColor = [UIColor colorWithPatternImage:[UIImage imageNamed:@"BlackToolbarPatterniOS7"]];
-    } else {
-        _textBarView.backgroundColor = [UIColor colorWithPatternImage:[UIImage imageNamed:@"BlackToolbarPattern"]];
-    }
-
-    int textFieldMargin = 6;
+    int textFieldMargin = 8; // 增加边距
     _textField = [[MUConsistentTextField alloc] initWithFrame:CGRectMake(textFieldMargin, textFieldMargin, tableViewFrame.size.width-2*textFieldMargin, textBarHeight-2*textFieldMargin)];
     _textField.leftViewMode = UITextFieldViewModeAlways;
     _textField.rightViewMode = UITextFieldViewModeAlways;
     _textField.borderStyle = UITextBorderStyleRoundedRect;
-    _textField.textColor = [UIColor blackColor];
-    _textField.font = [UIFont systemFontOfSize:17.0];
+    
+    // 现代化文本框样式
+    if (@available(iOS 13.0, *)) {
+        _textField.backgroundColor = [UIColor secondarySystemBackgroundColor];
+        _textField.textColor = [UIColor labelColor];
+        _textField.layer.cornerRadius = 18;
+        _textField.layer.borderWidth = 0;
+        // 设置占位符颜色
+        _textField.attributedPlaceholder = [[NSAttributedString alloc] 
+            initWithString:NSLocalizedString(@"Type a message...", @"Message input placeholder")
+            attributes:@{NSForegroundColorAttributeName: [UIColor tertiaryLabelColor]}];
+    } else {
+        _textField.textColor = [UIColor blackColor];
+        _textField.placeholder = NSLocalizedString(@"Type a message...", @"Message input placeholder");
+    }
+    
+    _textField.font = [UIFont systemFontOfSize:16.0]; // 稍大的字体
     _textField.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
     _textField.returnKeyType = UIReturnKeySend;
     [_textField setDelegate:self];

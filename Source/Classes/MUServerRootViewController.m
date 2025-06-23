@@ -79,20 +79,83 @@
 - (void) viewDidLoad {
     [super viewDidLoad];
     
+    // 首先设置导航栏外观
+    [self setupNavigationBarAppearance];
+    
+    // 设置导航栏按钮
+    [self setupNavigationBarButtons];
+    
     // 创建导航栏中的切换控件
     [self setupNavigationBarSegmentedControl];
     
     // 创建底部控制视图（麦克风静音和扬声器静音）
     [self setupBottomControls];
     
-    // 设置导航栏按钮
-    [self setupNavigationBarButtons];
-    
     // 设置初始视图控制器
     [self setViewControllers:[NSArray arrayWithObject:_serverView] animated:NO];
     
+    // 更新导航栏
+    [self updateNavigationBarForCurrentView];
+    
     // 隐藏工具栏
     [self setToolbarHidden:YES animated:NO];
+}
+
+- (void) setupNavigationBarAppearance {
+    if (@available(iOS 13.0, *)) {
+        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+        
+        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+            // 深色模式
+            [appearance configureWithOpaqueBackground];
+            appearance.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色背景
+            appearance.titleTextAttributes = @{NSForegroundColorAttributeName: [UIColor whiteColor]};
+        } else {
+            // 浅色模式
+            [appearance configureWithDefaultBackground];
+            appearance.backgroundColor = [UIColor systemBackgroundColor];
+            appearance.titleTextAttributes = @{NSForegroundColorAttributeName: [UIColor blackColor]};
+        }
+        
+        // 移除阴影
+        appearance.shadowColor = [UIColor clearColor];
+        
+        self.navigationBar.standardAppearance = appearance;
+        self.navigationBar.scrollEdgeAppearance = appearance;
+        if (@available(iOS 15.0, *)) {
+            self.navigationBar.compactScrollEdgeAppearance = appearance;
+        }
+        
+        // 设置按钮颜色
+        self.navigationBar.tintColor = [UIColor labelColor];
+        
+    } else {
+        // iOS 12 及以下
+        self.navigationBar.barStyle = UIBarStyleDefault;
+        self.navigationBar.backgroundColor = [UIColor whiteColor];
+        self.navigationBar.tintColor = [UIColor blackColor];
+    }
+}
+
+- (void) setupNavigationBarButtons {
+    // 左上角：断开连接按钮（红色）
+    _disconnectButton = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Leave", nil)
+                                                         style:UIBarButtonItemStylePlain
+                                                        target:self
+                                                        action:@selector(disconnectButtonTapped:)];
+    _disconnectButton.tintColor = [UIColor systemRedColor];
+    
+    // 右上角：模式切换按钮
+    _modeSwitchButton = [[UIBarButtonItem alloc] initWithImage:nil
+                                                         style:UIBarButtonItemStylePlain
+                                                        target:self
+                                                        action:@selector(modeSwitchButtonTapped:)];
+    if (@available(iOS 13.0, *)) {
+        _modeSwitchButton.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
+        _modeSwitchButton.tintColor = [UIColor labelColor];
+    } else {
+        _modeSwitchButton.title = @"Mode";
+    }
 }
 
 - (void) setupNavigationBarSegmentedControl {
@@ -106,17 +169,6 @@
     _segmentIndex = 0;
     _segmentedControl.selectedSegmentIndex = _segmentIndex;
     [_segmentedControl addTarget:self action:@selector(segmentChanged:) forControlEvents:UIControlEventValueChanged];
-    
-    // 创建容器视图来放置分段控制器和徽章
-    UIView *titleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 44)];
-    
-    // 设置分段控制器的frame
-    _segmentedControl.frame = CGRectMake(0, 6, 200, 32);
-    [titleView addSubview:_segmentedControl];
-    
-    // 设置消息徽章位置
-    _numberBadgeView.frame = CGRectMake(190, -4, 20, 20);
-    [titleView addSubview:_numberBadgeView];
     
     _numberBadgeView.value = _unreadMessages;
     _numberBadgeView.hidden = _unreadMessages == 0;
@@ -187,57 +239,100 @@
     ]];
 }
 
-- (void) setupNavigationBarButtons {
-    // 左上角：断开连接按钮（红色）
-    _disconnectButton = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Leave", nil)
-                                                         style:UIBarButtonItemStylePlain
-                                                        target:self
-                                                        action:@selector(disconnectButtonTapped:)];
-    _disconnectButton.tintColor = [UIColor systemRedColor];
-    
-    // 右上角：模式切换按钮
-    _modeSwitchButton = [[UIBarButtonItem alloc] initWithImage:nil
-                                                         style:UIBarButtonItemStylePlain
-                                                        target:self
-                                                        action:@selector(modeSwitchButtonTapped:)];
-    if (@available(iOS 13.0, *)) {
-        _modeSwitchButton.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
-    } else {
-        _modeSwitchButton.title = @"Mode";
-    }
-    
-    // 设置导航栏按钮
-    [self updateNavigationBarForCurrentView];
-}
-
 - (void) updateNavigationBarForCurrentView {
     UIViewController *currentVC = [[self viewControllers] firstObject];
     
+    // 先设置按钮
     currentVC.navigationItem.leftBarButtonItem = _disconnectButton;
     currentVC.navigationItem.rightBarButtonItem = _modeSwitchButton;
     
-    // 将分段控制器设置为标题视图
+    // 然后设置标题视图
     UIView *titleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 44)];
+    titleView.backgroundColor = [UIColor clearColor];
     
     // 重新设置分段控制器的frame
     _segmentedControl.frame = CGRectMake(0, 6, 200, 32);
+    
+    // 确保分段控制器从之前的父视图中移除
+    [_segmentedControl removeFromSuperview];
     [titleView addSubview:_segmentedControl];
     
     // 重新设置消息徽章位置
     _numberBadgeView.frame = CGRectMake(190, -4, 20, 20);
+    [_numberBadgeView removeFromSuperview];
     [titleView addSubview:_numberBadgeView];
     
     currentVC.navigationItem.titleView = titleView;
     
-    // 只在服务器视图时启用模式切换按钮
+    // 确保按钮可见且可交互
+    _disconnectButton.enabled = YES;
     _modeSwitchButton.enabled = (currentVC == _serverView);
+    
+    // 调试信息 - 可以暂时添加来确认按钮存在
+    NSLog(@"Left button: %@", currentVC.navigationItem.leftBarButtonItem);
+    NSLog(@"Right button: %@", currentVC.navigationItem.rightBarButtonItem);
+    NSLog(@"Title view: %@", currentVC.navigationItem.titleView);
 }
 
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     
+    // 确保导航栏按钮正确设置
+    [self updateNavigationBarForCurrentView];
+    
     // 更新按钮状态
     [self updateMuteButtonStates];
+}
+
+- (void) viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    
+    // 再次确保导航栏按钮正确设置
+    [self updateNavigationBarForCurrentView];
+}
+
+- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self setupNavigationBarAppearance];
+            [self updateMuteButtonStates];
+        }
+    }
+}
+
+- (void) segmentChanged:(id)sender {
+    if (_segmentedControl.selectedSegmentIndex == 0) { // Server view
+        [self setViewControllers:[NSArray arrayWithObject:_serverView] animated:NO];
+        // 显示底部控制按钮
+        [self showBottomControls:YES];
+    } else if (_segmentedControl.selectedSegmentIndex == 1) { // Messages view
+        [self setViewControllers:[NSArray arrayWithObject:_messagesView] animated:NO];
+        // 隐藏底部控制按钮，避免挡住消息输入框
+        [self showBottomControls:NO];
+    }
+    
+    // 重要：在切换视图后重新设置导航栏
+    [self updateNavigationBarForCurrentView];
+    
+    if (_segmentedControl.selectedSegmentIndex == 1) { // Messages view
+        _unreadMessages = 0;
+        _numberBadgeView.value = 0;
+        _numberBadgeView.hidden = YES;
+        [[UIApplication sharedApplication] setApplicationIconBadgeNumber:0];
+    } else if (_numberBadgeView.value > 0) {
+        _numberBadgeView.hidden = NO;
+    }
+
+    [[MKAudio sharedAudio] setForceTransmit:NO];
+}
+
+- (void) showBottomControls:(BOOL)show {
+    [UIView animateWithDuration:0.3 animations:^{
+        self->_bottomControlsView.alpha = show ? 1.0 : 0.0;
+        self->_bottomControlsView.hidden = !show;
+    }];
 }
 
 - (void) updateMuteButtonStates {
@@ -252,6 +347,15 @@
             _muteButton.image = [UIImage systemImageNamed:@"mic.fill"];
             _muteButton.tintColor = [UIColor labelColor];
         }
+    } else {
+        // iOS 12 及以下版本的处理
+        if ([connUser isSelfMuted]) {
+            _muteButton.title = @"Unmute";
+            _muteButton.tintColor = [UIColor redColor];
+        } else {
+            _muteButton.title = @"Mute";
+            _muteButton.tintColor = [UIColor blackColor];
+        }
     }
     
     // 更新耳聋按钮状态和图标
@@ -262,6 +366,15 @@
         } else {
             _deafenButton.image = [UIImage systemImageNamed:@"speaker.2.fill"];
             _deafenButton.tintColor = [UIColor labelColor];
+        }
+    } else {
+        // iOS 12 及以下版本的处理
+        if ([connUser isSelfDeafened]) {
+            _deafenButton.title = @"Undeafen";
+            _deafenButton.tintColor = [UIColor orangeColor];
+        } else {
+            _deafenButton.title = @"Deafen";
+            _deafenButton.tintColor = [UIColor blackColor];
         }
     }
 }
@@ -322,27 +435,6 @@
     }
     
     [self updateMuteButtonStates];
-}
-
-- (void) segmentChanged:(id)sender {
-    if (_segmentedControl.selectedSegmentIndex == 0) { // Server view
-        [self setViewControllers:[NSArray arrayWithObject:_serverView] animated:NO];
-    } else if (_segmentedControl.selectedSegmentIndex == 1) { // Messages view
-        [self setViewControllers:[NSArray arrayWithObject:_messagesView] animated:NO];
-    }
-    
-    [self updateNavigationBarForCurrentView];
-    
-    if (_segmentedControl.selectedSegmentIndex == 1) { // Messages view
-        _unreadMessages = 0;
-        _numberBadgeView.value = 0;
-        _numberBadgeView.hidden = YES;
-        [[UIApplication sharedApplication] setApplicationIconBadgeNumber:0];
-    } else if (_numberBadgeView.value > 0) {
-        _numberBadgeView.hidden = NO;
-    }
-
-    [[MKAudio sharedAudio] setForceTransmit:NO];
 }
 
 #pragma mark - MKConnection delegate
