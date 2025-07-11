@@ -145,6 +145,34 @@ class ServerModelManager: ObservableObject {
                         )
                 }
             }
+        
+        NotificationCenter.default.addObserver(
+                    forName: ServerModelNotificationManager.userMovedNotification,
+                    object: nil,
+                    queue: nil // 在后台队列接收
+                ) { [weak self] notification in
+                    guard let userInfo = notification.userInfo,
+                          let user = userInfo["user"] as? MKUser,
+                          let channel = userInfo["channel"] as? MKChannel else { return }
+                    
+                    // 1. 在进入异步任务前，提取所有需要的数据为“值类型”
+                    let movingUserSession = user.session()
+                    let newChannelName = channel.channelName() ?? "Unknown Channel"
+                    
+                    // 2. 将这些安全的值传递进主线程任务
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        
+                        // 在安全的上下文里获取 connectedUserSession
+                        let connectedUserSession = self.serverModel?.connectedUser().session()
+                        
+                        // 只有当移动的用户是当前用户时，才显示通知
+                        if movingUserSession == connectedUserSession {
+                            self.addChannelJoinNotification(channelName: newChannelName)
+                        }
+                    }
+                }
+    
         // --- 核心修改 2：添加对新消息通知的监听 ---
         NotificationCenter.default.addObserver(
                     forName: ServerModelNotificationManager.textMessageReceivedNotification,
@@ -156,22 +184,15 @@ class ServerModelManager: ObservableObject {
                           let user = userInfo["user"] as? MKUser else { return }
                     
                     let senderName = user.userName() ?? "Unknown"
-                    // --- 核心修改 1：接收消息时，修剪文本 ---
                     let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    
-                    let imageData = message.embeddedImages().compactMap { item -> Data? in
-                        if let urlString = item as? String {
-                            // 直接调用 dataFromDataURLString
-                            return self?.dataFromDataURLString(urlString)
-                        }
-                        return nil
-                    }
-                    
+                    let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
                     let senderSession = user.session()
                     
                     Task { @MainActor [weak self] in
                         guard let self = self else { return }
                         let connectedUserSession = self.serverModel?.connectedUser()?.session()
+                        
+                        // 1. 先调用 handleReceivedMessage，它会创建并添加 chatMessage 到数组
                         self.handleReceivedMessage(
                             senderName: senderName,
                             plainText: plainText,
@@ -179,9 +200,30 @@ class ServerModelManager: ObservableObject {
                             senderSession: senderSession,
                             connectedUserSession: connectedUserSession
                         )
+                        
+                        // 2. 现在，我们可以安全地检查刚刚被添加的消息
+                        // 我们只需要判断这次消息是不是自己发送的即可
+                        let isSentBySelf = (senderSession == connectedUserSession)
+                        if AppState.shared.currentTab != .messages && !isSentBySelf {
+                            AppState.shared.unreadMessageCount += 1
+                        }
                     }
                 }
     }
+    
+    // --- 核心修改 2：添加一个创建系统通知的新方法 ---
+        private func addChannelJoinNotification(channelName: String) {
+            let notificationMessage = ChatMessage(
+                id: UUID(),
+                type: .notification, // 类型为系统通知
+                senderName: "System", // 发送者为系统
+                message: "You have joined the channel: \(channelName)", // 通知内容
+                images: [],
+                timestamp: Date(),
+                isSentBySelf: false
+            )
+            messages.append(notificationMessage)
+        }
     
     // 替换为系统级、更健壮的 Data URI 解析方法
     private nonisolated func dataFromDataURLString(_ dataURLString: String) -> Data? {
@@ -229,6 +271,7 @@ class ServerModelManager: ObservableObject {
                 
         let chatMessage = ChatMessage(
             id: UUID(),
+            type: .notification,
             senderName: senderName,
             message: plainText,
             images: images,
@@ -261,6 +304,7 @@ class ServerModelManager: ObservableObject {
         // 立即在UI上显示自己发送的消息，体验更流畅
         let selfMessage = ChatMessage(
             id: UUID(),
+            type: .notification,
             senderName: serverModel.connectedUser()?.userName() ?? "Me",
             message: text,
             images: [],

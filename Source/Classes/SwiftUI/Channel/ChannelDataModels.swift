@@ -75,11 +75,20 @@ struct ChannelNavigationConfig: NavigationConfigurable {
     }
 }
 
-// 新的消息数据模型，用于 SwiftUI 视图
+// 1. 定义一个新的枚举来表示消息的类型
+enum ChatMessageType {
+    case userMessage // 普通的用户聊天消息
+    case notification // 系统通知，例如“加入频道”
+}
+
+// 2. 为 ChatMessage 结构体添加一个新的 type 属性
 struct ChatMessage: Identifiable, Equatable {
-    // --- 核心修改：确保 id 属性存在 ---
-    let id: UUID
+    static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
+        lhs.id == rhs.id
+    }
     
+    let id: UUID
+    let type: ChatMessageType // 新增的类型属性
     let senderName: String
     let message: String
     let images: [UIImage]

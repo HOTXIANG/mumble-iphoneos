@@ -2,6 +2,21 @@
 
 import SwiftUI
 
+// 新的系统通知视图
+private struct NotificationMessageView: View {
+    let message: ChatMessage
+    
+    var body: some View {
+        Text(message.message)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color(uiColor: .systemGray5), in: Capsule())
+            .frame(maxWidth: .infinity, alignment: .center)
+    }
+}
+
 // 消息气泡现在接收一个 ChatMessage 对象
 private struct MessageBubbleView: View {
     let message: ChatMessage
