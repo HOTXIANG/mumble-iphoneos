@@ -5,3 +5,7 @@
 #ifdef __OBJC__
 @import UIKit;
 #endif
+
+#ifdef __OBJC__
+    #import "Mumble-Bridging-Header.h"
+#endif

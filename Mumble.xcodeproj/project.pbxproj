@@ -185,6 +185,8 @@
 		F2AD3A762E0E40BD00FC7006 /* FavouriteServerEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A742E0E40B300FC7006 /* FavouriteServerEditView.swift */; };
 		F2C0EE392E0E120300B80B44 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C0EE372E0E11F900B80B44 /* WelcomeView.swift */; };
 		F2DF4AA02E1FB2AD00A0C166 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF4A962E1FB2A800A0C166 /* AppState.swift */; };
+		F2FBE1C52E2167F4000AA092 /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */; };
+		F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C62E216A7F000AA092 /* Assets.xcassets */; };
 		F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56722E0F711A00D76B49 /* MessagesView.swift */; };
 		F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */; };
 		F2FF567B2E0F711A00D76B49 /* ServerChannelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56732E0F711A00D76B49 /* ServerChannelView.swift */; };
@@ -541,6 +543,8 @@
 		F2C0EE372E0E11F900B80B44 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		F2DBFD1B2E0E2216004EFA06 /* Mumble-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Mumble-Bridging-Header.h"; sourceTree = "<group>"; };
 		F2DF4A962E1FB2A800A0C166 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = NeoMumble.icon; sourceTree = "<group>"; };
+		F2FBE1C62E216A7F000AA092 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelDataModels.swift; sourceTree = "<group>"; };
 		F2FF56702E0F711A00D76B49 /* ChannelRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelRowViews.swift; sourceTree = "<group>"; };
 		F2FF56712E0F711A00D76B49 /* ChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelView.swift; sourceTree = "<group>"; };
@@ -954,6 +958,8 @@
 		29B97314FDCFA39411CA2CEA /* CustomTemplate */ = {
 			isa = PBXGroup;
 			children = (
+				F2FBE1C62E216A7F000AA092 /* Assets.xcassets */,
+				F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */,
 				2861C28C116BE90B002B8514 /* Dependencies */,
 				080E96DDFE201D6D7F000001 /* Classes */,
 				285D6B7616BF028700F239EB /* Tests */,
@@ -1188,6 +1194,7 @@
 				28BE999918CFED9A00910551 /* Balloon_2_Right.png in Resources */,
 				287639FF11D2A242009DB8B6 /* MUCertificateCreationProgressView.xib in Resources */,
 				2858A580123B9E5700A82155 /* MUCertificateCell.xib in Resources */,
+				F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */,
 				28DC1C5C13DE596B0037CDC2 /* authenticated.png in Resources */,
 				28DC1C5D13DE596B0037CDC2 /* authenticated@2x.png in Resources */,
 				28DC1C6513DE596B0037CDC2 /* certificatecell-selected.png in Resources */,
@@ -1196,6 +1203,7 @@
 				28BE998E18CFD7DC00910551 /* Default-iOS7@2x.png in Resources */,
 				28DC1C6813DE596B0037CDC2 /* certificatecell@2x.png in Resources */,
 				28DC1C6913DE596B0037CDC2 /* channel.png in Resources */,
+				F2FBE1C52E2167F4000AA092 /* NeoMumble.icon in Resources */,
 				28DC1C6B13DE596B0037CDC2 /* channel@2x.png in Resources */,
 				28DC1C7013DE596B0037CDC2 /* Continents.plist in Resources */,
 				28DC1C7213DE596B0037CDC2 /* Countries.plist in Resources */,
@@ -1455,36 +1463,74 @@
 		1D6058940D05DD3E006BFB54 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = NeoMumble;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
+				HEADER_SEARCH_PATHS = (
+					"\"${PROJECT_DIR}/MumbleKit/src/\"",
+					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
+					"\"${PROJECT_DIR}/Source/Classes/\"",
+					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
+				);
+				INFOPLIST_KEY_CFBundleDisplayName = NeoMumble;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 0.0.1;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SWIFT_ENABLE_EMIT_CONST_VALUES = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
+				SYSTEM_HEADER_SEARCH_PATHS = "";
 				TARGETED_DEVICE_FAMILY = 1;
+				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Debug;
 		};
 		1D6058950D05DD3E006BFB54 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = NeoMumble;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
+				HEADER_SEARCH_PATHS = (
+					"\"${PROJECT_DIR}/MumbleKit/src/\"",
+					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
+					"\"${PROJECT_DIR}/Source/Classes/\"",
+					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
+				);
+				INFOPLIST_KEY_CFBundleDisplayName = NeoMumble;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 0.0.1;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SWIFT_ENABLE_EMIT_CONST_VALUES = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
+				SYSTEM_HEADER_SEARCH_PATHS = "";
 				TARGETED_DEVICE_FAMILY = 1;
+				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = Release;
 		};
@@ -1627,24 +1673,44 @@
 				CLANG_ENABLE_OBJC_ARC = YES;
 				DEVELOPMENT_TEAM = J3TTEQJNML;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 			};
 			name = AppStore;
 		};
 		2887C88A1454C4C2009B3576 /* AppStore */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = NeoMumble;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
+				HEADER_SEARCH_PATHS = (
+					"\"${PROJECT_DIR}/MumbleKit/src/\"",
+					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
+					"\"${PROJECT_DIR}/Source/Classes/\"",
+					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
+				);
+				INFOPLIST_KEY_CFBundleDisplayName = NeoMumble;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 0.0.1;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SWIFT_ENABLE_EMIT_CONST_VALUES = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
+				SYSTEM_HEADER_SEARCH_PATHS = "";
 				TARGETED_DEVICE_FAMILY = 1;
+				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = AppStore;
 		};
@@ -1656,24 +1722,44 @@
 				CLANG_ENABLE_OBJC_ARC = YES;
 				DEVELOPMENT_TEAM = J3TTEQJNML;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 			};
 			name = BetaDist;
 		};
 		28BC1E7B1227155500C03FCF /* BetaDist */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = NeoMumble;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
+				HEADER_SEARCH_PATHS = (
+					"\"${PROJECT_DIR}/MumbleKit/src/\"",
+					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
+					"\"${PROJECT_DIR}/Source/Classes/\"",
+					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
+				);
+				INFOPLIST_KEY_CFBundleDisplayName = NeoMumble;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 0.0.1;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SWIFT_ENABLE_EMIT_CONST_VALUES = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
+				SYSTEM_HEADER_SEARCH_PATHS = "";
 				TARGETED_DEVICE_FAMILY = 1;
+				USER_HEADER_SEARCH_PATHS = "";
 			};
 			name = BetaDist;
 		};
@@ -1686,6 +1772,7 @@
 				DEVELOPMENT_TEAM = J3TTEQJNML;
 				ONLY_ACTIVE_ARCH = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 			};
 			name = Debug;
 		};
@@ -1697,6 +1784,7 @@
 				CLANG_ENABLE_OBJC_ARC = YES;
 				DEVELOPMENT_TEAM = J3TTEQJNML;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 			};
 			name = Release;
 		};

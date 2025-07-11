@@ -35,7 +35,7 @@ class ServerModelManager: ObservableObject {
             "🚀 ServerModelManager: ACTIVATE - Activating model and notifications."
         ); setupServerModel(); setupNotifications()
     }
-    nonisolated deinit {
+    deinit {
         print(
             "🔴 ServerModelManager: DEINIT"
         ); NotificationCenter.default.removeObserver(
