@@ -26,71 +26,10 @@
 @implementation MUWelcomeScreenPhone
 
 - (id) init {
-    // 使用 InsetGrouped 样式以获得现代化的卡片式外观
-    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
-        // ...existing code...
+    if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
+        // ...
     }
     return self;
-}
-
-- (void) viewDidLoad {
-    [super viewDidLoad];
-    
-    // 设置背景色 - 深色模式使用深灰色而不是纯黑色
-    [self updateBackgroundColor];
-}
-
-- (void) updateBackgroundColor {
-    if (@available(iOS 13.0, *)) {
-        // 深色模式使用深灰色，浅色模式使用系统默认
-        UIColor *backgroundColor = [UIColor systemGroupedBackgroundColor];
-        
-        // 如果是深色模式，使用自定义的深灰色
-        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
-            backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色 #1C1C1E
-        }
-        
-        self.view.backgroundColor = backgroundColor;
-        self.tableView.backgroundColor = backgroundColor;
-    } else {
-        self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
-        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
-    }
-}
-
-// 正确的方式来监听主题变化
-- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
-    [super traitCollectionDidChange:previousTraitCollection];
-    
-    if (@available(iOS 13.0, *)) {
-        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
-            [self updateBackgroundColor];
-            [self updateNavigationBarAppearance];
-        }
-    }
-}
-
-- (void) updateNavigationBarAppearance {
-    if (@available(iOS 13.0, *)) {
-        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
-        [appearance configureWithDefaultBackground];
-        
-        // 根据当前主题设置导航栏背景色
-        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
-            appearance.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
-        } else {
-            appearance.backgroundColor = [UIColor systemGroupedBackgroundColor];
-        }
-        
-        // 移除阴影以获得无缝外观
-        appearance.shadowColor = nil;
-
-        self.navigationController.navigationBar.standardAppearance = appearance;
-        self.navigationController.navigationBar.scrollEdgeAppearance = appearance;
-        if (@available(iOS 15.0, *)) {
-            self.navigationController.navigationBar.compactScrollEdgeAppearance = appearance;
-        }
-    }
 }
 
 - (void) viewWillAppear:(BOOL)animated {
@@ -98,27 +37,17 @@
 
     self.navigationItem.title = @"Mumble";
     self.navigationController.toolbarHidden = YES;
-    
-    // 更新背景色
-    [self updateBackgroundColor];
 
-    // 配置导航栏外观 - 禁用大标题以减少额头空间
-    [self updateNavigationBarAppearance];
+    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
-    if (@available(iOS 13.0, *)) {
-        // 禁用大标题以减少额头空间
-        self.navigationController.navigationBar.prefersLargeTitles = NO;
-        self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+    if (@available(iOS 7, *)) {
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
+        self.tableView.separatorInset = UIEdgeInsetsZero;
+    } else {
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     }
 
-    // 启用滚动
-    self.tableView.scrollEnabled = YES;
-    self.tableView.showsVerticalScrollIndicator = NO;
-    
-    // 设置导航栏为紧凑模式
-    if (@available(iOS 11.0, *)) {
-        self.navigationController.navigationBar.prefersLargeTitles = NO;
-    }
+    self.tableView.scrollEnabled = NO;
     
 #if MUMBLE_LAUNCH_IMAGE_CREATION != 1
     UIBarButtonItem *about = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"About", nil)
@@ -139,174 +68,69 @@
 #pragma mark TableView
 
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView {
-    return 2; // 一个用于logo，一个用于菜单项
+    return 1;
 }
 
+// Customize the number of rows in the table view.
 - (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
 #if MUMBLE_LAUNCH_IMAGE_CREATION == 1
     return 1;
 #endif
     if (section == 0)
-        return 0; // Logo section 没有行
-    if (section == 1)
-        return 3; // 菜单项
+        return 3;
     return 0;
 }
 
 - (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        // 创建一个紧凑的 Logo 头部
-        UIView *headerContainer = [[UIView alloc] init];
-        
-        // 设置 header 背景色与整体背景一致
-        if (@available(iOS 13.0, *)) {
-            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
-                headerContainer.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
-            } else {
-                headerContainer.backgroundColor = [UIColor systemGroupedBackgroundColor];
-            }
-        } else {
-            headerContainer.backgroundColor = [UIColor groupTableViewBackgroundColor];
-        }
-        
-        UIImage *logoImage = [UIImage imageNamed:@"WelcomeScreenIcon"];
-        UIImageView *logoImageView = [[UIImageView alloc] initWithImage:logoImage];
-        logoImageView.contentMode = UIViewContentModeScaleAspectFit;
-        logoImageView.translatesAutoresizingMaskIntoConstraints = NO;
-        
-        UILabel *titleLabel = [[UILabel alloc] init];
-        titleLabel.text = @"Welcome to Mumble";
-        titleLabel.font = [UIFont boldSystemFontOfSize:22];
-        titleLabel.textAlignment = NSTextAlignmentCenter;
-        titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        titleLabel.numberOfLines = 1;
-        if (@available(iOS 13.0, *)) {
-            titleLabel.textColor = [UIColor labelColor];
-        }
-
-        UILabel *subtitleLabel = [[UILabel alloc] init];
-        subtitleLabel.text = @"Low latency, high quality voice chat";
-        subtitleLabel.font = [UIFont systemFontOfSize:15];
-        if (@available(iOS 13.0, *)) {
-            subtitleLabel.textColor = [UIColor secondaryLabelColor];
-        } else {
-            subtitleLabel.textColor = [UIColor grayColor];
-        }
-        subtitleLabel.textAlignment = NSTextAlignmentCenter;
-        subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        subtitleLabel.numberOfLines = 2;
-        subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
-
-        [headerContainer addSubview:logoImageView];
-        [headerContainer addSubview:titleLabel];
-        [headerContainer addSubview:subtitleLabel];
-        
-        [NSLayoutConstraint activateConstraints:@[
-            // Logo 约束 - 减小顶部间距
-            [logoImageView.topAnchor constraintEqualToAnchor:headerContainer.topAnchor constant:20],
-            [logoImageView.centerXAnchor constraintEqualToAnchor:headerContainer.centerXAnchor],
-            [logoImageView.heightAnchor constraintEqualToConstant:50], // 进一步减小 logo 尺寸
-            [logoImageView.widthAnchor constraintEqualToConstant:50],
-
-            // 标题约束 - 减小间距
-            [titleLabel.topAnchor constraintEqualToAnchor:logoImageView.bottomAnchor constant:12],
-            [titleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.leadingAnchor constant:16],
-            [titleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.trailingAnchor constant:-16],
-
-            // 副标题约束 - 增加间距和底部空间
-            [subtitleLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:6],
-            [subtitleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.leadingAnchor constant:16],
-            [subtitleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.trailingAnchor constant:-16],
-            [subtitleLabel.bottomAnchor constraintLessThanOrEqualToAnchor:headerContainer.bottomAnchor constant:-20] // 确保有足够的底部空间
-        ]];
-        
-        return headerContainer;
-    }
-    return nil;
+    UIImage *img = [MUImage imageNamed:@"WelcomeScreenIcon"];
+    UIImageView *imgView = [[UIImageView alloc] initWithImage:img];
+    [imgView setContentMode:UIViewContentModeCenter];
+    [imgView setFrame:CGRectMake(0, 0, img.size.width, img.size.height)];
+    return imgView;
 }
 
 - (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        return 160; // 增加头部高度以容纳副标题
-    }
-    return UITableViewAutomaticDimension;
-}
-
-- (NSString *) tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 1) {
-        return NSLocalizedString(@"Connect to Server", nil);
-    }
-    return nil;
+#if MUMBLE_LAUNCH_IMAGE_CREATION == 1
+    CGFloat statusBarAndTitleBarHeight = 64;
+    return [UIScreen mainScreen].bounds.size.height - statusBarAndTitleBarHeight;
+#endif
+    UIImage *img = [MUImage imageNamed:@"WelcomeScreenIcon"];
+    return img.size.height;
 }
 
 - (CGFloat) tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 50.0; // 稍微增加行高以获得更好的触摸体验
+    return 44.0;
 }
 
+// Customize the appearance of table view cells.
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"welcomeItem"];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"welcomeItem"];
     }
     
-    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    cell.selectionStyle = UITableViewCellSelectionStyleGray;
     
-    // 设置 cell 背景色以创建层次感
-    if (@available(iOS 13.0, *)) {
-        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
-            // 深色模式：使用比背景更亮的颜色
-            cell.backgroundColor = [UIColor colorWithRed:0.17 green:0.17 blue:0.18 alpha:1.0]; // #2C2C2E
-        } else {
-            // 浅色模式：使用标准的次级背景色
-            cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
-        }
-    } else {
-        cell.backgroundColor = [UIColor whiteColor];
-    }
-    
-    NSString *text = @"";
-    NSString *symbolName = @"";
-    
-    if (indexPath.section == 1) {
+    /* Servers section. */
+    if (indexPath.section == 0) {
         if (indexPath.row == 0) {
-            text = NSLocalizedString(@"Public Servers", nil);
-            symbolName = @"globe";
+            cell.textLabel.text = NSLocalizedString(@"Public Servers", nil);
         } else if (indexPath.row == 1) {
-            text = NSLocalizedString(@"Favourite Servers", nil);
-            symbolName = @"star.fill";
+            cell.textLabel.text = NSLocalizedString(@"Favourite Servers", nil);
         } else if (indexPath.row == 2) {
-            text = NSLocalizedString(@"LAN Servers", nil);
-            symbolName = @"wifi";
+            cell.textLabel.text = NSLocalizedString(@"LAN Servers", nil);
         }
     }
 
-    if (@available(iOS 14.0, *)) {
-        UIListContentConfiguration *content = [cell defaultContentConfiguration];
-        content.text = text;
-        content.textProperties.font = [UIFont systemFontOfSize:17];
-        if (@available(iOS 13.0, *)) {
-            UIImage *image = [UIImage systemImageNamed:symbolName];
-            content.image = [image imageWithConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightMedium]];
-            content.imageProperties.tintColor = [UIColor systemBlueColor];
-        }
-        cell.contentConfiguration = content;
-    } else {
-        // Fallback on earlier versions
-        cell.textLabel.text = text;
-        cell.textLabel.font = [UIFont systemFontOfSize:17];
-        if (@available(iOS 13.0, *)) {
-            UIImage *image = [UIImage systemImageNamed:symbolName];
-            cell.imageView.image = image;
-            cell.imageView.tintColor = [UIColor systemBlueColor];
-        }
-    }
+    [[cell textLabel] setHidden: NO];
 
     return cell;
 }
 
+// Override to support row selection in the table view.
 - (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     /* Servers section. */
-    if (indexPath.section == 1) {
+    if (indexPath.section == 0) {
         if (indexPath.row == 0) {
             MUPublicServerListController *serverList = [[MUPublicServerListController alloc] init];
             [self.navigationController pushViewController:serverList animated:YES];
@@ -318,8 +142,6 @@
             [self.navigationController pushViewController:lanList animated:YES];
         }
     }
-    // Deselect row for a cleaner transition
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
 - (void) aboutClicked:(id)sender {

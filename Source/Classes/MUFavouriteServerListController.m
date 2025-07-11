@@ -19,7 +19,6 @@
 }
 - (void) reloadFavourites;
 - (void) deleteFavouriteAtIndexPath:(NSIndexPath *)indexPath;
-- (void) connectToFavouriteServer:(MUFavouriteServer *)favServ;
 @end
 
 @implementation MUFavouriteServerListController
@@ -28,8 +27,7 @@
 #pragma mark Initialization
 
 - (id) init {
-    // 使用现代的 UITableViewStyleInsetGrouped 样式
-    if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
+    if ((self = [super init])) {
         // ...
     }
     
@@ -49,173 +47,25 @@
     return toInterfaceOrientation == UIInterfaceOrientationPortrait;
 }
 
-- (void) updateBackgroundColor {
-    if (@available(iOS 13.0, *)) {
-        // 深色模式使用深灰色，浅色模式使用系统默认
-        UIColor *backgroundColor = [UIColor systemGroupedBackgroundColor];
-        
-        // 如果是深色模式，使用自定义的深灰色
-        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
-            backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; // 深灰色 #1C1C1E
-        }
-        
-        self.view.backgroundColor = backgroundColor;
-        self.tableView.backgroundColor = backgroundColor;
-    } else {
-        self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
-        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
-    }
-}
-
-// 正确的方式来监听主题变化
-- (void) traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
-    [super traitCollectionDidChange:previousTraitCollection];
-    
-    if (@available(iOS 13.0, *)) {
-        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
-            [self updateBackgroundColor];
-            [self updateEmptyStateBackgroundColor]; // 更新空状态背景色
-        }
-    }
-}
-
-- (void) viewDidLoad {
-    [super viewDidLoad];
-    
-    // 配置现代化的表格视图外观
-    if (@available(iOS 15.0, *)) {
-        self.tableView.sectionHeaderTopPadding = 0;
-    }
-    
-    // 设置表格视图样式以支持圆角
-    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone; // 去除分隔线以突出圆角效果
-    
-    // 设置背景色 - 与欢迎界面一致
-    [self updateBackgroundColor];
-    
-    // 设置空状态视图
-    [self setupEmptyStateView];
-}
-
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
 
-    self.navigationItem.title = NSLocalizedString(@"Favourite Servers", nil);
+    [[self navigationItem] setTitle:NSLocalizedString(@"Favourite Servers", nil)];
     
-    // 现代化导航栏样式 - 禁用大标题保持一致性
-    if (@available(iOS 13.0, *)) {
-        self.navigationController.navigationBar.prefersLargeTitles = NO;
-        self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+    if (@available(iOS 7, *)) {
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
+        self.tableView.separatorInset = UIEdgeInsetsZero;
     }
     
-    // 更新背景色 - 与欢迎界面一致
-    [self updateBackgroundColor];
-    
-    // 添加按钮
     UIBarButtonItem *addButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addButtonClicked:)];
-    self.navigationItem.rightBarButtonItem = addButton;
+    [[self navigationItem] setRightBarButtonItem:addButton];
 
     [self reloadFavourites];
-    [self updateEmptyStateVisibility];
-}
-
-- (void) setupEmptyStateView {
-    UIView *emptyView = [[UIView alloc] init];
-    
-    // 设置空状态视图背景色与整体背景一致
-    if (@available(iOS 13.0, *)) {
-        if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
-            emptyView.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
-        } else {
-            emptyView.backgroundColor = [UIColor systemGroupedBackgroundColor];
-        }
-    } else {
-        emptyView.backgroundColor = [UIColor groupTableViewBackgroundColor];
-    }
-    
-    UIImageView *imageView = [[UIImageView alloc] init];
-    if (@available(iOS 13.0, *)) {
-        UIImage *image = [UIImage systemImageNamed:@"star.circle"];
-        imageView.image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        imageView.tintColor = [UIColor systemGrayColor];
-    } else {
-        imageView.image = [UIImage imageNamed:@"star"];
-        imageView.tintColor = [UIColor grayColor];
-    }
-    imageView.contentMode = UIViewContentModeScaleAspectFit;
-    
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text = NSLocalizedString(@"No Favourite Servers", nil);
-    titleLabel.font = [UIFont boldSystemFontOfSize:20];
-    if (@available(iOS 13.0, *)) {
-        titleLabel.textColor = [UIColor secondaryLabelColor];
-    } else {
-        titleLabel.textColor = [UIColor grayColor];
-    }
-    titleLabel.textAlignment = NSTextAlignmentCenter;
-    
-    UILabel *messageLabel = [[UILabel alloc] init];
-    messageLabel.text = NSLocalizedString(@"Tap the + button to add your first favourite server", nil);
-    messageLabel.font = [UIFont systemFontOfSize:16];
-    if (@available(iOS 13.0, *)) {
-        messageLabel.textColor = [UIColor tertiaryLabelColor];
-    } else {
-        messageLabel.textColor = [UIColor lightGrayColor];
-    }
-    messageLabel.textAlignment = NSTextAlignmentCenter;
-    messageLabel.numberOfLines = 0;
-    
-    [emptyView addSubview:imageView];
-    [emptyView addSubview:titleLabel];
-    [emptyView addSubview:messageLabel];
-    
-    // 使用 Auto Layout
-    imageView.translatesAutoresizingMaskIntoConstraints = NO;
-    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    messageLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    
-    [NSLayoutConstraint activateConstraints:@[
-        [imageView.centerXAnchor constraintEqualToAnchor:emptyView.centerXAnchor],
-        [imageView.centerYAnchor constraintEqualToAnchor:emptyView.centerYAnchor constant:-60],
-        [imageView.widthAnchor constraintEqualToConstant:80],
-        [imageView.heightAnchor constraintEqualToConstant:80],
-        
-        [titleLabel.topAnchor constraintEqualToAnchor:imageView.bottomAnchor constant:20],
-        [titleLabel.leadingAnchor constraintEqualToAnchor:emptyView.leadingAnchor constant:20],
-        [titleLabel.trailingAnchor constraintEqualToAnchor:emptyView.trailingAnchor constant:-20],
-        
-        [messageLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:8],
-        [messageLabel.leadingAnchor constraintEqualToAnchor:emptyView.leadingAnchor constant:20],
-        [messageLabel.trailingAnchor constraintEqualToAnchor:emptyView.trailingAnchor constant:-20]
-    ]];
-    
-    self.tableView.backgroundView = emptyView;
-}
-
-// 更新空状态视图的背景色
-- (void) updateEmptyStateBackgroundColor {
-    if (self.tableView.backgroundView) {
-        if (@available(iOS 13.0, *)) {
-            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
-                self.tableView.backgroundView.backgroundColor = [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0];
-            } else {
-                self.tableView.backgroundView.backgroundColor = [UIColor systemGroupedBackgroundColor];
-            }
-        } else {
-            self.tableView.backgroundView.backgroundColor = [UIColor groupTableViewBackgroundColor];
-        }
-    }
-}
-
-- (void) updateEmptyStateVisibility {
-    self.tableView.backgroundView.hidden = [_favouriteServers count] > 0;
-    self.tableView.separatorStyle = [_favouriteServers count] > 0 ? UITableViewCellSeparatorStyleSingleLine : UITableViewCellSeparatorStyleNone;
 }
 
 - (void) reloadFavourites {
     _favouriteServers = [MUDatabase fetchAllFavourites];
     [_favouriteServers sortUsingSelector:@selector(compare:)];
-    [self.tableView reloadData];
 }
 
 #pragma mark -
@@ -236,19 +86,7 @@
         cell = [[MUServerCell alloc] init];
     }
     [cell populateFromFavouriteServer:favServ];
-    
-    // 现代化的选择样式
-    if (@available(iOS 13.0, *)) {
-        cell.selectionStyle = UITableViewCellSelectionStyleNone; // 禁用默认选择样式以保持圆角
-    } else {
-        cell.selectionStyle = UITableViewCellSelectionStyleGray;
-    }
-    
-    // 添加长按手势识别器
-    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-    longPress.minimumPressDuration = 0.5;
-    [cell addGestureRecognizer:longPress];
-    
+    cell.selectionStyle = UITableViewCellSelectionStyleGray;
     return (UITableViewCell *) cell;
 }
 
@@ -256,155 +94,77 @@
     return YES;
 }
 
-// 配置左滑删除按钮
-- (UISwipeActionsConfiguration *) tableView:(UITableView *)tableView trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath API_AVAILABLE(ios(11.0)) {
-    
-    UIContextualAction *deleteAction = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive
-                                                                               title:NSLocalizedString(@"Delete", nil)
-                                                                             handler:^(UIContextualAction * _Nonnull action, __kindof UIView * _Nonnull sourceView, void (^ _Nonnull completionHandler)(BOOL)) {
-        [self showDeleteConfirmationForIndexPath:indexPath completion:completionHandler];
-    }];
-    
-    if (@available(iOS 13.0, *)) {
-        deleteAction.image = [UIImage systemImageNamed:@"trash"];
-    }
-    
-    UIContextualAction *editAction = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal
-                                                                             title:NSLocalizedString(@"Edit", nil)
-                                                                           handler:^(UIContextualAction * _Nonnull action, __kindof UIView * _Nonnull sourceView, void (^ _Nonnull completionHandler)(BOOL)) {
-        MUFavouriteServer *favServ = [self->_favouriteServers objectAtIndex:indexPath.row];
-        [self presentEditDialogForFavourite:favServ];
-        completionHandler(YES);
-    }];
-    
-    editAction.backgroundColor = [UIColor systemBlueColor];
-    if (@available(iOS 13.0, *)) {
-        editAction.image = [UIImage systemImageNamed:@"pencil"];
-    }
-    
-    UISwipeActionsConfiguration *configuration = [UISwipeActionsConfiguration configurationWithActions:@[deleteAction, editAction]];
-    
-    // 设置为不会完全显示操作，保持部分圆角效果
-    configuration.performsFirstActionWithFullSwipe = NO;
-    
-    return configuration;
-}
-
-// 兼容 iOS 10 及以下版本的删除方法
 - (void) tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
-        if (@available(iOS 11.0, *)) {
-            // iOS 11+ 使用滑动操作
-            return;
-        } else {
-            // iOS 10 及以下使用传统删除确认
-            [self showDeleteConfirmationForIndexPath:indexPath completion:nil];
-        }
-    }
-}
-
-- (void) showDeleteConfirmationForIndexPath:(NSIndexPath *)indexPath completion:(void (^)(BOOL))completion {
-    NSString *title = NSLocalizedString(@"Delete Favourite", nil);
-    NSString *msg = NSLocalizedString(@"Are you sure you want to delete this favourite server?", nil);
-    
-    UIAlertController* alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                                       message:msg
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-    
-    [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
-                                                   style:UIAlertActionStyleCancel
-                                                 handler:^(UIAlertAction * _Nonnull action) {
-        if (completion) completion(NO);
-    }]];
-    
-    [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Delete", nil)
-                                                   style:UIAlertActionStyleDestructive
-                                                 handler:^(UIAlertAction * _Nonnull action) {
         [self deleteFavouriteAtIndexPath:indexPath];
-        if (completion) completion(YES);
-    }]];
-    
-    [self presentViewController:alertCtrl animated:YES completion:nil];
+    }
 }
 
 #pragma mark -
 #pragma mark Table view delegate
 
 - (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    // 自定义选择动画
-    UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+    MUFavouriteServer *favServ = [_favouriteServers objectAtIndex:[indexPath row]];
+    BOOL pad = [[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad;
     
-    // 添加轻微的缩放动画效果
-    [UIView animateWithDuration:0.1 animations:^{
-        cell.transform = CGAffineTransformMakeScale(0.95, 0.95);
-    } completion:^(BOOL finished) {
-        [UIView animateWithDuration:0.1 animations:^{
-            cell.transform = CGAffineTransformIdentity;
-        } completion:^(BOOL finished) {
-            // 直接连接到服务器
-            MUFavouriteServer *favServ = [self->_favouriteServers objectAtIndex:[indexPath row]];
-            [self connectToFavouriteServer:favServ];
-        }];
-    }];
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 70.0; // 增加行高以容纳圆角设计
-}
-
-// 添加 section 间距
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return 10.0; // 添加顶部间距
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section {
-    return 10.0; // 添加底部间距
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    return [[UIView alloc] init]; // 透明的头部视图
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForFooterInSection:(NSInteger)section {
-    return [[UIView alloc] init]; // 透明的脚部视图
-}
-
-#pragma mark -
-#pragma mark Gesture recognizers
-
-- (void) handleLongPress:(UILongPressGestureRecognizer *)gestureRecognizer {
-    if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
-        CGPoint point = [gestureRecognizer locationInView:self.tableView];
-        NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:point];
+    NSString *sheetTitle = pad ? nil : [favServ displayName];
+    
+    UIAlertController* sheetCtrl = [UIAlertController alertControllerWithTitle:sheetTitle
+                                                                       message:nil
+                                                                preferredStyle:UIAlertControllerStyleActionSheet];
+    
+    [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
+                                                   style:UIAlertActionStyleCancel
+                                                 handler:^(UIAlertAction * _Nonnull action) {
+        [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
+    }]];
+    
+    [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Delete", nil)
+                                                   style:UIAlertActionStyleDestructive
+                                                 handler:^(UIAlertAction * _Nonnull action) {
+        NSString *title = NSLocalizedString(@"Delete Favourite", nil);
+        NSString *msg = NSLocalizedString(@"Are you sure you want to delete this favourite server?", nil);
+        UIAlertController* alertCtrl = [UIAlertController alertControllerWithTitle:title
+                                                                           message:msg
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
         
-        if (indexPath) {
-            MUFavouriteServer *favServ = [_favouriteServers objectAtIndex:indexPath.row];
-            [self presentEditDialogForFavourite:favServ];
-            
-            // 提供触觉反馈
-            if (@available(iOS 10.0, *)) {
-                UIImpactFeedbackGenerator *feedbackGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
-                [feedbackGenerator impactOccurred];
-            }
-        }
-    }
-}
+        [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"No", nil)
+                                                       style:UIAlertActionStyleCancel
+                                                     handler:nil]];
+        [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Yes", nil)
+                                                       style:UIAlertActionStyleDefault
+                                                     handler:^(UIAlertAction * _Nonnull action) {
+            [self deleteFavouriteAtIndexPath:indexPath];
+        }]];
 
-#pragma mark -
-#pragma mark Server connection
-
-- (void) connectToFavouriteServer:(MUFavouriteServer *)favServ {
-    NSString *userName = [favServ userName];
-    if (userName == nil || [userName length] == 0) {
-        userName = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultUserName"];
-    }
+        [self presentViewController:alertCtrl animated:YES completion:nil];
+        [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
+    }]];
+    [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Edit", nil)
+                                                   style:UIAlertActionStyleDefault
+                                                 handler:^(UIAlertAction * _Nonnull action) {
+        [self presentEditDialogForFavourite:favServ];
+        [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
+    }]];
     
-    MUConnectionController *connCtrlr = [MUConnectionController sharedController];
-    [connCtrlr connetToHostname:[favServ hostName]
-                           port:[favServ port]
-                       withUsername:userName
-                    andPassword:[favServ password]
-       withParentViewController:self];
+    [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Connect", nil)
+                                                   style:UIAlertActionStyleDefault
+                                                 handler:^(UIAlertAction * _Nonnull action) {
+        NSString *userName = [favServ userName];
+        if (userName == nil) {
+            userName = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultUserName"];
+        }
+        
+        MUConnectionController *connCtrlr = [MUConnectionController sharedController];
+        [connCtrlr connetToHostname:[favServ hostName]
+                               port:[favServ port]
+                            withUsername:userName
+                        andPassword:[favServ password]
+           withParentViewController:self];
+        [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
+    }]];
+    
+    [self presentViewController:sheetCtrl animated:YES completion:nil];
 }
 
 - (void) deleteFavouriteAtIndexPath:(NSIndexPath *)indexPath {
@@ -414,9 +174,8 @@
     
     // And remove it from our locally sorted array
     [_favouriteServers removeObjectAtIndex:[indexPath row]];
-    [self.tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationFade];
-    
-    [self updateEmptyStateVisibility];
+    [[self tableView] deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:YES];
+    [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
 }
 
 #pragma mark -
@@ -434,13 +193,8 @@
     [editView setDoneAction:@selector(doneButtonClicked:)];
     [modalNav pushViewController:editView animated:NO];
     
-    if (@available(iOS 13.0, *)) {
-        modalNav.modalPresentationStyle = UIModalPresentationFormSheet;
-    } else {
-        modalNav.modalPresentationStyle = UIModalPresentationFormSheet;
-    }
-    
-    [self presentViewController:modalNav animated:YES completion:nil];
+    modalNav.modalPresentationStyle = UIModalPresentationFormSheet;
+    [[self navigationController] presentViewController:modalNav animated:YES completion:nil];
 }
 
 - (void) presentEditDialogForFavourite:(MUFavouriteServer *)favServ {
@@ -455,13 +209,8 @@
     [editView setDoneAction:@selector(doneButtonClicked:)];
     [modalNav pushViewController:editView animated:NO];
     
-    if (@available(iOS 13.0, *)) {
-        modalNav.modalPresentationStyle = UIModalPresentationFormSheet;
-    } else {
-        modalNav.modalPresentationStyle = UIModalPresentationFormSheet;
-    }
-    
-    [self presentViewController:modalNav animated:YES completion:nil];
+    modalNav.modalPresentationStyle = UIModalPresentationFormSheet;
+    [[self navigationController]presentViewController:modalNav animated:YES completion:nil];
 }
 
 #pragma mark -
@@ -484,7 +233,7 @@
     [MUDatabase storeFavourite:newServer];
 
     [self reloadFavourites];
-    [self updateEmptyStateVisibility];
+    [self.tableView reloadData];
 }
 
 @end

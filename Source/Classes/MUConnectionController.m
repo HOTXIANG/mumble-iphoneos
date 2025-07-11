@@ -63,6 +63,10 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
     return self;
 }
 
+- (MKServerModel *)serverModel {
+    return _serverModel;
+}
+
 - (void) connetToHostname:(NSString *)hostName port:(NSUInteger)port withUsername:(NSString *)userName andPassword:(NSString *)password withParentViewController:(UIViewController *)parentViewController {
     _hostname = hostName;
     _port = port;
@@ -119,6 +123,9 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
     _connection = [[MKConnection alloc] init];
     [_connection setDelegate:self];
     [_connection setForceTCP:[[NSUserDefaults standardUserDefaults] boolForKey:@"NetworkForceTCP"]];
+    
+    // 添加：设置忽略 SSL 验证（用于测试）
+    [_connection setIgnoreSSLVerification:YES];
     
     _serverModel = [[MKServerModel alloc] initWithConnection:_connection];
     [_serverModel addDelegate:self];
@@ -493,9 +500,25 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
         self->_hostname = nil;
         self->_password = nil;
         
-        self->_serverRoot.modalPresentationStyle = UIModalPresentationFullScreen;
-        [[self->_parentViewController navigationController] presentViewController:self->_serverRoot animated:YES completion:nil];
-        self->_parentViewController = nil;
+        // 注释掉原来的代码
+        //self->_serverRoot.modalPresentationStyle = UIModalPresentationFullScreen;
+        //[[self->_parentViewController navigationController] presentViewController:self->_serverRoot animated:YES completion:nil];
+        //self->_parentViewController = nil;
+        
+        // 发送连接成功通知，让 Swift 代码处理导航
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+            if (self->_parentViewController) {
+                userInfo[@"parentViewController"] = self->_parentViewController;
+            }
+            
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"MUConnectionReadyForSwiftUI"
+                                                                object:self
+                                                              userInfo:userInfo];
+            
+            // 也发送原来的通知
+            [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionOpenedNotification object:self];
+        });
     }];
 }
 

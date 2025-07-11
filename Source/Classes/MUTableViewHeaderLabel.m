@@ -9,21 +9,13 @@
 - (id) init {
     if ((self = [super init])) {
         self.font = [UIFont boldSystemFontOfSize:18.0f];
-        
-        // 设置现代化的文字颜色
-        if (@available(iOS 13.0, *)) {
-            self.textColor = [UIColor secondaryLabelColor];
-        } else {
-            self.textColor = [UIColor darkGrayColor];
-        }
-        
+        self.textColor = [UIColor whiteColor];
         if (@available(iOS 7, *)) {
             // Don't use shadows on iOS 7 or greater.
         } else {
             self.shadowColor = [UIColor darkGrayColor];
             self.shadowOffset = CGSizeMake(1.5f, 1.5f);
         }
-        
         self.backgroundColor = [UIColor clearColor];
         self.textAlignment = NSTextAlignmentCenter;
     }

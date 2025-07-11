@@ -14,8 +14,10 @@
 #import "MUImage.h"
 #import "MUBackgroundView.h"
 
+#import "Mumble-Swift.h"  // 这是 Xcode 自动生成的 Swift 桥接头文件
 #import <MumbleKit/MKAudio.h>
 #import <MumbleKit/MKVersion.h>
+#import <UserNotifications/UserNotifications.h>
 
 @interface MUApplicationDelegate () <UIApplicationDelegate,
                                      UIAlertViewDelegate> {
@@ -42,7 +44,12 @@
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(connectionClosed:) name:MUConnectionClosedNotification object:nil];
     
     // Reset application badge, in case something brought it into an inconsistent state.
-    [[UIApplication sharedApplication] setApplicationIconBadgeNumber:0];
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+    [center setBadgeCount:0 withCompletionHandler:^(NSError * _Nullable error) {
+        if (error) {
+            NSLog(@"Error setting badge count: %@", error.localizedDescription);
+        }
+    }];
     
     // Initialize the notification controller
     [MUNotificationController sharedController];
@@ -102,14 +109,16 @@
     //    _window.tintColor = [UIColor whiteColor];
     }
 
-    UINavigationBar.appearance.tintColor = [UIColor whiteColor];
-    UINavigationBar.appearance.translucent = NO;
-    UINavigationBar.appearance.barTintColor = [UIColor blackColor];
-    UINavigationBar.appearance.backgroundColor = [UIColor blackColor];
-    UINavigationBar.appearance.barStyle = UIBarStyleBlack;
+    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
+        UINavigationBar.appearance.tintColor = [UIColor whiteColor];
+        UINavigationBar.appearance.translucent = YES;
+        UINavigationBar.appearance.barTintColor = [UIColor colorWithRed:0.2 green:0.2 blue:0.2 alpha:1.0];
+        UINavigationBar.appearance.backgroundColor = [UIColor colorWithRed:0.2 green:0.2 blue:0.2 alpha:1.0];
+        UINavigationBar.appearance.barStyle = UIBarStyleBlack;
+    }
     
     // Put a background view in here, to have prettier transitions.
-    [_window addSubview:[MUBackgroundView backgroundView]];
+    //[_window addSubview:[MUBackgroundView backgroundView]];
 
     // Add our default navigation controller
     _navigationController = [[UINavigationController alloc] init];
@@ -120,12 +129,13 @@
     if (idiom == UIUserInterfaceIdiomPad) {
         welcomeScreen = [[MUWelcomeScreenPad alloc] init];
         [_navigationController pushViewController:welcomeScreen animated:YES];
+        [_window setRootViewController:_navigationController];
     } else {
-        welcomeScreen = [[MUWelcomeScreenPhone alloc] init];
-        [_navigationController pushViewController:welcomeScreen animated:YES];
+        // iPhone 使用纯 SwiftUI 实现
+        SwiftRootViewControllerWrapper *swiftRoot = [[SwiftRootViewControllerWrapper alloc] init];
+        [_window setRootViewController:swiftRoot];
     }
     
-    [_window setRootViewController:_navigationController];
     [_window makeKeyAndVisible];
 
     NSURL *url = [launchOptions objectForKey:UIApplicationLaunchOptionsURLKey];
@@ -193,13 +203,13 @@
         settings.quality = 16000;
         settings.audioPerPacket = 6;
     } else if ([quality isEqualToString:@"balanced"]) {
-        // Will fall back to CELT if the 
+        // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
         settings.quality = 40000;
         settings.audioPerPacket = 2;
     } else if ([quality isEqualToString:@"high"] || [quality isEqualToString:@"opus"]) {
-        // Will fall back to CELT if the 
+        // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
         settings.quality = 72000;

@@ -4,7 +4,7 @@
 
 #import "MUFavouriteServer.h"
 
-@interface MUFavouriteServerListController : UITableViewController
+@interface MUFavouriteServerListController : UITableViewController <UIActionSheetDelegate>
 - (id) init;
 - (void) presentNewFavouriteDialog;
 - (void) presentEditDialogForFavourite:(MUFavouriteServer *)favServ;

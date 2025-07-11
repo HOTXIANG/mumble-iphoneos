@@ -1,4 +1,4 @@
-// Copyright 2012-2024 The 'Mumble for iOS' Developers. All rights reserved.
+// Copyright 2012 The 'Mumble for iOS' Developers. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -12,7 +12,10 @@
 
 @interface MUWelcomeScreenPad () <UIPopoverControllerDelegate, UITableViewDataSource, UITableViewDelegate> {
     UIPopoverController   *_prefsPopover;
+    UIView                *_view;
+    UIImageView           *_backgroundView;
     UITableView           *_tableView;
+    UIImageView           *_logoView;
 }
 @end
 
@@ -25,178 +28,127 @@
 }
 
 - (void) loadView {
-    [super loadView];
-    // Use systemGroupedBackgroundColor for the correct dark gray in dark mode.
-    self.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    _view = [[UIView alloc] initWithFrame:CGRectZero];
+    _view.frame = CGRectMake(0, 0, 768, 1024);
+    self.view = _view;
+    
+    _backgroundView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"BackgroundTextureBlackGradientPad"]];
+    [_backgroundView setFrame:_view.frame];
+    [_view addSubview:_backgroundView];
 
-    // Create table view with modern inset grouped style
-    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
-    _tableView.translatesAutoresizingMaskIntoConstraints = NO;
+    _logoView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"LogoBigShadow"]];
+    [_view addSubview:_logoView];
+
+    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleGrouped];
     _tableView.delegate = self;
     _tableView.dataSource = self;
-    [self.view addSubview:_tableView];
-
-    // Pin the table view to the safe area
-    [NSLayoutConstraint activateConstraints:@[
-        [_tableView.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor],
-        [_tableView.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor],
-        [_tableView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [_tableView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor]
-    ]];
-
-    // Create and assign the modern header view
-    _tableView.tableHeaderView = [self createHeaderView];
+    _tableView.backgroundColor = [UIColor clearColor];
+    _tableView.opaque = NO;
+    _tableView.backgroundView = nil;
+    _tableView.scrollEnabled = NO;
+    _tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    [_view addSubview:_tableView];
 }
 
-- (UIView *) createHeaderView {
-    UIView *headerContainer = [[UIView alloc] init];
-    headerContainer.translatesAutoresizingMaskIntoConstraints = NO;
+- (void) setViewPositions {
+    CGRect pr = self.view.frame;
+    CGFloat pw = pr.size.width;
+    
+    CGFloat lw = 259;
+    CGFloat lh = 259;
+    
+    CGFloat tw = 320;
+    CGFloat th = 210;
+    
+    [_backgroundView setFrame:_view.frame];
+    [_logoView setFrame:CGRectMake(pw/2 - lw/2, 50, lw, lh)];
+    [_tableView setFrame:CGRectMake(pw/2 - tw/2, 2*50 + lh, tw, th)];
+}
 
-    UIImage *logoImage = [UIImage imageNamed:@"LogoBigShadow"];
-    UIImageView *logoImageView = [[UIImageView alloc] initWithImage:logoImage];
-    logoImageView.contentMode = UIViewContentModeScaleAspectFit;
-    logoImageView.translatesAutoresizingMaskIntoConstraints = NO;
+- (void) viewWillLayoutSubviews {
+    [self setViewPositions];
+}
 
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text = @"Welcome to Mumble";
-    titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleLargeTitle];
-    titleLabel.textAlignment = NSTextAlignmentCenter;
-    titleLabel.adjustsFontForContentSizeCategory = YES;
-    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+- (BOOL) shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
+    return YES;
+}
 
-    UILabel *subtitleLabel = [[UILabel alloc] init];
-    subtitleLabel.text = @"Low latency, high quality voice chat";
-    subtitleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
-    subtitleLabel.textColor = [UIColor secondaryLabelColor];
-    subtitleLabel.textAlignment = NSTextAlignmentCenter;
-    subtitleLabel.adjustsFontForContentSizeCategory = YES;
-    subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-
-    [headerContainer addSubview:logoImageView];
-    [headerContainer addSubview:titleLabel];
-    [headerContainer addSubview:subtitleLabel];
-
-    // Layout for the header content
-    [NSLayoutConstraint activateConstraints:@[
-        [logoImageView.topAnchor constraintEqualToAnchor:headerContainer.topAnchor constant:40],
-        [logoImageView.centerXAnchor constraintEqualToAnchor:headerContainer.centerXAnchor],
-        [logoImageView.heightAnchor constraintEqualToConstant:150],
-        [logoImageView.widthAnchor constraintEqualToConstant:150],
-
-        [titleLabel.topAnchor constraintEqualToAnchor:logoImageView.bottomAnchor constant:20],
-        [titleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.leadingAnchor],
-        [titleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.trailingAnchor],
-
-        [subtitleLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:8],
-        [subtitleLabel.leadingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.leadingAnchor],
-        [subtitleLabel.trailingAnchor constraintEqualToAnchor:headerContainer.layoutMarginsGuide.trailingAnchor],
-        [subtitleLabel.bottomAnchor constraintEqualToAnchor:headerContainer.bottomAnchor constant:-20]
-    ]];
-
-    // Calculate the size of the header view to properly set it on the table view
-    [headerContainer setNeedsLayout];
-    [headerContainer layoutIfNeeded];
-    CGFloat height = [headerContainer systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-    CGRect frame = headerContainer.frame;
-    frame.size.height = height;
-    headerContainer.frame = frame;
-
-    return headerContainer;
+- (void) willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+    [self setViewPositions];
 }
 
 - (void) viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
     self.navigationItem.title = @"Mumble";
-
-    // Modern navigation bar appearance for a seamless look
-    if (@available(iOS 13.0, *)) {
-        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
-        // Configure the appearance to be transparent, allowing the background color to show through.
-        [appearance configureWithTransparentBackground];
-        // Set the background color to match the view's background.
-        appearance.backgroundColor = [UIColor systemGroupedBackgroundColor];
-        // Remove the shadow/separator line for a seamless transition.
-        appearance.shadowColor = nil;
-
-        self.navigationController.navigationBar.standardAppearance = appearance;
-        self.navigationController.navigationBar.scrollEdgeAppearance = appearance;
-        self.navigationController.navigationBar.compactAppearance = appearance;
-    }
-
+    
+    self.navigationController.navigationBar.barStyle = UIBarStyleBlackOpaque;
+    
     UIBarButtonItem *aboutBtn = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"About", nil) style:UIBarButtonItemStylePlain target:self action:@selector(aboutButtonClicked:)];
     self.navigationItem.rightBarButtonItem = aboutBtn;
-
+    
     UIBarButtonItem *prefsBtn = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Preferences", nil) style:UIBarButtonItemStylePlain target:self action:@selector(prefsButtonClicked:)];
     self.navigationItem.leftBarButtonItem = prefsBtn;
-
+    
     [_tableView deselectRowAtIndexPath:[_tableView indexPathForSelectedRow] animated:animated];
 }
 
-#pragma mark - TableView
+#pragma mark -
+#pragma mark TableView
 
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView {
     return 1;
 }
 
+// Customize the number of rows in the table view.
 - (NSInteger) tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return 3;
+    if (section == 0)
+        return 3;
+    return 0;
 }
 
 - (CGFloat) tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     return 44.0;
 }
 
+// Customize the appearance of table view cells.
 - (UITableViewCell *) tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"welcomeItem"];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"welcomeItem"];
     }
-
-    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-
-    NSString *text = @"";
-    NSString *symbolName = @"";
-
-    if (indexPath.row == 0) {
-        text = NSLocalizedString(@"Public Servers", nil);
-        symbolName = @"globe";
-    } else if (indexPath.row == 1) {
-        text = NSLocalizedString(@"Favourite Servers", nil);
-        symbolName = @"star.fill";
-    } else if (indexPath.row == 2) {
-        text = NSLocalizedString(@"LAN Servers", nil);
-        symbolName = @"wifi";
+    
+    cell.selectionStyle = UITableViewCellSelectionStyleGray;
+    
+    /* Servers section. */
+    if (indexPath.section == 0) {
+        if (indexPath.row == 0) {
+            cell.textLabel.text = NSLocalizedString(@"Public Servers", nil);
+        } else if (indexPath.row == 1) {
+            cell.textLabel.text = NSLocalizedString(@"Favourite Servers", nil);
+        } else if (indexPath.row == 2) {
+            cell.textLabel.text = NSLocalizedString(@"LAN Servers", nil);
+        }
     }
-
-    if (@available(iOS 14.0, *)) {
-        UIListContentConfiguration *content = [cell defaultContentConfiguration];
-        content.text = text;
-        content.image = [UIImage systemImageNamed:symbolName];
-        cell.contentConfiguration = content;
-    } else {
-        // Fallback on earlier versions
-        cell.textLabel.text = text;
-        cell.imageView.image = [UIImage systemImageNamed:symbolName];
-    }
-
+    
+    [[cell textLabel] setHidden: NO];
+    
     return cell;
 }
 
+// Override to support row selection in the table view.
 - (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    UIViewController *nextViewController = nil;
+    /* Servers section. */
     if (indexPath.section == 0) {
         if (indexPath.row == 0) {
-            nextViewController = [[MUPublicServerListController alloc] init];
+            MUPublicServerListController *serverList = [[MUPublicServerListController alloc] init];
+            [self.navigationController pushViewController:serverList animated:YES];
         } else if (indexPath.row == 1) {
-            nextViewController = [[MUFavouriteServerListController alloc] init];
+            MUFavouriteServerListController *favList = [[MUFavouriteServerListController alloc] init];
+            [self.navigationController pushViewController:favList animated:YES];
         } else if (indexPath.row == 2) {
-            nextViewController = [[MULanServerListController alloc] init];
+            MULanServerListController *lanList = [[MULanServerListController alloc] init];
+            [self.navigationController pushViewController:lanList animated:YES];
         }
     }
-    if (nextViewController) {
-        [self.navigationController pushViewController:nextViewController animated:YES];
-    }
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
 #pragma mark - Actions
@@ -211,9 +163,9 @@
                             [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"]];
 #endif
     NSString *aboutMessage = NSLocalizedString(@"Low latency, high quality voice chat", nil);
-
+    
     UIAlertController* aboutAlert = [UIAlertController alertControllerWithTitle:aboutTitle message:aboutMessage preferredStyle:UIAlertControllerStyleAlert];
-
+    
     [aboutAlert addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
                                                     style:UIAlertActionStyleCancel
                                                   handler:nil]];
@@ -235,7 +187,7 @@
                                                   handler:^(UIAlertAction * _Nonnull action) {
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://github.com/mumble-voip/mumble-iphoneos/issues"] options:@{} completionHandler:nil];
     }]];
-
+    
     [self presentViewController:aboutAlert animated:YES completion:nil];
 }
 
@@ -243,14 +195,14 @@
     if (_prefsPopover != nil) {
         return;
     }
-
+    
     MUPreferencesViewController *prefs = [[MUPreferencesViewController alloc] init];
     UINavigationController *navCtrl = [[UINavigationController alloc] initWithRootViewController:prefs];
     UIPopoverController *popOver = [[UIPopoverController alloc] initWithContentViewController:navCtrl];
     popOver.popoverBackgroundViewClass = [MUPopoverBackgroundView class];
     popOver.delegate = self;
     [popOver presentPopoverFromBarButtonItem:sender permittedArrowDirections:UIPopoverArrowDirectionUp animated:YES];
-
+    
     _prefsPopover = popOver;
 }
 

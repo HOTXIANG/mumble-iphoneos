@@ -146,16 +146,15 @@
 }
 
 - (void) drawRect:(CGRect)rect {
+
     UIImage *balloon = nil;
     UIImage *stretchableBalloon = nil;
 
-    // 现代化气泡样式选择
-    if (@available(iOS 13.0, *)) {
+    if (@available(iOS 7, *)) {
         if (_rightSide) {
             if (_selected) {
                 balloon = [UIImage imageNamed:@"RightBalloonSelectedMono"];
             } else {
-                // 使用更现代的气泡或纯色背景
                 balloon = [UIImage imageNamed:@"Balloon_2_Right"];
             }
             stretchableBalloon = [balloon resizableImageWithCapInsets:UIEdgeInsetsMake(kBalloonTopInset, kBalloonNoTailInset, kBalloonBottomInset, kBalloonTailInset)];
