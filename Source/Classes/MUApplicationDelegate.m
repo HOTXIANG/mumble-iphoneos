@@ -76,7 +76,7 @@
                                                                 [NSNumber numberWithBool:YES],     @"AudioPreprocessor",
                                                                 [NSNumber numberWithBool:YES],     @"AudioEchoCancel",
                                                                 [NSNumber numberWithFloat:1.0f],   @"AudioMicBoost",
-                                                                @"balanced",                       @"AudioQualityKind",
+                                                                @"high",                       @"AudioQualityKind",
                                                                 [NSNumber numberWithBool:NO],      @"AudioSidetone",
                                                                 [NSNumber numberWithFloat:0.2f],   @"AudioSidetoneVolume",
                                                                 [NSNumber numberWithBool:YES],     @"AudioSpeakerPhoneMode",

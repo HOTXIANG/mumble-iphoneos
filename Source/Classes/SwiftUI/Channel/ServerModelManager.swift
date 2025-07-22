@@ -211,13 +211,27 @@ class ServerModelManager: ObservableObject {
                 }
     }
     
+    // 新增：一个用于将纯文本转换为 AttributedString 的辅助函数
+        private func attributedString(from plainText: String) -> AttributedString {
+            do {
+                // 使用 Markdown 解析器来自动识别链接
+                // `inlineOnlyPreservingWhitespace` 选项能最好地保留原始文本的格式
+                return try AttributedString(markdown: plainText, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
+            } catch {
+                // 如果 Markdown 解析失败，则返回一个普通的字符串
+                print("Could not parse markdown: \(error)")
+                return AttributedString(plainText)
+            }
+        }
+    
     // --- 核心修改 2：添加一个创建系统通知的新方法 ---
         private func addChannelJoinNotification(channelName: String) {
+            let text = "You have joined the channel: \(channelName)"
             let notificationMessage = ChatMessage(
                 id: UUID(),
                 type: .notification, // 类型为系统通知
                 senderName: "System", // 发送者为系统
-                message: "You have joined the channel: \(channelName)", // 通知内容
+                attributedMessage: AttributedString(text),
                 images: [],
                 timestamp: Date(),
                 isSentBySelf: false
@@ -271,9 +285,9 @@ class ServerModelManager: ObservableObject {
                 
         let chatMessage = ChatMessage(
             id: UUID(),
-            type: .notification,
+            type: .userMessage,
             senderName: senderName,
-            message: plainText,
+            attributedMessage: attributedString(from: plainText),
             images: images,
             timestamp: Date(),
             isSentBySelf: senderSession == connectedUserSession
@@ -291,7 +305,7 @@ class ServerModelManager: ObservableObject {
         
         // processedHTMLFromPlainTextMessage 会将纯文本转换为带 <p> 标签的 HTML
         let htmlMessage = MUTextMessageProcessor.processedHTML(
-            fromPlainTextMessage: text
+            fromPlainTextMessage: trimmedText
         )
             
         // 使用编译器提示的、正确的初始化方法
@@ -304,9 +318,9 @@ class ServerModelManager: ObservableObject {
         // 立即在UI上显示自己发送的消息，体验更流畅
         let selfMessage = ChatMessage(
             id: UUID(),
-            type: .notification,
+            type: .userMessage,
             senderName: serverModel.connectedUser()?.userName() ?? "Me",
-            message: text,
+            attributedMessage: attributedString(from: trimmedText),
             images: [],
             timestamp: Date(),
             isSentBySelf: true
@@ -320,8 +334,7 @@ class ServerModelManager: ObservableObject {
         // 将 CPU 密集型任务（压缩和编码）放到后台线程执行
                 let compressedData = await Task.detached(priority: .userInitiated) {
                     let maxSizeInBytes = 60 * 1024 // Mumble 消息大小上限
-                    let compressedImage = self.compressImage(image, maxSizeInBytes: maxSizeInBytes)
-                    return compressedImage.jpegData(compressionQuality: 0.8)
+                    return self.compressImage(image, toTargetSizeInBytes: maxSizeInBytes)
                 }.value
                 
                 guard let imageData = compressedData else {
@@ -340,35 +353,72 @@ class ServerModelManager: ObservableObject {
                 
                 // 立即在UI上显示自己发送的图片 (UI更新会自动回到主线程)
                 let finalImage = UIImage(data: imageData) ?? image
-                let selfMessage = ChatMessage(
-                    id: UUID(), type: .userMessage, senderName: serverModel.connectedUser()?.userName() ?? "Me",
-                    message: "", images: [finalImage], timestamp: Date(), isSentBySelf: true
-                )
+        let selfMessage = ChatMessage(
+            id: UUID(),
+            type: .userMessage,
+            senderName: serverModel
+                .connectedUser()?
+                .userName() ?? "Me",
+            attributedMessage: AttributedString(""),
+            images: [finalImage],
+            timestamp: Date(),
+            isSentBySelf: true
+        )
                 messages.append(selfMessage)
         }
 
         // 新增一个私有辅助函数，用于压缩图片
-        private nonisolated func compressImage(_ image: UIImage, maxSizeInBytes: Int) -> UIImage {
-            var compressedImage = image
-            var compressionQuality: CGFloat = 1.0
+    private nonisolated func compressImage(_ image: UIImage, toTargetSizeInBytes targetSize: Int) -> Data? {
+        let imageData = image.jpegData(compressionQuality: 1.0)
             
-            // 首先通过调整 JPEG 质量来压缩
-            while let data = compressedImage.jpegData(compressionQuality: compressionQuality), data.count > maxSizeInBytes && compressionQuality > 0.1 {
-                compressionQuality -= 0.1
+            // 如果图片本来就小于目标大小，直接返回最高质量的JPEG数据
+            if let data = imageData, data.count <= targetSize {
+                return data
+            }
+
+            // --- 使用二分搜索寻找最佳压缩质量 ---
+            var minQuality: CGFloat = 0.0
+            var maxQuality: CGFloat = 1.0
+            var bestImageData: Data?
+
+            for _ in 0..<8 { // 8次迭代足以达到很高的精度
+                let currentQuality = (minQuality + maxQuality) / 2
+                guard let data = image.jpegData(compressionQuality: currentQuality) else { continue }
+                
+                if data.count <= targetSize {
+                    // 这是一个可行的方案，保存它，然后尝试寻找更高质量的方案
+                    bestImageData = data
+                    minQuality = currentQuality
+                } else {
+                    // 图片还是太大，降低质量上限
+                    maxQuality = currentQuality
+                }
+            }
+
+            // 如果通过降低质量找到了一个可行的方案，就返回它
+            if let finalData = bestImageData {
+                 print("✅ Compressed image with quality \(minQuality) to \(finalData.count) bytes.")
+                return finalData
+            }
+
+            // --- 如果最低质量依然过大，则开始降低分辨率 ---
+            // (这种情况很少见，但作为备用方案)
+            var scale: CGFloat = 0.9
+            var resizedImage = image
+            while let newImage = resizedImage.resized(by: scale),
+                  let data = newImage.jpegData(compressionQuality: 0.75), // 使用一个较高的质量
+                  data.count > targetSize && scale > 0.1 {
+                resizedImage = newImage
+                scale -= 0.1
             }
             
-            // 如果调整质量后依然过大，则开始降低分辨率
-            if let data = compressedImage.jpegData(compressionQuality: compressionQuality), data.count > maxSizeInBytes {
-                var scale: CGFloat = 0.9
-                while let resizedData = compressedImage.resized(by: scale)?.jpegData(compressionQuality: 0.8), resizedData.count > maxSizeInBytes && scale > 0.1 {
-                    scale -= 0.1
-                }
-                if let finalImage = compressedImage.resized(by: scale) {
-                    compressedImage = finalImage
-                }
+            if let finalImage = resizedImage.resized(by: scale) {
+                 print("⚠️ Image too large, had to resize by scale \(scale).")
+                return finalImage.jpegData(compressionQuality: 0.75)
             }
             
-            return compressedImage
+            // 最终的备用方案：返回最低质量的原始图片数据
+            return image.jpegData(compressionQuality: 0.0)
         }
     
     func updateUserBySession(

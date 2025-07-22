@@ -26,7 +26,7 @@ struct ChannelListView: View {
         .toolbar {
             // 左上角按钮组
             ToolbarItemGroup(placement: .navigationBarLeading) {
-                HStack(spacing: 16) {
+                HStack(alignment: .center, spacing: 16) {
                     // Self-Deafen 按钮
                     Button(action: {
                         hapticGenerator.impactOccurred()
@@ -35,7 +35,7 @@ struct ChannelListView: View {
                         Image(systemName: serverManager.connectedUserState?.isSelfDeafened == true ? "speaker.slash.fill" : "speaker.wave.2.fill")
                             .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
                     }
-
+                    
                     // Self-Mute 按钮
                     Button(action: {
                         hapticGenerator.impactOccurred()
@@ -46,11 +46,12 @@ struct ChannelListView: View {
                     }
                 }
                 .tint(.primary)
+                .padding(.horizontal,8)
             }
 
             // 右上角按钮组
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                HStack(spacing: 16) {
+                HStack(alignment: .center, spacing: 16) {
                     // “更多”菜单按钮 - 保留图标样式
                     Button(action: {
                         hapticGenerator.impactOccurred()
@@ -58,7 +59,7 @@ struct ChannelListView: View {
                     }) {
                         Image(systemName: "ellipsis")
                     }
-
+                    
                     // “离开”按钮
                     Button(action: {
                         hapticGenerator.impactOccurred()
@@ -69,6 +70,7 @@ struct ChannelListView: View {
                     }
                 }
                 .tint(.primary)
+                .padding(.horizontal,8)
             }
         }
         .confirmationDialog("Server Menu", isPresented: $showingMenu, titleVisibility: .visible) {

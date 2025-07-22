@@ -90,8 +90,15 @@ struct ChatMessage: Identifiable, Equatable {
     let id: UUID
     let type: ChatMessageType // 新增的类型属性
     let senderName: String
-    let message: String
+    let attributedMessage: AttributedString
     let images: [UIImage]
     let timestamp: Date
     let isSentBySelf: Bool
+    
+    // 为了方便，我们保留一个纯文本的计算属性
+    var plainTextMessage: String {
+        return attributedMessage.description
+    }
 }
+
+
