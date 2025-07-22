@@ -145,6 +145,8 @@ struct FavouriteServerListContentView: View {
         "MUConnectionOpenedNotification"
     )
     
+    private let successHaptic = UINotificationFeedbackGenerator()
+    
     var body: some View {
         ZStack {
             LinearGradient(
@@ -325,7 +327,17 @@ struct FavouriteServerListContentView: View {
         Task {
             @MainActor in print(
                 "✅ Received 'MUConnectionOpenedNotification'! Updating global state."
-            ); self.showingConnectionAlert = false; withAnimation(
+            );
+            // 1. 准备并触发第一次强烈的震动
+            successHaptic.prepare()
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                        
+            // 2. 延迟一小段时间后，触发震动
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
+            
+            self.showingConnectionAlert = false; withAnimation(
                 .spring()
             ) {
                 AppState.shared.isConnected = true

@@ -33,8 +33,8 @@ struct ChannelView: View {
                 // 将所有 onAppear 的逻辑合并到一个地方
                 let appearance = UITabBarAppearance()
                 appearance.configureWithTransparentBackground()
-                UITabBar.appearance().standardAppearance = appearance
-                UITabBar.appearance().scrollEdgeAppearance = appearance
+                //UITabBar.appearance().standardAppearance = appearance
+                //UITabBar.appearance().scrollEdgeAppearance = appearance
                 
                 serverManager.activate()
             }

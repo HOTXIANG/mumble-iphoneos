@@ -287,26 +287,70 @@ struct AppRootView: View {
     // 监听我们创建的全局状态
     @StateObject private var appState = AppState.shared
 
+    // 为两个独立的导航栈分别创建 NavigationManager
+    @StateObject private var disconnectedNavManager = NavigationManager()
+    @StateObject private var connectedNavManager = NavigationManager()
+
     var body: some View {
         // 使用ZStack可以帮助动画系统在过渡期间更好地管理两个视图
         ZStack {
             // 根据 isConnected 的值来决定显示哪个界面
             if appState.isConnected {
                 // 如果已连接，直接显示频道界面
-                NavigationStack {
+                NavigationStack(path: $connectedNavManager.navigationPath) {
                     ChannelListView()
+                    .navigationDestination(for: NavigationDestination.self) { destination in
+                        // 使用与 WelcomeRootView 相同的导航地图
+                        destinationView(for: destination, with: connectedNavManager)
+                    }
                 }
+                .environmentObject(connectedNavManager)
                 .preferredColorScheme(.dark)
                 // 频道视图的动画：总是从右侧滑入和滑出
                 .transition(.move(edge: .trailing))
                 .zIndex(1) // 确保它在顶层
             } else {
                 // 如果未连接，显示我们现有的欢迎界面流程
-                WelcomeRootView()
-                    // 欢迎页的动画：原地淡入淡出，不滑动
-                    .transition(.opacity)
-                    .zIndex(0) // 确保它在底层
+                NavigationStack(path: $disconnectedNavManager.navigationPath) {
+                    WelcomeView()
+                    .navigationDestination(for: NavigationDestination.self) { destination in
+                        destinationView(for: destination, with: disconnectedNavManager)
+                    }
+                }
+                .environmentObject(disconnectedNavManager)
+                .preferredColorScheme(.dark)
+                .transition(.opacity)
+                .zIndex(0)
             }
         }
     }
+    
+    @ViewBuilder
+        private func destinationView(for destination: NavigationDestination, with manager: NavigationManager) -> some View {
+            switch destination {
+            case .objectiveC(let type):
+                ObjectiveCViewWrapper(controllerType: type)
+            case .swiftUI(let type):
+                switch type {
+                case .favouriteServerList:
+                    FavouriteServerListView()
+                case .favouriteServerEdit(let primaryKey):
+                    let server: MUFavouriteServer? = {
+                        guard let key = primaryKey else { return nil }
+                        if let allFavourites = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] {
+                            return allFavourites.first { $0.primaryKey == key }
+                        }
+                        return nil
+                    }()
+                    FavouriteServerEditView(server: server) { serverToSave in
+                        MUDatabase.storeFavourite(serverToSave)
+                        manager.goBack()
+                    }
+                case .channelList:
+                    // ChannelListView 不应该在这里被导航到，因为它已经是根视图
+                    // 但为了完整性，我们保留这个 case
+                    EmptyView()
+                }
+            }
+        }
 }
