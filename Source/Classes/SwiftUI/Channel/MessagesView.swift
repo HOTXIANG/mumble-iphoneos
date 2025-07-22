@@ -1,6 +1,7 @@
 // 文件: MessagesView.swift (最终版)
 
 import SwiftUI
+import PhotosUI
 
 // 新的系统通知视图
 private struct NotificationMessageView: View {
@@ -52,7 +53,8 @@ private struct MessageBubbleView: View {
                     Text(
                         message.message
                     )
-                    .foregroundColor(.black)
+                    .foregroundColor(message.isSentBySelf ? .white : .black)
+                    .textSelection(.enabled)
                 }
                 // 显示图片
                 if !message.images.isEmpty {
@@ -81,7 +83,7 @@ private struct MessageBubbleView: View {
             }
             .padding(
                 .horizontal,
-                12
+                !message.images.isEmpty ? 8 : 10
             )
             .padding(
                 .vertical,
@@ -113,9 +115,12 @@ private struct MessageBubbleView: View {
 
 struct MessagesView: View {
     @ObservedObject var serverManager: ServerModelManager
-    @State private var isInputActive: Bool = false
     @State private var newMessage = ""
     @FocusState private var isTextFieldFocused: Bool
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedImageForPreview: UIImage?
+    @State private var isSendingImage = false
+    
     private let bottomID = "bottomOfMessages"
     
     var body: some View {
@@ -131,175 +136,161 @@ struct MessagesView: View {
                 endPoint: .bottom
             ).ignoresSafeArea()
             
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(
-                        alignment: .leading,
-                        spacing: 16
-                    ) { // 增大气泡间距
-                        // --- 核心修改 1：循环遍历真实的消息数组 ---
-                        ForEach(
-                            serverManager.messages
-                        ) { message in
-                            MessageBubbleView(
-                                message: message
-                            )
+            ZStack(alignment: .bottom) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 16) {
+                            ForEach(serverManager.messages) { message in
+                                MessageBubbleView(message: message)
+                            }
+                            Color.clear.frame(height: 1).id(bottomID)
                         }
-                        Color.clear
-                            .frame(
-                                height: 1
-                            )
-                            .id(
-                                bottomID
-                            )
+                        .padding()
                     }
-                    .padding()
-                }
-                .padding(
-                    .bottom,
-                    isInputActive ? 85 : 50
-                )
-                // --- 核心修改 2：当消息数组变化时，自动滚动到底部 ---
-                .onChange(
-                    of: serverManager.messages
-                ) {
-                    withAnimation {
-                        proxy
-                            .scrollTo(
-                                bottomID,
-                                anchor: .bottom
-                            )
+                    // --- 核心修改 3：添加手势交互式关闭键盘 ---
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: serverManager.messages) {
+                        withAnimation {
+                            proxy.scrollTo(bottomID, anchor: .bottom)
+                        }
                     }
                 }
-            }
-            
-            if isInputActive {
+                
                 TextInputBar(
                     text: $newMessage,
                     isFocused: $isTextFieldFocused,
-                    onSend: sendMessage,
-                    onDismiss: {
-                        isInputActive = false
-                    })
-            } else {
-                Button(
-                    action: {
-                        isInputActive = true
-                    }) {
-                        Image(
-                            systemName: "keyboard.fill"
-                        )
-                        .font(
-                            .title2
-                        )
-                        .foregroundColor(
-                            .white
-                        )
-                        .padding()
-                        .background(
-                            Color.accentColor,
-                            in: Circle()
-                        )
-                        .shadow(
-                            radius: 5
-                        )
+                    onSendText: sendTextMessage,
+                    onSendImage: { image in
+                        // 当选择了图片后，弹出确认框
+                        isTextFieldFocused = false
+                        selectedImageForPreview = image
                     }
-                    .padding()
-                    .padding(
-                        .bottom,
-                        40
-                    )
-                    .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity,
-                        alignment: .bottomTrailing
-                    )
-                    .transition(
-                        .scale.combined(
-                            with: .opacity
-                        )
-                    )
+                )
             }
         }
-        .animation(
-            .spring(
-                response: 0.4,
-                dampingFraction: 0.8
-            ),
-            value: isInputActive
-        )
+        // 当键盘出现或消失时，应用动画
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTextFieldFocused)
+        // 图片确认 Sheet 保持不变
+        .sheet(item: $selectedImageForPreview) { image in
+            ImageConfirmationView(
+                image: image,
+                onCancel: {
+                    selectedImageForPreview = nil
+                },
+                onSend: { imageToSend in
+                    // 直接调用异步的 sendImageMessage
+                    await sendImageMessage(image: imageToSend)
+                    // 发送完成后，关闭 sheet
+                    selectedImageForPreview = nil
+                }
+            )
+            .presentationDetents([.medium , .large])
+        }
     }
     
     // --- 核心修改 3：发送消息方法现在调用 serverManager ---
-    private func sendMessage() {
-        guard !newMessage.isEmpty else {
-            return
+    private func sendTextMessage() {
+            guard !newMessage.isEmpty else { return }
+            serverManager.sendTextMessage(newMessage)
+            newMessage = ""
         }
-        serverManager
-            .sendTextMessage(
-                newMessage
-            )
-        newMessage = "" // 清空输入框
+        
+    private func sendImageMessage(image: UIImage) async {
+        await serverManager.sendImageMessage(image: image)
+        }
+}
+
+private struct ImageConfirmationView: View {
+    let image: UIImage
+    let onCancel: () -> Void
+    let onSend: (UIImage) async -> Void
+    @State private var isSending = false
+
+    var body: some View {
+        // 不再使用 NavigationView，让视图更紧凑
+        VStack(spacing: 16) {
+            if isSending {
+                // 加载状态
+                ProgressView("Compressing and Sending...")
+                    .padding(.vertical, 80) // 给加载视图一个合适的高度
+            } else {
+                // 预览状态
+                Text("Confirm Image")
+                    .font(.headline)
+                    .padding(.top, 20)
+                    
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .cornerRadius(12) // 给图片预览也加上圆角
+                    .padding(.horizontal)
+
+                HStack(spacing: 20) {
+                    Button("Cancel", role: .cancel, action: onCancel)
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        
+                    Button("Send") {
+                        Task {
+                            isSending = true
+                            await onSend(image)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                }
+            }
+        }
+        .padding(.bottom)
+        // 在发送过程中，禁止用户通过向下滑动来关闭弹窗
+        .interactiveDismissDisabled(isSending)
     }
 }
 
-// TextInputBar 保持不变
 private struct TextInputBar: View {
-    @Binding var text: String; @FocusState.Binding var isFocused: Bool; let onSend: () -> Void; let onDismiss: () -> Void
+    @Binding var text: String
+    @FocusState.Binding var isFocused: Bool
+    let onSendText: () -> Void
+    let onSendImage: (UIImage) async -> Void
+    
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var editorHeight: CGFloat = 40
+    
     var body: some View {
         HStack(
             alignment: .center,
             spacing: 10
         ) {
-            Button(
-                action: {
-                    isFocused = false; onDismiss()
-                }) {
-                    Image(
-                        systemName: "xmark"
-                    ).font(
-                        .system(
-                            size: 17,
-                            weight: .semibold
-                        )
-                    ).foregroundColor(
-                        .secondary
-                    ).frame(
-                        width: 40,
-                        height: 40
-                    ).background(
-                        Color(
-                            uiColor: .systemGray4
-                        ),
-                        in: Circle()
-                    )
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(.accentColor)
+                    .frame(width: 40, height: 40)
+            }
+            .onChange(of: selectedPhoto) {
+                Task {
+                    if let data = try? await selectedPhoto?.loadTransferable(
+                        type: Data.self
+                    ),
+                       let image = UIImage(data: data) {
+                        await onSendImage(image)
+                    }
+                    // 选择后重置，以便可以再次选择同一张图片
+                    selectedPhoto = nil
                 }
-                .buttonStyle(
-                    .plain
+            }
+            TextField("Type a message...", text: $text, axis: .vertical)
+                .focused($isFocused)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .frame(minHeight: 40)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Color(uiColor: .systemGray4), lineWidth: 1)
                 )
-            TextField(
-                "Type a message...",
-                text: $text,
-                onCommit: onSend
-            )
-            .focused(
-                $isFocused
-            )
-            .padding(
-                .horizontal,
-                16
-            )
-            .frame(
-                height: 40
-            )
-            .background(
-                Color(
-                    uiColor: .systemGray6
-                ),
-                in: Capsule()
-            )
+            
             Button(
-                action: onSend
+                action: onSendText
             ) {
                 Image(
                     systemName: "arrow.up"
@@ -309,17 +300,23 @@ private struct TextInputBar: View {
                         weight: .semibold
                     )
                 ).foregroundColor(
-                    text.isEmpty ? .white : .white
+                    .white
                 ).frame(
                     width: 40,
                     height: 40
-                ).background(
-                    text.isEmpty ? Color.gray : Color.accentColor,
-                    in: Circle()
-                )
+                ).background(Circle()
+                    .fill(.regularMaterial)
+                    .overlay(
+                        Circle()
+                            .fill(text.isEmpty ? Color.gray.opacity(0.5) : Color.blue.opacity(0.7))
+                    )
+                             )
             }
             .buttonStyle(
                 .plain
+            )
+            .overlay(
+                Circle().stroke(Color(uiColor: .systemGray4), lineWidth: 1)
             )
             .disabled(
                 text.isEmpty
@@ -331,14 +328,12 @@ private struct TextInputBar: View {
             8
         ).background(
             Color.clear
-        ).transition(
-            .move(
-                edge: .bottom
-            ).combined(
-                with: .opacity
-            )
-        ).onAppear {
-            isFocused = true
-        }
+        )
+    }
+}
+
+extension UIImage: Identifiable {
+    public var id: String {
+        return UUID().uuidString
     }
 }

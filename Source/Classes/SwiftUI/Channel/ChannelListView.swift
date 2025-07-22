@@ -21,6 +21,8 @@ struct ChannelListView: View {
         .navigationBarBackButtonHidden(true)
         .navigationTitle(Text(serverManager.serverName ?? "Channel"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .navigationBar) // 确保背景区域可见
+        .toolbarBackground(.clear, for: .navigationBar) // 设置背景为玻璃材质
         .toolbar {
             // 左上角按钮组
             ToolbarItemGroup(placement: .navigationBarLeading) {

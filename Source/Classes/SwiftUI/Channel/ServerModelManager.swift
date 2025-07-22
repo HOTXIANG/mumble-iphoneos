@@ -314,6 +314,63 @@ class ServerModelManager: ObservableObject {
         messages.append(selfMessage)
     }
     
+    func sendImageMessage(image: UIImage) async {
+        guard let serverModel = serverModel else { return }
+        
+        // 将 CPU 密集型任务（压缩和编码）放到后台线程执行
+                let compressedData = await Task.detached(priority: .userInitiated) {
+                    let maxSizeInBytes = 60 * 1024 // Mumble 消息大小上限
+                    let compressedImage = self.compressImage(image, maxSizeInBytes: maxSizeInBytes)
+                    return compressedImage.jpegData(compressionQuality: 0.8)
+                }.value
+                
+                guard let imageData = compressedData else {
+                    print("🔴 Error: Could not convert compressed UIImage to JPEG data.")
+                    return
+                }
+                
+                let base64String = imageData.base64EncodedString()
+                let dataURI = "data:image/jpeg;base64,\(base64String)"
+                let htmlMessage = "<img src=\"\(dataURI)\" />"
+                let message = MKTextMessage(string: htmlMessage)
+                
+                if let userChannel = serverModel.connectedUser()?.channel() {
+                    serverModel.send(message, to: userChannel)
+                }
+                
+                // 立即在UI上显示自己发送的图片 (UI更新会自动回到主线程)
+                let finalImage = UIImage(data: imageData) ?? image
+                let selfMessage = ChatMessage(
+                    id: UUID(), type: .userMessage, senderName: serverModel.connectedUser()?.userName() ?? "Me",
+                    message: "", images: [finalImage], timestamp: Date(), isSentBySelf: true
+                )
+                messages.append(selfMessage)
+        }
+
+        // 新增一个私有辅助函数，用于压缩图片
+        private nonisolated func compressImage(_ image: UIImage, maxSizeInBytes: Int) -> UIImage {
+            var compressedImage = image
+            var compressionQuality: CGFloat = 1.0
+            
+            // 首先通过调整 JPEG 质量来压缩
+            while let data = compressedImage.jpegData(compressionQuality: compressionQuality), data.count > maxSizeInBytes && compressionQuality > 0.1 {
+                compressionQuality -= 0.1
+            }
+            
+            // 如果调整质量后依然过大，则开始降低分辨率
+            if let data = compressedImage.jpegData(compressionQuality: compressionQuality), data.count > maxSizeInBytes {
+                var scale: CGFloat = 0.9
+                while let resizedData = compressedImage.resized(by: scale)?.jpegData(compressionQuality: 0.8), resizedData.count > maxSizeInBytes && scale > 0.1 {
+                    scale -= 0.1
+                }
+                if let finalImage = compressedImage.resized(by: scale) {
+                    compressedImage = finalImage
+                }
+            }
+            
+            return compressedImage
+        }
+    
     func updateUserBySession(
         _ session: UInt
     ) {
@@ -559,5 +616,16 @@ class ServerModelManager: ObservableObject {
             }) else {
             return nil
         }; return connectedUserItem.state
+    }
+}
+
+extension UIImage {
+    func resized(by scale: CGFloat) -> UIImage? {
+        let newSize = CGSize(width: self.size.width * scale, height: self.size.height * scale)
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        self.draw(in: CGRect(origin: .zero, size: newSize))
+        let newImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return newImage
     }
 }

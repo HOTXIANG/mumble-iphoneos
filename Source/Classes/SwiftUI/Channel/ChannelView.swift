@@ -41,5 +41,6 @@ struct ChannelView: View {
             .onDisappear {
                 serverManager.cleanup()
             }
+            .ignoresSafeArea(edges: .top)
         }
 }
