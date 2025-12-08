@@ -148,6 +148,7 @@ enum ObjectiveCControllerType: Hashable, Equatable {
     case lanServers
     case preferences
     case legal
+    case certificates
 }
 
 // Objective-C 视图控制器包装器 (保持不变)
@@ -166,6 +167,8 @@ struct ObjectiveCViewWrapper: UIViewControllerRepresentable {
             return MUPreferencesViewController()
         case .legal:
             return MULegalViewController()
+        case .certificates:
+            return MUCertificatePreferencesViewController()
         }
     }
     

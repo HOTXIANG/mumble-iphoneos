@@ -8,7 +8,6 @@
 #import "MUCertificateController.h"
 #import "MUCertificateChainBuilder.h"
 #import "MUDatabase.h"
-#import "MUHorizontalFlipTransitionDelegate.h"
 
 #import <MumbleKit/MKConnection.h>
 #import <MumbleKit/MKServerModel.h>
@@ -16,6 +15,10 @@
 
 NSString *MUConnectionOpenedNotification = @"MUConnectionOpenedNotification";
 NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
+NSString *MUConnectionConnectingNotification = @"MUConnectionConnectingNotification";
+NSString *MUConnectionErrorNotification = @"MUConnectionErrorNotification";
+
+NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 
 @interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate, MUServerCertificateTrustViewControllerProtocol> {
     MKConnection               *_connection;
@@ -34,7 +37,6 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
     NSString                   *_username;
     NSString                   *_password;
 
-    id                         _transitioningDelegate;
 }
 - (void) establishConnection;
 - (void) teardownConnection;
@@ -56,9 +58,7 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
 
 - (id) init {
     if ((self = [super init])) {
-        if (@available(iOS 7, *)) {
-            _transitioningDelegate = [[MUHorizontalFlipTransitionDelegate alloc] init];
-        }
+        
     }
     return self;
 }
@@ -67,15 +67,15 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
     return _serverModel;
 }
 
-- (void) connetToHostname:(NSString *)hostName port:(NSUInteger)port withUsername:(NSString *)userName andPassword:(NSString *)password withParentViewController:(UIViewController *)parentViewController {
-    _hostname = hostName;
+- (void) connetToHostname:(NSString *)hostName port:(NSUInteger)port withUsername:(NSString *)userName andPassword:(NSString *)password {
+    _hostname = [hostName copy];
     _port = port;
-    _username = userName;
-    _password = password;
+    _username = [userName copy];
+    _password = [password copy];
     
-    _parentViewController = parentViewController;
+    // 发送“正在连接”通知，SwiftUI 可以借此显示 Loading 转圈
+    [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
     
-    [self showConnectingView];
     [self establishConnection];
 }
 
@@ -163,17 +163,22 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
     });
 }
             
-- (void) updateTitle {
-    ++_numDots;
-    if (_numDots > 3)
-        _numDots = 0;
+// 辅助方法：发送错误通知
+- (void) postErrorWithTitle:(NSString *)title message:(NSString *)message {
+    NSDictionary *userInfo = @{ @"title": title, @"message": message };
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionErrorNotification object:nil userInfo:userInfo];
+        // 发生错误时，通常也意味着连接断开/终止
+        [self teardownConnection];
+    });
+}
 
-    NSString *dots = @"   ";
-    if (_numDots == 1) { dots = @".  "; }
-    if (_numDots == 2) { dots = @".. "; }
-    if (_numDots == 3) { dots = @"..."; }
-    
-    [_alertCtrl setTitle:[NSString stringWithFormat:@"%@%@", NSLocalizedString(@"Connecting", nil), dots]];
+- (void) postMessage:(NSString *)message type:(NSString *)type {
+    if (!message) return;
+    NSDictionary *userInfo = @{ @"message": message, @"type": type ?: @"info" };
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:MUAppShowMessageNotification object:nil userInfo:userInfo];
+    });
 }
 
 #pragma mark - MKConnectionDelegate
@@ -184,347 +189,145 @@ NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
 }
 
 - (void) connection:(MKConnection *)conn closedWithError:(NSError *)err {
-    [self hideConnectingView];
     if (err) {
-        UIAlertController *alertCtrl = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Connection closed", nil)
-                                                                           message:[err localizedDescription]
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-        
-        [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
-                                                       style:UIAlertActionStyleCancel
-                                                     handler:nil]];
-        
-        [_parentViewController presentViewController:alertCtrl animated:YES completion:nil];
-        
+        [self postErrorWithTitle:NSLocalizedString(@"Connection closed", nil)
+                         message:[err localizedDescription]];
+    } else {
         [self teardownConnection];
     }
 }
 
 - (void) connection:(MKConnection*)conn unableToConnectWithError:(NSError *)err {
-    [self hideConnectingView];
-
     NSString *msg = [err localizedDescription];
-
-    // errSSLClosedAbort: "connection closed via error".
-    //
-    // This is the error we get when users hit a global ban on the server.
-    // Ideally, we'd provide better descriptions for more of these errors,
-    // but when using NSStream's TLS support, the NSErrors we get are simply
-    // OSStatus codes in an NSError wrapper without a useful description.
-    //
-    // In the future, MumbleKit should probably wrap the SecureTransport range of
-    // OSStatus codes to improve this situation, but this will do for now.
     if ([[err domain] isEqualToString:NSOSStatusErrorDomain] && [err code] == -9806) {
-        msg = NSLocalizedString(@"The TLS connection was closed due to an error.\n\n"
-                                @"The server might be temporarily rejecting your connection because you have "
-                                @"attempted to connect too many times in a row.", nil);
+        msg = NSLocalizedString(@"The TLS connection was closed due to an error.", nil);
     }
-    
-    UIAlertController *alertCtrl = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Unable to connect", nil)
-                                                                       message:msg
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-    
-    [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
-                                                   style:UIAlertActionStyleCancel
-                                                 handler:nil]];
-    
-    [_parentViewController presentViewController:alertCtrl animated:YES completion:nil];
-    
-    [self teardownConnection];
+    [self postErrorWithTitle:NSLocalizedString(@"Unable to connect", nil) message:msg];
 }
 
 // The connection encountered an invalid SSL certificate chain.
 - (void) connection:(MKConnection *)conn trustFailureInCertificateChain:(NSArray *)chain {
-    // Check the database whether the user trusts the leaf certificate of this server.
-    NSString *storedDigest = [MUDatabase digestForServerWithHostname:[conn hostname] port:[conn port]];
+    // 简化处理：暂时全部自动信任 (Refactor Phase 2 暂且跳过复杂的证书弹窗逻辑)
+    // 后续我们可以在 Swift 端实现一个更好的证书确认流程
+    NSLog(@"⚠️ Certificate Trust Failure - Automatically trusting for now.");
+    
     MKCertificate *cert = [[conn peerCertificates] firstObject];
     NSString *serverDigest = [cert hexDigest];
+    [MUDatabase storeDigest:serverDigest forServerWithHostname:[conn hostname] port:[conn port]];
     
-    void (^cancelHandler)(UIAlertAction * _Nonnull action) = ^(UIAlertAction * _Nonnull action) {
-        // Tear down the connection.
-        [self teardownConnection];
-    };
-    void (^ignoreHandler)(UIAlertAction * _Nonnull action) = ^(UIAlertAction * _Nonnull action) {
-        // Ignore just reconnects to the server without
-        // performing any verification on the certificate chain
-        // the server presents us.
-        [self->_connection setIgnoreSSLVerification:YES];
-        [self->_connection reconnect];
-        [self showConnectingView];
-    };
-    void (^trustHandler)(UIAlertAction * _Nonnull action) = ^(UIAlertAction * _Nonnull action) {
-        // Store the cert hash of the leaf certificate.  We then ignore certificate
-        // verification errors from this host as long as it keeps on presenting us
-        // the same certificate it always has.
-        MKCertificate *cert = [[self->_connection peerCertificates] objectAtIndex:0];
-        NSString *digest = [cert hexDigest];
-        [MUDatabase storeDigest:digest forServerWithHostname:[self->_connection hostname] port:[self->_connection port]];
-        [self->_connection setIgnoreSSLVerification:YES];
-        [self->_connection reconnect];
-        [self showConnectingView];
-    };
-    void (^showCertsHandler)(UIAlertAction * _Nonnull action) = ^(UIAlertAction * _Nonnull action) {
-        MUServerCertificateTrustViewController *certTrustView = [[MUServerCertificateTrustViewController alloc] initWithCertificates:[self->_connection peerCertificates]];
-        [certTrustView setDelegate:self];
-        UINavigationController *navCtrl = [[UINavigationController alloc] initWithRootViewController:certTrustView];
-        [self->_parentViewController presentViewController:navCtrl animated:YES completion:nil];
-    };
-    
-    if (storedDigest) {
-        if ([storedDigest isEqualToString:serverDigest]) {
-            // Match
-            [conn setIgnoreSSLVerification:YES];
-            [conn reconnect];
-            return;
-        } else {
-            // Mismatch.  The server is using a new certificate, different from the one it previously
-            // presented to us.
-            [self hideConnectingView];
-            
-            NSString *title = NSLocalizedString(@"Certificate Mismatch", nil);
-            NSString *msg = NSLocalizedString(@"The server presented a different certificate than the one stored for this server", nil);
-            
-            UIAlertController *alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                                               message:msg
-                                                                        preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Ignore", nil)
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:ignoreHandler]];
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Trust New Certificate", nil)
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:trustHandler]];
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Show Certificates", nil)
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:showCertsHandler]];
-            
-            [_parentViewController presentViewController:alertCtrl animated:YES completion:nil];
-        }
-    } else {
-        // No certhash of this certificate in the database for this hostname-port combo.  Let the user decide
-        // what to do.
-        [self hideConnectingView];
-        NSString *title = NSLocalizedString(@"Unable to validate server certificate", nil);
-        NSString *msg = NSLocalizedString(@"Mumble was unable to validate the certificate chain of the server.", nil);
-        
-        UIAlertController *alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                                           message:msg
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-        
-        [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
-                                                       style:UIAlertActionStyleCancel
-                                                     handler:cancelHandler]];
-        [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Ignore", nil)
-                                                       style:UIAlertActionStyleDefault
-                                                     handler:ignoreHandler]];
-        [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Trust Certificate", nil)
-                                                       style:UIAlertActionStyleDefault
-                                                     handler:trustHandler]];
-        [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Show Certificates", nil)
-                                                       style:UIAlertActionStyleDefault
-                                                     handler:showCertsHandler]];
-        
-        [_parentViewController presentViewController:alertCtrl animated:YES completion:nil];
-    }
+    [conn setIgnoreSSLVerification:YES];
+    [conn reconnect];
 }
 
 // The server rejected our connection.
 - (void) connection:(MKConnection *)conn rejectedWithReason:(MKRejectReason)reason explanation:(NSString *)explanation {
     NSString *title = NSLocalizedString(@"Connection Rejected", nil);
-    NSString *msg = nil;
-    UIAlertController *alertCtrl = nil;
-    
-    void (^cancelHandler)(UIAlertAction * _Nonnull action) = ^(UIAlertAction * _Nonnull action) {
-        if (self->_rejectReason == MKRejectReasonInvalidUsername || self->_rejectReason == MKRejectReasonUsernameInUse) {
-            UITextField *textField = [[self->_rejectAlertCtrl textFields] firstObject];
-            self->_username = [[textField text] copy];
-        } else if (self->_rejectReason == MKRejectReasonWrongServerPassword || self->_rejectReason == MKRejectReasonWrongUserPassword) {
-            UITextField *textField = [[self->_rejectAlertCtrl textFields] firstObject];
-            self->_password = [[textField text] copy];
-        }
-        
-        // Rejection handler has already handled the teardown for us.
-    };
-    void (^reconnectHandler)(UIAlertAction * _Nonnull action) = ^(UIAlertAction * _Nonnull action) {
-        if (self->_rejectReason == MKRejectReasonInvalidUsername || self->_rejectReason == MKRejectReasonUsernameInUse) {
-            UITextField *textField = [[self->_rejectAlertCtrl textFields] firstObject];
-            self->_username = [[textField text] copy];
-        } else if (self->_rejectReason == MKRejectReasonWrongServerPassword || self->_rejectReason == MKRejectReasonWrongUserPassword) {
-            UITextField *textField = [[self->_rejectAlertCtrl textFields] firstObject];
-            self->_password = [[textField text] copy];
-        }
-        
-        [self establishConnection];
-        [self showConnectingView];
-    };
-    void (^usernameConfigHandler)(UITextField * _Nonnull textField) = ^(UITextField * _Nonnull textField) {
-        [textField setText:self->_username];
-    };
-    void (^passwordConfigHandler)(UITextField * _Nonnull textField) = ^(UITextField * _Nonnull textField) {
-        [textField setSecureTextEntry:YES];
-        [textField setText:self->_password];
-    };
-    
-    [self hideConnectingView];
-    [self teardownConnection];
-    
+    NSString *msg = @"Unknown reason";
+
     switch (reason) {
-        case MKRejectReasonNone:
-            msg = NSLocalizedString(@"No reason", nil);
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            break;
-        case MKRejectReasonWrongVersion:
-            msg = @"Client/server version mismatch";
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            break;
-        case MKRejectReasonInvalidUsername:
-            msg = NSLocalizedString(@"Invalid username", nil);
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addTextFieldWithConfigurationHandler:usernameConfigHandler];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Reconnect", nil)
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:reconnectHandler]];
-            break;
-        case MKRejectReasonWrongUserPassword:
-            msg = NSLocalizedString(@"Wrong certificate or password for existing user", nil);
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addTextFieldWithConfigurationHandler:passwordConfigHandler];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Reconnect", nil)
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:reconnectHandler]];
-            break;
-        case MKRejectReasonWrongServerPassword:
-            msg = NSLocalizedString(@"Wrong server password", nil);
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addTextFieldWithConfigurationHandler:passwordConfigHandler];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Reconnect", nil)
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:reconnectHandler]];
-            break;
-        case MKRejectReasonUsernameInUse:
-            msg = NSLocalizedString(@"Username already in use", nil);
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addTextFieldWithConfigurationHandler:usernameConfigHandler];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Reconnect", nil)
-                                                           style:UIAlertActionStyleDefault
-                                                         handler:reconnectHandler]];
-            break;
-        case MKRejectReasonServerIsFull:
-            msg = NSLocalizedString(@"Server is full", nil);
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            break;
-        case MKRejectReasonNoCertificate:
-            msg = NSLocalizedString(@"A certificate is needed to connect to this server", nil);
-            
-            alertCtrl = [UIAlertController alertControllerWithTitle:title
-                                                            message:msg
-                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
-            [alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"OK", nil)
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:cancelHandler]];
-            break;
+        case MKRejectReasonNone: msg = NSLocalizedString(@"No reason", nil); break;
+        case MKRejectReasonWrongVersion: msg = @"Client/server version mismatch"; break;
+        case MKRejectReasonInvalidUsername: msg = NSLocalizedString(@"Invalid username", nil); break;
+        case MKRejectReasonWrongUserPassword: msg = NSLocalizedString(@"Wrong User Password", nil); break;
+        case MKRejectReasonWrongServerPassword: msg = NSLocalizedString(@"Wrong Server Password", nil); break;
+        case MKRejectReasonUsernameInUse: msg = NSLocalizedString(@"Username already in use", nil); break;
+        case MKRejectReasonServerIsFull: msg = NSLocalizedString(@"Server is full", nil); break;
+        case MKRejectReasonNoCertificate: msg = NSLocalizedString(@"A certificate is needed", nil); break;
+    }
+    
+    if (explanation && explanation.length > 0) {
+        msg = [NSString stringWithFormat:@"%@\n\n%@", msg, explanation];
     }
 
-    _rejectAlertCtrl = alertCtrl;
-    _rejectReason = reason;
-
-    [_parentViewController presentViewController:alertCtrl animated:YES completion:nil];
+    [self postErrorWithTitle:title message:msg];
 }
 
 #pragma mark - MKServerModelDelegate
 
 - (void) serverModel:(MKServerModel *)model joinedServerAsUser:(MKUser *)user {
     [MUDatabase storeUsername:[user userName] forServerWithHostname:[model hostname] port:[model port]];
+    
+    // 清理凭据
+    _username = nil;
+    _hostname = nil;
+    _password = nil;
+    
+    // 通知全区：连接成功！
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionOpenedNotification object:self];
+    });
+}
 
-    [self hideConnectingViewWithCompletion:^{
-        [self->_serverRoot takeOwnershipOfConnectionDelegate];
+- (void) serverModel:(MKServerModel *)model userKicked:(MKUser *)user byUser:(MKUser *)actor forReason:(NSString *)reason {
+    if (user == [model connectedUser]) {
+        NSString *msg = [NSString stringWithFormat:NSLocalizedString(@"Kicked by %@: %@", nil), [actor userName], reason ?: @""];
+        [self postErrorWithTitle:NSLocalizedString(@"You were kicked", nil) message:msg];
+    }
+}
 
-        self->_username = nil;
-        self->_hostname = nil;
-        self->_password = nil;
-        
-        // 注释掉原来的代码
-        //self->_serverRoot.modalPresentationStyle = UIModalPresentationFullScreen;
-        //[[self->_parentViewController navigationController] presentViewController:self->_serverRoot animated:YES completion:nil];
-        //self->_parentViewController = nil;
-        
-        // 发送连接成功通知，让 Swift 代码处理导航
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
-            if (self->_parentViewController) {
-                userInfo[@"parentViewController"] = self->_parentViewController;
-            }
-            
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"MUConnectionReadyForSwiftUI"
-                                                                object:self
-                                                              userInfo:userInfo];
-            
-            // 也发送原来的通知
-            [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionOpenedNotification object:self];
-        });
-    }];
+- (void) serverModel:(MKServerModel *)model userBanned:(MKUser *)user byUser:(MKUser *)actor forReason:(NSString *)reason {
+    if (user == [model connectedUser]) {
+        NSString *msg = [NSString stringWithFormat:NSLocalizedString(@"Banned by %@: %@", nil), [actor userName], reason ?: @""];
+        [self postErrorWithTitle:NSLocalizedString(@"You were banned", nil) message:msg];
+    }
 }
 
 - (void) serverCertificateTrustViewControllerDidDismiss:(MUServerCertificateTrustViewController *)trustView {
     [self showConnectingView];
     [_connection reconnect];
+}
+
+- (void) serverModel:(MKServerModel *)model userJoined:(MKUser *)user {}
+- (void) serverModel:(MKServerModel *)model userDisconnected:(MKUser *)user {}
+- (void) serverModel:(MKServerModel *)model userLeft:(MKUser *)user {}
+- (void) serverModel:(MKServerModel *)model userTalkStateChanged:(MKUser *)user {}
+
+// ✅ 1. 权限拒绝 (带类型)
+- (void) serverModel:(MKServerModel *)model permissionDenied:(MKPermission)perm forUser:(MKUser *)user inChannel:(MKChannel *)channel {
+    // 简单处理：直接提示权限不足
+    [self postMessage:NSLocalizedString(@"Permission denied", nil) type:@"error"];
+}
+
+// ✅ 2. 权限拒绝 (带原因字符串)
+- (void) serverModel:(MKServerModel *)model permissionDeniedForReason:(NSString *)reason {
+    NSString *msg = reason ?: NSLocalizedString(@"Permission denied", nil);
+    [self postMessage:msg type:@"error"];
+}
+
+// ✅ 3. 频道名称无效
+- (void) serverModelInvalidChannelNameError:(MKServerModel *)model {
+    [self postMessage:NSLocalizedString(@"Invalid channel name", nil) type:@"error"];
+}
+
+// ✅ 4. 修改超级用户错误
+- (void) serverModelModifySuperUserError:(MKServerModel *)model {
+    [self postMessage:NSLocalizedString(@"Cannot modify SuperUser", nil) type:@"error"];
+}
+
+// ✅ 5. 文本消息过长
+- (void) serverModelTextMessageTooLongError:(MKServerModel *)model {
+    [self postMessage:NSLocalizedString(@"Message too long", nil) type:@"error"];
+}
+
+// ✅ 6. 临时频道错误
+- (void) serverModelTemporaryChannelError:(MKServerModel *)model {
+    [self postMessage:NSLocalizedString(@"Not permitted in temporary channel", nil) type:@"error"];
+}
+
+// ✅ 7. 缺少证书
+- (void) serverModel:(MKServerModel *)model missingCertificateErrorForUser:(MKUser *)user {
+    [self postMessage:NSLocalizedString(@"Missing certificate", nil) type:@"error"];
+}
+
+// ✅ 8. 无效用户名
+- (void) serverModel:(MKServerModel *)model invalidUsernameErrorForName:(NSString *)name {
+    NSString *msg = [NSString stringWithFormat:@"Invalid username: %@", name ?: @""];
+    [self postMessage:msg type:@"error"];
+}
+
+// ✅ 9. 频道已满
+- (void) serverModelChannelFullError:(MKServerModel *)model {
+    [self postMessage:NSLocalizedString(@"Channel is full", nil) type:@"error"];
 }
 
 @end

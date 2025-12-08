@@ -3,10 +3,8 @@
 // license that can be found in the LICENSE file.
 
 #import "MUAudioSidetonePreferencesViewController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUColor.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 @implementation MUAudioSidetonePreferencesViewController
 
@@ -21,8 +19,6 @@
     [super viewWillAppear:animated];
     
     self.title = NSLocalizedString(@"Sidetone", nil);
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
@@ -80,20 +76,6 @@
     }
     
     return cell;
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Sidetone Feedback", nil)];
-    }
-    return nil;
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    }
-    return 0.0f;
 }
 
 #pragma mark - Actions

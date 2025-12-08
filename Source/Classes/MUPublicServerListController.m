@@ -5,9 +5,7 @@
 #import "MUPublicServerList.h"
 #import "MUPublicServerListController.h"
 #import "MUCountryServerListController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 @interface MUPublicServerListController () {
     MUPublicServerList        *_serverList;
@@ -27,8 +25,6 @@
     [super viewWillAppear:YES];
 
     self.navigationItem.title = NSLocalizedString(@"Public Servers", nil);
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
@@ -67,15 +63,6 @@
 - (NSInteger) numberOfSectionsInTableView:(UITableView *)tableView {
     return [_serverList numberOfContinents];
 }
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    return [MUTableViewHeaderLabel labelWithText:[_serverList continentNameAtIndex:section]];
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return [MUTableViewHeaderLabel defaultHeaderHeight];
-}
-
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     return [_serverList numberOfCountriesAtContinentIndex:section];

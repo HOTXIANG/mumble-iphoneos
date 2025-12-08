@@ -4,15 +4,12 @@
 
 #import "MUApplicationDelegate.h"
 
-#import "MUWelcomeScreenPhone.h"
-#import "MUWelcomeScreenPad.h"
 #import "MUDatabase.h"
 #import "MUPublicServerList.h"
 #import "MUConnectionController.h"
 #import "MUNotificationController.h"
 #import "MURemoteControlServer.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 #import "Mumble-Swift.h"  // 这是 Xcode 自动生成的 Swift 桥接头文件
 #import <MumbleKit/MKAudio.h>
@@ -34,6 +31,8 @@
 @end
 
 @implementation MUApplicationDelegate
+
+    NSTimeInterval _lastAudioRestartTime;
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 #ifdef MUMBLE_BETA_DIST
@@ -89,6 +88,11 @@
     // Disable mixer debugging for all builds.
     [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:NO] forKey:@"AudioMixerDebug"];
     
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                            selector:@selector(reloadPreferences)
+                                                name:@"MumblePreferencesChanged"
+                                            object:nil];
+    
     [self reloadPreferences];
     [MUDatabase initializeDatabase];
     
@@ -126,15 +130,9 @@
 
     UIUserInterfaceIdiom idiom = [[UIDevice currentDevice] userInterfaceIdiom];
     UIViewController *welcomeScreen = nil;
-    if (idiom == UIUserInterfaceIdiomPad) {
-        welcomeScreen = [[MUWelcomeScreenPad alloc] init];
-        [_navigationController pushViewController:welcomeScreen animated:YES];
-        [_window setRootViewController:_navigationController];
-    } else {
-        // iPhone 使用纯 SwiftUI 实现
-        SwiftRootViewControllerWrapper *swiftRoot = [[SwiftRootViewControllerWrapper alloc] init];
-        [_window setRootViewController:swiftRoot];
-    }
+    // iPhone 使用纯 SwiftUI 实现
+    SwiftRootViewControllerWrapper *swiftRoot = [[SwiftRootViewControllerWrapper alloc] init];
+    [_window setRootViewController:swiftRoot];
     
     [_window makeKeyAndVisible];
 
@@ -145,7 +143,7 @@
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password withParentViewController:welcomeScreen];
+        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password];
         return YES;
     }
     return NO;
@@ -161,7 +159,7 @@
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password withParentViewController:_navigationController.visibleViewController];
+        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password];
         return YES;
     }
     return NO;
@@ -176,6 +174,15 @@
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     MKAudioSettings settings;
 
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    if (now - _lastAudioRestartTime < 0.5) {
+        NSLog(@"⚠️ Audio restart ignored (too frequent)");
+        // 如果你需要确保最后一次设置生效，这里其实应该用 NSTimer 再次尝试
+        // 但配合 Swift 端的 Debounce，这里直接 return 也是一种保护防止崩坏
+        return;
+    }
+    _lastAudioRestartTime = now;
+    
     if ([[defaults stringForKey:@"AudioTransmitMethod"] isEqualToString:@"vad"])
         settings.transmitType = MKTransmitTypeVAD;
     else if ([[defaults stringForKey:@"AudioTransmitMethod"] isEqualToString:@"continuous"])
@@ -200,19 +207,19 @@
         // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
-        settings.quality = 16000;
+        settings.quality = 40000;
         settings.audioPerPacket = 6;
     } else if ([quality isEqualToString:@"balanced"]) {
         // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
-        settings.quality = 40000;
+        settings.quality = 72000;
         settings.audioPerPacket = 2;
     } else if ([quality isEqualToString:@"high"] || [quality isEqualToString:@"opus"]) {
         // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
-        settings.quality = 72000;
+        settings.quality = 100000;
         settings.audioPerPacket = 1;
     } else {
         settings.codec = MKCodecFormatCELT;

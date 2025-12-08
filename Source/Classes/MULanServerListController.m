@@ -10,7 +10,6 @@
 #import "MUDatabase.h"
 #import "MUFavouriteServerListController.h"
 #import "MUConnectionController.h"
-#import "MUBackgroundView.h"
 
 static NSInteger NetServiceAlphabeticalSort(id arg1, id arg2, void *reverse) {
     if (reverse) {
@@ -164,8 +163,7 @@ static NSInteger NetServiceAlphabeticalSort(id arg1, id arg2, void *reverse) {
             [connCtrlr connetToHostname:[netService hostName]
                                    port:[netService port]
                            withUsername:[[[alertCtrl textFields] objectAtIndex:0] text]
-                            andPassword:nil
-               withParentViewController:self];
+                            andPassword:nil];
             
             [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
         }]];

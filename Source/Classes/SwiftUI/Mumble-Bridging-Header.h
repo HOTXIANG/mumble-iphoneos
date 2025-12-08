@@ -14,7 +14,6 @@
 #import "MULegalViewController.h"
 
 // 导入其他必要的类
-#import "MUBackgroundView.h"
 #import "MUImage.h"
 #import "MUFavouriteServer.h"
 #import "MUPublicServerList.h"
@@ -22,6 +21,7 @@
 #import "MUConnectionController.h"
 #import "MUServerViewController.h"
 #import "MUTextMessageProcessor.h"
+#import "MUCertificatePreferencesViewController.h"
 
 // 导入 MumbleKit
 #import <MumbleKit/MKConnection.h>

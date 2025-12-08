@@ -7,12 +7,21 @@
 // 前向声明 MKServerModel
 @class MKServerModel;
 
-extern NSString *MUConnectionOpenedNotification;
-extern NSString *MUConnectionClosedNotification;
+extern NSString *MUConnectionOpenedNotification;  // 连接成功 (已有)
+extern NSString *MUConnectionClosedNotification;  // 连接关闭 (已有)
+extern NSString *MUConnectionConnectingNotification; // 正在连接 (新增)
+extern NSString *MUAppShowMessageNotification;
+
+// 错误处理通知 (新增)
+// userInfo key: @"title", @"message"
+extern NSString *MUConnectionErrorNotification;
 
 @interface MUConnectionController : NSObject
 + (MUConnectionController *) sharedController;
-- (void) connetToHostname:(NSString *)hostName port:(NSUInteger)port withUsername:(NSString *)userName andPassword:(NSString *)password withParentViewController:(UIViewController *)parentViewController;
+- (void) connetToHostname:(NSString *)hostName
+                     port:(NSUInteger)port
+             withUsername:(NSString *)userName
+              andPassword:(NSString *)password;
 - (BOOL) isConnected;
 - (void) disconnectFromServer;
 @property (nonatomic, readonly) MKServerModel *serverModel;

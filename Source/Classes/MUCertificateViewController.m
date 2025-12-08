@@ -5,12 +5,10 @@
 @import CoreServices;
 
 #import "MUCertificateViewController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUCertificateController.h"
 #import "MUCertificateChainBuilder.h"
 #import "MUColor.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 #import <MumbleKit/MKCertificate.h>
 
@@ -103,8 +101,6 @@ static const NSUInteger CertificateViewSectionTotal              = 4;
         _arrows.momentary = YES;
         [_arrows addTarget:self action:@selector(certificateSwitch:) forControlEvents:UIControlEventValueChanged];
     }
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
@@ -239,27 +235,6 @@ static const NSUInteger CertificateViewSectionTotal              = 4;
         return 1;
     }
     return 0;
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    NSString *subject = NSLocalizedString(@"Subject", @"Subject of an X.509 certificate");
-    NSString *issuer = NSLocalizedString(@"Issuer", @"Issuer of an X.509 certificate");
-    NSString *sha1fp = NSLocalizedString(@"SHA1 Fingerprint", @"SHA1 fingerprint of an X.509 certificate");
-    NSString *sha256fp = NSLocalizedString(@"SHA256 Fingerprint", @"SHA256 fingerprint of an X.509 certificate");
-    if (section == CertificateViewSectionSubject) {
-        return [MUTableViewHeaderLabel labelWithText:subject];
-    } else if (section == CertificateViewSectionIssuer) {
-        return [MUTableViewHeaderLabel labelWithText:issuer];
-    } else if (section == CertificateViewSectionSHA1Fingerprint) {
-        return [MUTableViewHeaderLabel labelWithText:sha1fp];
-    } else if (section == CertificateViewSectionSHA256Fingerprint) {
-        return [MUTableViewHeaderLabel labelWithText:sha256fp];
-    }
-    return nil;
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return [MUTableViewHeaderLabel defaultHeaderHeight];
 }
 
 // Customize the appearance of table view cells.

@@ -9,91 +9,12 @@ private struct NotificationMessageView: View {
     
     var body: some View {
         Text(message.attributedMessage)
-        Text(message.attributedMessage)
             .font(.system(size: 13, weight: .medium))
             .foregroundColor(.secondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(Color(uiColor: .systemGray5), in: Capsule())
             .frame(maxWidth: .infinity, alignment: .center)
-    }
-}
-
-private struct FullscreenImageView: View {
-    let image: UIImage
-    // 使用 @Environment 来获取系统提供的“关闭”功能
-    @Environment(\.dismiss) var dismiss
-    
-    @State private var scale: CGFloat = 1.0
-    @GestureState private var gestureScale: CGFloat = 1.0
-    @State private var offset: CGSize = .zero
-    @GestureState private var gestureOffset: CGSize = .zero
-
-    var body: some View {
-            ZStack {
-                // 底层：黑色的背景，添加单击退出的手势
-                Color.black
-                    .opacity(0.8)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.smooth(duration: 0.5)){
-                            scale = 1.0
-                            offset = .zero
-                        }
-                        dismiss()
-                    }
-
-                // 顶层：图片
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    // --- 核心修改 2：应用最终的缩放和偏移 ---
-                    // ZStack 会自动将图片居中，我们只需要应用手势产生的变化即可
-                    .scaleEffect(scale * gestureScale)
-                    .offset(offset + gestureOffset)
-                    .onTapGesture {
-                        withAnimation(.smooth(duration: 0.5)){
-                            scale = 1.0
-                            offset = .zero
-                        }
-                        dismiss()
-                    }
-                    // --- 核心修改 3：添加组合手势 ---
-                    .gesture(
-                        // 拖动手势（平移）
-                        DragGesture()
-                            .updating($gestureOffset) { value, state, _ in
-                                state = value.translation
-                            }
-                            .onEnded { value in
-                                // 当拖动结束时，将手势的偏移量“固化”到最终的偏移量中
-                                offset.width += value.translation.width
-                                offset.height += value.translation.height
-                            }
-                            .simultaneously(with:
-                                // 缩放手势
-                                MagnificationGesture()
-                                    .updating($gestureScale) { value, state, _ in
-                                        state = value
-                                    }
-                                    .onEnded { value in
-                                        // 当缩放结束时，将手势的缩放比例“固化”到最终的缩放比例中
-                                        scale *= value
-                                        
-                                        // 添加动画，并限制缩放范围
-                                        withAnimation(.smooth()) {
-                                            if scale < 1.0 {
-                                                scale = 1.0
-                                                offset = .zero // 缩小时自动弹回居中
-                                            } else if scale > 3.0 {
-                                                scale = 3.0
-                                            }
-                                        }
-                                    }
-                            )
-                    )
-            }
-        }
     }
 }
 
@@ -180,8 +101,6 @@ private struct MessageBubbleView: View {
     
     let onImageTap: (UIImage) -> Void
     
-    let onImageTap: (UIImage) -> Void
-    
     var body: some View {
         VStack(
             alignment: message.isSentBySelf ? .trailing : .leading,
@@ -214,11 +133,6 @@ private struct MessageBubbleView: View {
                         .tint(.pink)
                         .shadow(color: Color.black, radius: 8)
                         .textSelection(.enabled)
-                if !message.plainTextMessage.isEmpty {
-                    Text(message.attributedMessage)
-                        .tint(.pink)
-                        .shadow(color: Color.black, radius: 8)
-                        .textSelection(.enabled)
                 }
                 // 显示图片
                 if !message.images.isEmpty {
@@ -226,13 +140,6 @@ private struct MessageBubbleView: View {
                         0..<message.images.count,
                         id: \.self
                     ) { index in
-                        Button(action: {
-                            // --- 核心修改 3：当图片被点击时，调用回调 ---
-                            onImageTap(message.images[index])
-                        }) {
-                            Image(uiImage: message.images[index])
-                                .resizable().aspectRatio(contentMode: .fit)
-                                .frame(maxWidth: 200).cornerRadius(8)
                         Button(action: {
                             // --- 核心修改 3：当图片被点击时，调用回调 ---
                             onImageTap(message.images[index])
@@ -260,7 +167,6 @@ private struct MessageBubbleView: View {
                 )
             )
             .foregroundColor(message.isSentBySelf ? .white : .black)
-            .foregroundColor(message.isSentBySelf ? .white : .black)
         }
         .foregroundColor(
             .primary
@@ -287,8 +193,6 @@ struct MessagesView: View {
     
     @State private var fullscreenImage: UIImage?
     
-    @State private var fullscreenImage: UIImage?
-    
     private let bottomID = "bottomOfMessages"
     
     var body: some View {
@@ -304,64 +208,63 @@ struct MessagesView: View {
                 endPoint: .bottom
             ).ignoresSafeArea()
             
-            ZStack(alignment: .bottom) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 16) {
-                            ForEach(serverManager.messages) { message in
-                                switch message.type {
-                                case .userMessage:
-                                    MessageBubbleView(
-                                        message: message,
-                                        onImageTap: { tappedImage in
-                                            fullscreenImage = tappedImage
-                                        }
-                                    )
-                                case .notification:
-                                    NotificationMessageView(message: message)
-                                }
-                            }
-                            Spacer().frame(height: 48).id(bottomID)
-                                switch message.type {
-                                case .userMessage:
-                                    MessageBubbleView(
-                                        message: message,
-                                        onImageTap: { tappedImage in
-                                            fullscreenImage = tappedImage
-                                        }
-                                    )
-                                case .notification:
-                                    NotificationMessageView(message: message)
-                                }
-                            }
-                            Spacer().frame(height: 48).id(bottomID)
-                        }
-                        .padding()
-                        .onChange(of: serverManager.messages) {
-                            withAnimation {
-                                proxy.scrollTo(bottomID, anchor: .bottom)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    // 消息列表容器
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        ForEach(serverManager.messages) { message in
+                            switch message.type {
+                            case .userMessage:
+                                MessageBubbleView(
+                                    message: message,
+                                    onImageTap: { tappedImage in
+                                        fullscreenImage = tappedImage
+                                    }
+                                )
+                            case .notification:
+                                NotificationMessageView(message: message)
                             }
                         }
-                        .onChange(of: serverManager.messages) {
-                            withAnimation {
-                                proxy.scrollTo(bottomID, anchor: .bottom)
-                            }
-                        }
+                        // 底部锚点，用于自动滚动
+                        Spacer().frame(height: 10).id(bottomID)
                     }
-                    // --- 核心修改 3：添加手势交互式关闭键盘 ---
-                    .scrollDismissesKeyboard(.interactively)
+                    .padding()
                 }
+                // ✅ 核心修复 1: 使用 safeAreaInset 放置输入栏
+                // 这会让 SwiftUI 自动处理键盘弹出时的布局挤压，并自动给 ScrollView 底部加 Padding
+                .safeAreaInset(edge: .bottom) {
+                    TextInputBar(
+                        text: $newMessage,
+                        isFocused: $isTextFieldFocused,
+                        onSendText: sendTextMessage,
+                        onSendImage: { image in
+                            isTextFieldFocused = false
+                            selectedImageForPreview = image
+                        }
+                    )
+                    .background(.clear)
+                }
+                // 交互式关闭键盘
+                .scrollDismissesKeyboard(.interactively)
                 
-                TextInputBar(
-                    text: $newMessage,
-                    isFocused: $isTextFieldFocused,
-                    onSendText: sendTextMessage,
-                    onSendImage: { image in
-                        // 当选择了图片后，弹出确认框
-                        isTextFieldFocused = false
-                        selectedImageForPreview = image
+                // 监听新消息，自动滚动到底部
+                .onChange(of: serverManager.messages) {
+                    scrollToBottom(proxy: proxy)
+                }
+                // ✅ 核心修复 2: 监听键盘弹出（焦点获取），自动滚动到底部
+                // 当键盘弹起改变了视图高度时，我们需要手动修正一下滚动位置
+                .onChange(of: isTextFieldFocused) { focused in
+                    if focused {
+                        // 延迟一点点，等待键盘动画开始后再滚动
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            scrollToBottom(proxy: proxy)
+                        }
                     }
-                )
+                }
+                .onAppear {
+                    // 进入页面时滚动到底部
+                    scrollToBottom(proxy: proxy, animated: false)
+                }
             }
         }
         // 当键盘出现或消失时，应用动画
@@ -370,13 +273,9 @@ struct MessagesView: View {
         .sheet(item: $selectedImageForPreview) { image in
             ImageConfirmationView(
                 image: image,
-                onCancel: {
-                    selectedImageForPreview = nil
-                },
+                onCancel: { selectedImageForPreview = nil },
                 onSend: { imageToSend in
-                    // 直接调用异步的 sendImageMessage
                     await sendImageMessage(image: imageToSend)
-                    // 发送完成后，关闭 sheet
                     selectedImageForPreview = nil
                 }
             )
@@ -385,11 +284,20 @@ struct MessagesView: View {
         .fullScreenCover(item: $fullscreenImage) { image in
             FullscreenImageView(image: image)
         }
-        .fullScreenCover(item: $fullscreenImage) { image in
-            FullscreenImageView(image: image)
-        }
     }
     
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+        if serverManager.messages.isEmpty { return }
+        
+        if animated {
+            withAnimation(.spring(response: 0.3, dampingFraction: 1.0)) {
+                proxy.scrollTo(bottomID, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(bottomID, anchor: .bottom)
+        }
+    }
+
     // --- 核心修改 3：发送消息方法现在调用 serverManager ---
     private func sendTextMessage() {
             guard !newMessage.isEmpty else { return }
@@ -537,12 +445,6 @@ private struct TextInputBar: View {
 extension UIImage: Identifiable {
     public var id: String {
         return UUID().uuidString
-    }
-}
-
-extension CGSize {
-    static func + (lhs: CGSize, rhs: CGSize) -> CGSize {
-        return CGSize(width: lhs.width + rhs.width, height: lhs.height + rhs.height)
     }
 }
 

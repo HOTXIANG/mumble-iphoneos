@@ -3,11 +3,9 @@
 // license that can be found in the LICENSE file.
 
 #import "MUCertificateDiskImportViewController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUCertificateController.h"
 #import "MUCertificateCell.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 static void ShowAlertDialog(NSString *title, NSString *msg) {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -69,13 +67,9 @@ static void ShowAlertDialog(NSString *title, NSString *msg) {
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
 
-    if (self.tableView.style == UITableViewStyleGrouped) {
-        self.tableView.backgroundView = [MUBackgroundView backgroundView];
-    } else {
-        if (@available(iOS 7, *)) {
-            self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
-            self.tableView.separatorInset = UIEdgeInsetsZero;
-        }
+    if (@available(iOS 7, *)) {
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
+        self.tableView.separatorInset = UIEdgeInsetsZero;
     }
 
     NSString *iTunesImport = NSLocalizedString(@"iTunes Import", @"Import a certificate from iTunes action sheet button.");
@@ -128,21 +122,6 @@ static void ShowAlertDialog(NSString *title, NSString *msg) {
     _attemptIndexPath = [indexPath retain];
 
     [self tryImportCertificateWithPassword:nil];
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    if (_showHelp) {
-        NSString *help = NSLocalizedString(@"To import your own certificate into\n"
-                                           @"Mumble, please transfer them to your\n"
-                                           @"device using iTunes File Transfer.",
-                                           @"Help text for iTunes File Transfer (iTunes Import)");
-        MUTableViewHeaderLabel *lbl = [MUTableViewHeaderLabel labelWithText:help];
-        lbl.font = [UIFont systemFontOfSize:16.0f];
-        lbl.lineBreakMode = NSLineBreakByWordWrapping;
-        lbl.numberOfLines = 0;
-        return lbl;
-    }
-    return nil;
 }
 
 - (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {

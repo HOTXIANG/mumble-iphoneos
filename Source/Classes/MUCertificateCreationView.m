@@ -7,7 +7,6 @@
 #import "MUCertificateController.h"
 #import "MUColor.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 #import <MumbleKit/MKCertificate.h>
 
@@ -113,9 +112,7 @@ static void ShowAlertDialog(NSString *title, NSString *msg) {
     NSString *newCert = NSLocalizedString(@"New Certificate",
                                           @"Title of MUCertificateCreationView (shown when creating a self-signed certificate)");
     [self setTitle:newCert];
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
-    
+
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
         self.tableView.separatorInset = UIEdgeInsetsZero;

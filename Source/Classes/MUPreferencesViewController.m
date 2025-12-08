@@ -9,11 +9,9 @@
 #import "MUAdvancedAudioPreferencesViewController.h"
 #import "MURemoteControlPreferencesViewController.h"
 #import "MUCertificateController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MURemoteControlServer.h"
 #import "MUColor.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 #import <MumbleKit/MKCertificate.h>
 
@@ -53,8 +51,6 @@
         [self.navigationController.navigationBar setBackgroundImage:[MUImage clearColorImage] forBarMetrics:UIBarMetricsDefault];
         self.navigationController.navigationBar.translucent = YES;
     }
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
@@ -190,20 +186,6 @@
     }
 
     return cell;
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Audio", nil)];
-    } else if (section == 1) {
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Network", nil)];
-    }
-
-    return nil;
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return [MUTableViewHeaderLabel defaultHeaderHeight];
 }
 
 #pragma mark -

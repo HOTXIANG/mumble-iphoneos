@@ -5,7 +5,6 @@
 #import "MURemoteControlPreferencesViewController.h"
 #import "MURemoteControlServer.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 @interface MURemoteControlPreferencesViewController () {
 }
@@ -23,8 +22,6 @@
 
 - (void) viewWillAppear:(BOOL)animated {
     self.navigationItem.title = NSLocalizedString(@"Remote Control", nil);
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;

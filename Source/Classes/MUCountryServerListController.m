@@ -154,8 +154,7 @@
             [connCtrlr connetToHostname:[serverItem objectForKey:@"ip"]
                                    port:[[serverItem objectForKey:@"port"] intValue]
                            withUsername:[[[alertCtrl textFields] firstObject] text]
-                            andPassword:nil
-               withParentViewController:self];
+                            andPassword:nil];
         }]];
 
         [self presentViewController:alertCtrl animated:YES completion:nil];

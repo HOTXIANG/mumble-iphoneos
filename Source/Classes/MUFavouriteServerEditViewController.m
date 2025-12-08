@@ -7,9 +7,7 @@
 #import "MUColor.h"
 #import "MUDatabase.h"
 #import "MUFavouriteServer.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 @interface MUFavouriteServerEditViewController () {
     BOOL               _editMode;
@@ -193,9 +191,7 @@
 
 - (void) viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
-    
+
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
         self.tableView.separatorInset = UIEdgeInsetsZero;

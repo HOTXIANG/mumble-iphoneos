@@ -3,11 +3,9 @@
 // license that can be found in the LICENSE file.
 
 #import "MUVoiceActivitySetupViewController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUAudioBarViewCell.h"
 #import "MUColor.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 @implementation MUVoiceActivitySetupViewController
 
@@ -25,7 +23,11 @@
     
     self.navigationItem.title = NSLocalizedString(@"Voice Activity", nil);
     
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
+    if (@available(iOS 13.0, *)) {
+        self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+    } else {
+        self.tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    }
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
@@ -127,28 +129,16 @@
     return cell;
 }
 
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (![[NSUserDefaults standardUserDefaults] boolForKey:@"AudioPreprocessor"])
         ++section;
 
     if (section == 0) {
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Method", nil)];
+        return NSLocalizedString(@"Method", nil);
     } else if (section == 1) {
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Configuration", nil)];
+        return NSLocalizedString(@"Configuration", nil);
     }
     return nil;
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"AudioPreprocessor"])
-        ++section;
-
-    if (section == 0) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    } else if (section == 1) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    }
-    return 0.0f;
 }
 
 - (void) tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {

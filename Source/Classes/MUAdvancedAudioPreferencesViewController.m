@@ -3,13 +3,11 @@
 // license that can be found in the LICENSE file.
 
 #import "MUAdvancedAudioPreferencesViewController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUApplicationDelegate.h"
 #import "MUAudioQualityPreferencesViewController.h"
 #import "MUAudioSidetonePreferencesViewController.h"
 #import "MUColor.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 #import <MumbleKit/MKAudio.h>
 
@@ -26,9 +24,7 @@
     [super viewWillAppear:animated];
 
     self.title = NSLocalizedString(@"Advanced Audio", nil);
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
-    
+
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
         self.tableView.separatorInset = UIEdgeInsetsZero;
@@ -172,49 +168,6 @@
     }
     
     return cell;
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    if (section == 0) { // Xmit
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Transmission Quality", nil)];
-    } else if (section == 1) { // Audio Input
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Audio Input", nil)];
-    } else if (section == 2) { // Audio Output
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Audio Output", nil)];
-    } else if (section == 3) { // Opus Codec
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Opus Codec", nil)];
-    } else {
-        return nil;
-    }
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    } else if (section == 1) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    } else if (section == 2) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    } else if (section == 3) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    }
-    return 0.0f;
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForFooterInSection:(NSInteger)section {
-    if (section == 1) {
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"AudioPreprocessor"]) {
-            if (![[MKAudio sharedAudio] echoCancellationAvailable]) {
-                NSString *echoCancelNotAvail = NSLocalizedString(@"Echo Cancellation is not available when using the current audio peripheral.", nil);
-                MUTableViewHeaderLabel *lbl = [MUTableViewHeaderLabel labelWithText:echoCancelNotAvail];
-                lbl.font = [UIFont systemFontOfSize:16.0f];
-                lbl.lineBreakMode = NSLineBreakByWordWrapping;
-                lbl.numberOfLines = 0;
-                return lbl;
-            }
-        }
-    }
-    return nil;
 }
 
 - (CGFloat) tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section {

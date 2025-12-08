@@ -3,10 +3,8 @@
 // license that can be found in the LICENSE file.
 
 #import "MUAudioQualityPreferencesViewController.h"
-#import "MUTableViewHeaderLabel.h"
 #import "MUColor.h"
 #import "MUImage.h"
-#import "MUBackgroundView.h"
 
 @implementation MUAudioQualityPreferencesViewController
 
@@ -21,8 +19,6 @@
     [super viewWillAppear:animated];
     
     self.title = NSLocalizedString(@"Audio Quality", nil);
-    
-    self.tableView.backgroundView = [MUBackgroundView backgroundView];
     
     if (@available(iOS 7, *)) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
@@ -89,25 +85,6 @@
     }
     
     return cell;
-}
-
-- (UIView *) tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    if (section == 0) { // Input
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Quality Presets", nil)];
-    } else if (section == 1) {
-        return [MUTableViewHeaderLabel labelWithText:NSLocalizedString(@"Custom Quality", nil)];
-    } else {
-        return nil;
-    }
-}
-
-- (CGFloat) tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    if (section == 0) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    } else if (section == 1) {
-        return [MUTableViewHeaderLabel defaultHeaderHeight];
-    }
-    return 0.0f;
 }
 
 #pragma mark - Table view delegate

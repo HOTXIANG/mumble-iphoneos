@@ -5,7 +5,6 @@
 #import "MUCertificateCreationProgressView.h"
 #import "MUImage.h"
 #import "MUColor.h"
-#import "MUBackgroundView.h"
 
 @interface MUCertificateCreationProgressView () {
     IBOutlet UIImageView              *_backgroundImage;

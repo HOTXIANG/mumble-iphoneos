@@ -4,7 +4,7 @@ import SwiftUI
 
 struct ChannelListView: View {
     @StateObject private var serverManager = ServerModelManager()
-    @State private var showingMenu = false
+    @State private var showingPrefs = false
     
     // --- 核心修改 1：注入 NavigationManager ---
     @EnvironmentObject var navigationManager: NavigationManager
@@ -26,38 +26,78 @@ struct ChannelListView: View {
         .toolbar {
             // 左上角按钮组
             ToolbarItemGroup(placement: .navigationBarLeading) {
-                HStack(alignment: .center, spacing: 16) {
+                HStack(alignment: .center, spacing: 0) {
                     // Self-Deafen 按钮
                     Button(action: {
                         hapticGenerator.impactOccurred()
                         serverManager.toggleSelfDeafen()
                     }) {
-                        Image(systemName: serverManager.connectedUserState?.isSelfDeafened == true ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                            .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
+                        ZStack {
+                            Image(systemName: serverManager.connectedUserState?.isSelfDeafened == true ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                .resizable() // 允许调整大小
+                                .aspectRatio(contentMode: .fit) // 保持比例
+                                .frame(width: 24, height: 24) // 强制固定图标渲染尺寸
+                                .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
+                        }
+                        .frame(width: 40, height: 44) // 增大点击热区，并固定整个按钮容器的宽度
+                        .contentShape(Rectangle()) // 确保点击区域填满 40x44
                     }
-                    
                     // Self-Mute 按钮
                     Button(action: {
                         hapticGenerator.impactOccurred()
                         serverManager.toggleSelfMute()
                     }) {
-                        Image(systemName: serverManager.connectedUserState?.isSelfMuted == true ? "mic.slash.fill" : "mic.fill")
-                            .foregroundColor(serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary)
+                        ZStack {
+                            Image(systemName: serverManager.connectedUserState?.isSelfMuted == true ? "mic.slash.fill" : "mic.fill")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 24, height: 24)
+                                .foregroundColor(serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary)
+                        }
+                        .frame(width: 40, height: 44) // 同样的固定容器宽度
+                        .contentShape(Rectangle())
                     }
                 }
                 .tint(.primary)
-                .padding(.horizontal,8)
             }
 
             // 右上角按钮组
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 HStack(alignment: .center, spacing: 16) {
                     // “更多”菜单按钮 - 保留图标样式
-                    Button(action: {
-                        hapticGenerator.impactOccurred()
-                        showingMenu = true
-                    }) {
+                    Menu {
+                        // 1. 切换视图模式
+                        Button(action: {
+                            serverManager.toggleMode()
+                        }) {
+                            Label("Switch View Mode", systemImage: "arrow.left.arrow.right")
+                        }
+                                            
+                        Divider()
+                                            
+                        // 2. 设置
+                        Button(action: {
+                            showingPrefs = true
+                        }) {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                                            
+                        Divider()
+                                            
+                        // 3. 其他功能占位
+                        Button(action: { /* TODO */ }) {
+                            Label("Access Tokens", systemImage: "key")
+                        }
+                                            
+                        Button(action: { /* TODO */ }) {
+                            Label("Certificates", systemImage: "lock.shield")
+                        }
+                                            
+                    } label: {
+                        // 菜单的触发图标
                         Image(systemName: "ellipsis")
+                            .frame(width: 30, height: 30) // 增加一点点击热区
+                            .contentShape(Rectangle())
                     }
                     
                     // “离开”按钮
@@ -73,14 +113,18 @@ struct ChannelListView: View {
                 .padding(.horizontal,8)
             }
         }
-        .confirmationDialog("Server Menu", isPresented: $showingMenu, titleVisibility: .visible) {
-            serverMenuButtons()
+        .sheet(isPresented: $showingPrefs) {
+            NavigationStack {
+                PreferencesView()
+            }
         }
     }
 
     @ViewBuilder private func serverMenuButtons() -> some View {
         Button("Switch View Mode") { serverManager.toggleMode() }; Divider()
-        Button("Settings", systemImage: "gearshape") { navigationManager.navigate(to: .objectiveC(.preferences ))}; Divider()
+        Button("Settings", systemImage: "gearshape") {
+                showingPrefs = true
+        };Divider()
         Button("Access Tokens") { /* TODO */ }; Button("Certificates") { /* TODO */ }; Divider()
         Button("Cancel", role: .cancel) {}
     }

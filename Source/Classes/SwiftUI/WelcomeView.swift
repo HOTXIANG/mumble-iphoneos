@@ -101,20 +101,24 @@ struct WelcomeContentView: View {
     }
 }
 struct WelcomeView: MumbleContentView {
-    @State private var showingAbout = false; @EnvironmentObject var navigationManager: NavigationManager; var navigationConfig: any NavigationConfigurable {
+    @State private var showingPreferences = false
+    @State private var showingAbout = false;
+    @EnvironmentObject var navigationManager: NavigationManager;
+    var navigationConfig: any NavigationConfigurable {
         WelcomeNavigationConfig(
             onPreferences: {
-                navigationManager.navigate(
-                    to: .objectiveC(
-                        .preferences
-                    )
-                )
+                showingPreferences = true // 触发 Sheet
             },
-            onAbout: {
-                showingAbout = true
-            })
-    }; var contentBody: some View {
-        WelcomeContentView().alert(
+            onAbout: { showingAbout = true }
+        )
+    }
+    var contentBody: some View {
+        WelcomeContentView()
+            .sheet(isPresented: $showingPreferences) { // 新增 Sheet
+                    NavigationStack {
+                    PreferencesView()
+                }
+            }.alert(
             "About",
             isPresented: $showingAbout
         ) {
@@ -284,73 +288,124 @@ struct WelcomeRootView: View {
     }
 } // AppRootView 保持不变
 struct AppRootView: View {
-    // 监听我们创建的全局状态
-    @StateObject private var appState = AppState.shared
+    @ObservedObject private var appState = AppState.shared
 
     // 为两个独立的导航栈分别创建 NavigationManager
     @StateObject private var disconnectedNavManager = NavigationManager()
     @StateObject private var connectedNavManager = NavigationManager()
 
     var body: some View {
-        // 使用ZStack可以帮助动画系统在过渡期间更好地管理两个视图
-        ZStack {
-            // 根据 isConnected 的值来决定显示哪个界面
-            if appState.isConnected {
-                // 如果已连接，直接显示频道界面
-                NavigationStack(path: $connectedNavManager.navigationPath) {
-                    ChannelListView()
-                    .navigationDestination(for: NavigationDestination.self) { destination in
-                        // 使用与 WelcomeRootView 相同的导航地图
-                        destinationView(for: destination, with: connectedNavManager)
+            ZStack {
+                // 主界面逻辑
+                if appState.isConnected {
+                    NavigationStack(path: $connectedNavManager.navigationPath) {
+                        ChannelListView()
+                            .navigationDestination(for: NavigationDestination.self) { destination in
+                                destinationView(for: destination, with: connectedNavManager)
+                            }
                     }
-                }
-                .environmentObject(connectedNavManager)
-                .preferredColorScheme(.dark)
-                // 频道视图的动画：总是从右侧滑入和滑出
-                .transition(.move(edge: .trailing))
-                .zIndex(1) // 确保它在顶层
-            } else {
-                // 如果未连接，显示我们现有的欢迎界面流程
-                NavigationStack(path: $disconnectedNavManager.navigationPath) {
-                    WelcomeView()
-                    .navigationDestination(for: NavigationDestination.self) { destination in
-                        destinationView(for: destination, with: disconnectedNavManager)
+                    .environmentObject(connectedNavManager)
+                    .preferredColorScheme(.dark)
+                    .transition(.move(edge: .trailing))
+                } else {
+                    NavigationStack(path: $disconnectedNavManager.navigationPath) {
+                        WelcomeView()
+                            .navigationDestination(for: NavigationDestination.self) { destination in
+                                destinationView(for: destination, with: disconnectedNavManager)
+                            }
                     }
+                    .environmentObject(disconnectedNavManager)
+                    .preferredColorScheme(.dark)
+                    .transition(.opacity)
                 }
-                .environmentObject(disconnectedNavManager)
-                .preferredColorScheme(.dark)
-                .transition(.opacity)
-                .zIndex(0)
+            }
+            .overlay(alignment: .top) {
+                if let toast = appState.activeToast {
+                    ToastView(toast: toast)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .zIndex(2000) // 确保在 PTT 按钮和普通内容之上
+                        // 点击 Toast 可以立即关闭
+                        .onTapGesture {
+                            withAnimation {
+                                appState.activeToast = nil
+                            }
+                        }
+                }
+            }
+            .overlay(alignment: .bottom) {
+                // 只有连接成功后才显示 PTT 按钮
+                if appState.isConnected {
+                    PTTButton()
+                        // 确保它不遮挡底部的某些操作，或者根据需要调整位置
+                        .padding(.bottom, 20)
+                }
+            }
+            // 修改点 2: 使用 .overlay 将遮罩层置于一切之上
+            .overlay {
+                if appState.isConnecting {
+                    ZStack {
+                        // 全屏半透明背景
+                        Color.black.opacity(0.6)
+                            .ignoresSafeArea()
+                            // 添加点击拦截，防止连接时误触底部按钮
+                            .onTapGesture { }
+                        
+                        // Loading 内容框
+                        VStack(spacing: 24) {
+                            ProgressView()
+                                .controlSize(.large)
+                                .tint(.white)
+                            
+                            Text("Connecting...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                        .padding(30)
+                        .background(.ultraThinMaterial) // 漂亮的毛玻璃
+                        .clipShape(RoundedRectangle(cornerRadius: 30))
+                        .shadow(radius: 10)
+                    }
+                    .ignoresSafeArea()
+                    .zIndex(9999) // 确保在最上层
+                    .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                }
+            }
+            // 全局错误弹窗
+            .alert(item: $appState.activeError) { error in
+                Alert(
+                    title: Text(error.title),
+                    message: Text(error.message),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+            .animation(.default, value: appState.isConnecting)
+            .animation(.spring(), value: appState.isConnected)
+        }
+    
+    @ViewBuilder
+    private func destinationView(for destination: NavigationDestination, with manager: NavigationManager) -> some View {
+        switch destination {
+        case .objectiveC(let type):
+            ObjectiveCViewWrapper(controllerType: type)
+        case .swiftUI(let type):
+            switch type {
+            case .favouriteServerList:
+                FavouriteServerListView()
+            case .favouriteServerEdit(let primaryKey):
+                let server: MUFavouriteServer? = {
+                    guard let key = primaryKey else { return nil }
+                    if let allFavourites = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] {
+                        return allFavourites.first { $0.primaryKey == key }
+                    }
+                    return nil
+                }()
+                FavouriteServerEditView(server: server) { serverToSave in
+                    MUDatabase.storeFavourite(serverToSave)
+                    manager.goBack()
+                }
+            case .channelList:
+                EmptyView()
             }
         }
     }
-    
-    @ViewBuilder
-        private func destinationView(for destination: NavigationDestination, with manager: NavigationManager) -> some View {
-            switch destination {
-            case .objectiveC(let type):
-                ObjectiveCViewWrapper(controllerType: type)
-            case .swiftUI(let type):
-                switch type {
-                case .favouriteServerList:
-                    FavouriteServerListView()
-                case .favouriteServerEdit(let primaryKey):
-                    let server: MUFavouriteServer? = {
-                        guard let key = primaryKey else { return nil }
-                        if let allFavourites = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] {
-                            return allFavourites.first { $0.primaryKey == key }
-                        }
-                        return nil
-                    }()
-                    FavouriteServerEditView(server: server) { serverToSave in
-                        MUDatabase.storeFavourite(serverToSave)
-                        manager.goBack()
-                    }
-                case .channelList:
-                    // ChannelListView 不应该在这里被导航到，因为它已经是根视图
-                    // 但为了完整性，我们保留这个 case
-                    EmptyView()
-                }
-            }
-        }
 }

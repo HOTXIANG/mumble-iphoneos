@@ -9,7 +9,6 @@
 #import "MUCertificateViewController.h"
 #import "MUNotificationController.h"
 #import "MUConnectionController.h"
-#import "MUMessagesViewController.h"
 #import "MUDatabase.h"
 #import "MUAudioMixerDebugViewController.h"
 
@@ -17,8 +16,6 @@
 #import <MumbleKit/MKServerModel.h>
 #import <MumbleKit/MKCertificate.h>
 #import <MumbleKit/MKAudio.h>
-
-#import "MKNumberBadgeView.h"
 
 @interface MUServerRootViewController () <MKConnectionDelegate, MKServerModelDelegate> {
     MKConnection                *_connection;
@@ -29,10 +26,8 @@
     UIBarButtonItem             *_menuButton;
     UIBarButtonItem             *_smallIcon;
     UIButton                    *_modeSwitchButton;
-    MKNumberBadgeView           *_numberBadgeView;
 
     MUServerViewController      *_serverView;
-    MUMessagesViewController    *_messagesView;
     
     NSInteger                   _unreadMessages;
 }
@@ -42,21 +37,7 @@
 
 - (id) initWithConnection:(MKConnection *)conn andServerModel:(MKServerModel *)model {
     if ((self = [super init])) {
-        _connection = conn;
-        _model = model;
-        [_model addDelegate:self];
-        
-        _unreadMessages = 0;
-        
-        _serverView = [[MUServerViewController alloc] initWithServerModel:_model];
-        _messagesView = [[MUMessagesViewController alloc] initWithServerModel:_model];
-        
-        _numberBadgeView = [[MKNumberBadgeView alloc] initWithFrame:CGRectZero];
-        _numberBadgeView.shadow = NO;
-        _numberBadgeView.font = [UIFont boldSystemFontOfSize:11.0f];
-        _numberBadgeView.hidden = YES;
-        _numberBadgeView.shine = NO;
-        _numberBadgeView.strokeColor = [UIColor redColor];
+
     }
     return self;
 }
@@ -101,10 +82,6 @@
     
     UIView* containerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, _segmentedControl.frame.size.width, 30)];
     [containerView addSubview:_segmentedControl];
-    [containerView addSubview:_numberBadgeView];
-    _numberBadgeView.frame = CGRectMake(_segmentedControl.frame.size.width-24, -10, 50, 30);
-    _numberBadgeView.value = _unreadMessages;
-    _numberBadgeView.hidden = _unreadMessages == 0;
     
     _serverView.navigationItem.titleView = containerView;
     
@@ -134,23 +111,12 @@
         [self setViewControllers:[NSArray arrayWithObject:_serverView] animated:NO];
         [_modeSwitchButton setEnabled:YES];
     } else if (_segmentedControl.selectedSegmentIndex == 1) { // Messages view
-        _messagesView.navigationItem.titleView = _segmentedControl;
-        _messagesView.navigationItem.leftBarButtonItem = _smallIcon;
-        _messagesView.navigationItem.rightBarButtonItem = _menuButton;
-        [self setViewControllers:[NSArray arrayWithObject:_messagesView] animated:NO];
         [_modeSwitchButton setEnabled:NO];
     }
     
     if (_segmentedControl.selectedSegmentIndex == 1) { // Messages view
         _unreadMessages = 0;
-        _numberBadgeView.value = 0;
-        _numberBadgeView.hidden = YES;
-        [[UIApplication sharedApplication] setApplicationIconBadgeNumber:0];
-    } else if (_numberBadgeView.value > 0) {
-        _numberBadgeView.hidden = NO;
     }
-
-    [_segmentedControl performSelector:@selector(bringSubviewToFront:) withObject:_numberBadgeView afterDelay:0.0f];
 
     [[MKAudio sharedAudio] setForceTransmit:NO];
 }
@@ -279,19 +245,10 @@
     }
 }
 
-- (void) serverModel:(MKServerModel *)model textMessageReceived:(MKTextMessage *)msg fromUser:(MKUser *)user {
-    if (_segmentedControl.selectedSegmentIndex != 1) { // When not in messages view
-        _unreadMessages++;
-        _numberBadgeView.value = _unreadMessages;
-        _numberBadgeView.hidden = NO;
-    }
-}
-
 #pragma mark - Actions
 
 - (void) actionButtonClicked:(id)sender {
     MKUser *connUser = [_model connectedUser];
-    BOOL inMessagesView = [[self viewControllers] objectAtIndex:0] == _messagesView;
     
     UIAlertController *sheetCtrl = [UIAlertController alertControllerWithTitle:nil
                                                                        message:nil
@@ -321,20 +278,6 @@
         [self presentViewController:navCtrl animated:YES completion:nil];
     }]];
     
-    if (!inMessagesView) {
-        [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Certificates", nil)
-                                                       style:UIAlertActionStyleDefault
-                                                     handler:^(UIAlertAction * _Nonnull action) {
-            MUCertificateViewController *certView = [[MUCertificateViewController alloc] initWithCertificates:[self->_model serverCertificates]];
-            UINavigationController *navCtrl = [[UINavigationController alloc] initWithRootViewController:certView];
-            UIBarButtonItem *doneButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
-                                                                                        target:self
-                                                                                        action:@selector(childDoneButton:)];
-            certView.navigationItem.leftBarButtonItem = doneButton;
-            [self presentViewController:navCtrl animated:YES completion:nil];
-        }]];
-    }
-    
     if (![connUser isAuthenticated]) {
         [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Self-Register", nil)
                                                        style:UIAlertActionStyleDefault
@@ -362,15 +305,7 @@
             [self presentViewController:alertCtrl animated:YES completion:nil];
         }]];
     }
-    
-    if (inMessagesView) {
-        [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Clear Messages", nil)
-                                                       style:UIAlertActionStyleDefault
-                                                     handler:^(UIAlertAction * _Nonnull action) {
-            
-        }]];
-    }
-    
+
     if ([connUser isSelfMuted] && [connUser isSelfDeafened]) {
         [sheetCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Unmute and undeafen", nil)
                                                        style:UIAlertActionStyleDefault

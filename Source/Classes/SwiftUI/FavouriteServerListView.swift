@@ -138,12 +138,12 @@ struct FavouriteServerListContentView: View {
     @State private var favouriteServers: [MUFavouriteServer] = []
     @State private var serverToDelete: MUFavouriteServer?
     @State private var showingDeleteAlert = false
-    @State private var showingConnectionAlert = false
-    @State private var connectionMessage = ""
     
     private let connectionSuccessNotificationName = Notification.Name(
         "MUConnectionOpenedNotification"
     )
+    private let connectionConnectingNotificationName = Notification.Name("MUConnectionConnectingNotification")
+    private let connectionErrorNotificationName = Notification.Name("MUConnectionErrorNotification")
     
     private let successHaptic = UINotificationFeedbackGenerator()
     
@@ -233,13 +233,6 @@ struct FavouriteServerListContentView: View {
                 )
             }
         }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: connectionSuccessNotificationName
-            )
-        ) {
-            _ in handleConnectionSuccess()
-        }
         .onAppear(
             perform: loadFavouriteServers
         )
@@ -259,20 +252,6 @@ struct FavouriteServerListContentView: View {
         } message: { server in
             Text(
                 "Are you sure you want to delete '\(server.displayName ?? "this server")'?"
-            )
-        }
-        .alert(
-            "Connecting",
-            isPresented: $showingConnectionAlert
-        ) {
-            Button(
-                "Cancel"
-            ) {
-                showingConnectionAlert = false
-            }
-        } message: {
-            Text(
-                connectionMessage
             )
         }
     }
@@ -336,25 +315,20 @@ struct FavouriteServerListContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
-            
-            self.showingConnectionAlert = false; withAnimation(
-                .spring()
-            ) {
-                AppState.shared.isConnected = true
-            }
         }
     }
-    private func connectToServer(
-        _ server: MUFavouriteServer
-    ) {
-        AppState.shared.serverDisplayName = server.displayName; connectionMessage = "Connecting to \(server.displayName ?? "server")..."; showingConnectionAlert = true; MUConnectionController.shared()?.connet(
+    private func connectToServer(_ server: MUFavouriteServer) {
+        // 只负责更新名字和发起连接，UI 由 AppState 接管
+        AppState.shared.serverDisplayName = server.displayName
+        
+        // 触发触感反馈
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        
+        MUConnectionController.shared()?.connet(
             toHostname: server.hostName,
-            port: UInt(
-                server.port
-            ),
+            port: UInt(server.port),
             withUsername: server.userName,
-            andPassword: server.password,
-            withParentViewController: nil
+            andPassword: server.password
         )
     }
     private func loadFavouriteServers() {
