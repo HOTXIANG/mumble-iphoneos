@@ -20,10 +20,16 @@ struct FavouriteServerListNavigationConfig: NavigationConfigurable {
     }
 }
 
-
-// --- 核心修改在这里 ---
 struct FavouriteServerRowView: View {
     let server: MUFavouriteServer
+    
+    @StateObject private var pingModel: ServerPingModel
+    
+    init(server: MUFavouriteServer) {
+        self.server = server
+        // 在 init 中初始化 StateObject
+        _pingModel = StateObject(wrappedValue: ServerPingModel(hostname: server.hostName, port: UInt(server.port)))
+    }
     
     var body: some View {
         HStack(
@@ -82,6 +88,34 @@ struct FavouriteServerRowView: View {
             
             Spacer()
             
+            VStack(alignment: .trailing, spacing: 4) {
+                // 1. 延迟显示
+                HStack(spacing: 4) {
+                    Text(pingModel.pingLabel)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(pingModel.pingColor)
+                    
+                    Image(systemName: "network")
+                        .font(.system(size: 12))
+                        .foregroundColor(pingModel.pingColor)
+                }
+                
+                // 2. 人数显示
+                if !pingModel.usersLabel.isEmpty {
+                    HStack(spacing: 4) {
+                        Text(pingModel.usersLabel)
+                            .font(.system(size: 13))
+                            .foregroundColor(pingModel.userCountColor)
+                        
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            // 确保不被压缩
+            .fixedSize(horizontal: true, vertical: false)
+            
             // 右侧的 chevron 图标
             Image(
                 systemName: "chevron.right"
@@ -96,7 +130,6 @@ struct FavouriteServerRowView: View {
                 .indigo
             )
         }
-        // 修复 2：为整个 HStack 设置主颜色，确保文本默认为白色
         .foregroundColor(
             .primary
         )
@@ -108,30 +141,16 @@ struct FavouriteServerRowView: View {
             .vertical,
             12
         )
-        // 修复 3：使用更明显的背景和边框，增强卡片感
-        .background(
-            .thinMaterial,
-            in: RoundedRectangle(
-                cornerRadius: 12,
-                style: .continuous
-            )
-        )
-        .overlay(
-            RoundedRectangle(
-                cornerRadius: 12
-            )
-            .stroke(
-                Color.white.opacity(
-                    0.25
-                ),
-                lineWidth: 1.5
-            )
-        )
+        .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 20))
+        .onAppear {
+            pingModel.startPinging()
+        }
+        .onDisappear {
+            pingModel.stopPinging()
+        }
     }
 }
 
-
-// 主内容视图：移除了所有与在线人数相关的逻辑
 struct FavouriteServerListContentView: View {
     var navigationManager: NavigationManager
     
@@ -328,7 +347,8 @@ struct FavouriteServerListContentView: View {
             toHostname: server.hostName,
             port: UInt(server.port),
             withUsername: server.userName,
-            andPassword: server.password
+            andPassword: server.password,
+            displayName: server.displayName
         )
     }
     private func loadFavouriteServers() {

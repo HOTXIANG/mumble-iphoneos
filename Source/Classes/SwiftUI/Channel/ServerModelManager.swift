@@ -44,20 +44,30 @@ class ServerModelManager: ObservableObject {
     }
     
     private func setupServerModel() {
-        if let connectionController = MUConnectionController.shared(), let model = connectionController.serverModel {
-            serverModel = model
-            delegateWrapper = ServerModelDelegateWrapper()
-            model
-                .addDelegate(
-                    delegateWrapper!
-                )
-            isConnected = true
-            
-            // --- 核心修改 2：在模型建立时，为 serverName 赋值 ---
-            self.serverName = AppState.shared.serverDisplayName
-            
-            rebuildModelArray()
+        guard let connectionController = MUConnectionController.shared(),
+              let model = connectionController.serverModel else {
+            return
         }
+        
+        serverModel = model
+        delegateWrapper = ServerModelDelegateWrapper()
+        model.addDelegate(delegateWrapper!)
+        isConnected = true
+        
+        // ✅ 极简逻辑：直接去 Recent 列表里查名字
+        // 因为 connectionOpened 已经执行过了，Recent 列表此刻肯定是最新的
+        let currentHost = model.hostname() ?? ""
+        let currentPort = Int(model.port())
+        
+        if let savedName = RecentServerManager.shared.getDisplayName(hostname: currentHost, port: currentPort) {
+            print("📖 ServerModelManager: Resolved name from Recents: '\(savedName)'")
+            self.serverName = savedName
+        } else {
+            // 理论上不应该进这里，除非 Recent 保存慢了，那就兜底显示域名
+            self.serverName = currentHost
+        }
+        
+        rebuildModelArray()
     }
     
     func cleanup() {
@@ -147,68 +157,86 @@ class ServerModelManager: ObservableObject {
             }
         
         NotificationCenter.default.addObserver(
-                    forName: ServerModelNotificationManager.userMovedNotification,
-                    object: nil,
-                    queue: nil // 在后台队列接收
-                ) { [weak self] notification in
-                    guard let userInfo = notification.userInfo,
-                          let user = userInfo["user"] as? MKUser,
-                          let channel = userInfo["channel"] as? MKChannel else { return }
-                    
-                    // 1. 在进入异步任务前，提取所有需要的数据为“值类型”
-                    let movingUserSession = user.session()
-                    let newChannelName = channel.channelName() ?? "Unknown Channel"
-                    
-                    // 2. 将这些安全的值传递进主线程任务
-                    Task { @MainActor [weak self] in
-                        guard let self = self else { return }
-                        
-                        // 在安全的上下文里获取 connectedUserSession
-                        let connectedUserSession = self.serverModel?.connectedUser().session()
-                        
-                        // 只有当移动的用户是当前用户时，才显示通知
-                        if movingUserSession == connectedUserSession {
-                            self.addChannelJoinNotification(channelName: newChannelName)
-                        }
-                    }
+            forName: ServerModelNotificationManager.userMovedNotification,
+            object: nil,
+            queue: nil // 在后台队列接收
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let user = userInfo["user"] as? MKUser,
+                  let channel = userInfo["channel"] as? MKChannel else { return }
+            
+            // 1. 在进入异步任务前，提取所有需要的数据为“值类型”
+            let movingUserSession = user.session()
+            let newChannelName = channel.channelName() ?? "Unknown Channel"
+            
+            // 2. 将这些安全的值传递进主线程任务
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                
+                // 在安全的上下文里获取 connectedUserSession
+                let connectedUserSession = self.serverModel?.connectedUser().session()
+                
+                // 只有当移动的用户是当前用户时，才显示通知
+                if movingUserSession == connectedUserSession {
+                    self.addChannelJoinNotification(channelName: newChannelName)
                 }
-    
+            }
+        }
+        
         // --- 核心修改 2：添加对新消息通知的监听 ---
         NotificationCenter.default.addObserver(
-                    forName: ServerModelNotificationManager.textMessageReceivedNotification,
-                    object: nil,
-                    queue: nil
-                ) { [weak self] notification in
-                    guard let userInfo = notification.userInfo,
-                          let message = userInfo["message"] as? MKTextMessage,
-                          let user = userInfo["user"] as? MKUser else { return }
-                    
-                    let senderName = user.userName() ?? "Unknown"
-                    let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
-                    let senderSession = user.session()
-                    
-                    Task { @MainActor [weak self] in
-                        guard let self = self else { return }
-                        let connectedUserSession = self.serverModel?.connectedUser()?.session()
-                        
-                        // 1. 先调用 handleReceivedMessage，它会创建并添加 chatMessage 到数组
-                        self.handleReceivedMessage(
-                            senderName: senderName,
-                            plainText: plainText,
-                            imageData: imageData,
-                            senderSession: senderSession,
-                            connectedUserSession: connectedUserSession
-                        )
-                        
-                        // 2. 现在，我们可以安全地检查刚刚被添加的消息
-                        // 我们只需要判断这次消息是不是自己发送的即可
-                        let isSentBySelf = (senderSession == connectedUserSession)
-                        if AppState.shared.currentTab != .messages && !isSentBySelf {
-                            AppState.shared.unreadMessageCount += 1
-                        }
-                    }
+            forName: ServerModelNotificationManager.textMessageReceivedNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let message = userInfo["message"] as? MKTextMessage,
+                  let user = userInfo["user"] as? MKUser else { return }
+            
+            let senderName = user.userName() ?? "Unknown"
+            let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
+            let senderSession = user.session()
+            
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let connectedUserSession = self.serverModel?.connectedUser()?.session()
+                
+                // 1. 先调用 handleReceivedMessage，它会创建并添加 chatMessage 到数组
+                self.handleReceivedMessage(
+                    senderName: senderName,
+                    plainText: plainText,
+                    imageData: imageData,
+                    senderSession: senderSession,
+                    connectedUserSession: connectedUserSession
+                )
+                
+                // 2. 现在，我们可以安全地检查刚刚被添加的消息
+                // 我们只需要判断这次消息是不是自己发送的即可
+                let isSentBySelf = (senderSession == connectedUserSession)
+                if AppState.shared.currentTab != .messages && !isSentBySelf {
+                    AppState.shared.unreadMessageCount += 1
                 }
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("MUConnectionOpenedNotification"),
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            
+            let userInfo = notification.userInfo
+            let extractedDisplayName = userInfo?["displayName"] as? String
+            
+            Task { @MainActor [weak self] in
+                if let name = extractedDisplayName {
+                    AppState.shared.serverDisplayName = name
+                }
+                
+                self?.cleanup()
+                self?.setupServerModel()
+            }
+        }
     }
     
     // 新增：一个用于将纯文本转换为 AttributedString 的辅助函数

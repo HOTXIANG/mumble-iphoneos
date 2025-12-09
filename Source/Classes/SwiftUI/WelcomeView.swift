@@ -4,176 +4,218 @@ import SwiftUI
 import UIKit
 
 struct WelcomeNavigationConfig: NavigationConfigurable {
-    let onPreferences: () -> Void; let onAbout: () -> Void; var title: String {
-        "Mumble"
-    }; var leftBarItems: [NavigationBarItem] {
-        [NavigationBarItem(
-            systemImage: "gearshape",
-            action: onPreferences
-        )]
-    }; var rightBarItems: [NavigationBarItem] {
-        [NavigationBarItem(
-            systemImage: "ellipsis",
-            action: onAbout
-        )]
+    let onPreferences: () -> Void
+    let onAbout: () -> Void
+    
+    var title: String { "Mumble" }
+    var leftBarItems: [NavigationBarItem] {
+        [NavigationBarItem(systemImage: "gearshape", action: onPreferences)]
+    }
+    var rightBarItems: [NavigationBarItem] {
+        [NavigationBarItem(systemImage: "info.circle", action: onAbout)]
     }
 }
+
 struct WelcomeContentView: View {
-    @EnvironmentObject var navigationManager: NavigationManager; var body: some View {
+    @EnvironmentObject var navigationManager: NavigationManager
+    @StateObject private var lanModel = LanDiscoveryModel()
+    @ObservedObject private var recentManager = RecentServerManager.shared
+    
+    @State private var favouriteServers: [MUFavouriteServer] = []
+    
+    var body: some View {
         ZStack {
+            // 背景
             LinearGradient(
-                gradient: Gradient(
-                    colors: [
-                        Color(
-                            red: 0.20,
-                            green: 0.20,
-                            blue: 0.20
-                        ),
-                        Color(
-                            red: 0.10,
-                            green: 0.10,
-                            blue: 0.10
-                        )
-                    ]
-                ),
+                gradient: Gradient(colors: [
+                    Color(red: 0.20, green: 0.20, blue: 0.20),
+                    Color(red: 0.10, green: 0.10, blue: 0.10)
+                ]),
                 startPoint: .top,
                 endPoint: .bottom
-            ).ignoresSafeArea(); VStack(
-                spacing: 0
-            ) {
-                WelcomeHeaderView().padding(
-                    .top
-                ).padding(
-                    .bottom,
-                    20
-                ); VStack(
-                    spacing: 8
-                ) {
-                    MenuRowView(
-                        title: NSLocalizedString(
-                            "Public Servers",
-                            comment: ""
-                        ),
-                        icon: "network"
-                    ) {
-                        navigationManager.navigate(
-                            to: .objectiveC(
-                                .publicServers
-                            )
-                        )
-                    }; MenuRowView(
-                        title: NSLocalizedString(
-                            "Favourite Servers",
-                            comment: ""
-                        ),
-                        icon: "heart.fill"
-                    ) {
-                        navigationManager.navigate(
-                            to: .swiftUI(
-                                .favouriteServerList
-                            )
-                        )
-                    }; MenuRowView(
-                        title: NSLocalizedString(
-                            "LAN Servers",
-                            comment: ""
-                        ),
-                        icon: "wifi"
-                    ) {
-                        navigationManager.navigate(
-                            to: .objectiveC(
-                                .lanServers
-                            )
-                        )
+            ).ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // 顶部 Logo 区域
+                WelcomeHeaderView()
+                    .padding(.top, 10)
+                    .padding(.bottom, 20)
+                
+                VStack(spacing: 0) {
+                    
+                    Button(action: {
+                        navigationManager.navigate(to: .swiftUI(.favouriteServerList))
+                    }) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.yellow)
+                                .frame(width: 30)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Favourite Servers")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Manage your saved servers")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.indigo)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 27))
                     }
-                }.padding(
-                    .horizontal,
-                    20
-                ); Spacer()
+                    .padding(.horizontal, 20)
+                }
+                .padding(.bottom, 20)
+
+                List {
+                    // --- 最近访问 ---
+                    if !recentManager.recents.isEmpty {
+                        Section(header: Text("Recent Connections")) {
+                            ForEach(recentManager.recents) { server in
+                                ServerListRow(
+                                    title: server.displayName,
+                                    subtitle: "\(server.username) @ \(server.hostname):\(server.port)",
+                                    icon: "clock.fill",
+                                    iconColor: .blue
+                                ) {
+                                    connectTo(hostname: server.hostname, port: server.port, username: server.username, displayName: server.displayName)
+                                }
+                            }
+                            .onDelete { indexSet in
+                                recentManager.recents.remove(atOffsets: indexSet)
+                            }
+                        }
+                        .listRowBackground(Rectangle().fill(.regularMaterial))
+                    } else if lanModel.servers.isEmpty {
+                        // 如果既没有最近记录，也没有 LAN 服务器，显示一个占位提示
+                        Section {
+                            Text("No recent connections.")
+                                .font(.caption)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .foregroundColor(.secondary)
+                                .listRowBackground(Color.clear)
+                        }
+                    }
+                    
+                    // --- LAN ---
+                    if !lanModel.servers.isEmpty {
+                        Section(header: Text("Local Network")) {
+                            ForEach(lanModel.servers) { server in
+                                ServerListRow(
+                                    title: server.name,
+                                    subtitle: "\(server.hostname):\(server.port)",
+                                    icon: "network",
+                                    iconColor: .green
+                                ) {
+                                    let defaultUser = UserDefaults.standard.string(forKey: "DefaultUserName") ?? "MumbleUser"
+                                    connectTo(hostname: server.hostname, port: server.port, username: defaultUser, displayName: server.name)
+                                }
+                            }
+                        }
+                        .listRowBackground(Rectangle().fill(.regularMaterial))
+                    }
+                }
+                .scrollContentBackground(.hidden)
+                .listStyle(.insetGrouped)
             }
-        }.toolbarBackground(
-            .hidden,
-            for: .navigationBar
-        ).toolbarColorScheme(
-            .dark,
-            for: .navigationBar
+        }
+        .onAppear {
+            lanModel.start()
+        }
+        .onDisappear {
+            lanModel.stop()
+        }
+    }
+    
+    private func connectTo(hostname: String, port: Int, username: String, displayName: String) {
+        // 触发连接
+        AppState.shared.serverDisplayName = hostname
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        
+        MUConnectionController.shared()?.connet(
+            toHostname: hostname,
+            port: UInt(port),
+            withUsername: username,
+            andPassword: "", // 最近列表/LAN 暂不存储密码，需要的话可以在 Model 里加 password 字段
+            displayName: displayName
         )
     }
 }
+
+struct ServerListRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let iconColor: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(iconColor)
+                    .frame(width: 24)
+                    .font(.system(size: 18)) // 稍微调整一下图标大小
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // 列表通常自带 chevron，或者根据需要手动添加
+                // 这里我们手动添加，因为 List 样式可能被修改了
+                // Image(systemName: "chevron.right")
+                //    .font(.caption)
+                //    .foregroundColor(.tertiaryLabel) // iOS 15+ 颜色，如果报错改用 .gray.opacity(0.5)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+}
+
 struct WelcomeView: MumbleContentView {
     @State private var showingPreferences = false
-    @State private var showingAbout = false;
-    @EnvironmentObject var navigationManager: NavigationManager;
+    @State private var showingAbout = false
+    @EnvironmentObject var navigationManager: NavigationManager
+    
     var navigationConfig: any NavigationConfigurable {
         WelcomeNavigationConfig(
-            onPreferences: {
-                showingPreferences = true // 触发 Sheet
-            },
+            onPreferences: { showingPreferences = true },
             onAbout: { showingAbout = true }
         )
     }
+
     var contentBody: some View {
         WelcomeContentView()
-            .sheet(isPresented: $showingPreferences) { // 新增 Sheet
-                    NavigationStack {
+            .sheet(isPresented: $showingPreferences) {
+                NavigationStack {
                     PreferencesView()
                 }
-            }.alert(
-            "About",
-            isPresented: $showingAbout
-        ) {
-            Button(
-                NSLocalizedString(
-                    "OK",
-                    comment: ""
-                ),
-                role: .cancel
-            ) {
-                
-            }; Button(
-                NSLocalizedString(
-                    "Website",
-                    comment: ""
-                )
-            ) {
-                if let url = URL(
-                    string: "https://www.mumble.info/"
-                ) {
-                    UIApplication.shared.open(
-                        url
-                    )
-                }
-            }; Button(
-                NSLocalizedString(
-                    "Legal",
-                    comment: ""
-                )
-            ) {
-                navigationManager.navigate(
-                    to: .objectiveC(
-                        .legal
-                    )
-                )
-            }; Button(
-                NSLocalizedString(
-                    "Support",
-                    comment: ""
-                )
-            ) {
-                if let url = URL(
-                    string: "https://github.com/mumble-voip/mumble-iphoneos/issues"
-                ) {
-                    UIApplication.shared.open(
-                        url
-                    )
-                }
             }
-        } message: {
-            let bundleVersion = Bundle.main.object(
-                forInfoDictionaryKey: "CFBundleVersion"
-            ) as? String ?? ""; Text("Mumble \(bundleVersion)\n\(NSLocalizedString("Low latency, high quality voice chat",comment: ""))")}
+            .alert("About", isPresented: $showingAbout) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Mumble for iOS\nRefactored with SwiftUI")
+            }
     }
 }
+
 struct MumbleNavigationModifier: ViewModifier {
     let config: NavigationConfigurable; func body(
         content: Content
@@ -351,18 +393,30 @@ struct AppRootView: View {
                             .onTapGesture { }
                         
                         // Loading 内容框
-                        VStack(spacing: 24) {
+                        VStack(spacing: 12) {
                             ProgressView()
                                 .controlSize(.large)
                                 .tint(.white)
                             
-                            Text("Connecting...")
+                            Text(appState.isReconnecting ? "Reconnecting..." : "Connecting...")
                                 .font(.headline)
                                 .foregroundColor(.white)
+                            Button(action: {
+                                appState.cancelConnection()
+                            })
+                            {
+                                Text("Cancel")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 32)
+                                    .padding(.vertical, 10)
+                                    .glassEffect(.regular.tint(.red.opacity(0.5)).interactive(), in: Capsule())
+                            }
                         }
-                        .padding(30)
-                        .background(.ultraThinMaterial) // 漂亮的毛玻璃
-                        .clipShape(RoundedRectangle(cornerRadius: 30))
+                        .padding(.horizontal, 64)
+                        .padding(.vertical, 24)
+                        .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 32))
                         .shadow(radius: 10)
                     }
                     .ignoresSafeArea()

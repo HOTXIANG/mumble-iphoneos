@@ -5,7 +5,6 @@
 #import "MUApplicationDelegate.h"
 
 #import "MUDatabase.h"
-#import "MUPublicServerList.h"
 #import "MUConnectionController.h"
 #import "MUNotificationController.h"
 #import "MURemoteControlServer.h"
@@ -20,7 +19,6 @@
                                      UIAlertViewDelegate> {
     UIWindow                  *_window;
     UINavigationController    *_navigationController;
-    MUPublicServerListFetcher *_publistFetcher;
     BOOL                      _connectionActive;
 #ifdef MUMBLE_BETA_DIST
     MUVersionChecker          *_verCheck;
@@ -52,10 +50,6 @@
     
     // Initialize the notification controller
     [MUNotificationController sharedController];
-    
-    // Try to fetch an updated public server list
-    _publistFetcher = [[MUPublicServerListFetcher alloc] init];
-    [_publistFetcher attemptUpdate];
     
     // Set MumbleKit release string
     [[MKVersion sharedVersion] setOverrideReleaseString:
@@ -143,7 +137,7 @@
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password];
+        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password displayName:nil];
         return YES;
     }
     return NO;
@@ -159,7 +153,7 @@
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password];
+        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password displayName:nil];
         return YES;
     }
     return NO;

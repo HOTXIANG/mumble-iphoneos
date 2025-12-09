@@ -21,7 +21,8 @@ extern NSString *MUConnectionErrorNotification;
 - (void) connetToHostname:(NSString *)hostName
                      port:(NSUInteger)port
              withUsername:(NSString *)userName
-              andPassword:(NSString *)password;
+              andPassword:(NSString *)password
+              displayName:(NSString *)displayName;
 - (BOOL) isConnected;
 - (void) disconnectFromServer;
 @property (nonatomic, readonly) MKServerModel *serverModel;

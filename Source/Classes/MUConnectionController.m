@@ -8,6 +8,7 @@
 #import "MUCertificateController.h"
 #import "MUCertificateChainBuilder.h"
 #import "MUDatabase.h"
+#import "Mumble-Swift.h"
 
 #import <MumbleKit/MKConnection.h>
 #import <MumbleKit/MKServerModel.h>
@@ -36,6 +37,11 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     NSUInteger                 _port;
     NSString                   *_username;
     NSString                   *_password;
+    NSString                   *_displayName;
+    
+    BOOL            _isUserInitiatedDisconnect; // 是否用户主动断开
+    NSTimer         *_reconnectTimer;           // 重连定时器
+    NSInteger       _retryCount;                // 重试计数
 
 }
 - (void) establishConnection;
@@ -67,11 +73,12 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     return _serverModel;
 }
 
-- (void) connetToHostname:(NSString *)hostName port:(NSUInteger)port withUsername:(NSString *)userName andPassword:(NSString *)password {
+- (void) connetToHostname:(NSString *)hostName port:(NSUInteger)port withUsername:(NSString *)userName andPassword:(NSString *)password displayName:(NSString *)displayName {
     _hostname = [hostName copy];
     _port = port;
     _username = [userName copy];
     _password = [password copy];
+    _displayName = [displayName copy];
     
     // 发送“正在连接”通知，SwiftUI 可以借此显示 Loading 转圈
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
@@ -84,6 +91,19 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 }
 
 - (void) disconnectFromServer {
+    NSLog(@"🛑 User initiated disconnect/cancel.");
+    _isUserInitiatedDisconnect = YES; // 标记为主动断开
+    // 1. 停止任何正在进行的重连定时器
+    if ([_reconnectTimer isValid]) {
+        [_reconnectTimer invalidate];
+    }
+    _reconnectTimer = nil;
+    
+    if (_connection) {
+        NSLog(@"🛑 Attempting to send disconnect packet...");
+        [_connection disconnect];
+    }
+    
     [_serverRoot dismissViewControllerAnimated:YES completion:nil];
     [self teardownConnection];
 }
@@ -120,6 +140,9 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 }
 
 - (void) establishConnection {
+    // 每次开始新连接时，重置主动断开标志
+    _isUserInitiatedDisconnect = NO;
+    
     _connection = [[MKConnection alloc] init];
     [_connection setDelegate:self];
     [_connection setForceTCP:[[NSUserDefaults standardUserDefaults] boolForKey:@"NetworkForceTCP"]];
@@ -147,11 +170,20 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 }
 
 - (void) teardownConnection {
-    [_serverModel removeDelegate:self];
-    _serverModel = nil;
-    [_connection setDelegate:nil];
-    [_connection disconnect];
-    _connection = nil;
+    // 1. 先断开 Model 的代理，防止后续不仅要的消息刷屏
+    if (_serverModel) {
+        [_serverModel removeDelegate:self];
+        _serverModel = nil;
+    }
+    
+    // 2. 再次确保断开连接并清理代理
+    if (_connection) {
+        [_connection setDelegate:nil];
+        // 即使 disconnectFromServer 已经调用过，这里再调用一次也是安全的（幂等操作），
+        // 确保如果是从其他路径进入 teardown（比如证书错误），也能断开连接。
+        [_connection disconnect];
+        _connection = nil;
+    }
     [_timer invalidate];
     _serverRoot = nil;
     
@@ -181,20 +213,70 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     });
 }
 
+- (NSString *) lastChannelKey {
+    return [NSString stringWithFormat:@"LastChannel_%@_%lu_%@", _hostname, (unsigned long)_port, _username];
+}
+
+// 生成状态存储 Key，绑定到具体服务器和用户名，避免跨服务器混淆
+- (NSString *) muteStateKey {
+    return [NSString stringWithFormat:@"State_Mute_%@_%lu_%@", _hostname, (unsigned long)_port, _username];
+}
+
+- (NSString *) deafStateKey {
+    return [NSString stringWithFormat:@"State_Deaf_%@_%lu_%@", _hostname, (unsigned long)_port, _username];
+}
+
 #pragma mark - MKConnectionDelegate
 
 - (void) connectionOpened:(MKConnection *)conn {
     NSArray *tokens = [MUDatabase accessTokensForServerWithHostname:[conn hostname] port:[conn port]];
     [conn authenticateWithUsername:_username password:_password accessTokens:tokens];
+    
+    NSString *nameToSave = (_displayName && _displayName.length > 0) ? _displayName : _hostname;
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // 调用 Swift 的 addRecent，把名字存进去！
+        [[RecentServerManager shared] addRecentWithHostname:self->_hostname
+                                                       port:self->_port
+                                                   username:self->_username
+                                                displayName:nameToSave];
+    });
 }
 
 - (void) connection:(MKConnection *)conn closedWithError:(NSError *)err {
-    if (err) {
-        [self postErrorWithTitle:NSLocalizedString(@"Connection closed", nil)
-                         message:[err localizedDescription]];
-    } else {
+    [self hideConnectingView]; // 关闭初始连接时的 Alert（如果有）
+    
+    if (_isUserInitiatedDisconnect) {
+        // 情况 A: 用户点了“断开”按钮 -> 正常清理，回主页
         [self teardownConnection];
+        return;
     }
+    
+    // 情况 B: 意外断线 -> 尝试重连
+    NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect...");
+    
+    // 1. 发送“正在重连”通知给 SwiftUI (稍后在 Swift 端定义这个通知名)
+    // 我们复用 MUConnectionConnectingNotification，或者定义一个新的
+    // 为了区分 UI（显示“Reconnecting”而不是“Connecting”），我们通过 userInfo 传参
+    NSDictionary *info = @{ @"isReconnecting": @(YES) };
+    [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil userInfo:info];
+    
+    // 2. 销毁旧的底层连接对象 (必须清理，否则状态会乱)
+    [_serverModel removeDelegate:self];
+    _serverModel = nil;
+    [_connection setDelegate:nil];
+    [_connection disconnect];
+    _connection = nil;
+    
+    // 3. 启动定时器，3秒后重试
+    [_reconnectTimer invalidate];
+    _reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:3.0 target:self selector:@selector(performReconnect) userInfo:nil repeats:NO];
+}
+
+// 执行重连的 Action
+- (void) performReconnect {
+    NSLog(@"🔄 Performing reconnect...");
+    [self establishConnection];
 }
 
 - (void) connection:(MKConnection*)conn unableToConnectWithError:(NSError *)err {
@@ -247,15 +329,73 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 - (void) serverModel:(MKServerModel *)model joinedServerAsUser:(MKUser *)user {
     [MUDatabase storeUsername:[user userName] forServerWithHostname:[model hostname] port:[model port]];
     
-    // 清理凭据
-    _username = nil;
-    _hostname = nil;
-    _password = nil;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger lastChannelId = [defaults integerForKey:[self lastChannelKey]];
+    BOOL shouldMute = [defaults boolForKey:[self muteStateKey]];
+    BOOL shouldDeaf = [defaults boolForKey:[self deafStateKey]];
     
-    // 通知全区：连接成功！
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionOpenedNotification object:self];
-    });
+    // 如果有记录状态（且状态为真），则应用
+    if (shouldMute || shouldDeaf) {
+        NSLog(@"🔄 Restoring user state: Muted=%d, Deafened=%d", shouldMute, shouldDeaf);
+        // 注意：Mumble 协议要求如果 Deaf 为真，Mute 必须也为真
+        if (shouldDeaf) shouldMute = YES;
+        [model setSelfMuted:shouldMute andSelfDeafened:shouldDeaf];
+    }
+    
+    // 0 通常是 Root 频道，如果存的是 0 就不需要动
+    if (lastChannelId > 0) {
+        MKChannel *targetChannel = [model channelWithId:lastChannelId];
+        if (targetChannel) {
+            NSLog(@"🔄 Automatically joining last channel: %@", [targetChannel channelName]);
+            [model joinChannel:targetChannel];
+        }
+    }
+    
+    [self hideConnectingViewWithCompletion:^{
+        [self->_serverRoot takeOwnershipOfConnectionDelegate];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            
+            NSString *displayTitle = self->_displayName;
+            if (!displayTitle || [displayTitle length] == 0) {
+                displayTitle = self->_hostname;
+            }
+            
+            // 构建 userInfo
+            NSDictionary *userInfo = nil;
+            if (displayTitle) {
+                userInfo = @{ @"displayName": displayTitle };
+            }
+            
+            NSLog(@"   -> Final UserInfo to send: %@", userInfo);
+            
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"MUConnectionReadyForSwiftUI"
+                                                                object:self
+                                                              userInfo:userInfo];
+            
+            [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionOpenedNotification
+                                                                object:self
+                                                              userInfo:userInfo];
+        });
+    }];
+}
+
+- (void) serverModel:(MKServerModel *)model userMoved:(MKUser *)user toChannel:(MKChannel *)chan fromChannel:(MKChannel *)prevChan byUser:(MKUser *)mover {
+    // 只有当移动的是“我自己”时才保存
+    if (user == [model connectedUser]) {
+        [[NSUserDefaults standardUserDefaults] setInteger:[chan channelId] forKey:[self lastChannelKey]];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+}
+
+- (void) serverModel:(MKServerModel *)model userSelfMuteDeafenStateChanged:(MKUser *)user {
+    // 只保存“我自己”的状态
+    if (user == [model connectedUser]) {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setBool:[user isSelfMuted] forKey:[self muteStateKey]];
+        [defaults setBool:[user isSelfDeafened] forKey:[self deafStateKey]];
+        [defaults synchronize];
+        // NSLog(@"💾 Saved user state: Muted=%d, Deafened=%d", [user isSelfMuted], [user isSelfDeafened]);
+    }
 }
 
 - (void) serverModel:(MKServerModel *)model userKicked:(MKUser *)user byUser:(MKUser *)actor forReason:(NSString *)reason {

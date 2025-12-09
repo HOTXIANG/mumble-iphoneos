@@ -96,27 +96,13 @@ struct ListRowView: View {
 // 头部图标视图 - 同样更新图标颜色以保持一致性
 struct WelcomeHeaderView: View {
     var body: some View {
-        if let image = MUImage.imageNamed("WelcomeScreenIcon") {
-            Image(uiImage: image)
+        VStack(spacing: 16) {
+            // ✅ 核心修复：添加 resizable 和 frame 限制
+            Image("TransparentLogo")
                 .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: image.size.width, height: image.size.height)
-                .padding(.bottom, 20)
-                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                .scaledToFit()
+                .frame(width: 300, height: 300)
+                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
         }
     }
 }
-
-
-// BackgroundViewRepresentable 不再需要，可以安全删除或注释掉
-/*
-struct BackgroundViewRepresentable: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.backgroundColor = .clear
-        return view
-    }
-    
-    func updateUIView(_ uiView: UIView, context: Context) {}
-}
-*/

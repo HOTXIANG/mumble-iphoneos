@@ -143,9 +143,7 @@ enum NavigationDestination: Hashable {
 
 // Objective-C 控制器类型枚举 (保持不变)
 enum ObjectiveCControllerType: Hashable, Equatable {
-    case publicServers
     case favouriteServers
-    case lanServers
     case preferences
     case legal
     case certificates
@@ -157,12 +155,8 @@ struct ObjectiveCViewWrapper: UIViewControllerRepresentable {
     
     func makeUIViewController(context: Context) -> UIViewController {
         switch controllerType {
-        case .publicServers:
-            return MUPublicServerListController()
         case .favouriteServers:
             return MUFavouriteServerListController()
-        case .lanServers:
-            return MULanServerListController()
         case .preferences:
             return MUPreferencesViewController()
         case .legal:

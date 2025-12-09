@@ -157,7 +157,8 @@
         [connCtrlr connetToHostname:[favServ hostName]
                                port:[favServ port]
                             withUsername:userName
-                        andPassword:[favServ password]];
+                        andPassword:[favServ password]
+                        displayName:[favServ displayName]];
         [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
     }]];
     
