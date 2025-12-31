@@ -127,15 +127,15 @@ struct AudioTransmissionSettingsView: View {
 
 // 2. 音频质量设置视图
 struct AudioQualitySettingsView: View {
-    @AppStorage("AudioQualityKind") var qualityKind: String = "high"
+    @AppStorage("AudioQualityKind") var qualityKind: String = "Balanced"
     
     var body: some View {
         Form {
             Section(header: Text("Quality Preset")) {
                 Picker("", selection: $qualityKind) {
-                    Text("Low (40kbit/s)").tag("low")
-                    Text("Balanced (72kbit/s)").tag("balanced")
-                    Text("High (100kbit/s)").tag("high")
+                    Text("Low (60kbit/s)").tag("low")
+                    Text("Balanced (100kbit/s)").tag("balanced")
+                    Text("High (192kbit/s)").tag("high")
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()

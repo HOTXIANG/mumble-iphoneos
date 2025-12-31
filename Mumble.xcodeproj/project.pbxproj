@@ -58,7 +58,6 @@
 		28EF155D14D8738C008A35A4 /* MUMessagesDatabase.m in Sources */ = {isa = PBXBuildFile; fileRef = 28EF155C14D8738C008A35A4 /* MUMessagesDatabase.m */; };
 		28F019911364585C00E402F6 /* MUServerCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F019901364585B00E402F6 /* MUServerCell.m */; };
 		28F04B2214898A7100C90909 /* MUAdvancedAudioPreferencesViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F04B2114898A7100C90909 /* MUAdvancedAudioPreferencesViewController.m */; };
-		28F0835F147F102F00DC126F /* publist.xml in Resources */ = {isa = PBXBuildFile; fileRef = 28F0835E147F102F00DC126F /* publist.xml */; };
 		28F08362147F263C00DC126F /* MUAudioBarView.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F08361147F263B00DC126F /* MUAudioBarView.m */; };
 		28F08365147F369200DC126F /* MUAudioBarViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F08364147F369200DC126F /* MUAudioBarViewCell.m */; };
 		28F79C70147973D60003B8BA /* MUUserStateAcessoryView.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79C6F147973D50003B8BA /* MUUserStateAcessoryView.m */; };
@@ -92,7 +91,6 @@
 		F2AD3A762E0E40BD00FC7006 /* FavouriteServerEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A742E0E40B300FC7006 /* FavouriteServerEditView.swift */; };
 		F2C0EE392E0E120300B80B44 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C0EE372E0E11F900B80B44 /* WelcomeView.swift */; };
 		F2DF4AA02E1FB2AD00A0C166 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF4A962E1FB2A800A0C166 /* AppState.swift */; };
-		F2FBE1C52E2167F4000AA092 /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */; };
 		F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C62E216A7F000AA092 /* Assets.xcassets */; };
 		F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56722E0F711A00D76B49 /* MessagesView.swift */; };
 		F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */; };
@@ -291,7 +289,6 @@
 		28F019901364585B00E402F6 /* MUServerCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUServerCell.m; sourceTree = "<group>"; };
 		28F04B2014898A7100C90909 /* MUAdvancedAudioPreferencesViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUAdvancedAudioPreferencesViewController.h; sourceTree = "<group>"; };
 		28F04B2114898A7100C90909 /* MUAdvancedAudioPreferencesViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUAdvancedAudioPreferencesViewController.m; sourceTree = "<group>"; };
-		28F0835E147F102F00DC126F /* publist.xml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; name = publist.xml; path = Resources/publist.xml; sourceTree = "<group>"; };
 		28F08360147F263B00DC126F /* MUAudioBarView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUAudioBarView.h; sourceTree = "<group>"; };
 		28F08361147F263B00DC126F /* MUAudioBarView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUAudioBarView.m; sourceTree = "<group>"; };
 		28F08363147F369100DC126F /* MUAudioBarViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUAudioBarViewCell.h; sourceTree = "<group>"; };
@@ -594,7 +591,6 @@
 			children = (
 				280256351510D70D00178B08 /* en.lproj */,
 				280256391510DDCA00178B08 /* da.lproj */,
-				28F0835E147F102F00DC126F /* publist.xml */,
 				28DC1C2713DE596B0037CDC2 /* Continents.plist */,
 				28DC1C2913DE596B0037CDC2 /* Countries.plist */,
 				F26689942EE8A46A008FC7EB /* iTunesArtwork.png */,
@@ -760,7 +756,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastTestingUpgradeCheck = 0700;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					1D6058900D05DD3D006BFB54 = {
 						LastSwiftMigration = 2600;
@@ -889,13 +885,11 @@
 				287639FF11D2A242009DB8B6 /* MUCertificateCreationProgressView.xib in Resources */,
 				2858A580123B9E5700A82155 /* MUCertificateCell.xib in Resources */,
 				F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */,
-				F2FBE1C52E2167F4000AA092 /* NeoMumble.icon in Resources */,
 				28DC1C7013DE596B0037CDC2 /* Continents.plist in Resources */,
 				F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */,
 				28DC1C7213DE596B0037CDC2 /* Countries.plist in Resources */,
 				F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */,
 				28851B95147DC97E00088C4F /* MULegalViewController.xib in Resources */,
-				28F0835F147F102F00DC126F /* publist.xml in Resources */,
 				280256381510D70D00178B08 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1065,6 +1059,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				ENABLE_MODULE_VERIFIER = YES;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
@@ -1077,6 +1072,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
@@ -1102,6 +1098,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				ENABLE_MODULE_VERIFIER = YES;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
@@ -1114,6 +1111,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
@@ -1282,6 +1280,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				ENABLE_MODULE_VERIFIER = YES;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
@@ -1294,6 +1293,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
@@ -1331,6 +1331,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
+				ENABLE_MODULE_VERIFIER = YES;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
@@ -1343,6 +1344,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
@@ -1378,6 +1380,7 @@
 				CLANG_ENABLE_OBJC_ARC = YES;
 				DEVELOPMENT_TEAM = J3TTEQJNML;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
 			};
 			name = Release;

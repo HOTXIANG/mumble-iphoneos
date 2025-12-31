@@ -69,7 +69,7 @@
                                                                 [NSNumber numberWithBool:YES],     @"AudioPreprocessor",
                                                                 [NSNumber numberWithBool:YES],     @"AudioEchoCancel",
                                                                 [NSNumber numberWithFloat:1.0f],   @"AudioMicBoost",
-                                                                @"high",                       @"AudioQualityKind",
+                                                                @"balanced",                       @"AudioQualityKind",
                                                                 [NSNumber numberWithBool:NO],      @"AudioSidetone",
                                                                 [NSNumber numberWithFloat:0.2f],   @"AudioSidetoneVolume",
                                                                 [NSNumber numberWithBool:YES],     @"AudioSpeakerPhoneMode",
@@ -164,9 +164,11 @@
 }
 
 - (void) setupAudio {
+    NSLog(@"[DEBUG] 🔧 setupAudio CALLED! Time: %f", [[NSDate date] timeIntervalSince1970]); // <--- 添加这行
     // Set up a good set of default audio settings.
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     MKAudioSettings settings;
+    memset(&settings, 0, sizeof(settings));
 
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     if (now - _lastAudioRestartTime < 0.5) {
@@ -201,19 +203,19 @@
         // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
-        settings.quality = 40000;
-        settings.audioPerPacket = 6;
+        settings.quality = 60000;
+        settings.audioPerPacket = 4;
     } else if ([quality isEqualToString:@"balanced"]) {
         // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
-        settings.quality = 72000;
+        settings.quality = 100000;
         settings.audioPerPacket = 2;
     } else if ([quality isEqualToString:@"high"] || [quality isEqualToString:@"opus"]) {
         // Will fall back to CELT if the
         // server requires it for inter-op.
         settings.codec = MKCodecFormatOpus;
-        settings.quality = 100000;
+        settings.quality = 192000;
         settings.audioPerPacket = 1;
     } else {
         settings.codec = MKCodecFormatCELT;
@@ -255,6 +257,8 @@
     MKAudio *audio = [MKAudio sharedAudio];
     [audio updateAudioSettings:&settings];
     [audio restart];
+    
+    NSLog(@"[DEBUG] ✅ setupAudio FINISHED. Engine should be running.");
 }
 
 // Reload application preferences...
