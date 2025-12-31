@@ -409,8 +409,6 @@ struct AppRootView: View {
                     navigationManager.goBack()
                 }
             case .channelList:
-                // 在 iPad 上，这个 case 不应该被触发到 Sidebar Stack 里
-                // 在 iPhone 上，这是正常的 Push 目标
                 ChannelListView()
             }
         }
