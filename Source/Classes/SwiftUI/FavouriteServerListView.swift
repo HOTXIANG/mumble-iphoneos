@@ -120,28 +120,22 @@ struct FavouriteServerRowView: View {
             Image(
                 systemName: "chevron.right"
             )
-            .font(
-                .system(
-                    size: 14,
-                    weight: .medium
-                )
-            )
-            .foregroundColor(
-                .indigo
-            )
+            .font(.caption)
+            .fontWeight(.bold)
+            .foregroundColor(.indigo)
         }
         .foregroundColor(
             .primary
         )
         .padding(
             .horizontal,
-            16
+            20
         )
         .padding(
             .vertical,
-            12
+            16
         )
-        .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 20))
+        .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 27))
         .onAppear {
             pingModel.startPinging()
         }

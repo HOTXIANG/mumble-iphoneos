@@ -1,4 +1,9 @@
-// 文件: WelcomeView.swift (最终修复版)
+//
+//  WelcomeView.swift
+//  Mumble
+//
+//  Created by 王梓田 on 2025/6/27.
+//
 
 import SwiftUI
 import UIKit
@@ -70,6 +75,7 @@ struct WelcomeContentView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
+                        .contentShape(Rectangle())
                         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 27))
                     }
                     .padding(.horizontal, 20)
@@ -178,12 +184,6 @@ struct ServerListRow: View {
                 }
                 
                 Spacer()
-                
-                // 列表通常自带 chevron，或者根据需要手动添加
-                // 这里我们手动添加，因为 List 样式可能被修改了
-                // Image(systemName: "chevron.right")
-                //    .font(.caption)
-                //    .foregroundColor(.tertiaryLabel) // iOS 15+ 颜色，如果报错改用 .gray.opacity(0.5)
             }
             .padding(.vertical, 4)
         }
@@ -218,227 +218,156 @@ struct WelcomeView: MumbleContentView {
 }
 
 struct MumbleNavigationModifier: ViewModifier {
-    let config: NavigationConfigurable; func body(
-        content: Content
-    ) -> some View {
-        content.navigationTitle(
-            config.title
-        ).navigationBarTitleDisplayMode(
-            .inline
-        ).toolbar {
-            ToolbarItemGroup(
-                placement: .navigationBarLeading
-            ) {
-                ForEach(
-                    Array(
-                        config.leftBarItems.enumerated()
-                    ),
-                    id: \.offset
-                ) {
-                    _,
-                    item in createBarButton(
-                        item
-                    )
+    let config: NavigationConfigurable
+    
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(config.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
+                    ForEach(Array(config.leftBarItems.enumerated()), id: \.offset) { _, item in
+                        createBarButton(item)
+                    }
                 }
-            }; ToolbarItemGroup(
-                placement: .navigationBarTrailing
-            ) {
-                ForEach(
-                    Array(
-                        config.rightBarItems.enumerated()
-                    ),
-                    id: \.offset
-                ) {
-                    _,
-                    item in createBarButton(
-                        item
-                    )
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    ForEach(Array(config.rightBarItems.enumerated()), id: \.offset) { _, item in
+                        createBarButton(item)
+                    }
                 }
+            }
+    }
+    
+    @ViewBuilder
+    private func createBarButton(_ item: NavigationBarItem) -> some View {
+        Button(action: item.action) {
+            if let title = item.title {
+                Text(NSLocalizedString(title, comment: ""))
+            } else if let systemImage = item.systemImage {
+                Image(systemName: systemImage)
             }
         }
-    }; @ViewBuilder private func createBarButton(
-        _ item: NavigationBarItem
-    ) -> some View {
-        Button(
-            action: item.action
-        ) {
-            if let title = item.title {
-                Text(
-                    NSLocalizedString(
-                        title,
-                        comment: ""
-                    )
-                )
-            } else if let systemImage = item.systemImage {
-                Image(
-                    systemName: systemImage
-                )
-            }
-        }.foregroundStyle(
-            .primary
-        )
+        .foregroundStyle(.primary)
     }
 }
+
 struct WelcomeRootView: View {
-    @StateObject private var navigationManager = NavigationManager(); var body: some View {
-        NavigationStack(
-            path: $navigationManager.navigationPath
-        ) {
-            WelcomeView().navigationDestination(
-                for: NavigationDestination.self
-            ) {
-                destination in destinationView(
-                    for: destination
-                ).environmentObject(
-                    navigationManager
-                )
-            }.environmentObject(
-                navigationManager
-            )
-        }.preferredColorScheme(
-            .dark
-        )
-    }; @ViewBuilder private func destinationView(
-        for destination: NavigationDestination
-    ) -> some View {
-        switch destination {
-        case .objectiveC(
-            let type
-        ): ObjectiveCViewWrapper(
-            controllerType: type
-        ); case .swiftUI(
-            let type
-        ): switch type {
-        case .favouriteServerList: FavouriteServerListView(); case .favouriteServerEdit(
-            let primaryKey
-        ): let server: MUFavouriteServer? = {
-            guard let key = primaryKey else {
-                return nil
-            }; if let allFavourites = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] {
-                return allFavourites.first {
-                    $0.primaryKey == key
+    @StateObject private var navigationManager = NavigationManager()
+    
+    var body: some View {
+        NavigationStack(path: $navigationManager.navigationPath) {
+            WelcomeView()
+                .navigationDestination(for: NavigationDestination.self) { destination in
+                    // 这里只是一个简单的预览实现，实际逻辑在 AppRootView
+                    Text("Destination: \(String(describing: destination))")
                 }
-            }; return nil
-        }(); FavouriteServerEditView(
-            server: server
-        ) {
-            serverToSave in MUDatabase.storeFavourite(
-                serverToSave
-            ); navigationManager.goBack()
-        }; case .channelList: ChannelListView()
+                .environmentObject(navigationManager)
         }
-        }
+        .preferredColorScheme(.dark)
     }
-} // AppRootView 保持不变
+}
+
+// MARK: - 核心修改后的 AppRootView
+
 struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
 
-    // 为两个独立的导航栈分别创建 NavigationManager
-    @StateObject private var disconnectedNavManager = NavigationManager()
-    @StateObject private var connectedNavManager = NavigationManager()
+    // 统一使用一个 NavigationManager，不再区分连接前后的栈
+    @StateObject private var navigationManager = NavigationManager()
 
     var body: some View {
-            ZStack {
-                // 主界面逻辑
-                if appState.isConnected {
-                    NavigationStack(path: $connectedNavManager.navigationPath) {
-                        ChannelListView()
-                            .navigationDestination(for: NavigationDestination.self) { destination in
-                                destinationView(for: destination, with: connectedNavManager)
-                            }
+        ZStack {
+            // 单一 NavigationStack，以 WelcomeView 为根
+            NavigationStack(path: $navigationManager.navigationPath) {
+                WelcomeView()
+                    .navigationDestination(for: NavigationDestination.self) { destination in
+                        destinationView(for: destination)
                     }
-                    .environmentObject(connectedNavManager)
-                    .preferredColorScheme(.dark)
-                    .transition(.move(edge: .trailing))
-                } else {
-                    NavigationStack(path: $disconnectedNavManager.navigationPath) {
-                        WelcomeView()
-                            .navigationDestination(for: NavigationDestination.self) { destination in
-                                destinationView(for: destination, with: disconnectedNavManager)
-                            }
-                    }
-                    .environmentObject(disconnectedNavManager)
-                    .preferredColorScheme(.dark)
-                    .transition(.opacity)
-                }
             }
-            .overlay(alignment: .top) {
-                if let toast = appState.activeToast {
-                    ToastView(toast: toast)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .zIndex(2000) // 确保在 PTT 按钮和普通内容之上
-                        // 点击 Toast 可以立即关闭
-                        .onTapGesture {
-                            withAnimation {
-                                appState.activeToast = nil
-                            }
-                        }
-                }
-            }
-            .overlay(alignment: .bottom) {
-                // 只有连接成功后才显示 PTT 按钮
-                if appState.isConnected {
-                    PTTButton()
-                        // 确保它不遮挡底部的某些操作，或者根据需要调整位置
-                        .padding(.bottom, 20)
-                }
-            }
-            // 修改点 2: 使用 .overlay 将遮罩层置于一切之上
-            .overlay {
-                if appState.isConnecting {
-                    ZStack {
-                        // 全屏半透明背景
-                        Color.black.opacity(0.6)
-                            .ignoresSafeArea()
-                            // 添加点击拦截，防止连接时误触底部按钮
-                            .onTapGesture { }
-                        
-                        // Loading 内容框
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .controlSize(.large)
-                                .tint(.white)
-                            
-                            Text(appState.isReconnecting ? "Reconnecting..." : "Connecting...")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            Button(action: {
-                                appState.cancelConnection()
-                            })
-                            {
-                                Text("Cancel")
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 32)
-                                    .padding(.vertical, 10)
-                                    .glassEffect(.regular.tint(.red.opacity(0.5)).interactive(), in: Capsule())
-                            }
-                        }
-                        .padding(.horizontal, 64)
-                        .padding(.vertical, 24)
-                        .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 32))
-                        .shadow(radius: 10)
-                    }
-                    .ignoresSafeArea()
-                    .zIndex(9999) // 确保在最上层
-                    .transition(.opacity.animation(.easeInOut(duration: 0.3)))
-                }
-            }
-            // 全局错误弹窗
-            .alert(item: $appState.activeError) { error in
-                Alert(
-                    title: Text(error.title),
-                    message: Text(error.message),
-                    dismissButton: .default(Text("OK"))
-                )
-            }
-            .animation(.default, value: appState.isConnecting)
-            .animation(.spring(), value: appState.isConnected)
+            .environmentObject(navigationManager)
+            .preferredColorScheme(.dark)
         }
+        // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
+        .overlay(alignment: .top) {
+            if let toast = appState.activeToast {
+                ToastView(toast: toast)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(2000)
+                    .onTapGesture {
+                        withAnimation { appState.activeToast = nil }
+                    }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            // 只有连接成功后才显示 PTT 按钮
+            if appState.isConnected {
+                PTTButton()
+                    .padding(.bottom, 20)
+            }
+        }
+        .overlay {
+            if appState.isConnecting {
+                ZStack {
+                    // 全屏半透明背景防止误触
+                    Color.black.opacity(0.6)
+                        .ignoresSafeArea()
+                        .onTapGesture { }
+                    
+                    // Loading 内容框
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.large)
+                            .tint(.white)
+                        
+                        Text(appState.isReconnecting ? "Reconnecting..." : "Connecting...")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Button(action: {
+                            appState.cancelConnection()
+                        }) {
+                            Text("Cancel")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 32)
+                                .padding(.vertical, 10)
+                                .glassEffect(.regular.tint(.red.opacity(0.5)).interactive(), in: Capsule())
+                        }
+                    }
+                    .padding(.horizontal, 64)
+                    .padding(.vertical, 24)
+                    .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 32))
+                    .shadow(radius: 10)
+                }
+                .ignoresSafeArea()
+                .zIndex(9999)
+                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+            }
+        }
+        .alert(item: $appState.activeError) { error in
+            Alert(
+                title: Text(error.title),
+                message: Text(error.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        // --- 核心逻辑：根据连接状态驱动导航 ---
+        .onChange(of: appState.isConnected) { isConnected in
+            if isConnected {
+                // 连接成功 -> 推入 ChannelList
+                // 避免重复推入（虽然通常 isConnected 只会变一次）
+                navigationManager.navigate(to: .swiftUI(.channelList))
+            } else {
+                // 连接断开 -> 返回根视图 (WelcomeView)
+                navigationManager.goToRoot()
+            }
+        }
+        .animation(.default, value: appState.isConnecting)
+        .animation(.spring(), value: appState.isConnected)
+    }
     
     @ViewBuilder
-    private func destinationView(for destination: NavigationDestination, with manager: NavigationManager) -> some View {
+    private func destinationView(for destination: NavigationDestination) -> some View {
         switch destination {
         case .objectiveC(let type):
             ObjectiveCViewWrapper(controllerType: type)
@@ -456,10 +385,10 @@ struct AppRootView: View {
                 }()
                 FavouriteServerEditView(server: server) { serverToSave in
                     MUDatabase.storeFavourite(serverToSave)
-                    manager.goBack()
+                    navigationManager.goBack()
                 }
             case .channelList:
-                EmptyView()
+                ChannelListView()
             }
         }
     }
