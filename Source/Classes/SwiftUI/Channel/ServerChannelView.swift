@@ -4,9 +4,11 @@ import SwiftUI
 
 struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
-
+    
     var body: some View {
         ZStack {
+            // --- 核心修复 1: 将渐变背景移到这里 (TabView 的父级) ---
+            // 这样它就能覆盖整个屏幕，包括顶部的导航栏区域
             LinearGradient(
                 gradient: Gradient(colors: [
                     Color(red: 0.20, green: 0.20, blue: 0.25),
@@ -14,8 +16,8 @@ struct ServerChannelView: View {
                 ]),
                 startPoint: .top,
                 endPoint: .bottom
-            ).ignoresSafeArea()
-
+            )
+            .ignoresSafeArea()
             List {
                 ForEach(serverManager.modelItems) { item in
                     if item.isChannel {
@@ -57,6 +59,7 @@ struct ServerChannelView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .background(Color.clear)
         }
     }
 

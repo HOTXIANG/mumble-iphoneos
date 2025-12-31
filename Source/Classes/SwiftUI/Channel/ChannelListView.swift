@@ -21,8 +21,8 @@ struct ChannelListView: View {
         .navigationBarBackButtonHidden(true)
         .navigationTitle(Text(serverManager.serverName ?? "Channel"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar) // 确保背景区域可见
-        .toolbarBackground(.clear, for: .navigationBar) // 设置背景为玻璃材质
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .background(Color.clear)
         .toolbar {
             // 左上角按钮组
             ToolbarItemGroup(placement: .navigationBarLeading) {
@@ -113,6 +113,7 @@ struct ChannelListView: View {
                 .padding(.horizontal,8)
             }
         }
+        .background(Color.clear)
         .sheet(isPresented: $showingPrefs) {
             NavigationStack {
                 PreferencesView()
