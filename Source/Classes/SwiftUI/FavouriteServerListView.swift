@@ -161,111 +161,88 @@ struct FavouriteServerListContentView: View {
     private let successHaptic = UINotificationFeedbackGenerator()
     
     var body: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(
-                    colors: [
-                        Color(
-                            red: 0.20,
-                            green: 0.20,
-                            blue: 0.20
-                        ),
-                        Color(
-                            red: 0.10,
-                            green: 0.10,
-                            blue: 0.10
-                        )
-                    ]
-                ),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(
-                .all
-            )
-            
-            if favouriteServers.isEmpty {
-                emptyStateView
-            } else {
-                List {
-                    ForEach(
-                        favouriteServers,
-                        id: \.primaryKey
-                    ) { server in
-                        Menu {
-                            Button(
-                                "Connect",
-                                systemImage: "bolt.fill"
-                            ) {
-                                connectToServer(
-                                    server
-                                )
-                            }
-                            Button(
-                                "Edit",
-                                systemImage: "pencil"
-                            ) {
-                                editServer(
-                                    server
-                                )
-                            }
-                            Button(
-                                "Delete",
-                                systemImage: "trash",
-                                role: .destructive
-                            ) {
-                                self.serverToDelete = server
-                                self.showingDeleteAlert = true
-                            }
-                        } label: {
-                            FavouriteServerRowView(
-                                server: server
+        if favouriteServers.isEmpty {
+            emptyStateView
+        } else {
+            List {
+                ForEach(
+                    favouriteServers,
+                    id: \.primaryKey
+                ) { server in
+                    Menu {
+                        Button(
+                            "Connect",
+                            systemImage: "bolt.fill"
+                        ) {
+                            connectToServer(
+                                server
                             )
                         }
-                    }
-                    .onDelete(
-                        perform: deleteServers
-                    )
-                    .listRowBackground(
-                        Color.clear
-                    )
-                    .listRowSeparator(
-                        .hidden
-                    )
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: 8,
-                            leading: 16,
-                            bottom: 8,
-                            trailing: 16
+                        Button(
+                            "Edit",
+                            systemImage: "pencil"
+                        ) {
+                            editServer(
+                                server
+                            )
+                        }
+                        Button(
+                            "Delete",
+                            systemImage: "trash",
+                            role: .destructive
+                        ) {
+                            self.serverToDelete = server
+                            self.showingDeleteAlert = true
+                        }
+                    } label: {
+                        FavouriteServerRowView(
+                            server: server
                         )
+                    }
+                }
+                .onDelete(
+                    perform: deleteServers
+                )
+                .listRowBackground(
+                    Color.clear
+                )
+                .listRowSeparator(
+                    .hidden
+                )
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 8,
+                        leading: 16,
+                        bottom: 8,
+                        trailing: 16
+                    )
+                )
+            }
+            .scrollContentBackground(.hidden)
+            .listStyle(
+                .plain
+            )
+            .onAppear(
+                perform: loadFavouriteServers
+            )
+            .alert(
+                "Delete Favourite",
+                isPresented: $showingDeleteAlert,
+                presenting: serverToDelete
+            ) { server in
+                Button(
+                    "Delete",
+                    role: .destructive
+                ) {
+                    deleteFavouriteServer(
+                        server
                     )
                 }
-                .listStyle(
-                    .plain
+            } message: { server in
+                Text(
+                    "Are you sure you want to delete '\(server.displayName ?? "this server")'?"
                 )
             }
-        }
-        .onAppear(
-            perform: loadFavouriteServers
-        )
-        .alert(
-            "Delete Favourite",
-            isPresented: $showingDeleteAlert,
-            presenting: serverToDelete
-        ) { server in
-            Button(
-                "Delete",
-                role: .destructive
-            ) {
-                deleteFavouriteServer(
-                    server
-                )
-            }
-        } message: { server in
-            Text(
-                "Are you sure you want to delete '\(server.displayName ?? "this server")'?"
-            )
         }
     }
     

@@ -106,14 +106,6 @@
     // XXX: don't do it system-wide just yet
     //    _window.tintColor = [UIColor whiteColor];
     }
-
-    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
-        UINavigationBar.appearance.tintColor = [UIColor whiteColor];
-        UINavigationBar.appearance.translucent = YES;
-        UINavigationBar.appearance.barTintColor = [UIColor colorWithRed:0.2 green:0.2 blue:0.2 alpha:1.0];
-        UINavigationBar.appearance.backgroundColor = [UIColor colorWithRed:0.2 green:0.2 blue:0.2 alpha:1.0];
-        UINavigationBar.appearance.barStyle = UIBarStyleBlack;
-    }
     
     // Put a background view in here, to have prettier transitions.
     //[_window addSubview:[MUBackgroundView backgroundView]];
