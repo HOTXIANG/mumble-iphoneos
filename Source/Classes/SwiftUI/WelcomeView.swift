@@ -69,7 +69,7 @@ struct WelcomeContentView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 16)
                     .contentShape(Rectangle()) // 修复点击热区问题
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 27))
+                    .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 27))
                 }
                 .padding(.horizontal, 20)
                 .buttonStyle(.plain)
@@ -327,7 +327,7 @@ struct AppRootView: View {
                     .background(Color.clear)
             }
             .environmentObject(sidebarNavigationManager)
-            .navigationSplitViewColumnWidth(min: 320, ideal: 350)
+            .navigationSplitViewColumnWidth(min: 320, ideal: 380)
             .background(Color.clear)
         } detail: {
             ZStack {
