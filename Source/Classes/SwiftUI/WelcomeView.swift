@@ -73,6 +73,7 @@ struct WelcomeContentView: View {
                         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 27))
                     }
                     .padding(.horizontal, 20)
+                    .buttonStyle(.plain)
                 }
                 .padding(.bottom, 20)
 
