@@ -67,13 +67,14 @@ struct FavouriteServerRowView: View {
             .fixedSize(horizontal: true, vertical: false)
             
             Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .medium))
+                .font(.caption)
+                .fontWeight(.bold)
                 .foregroundColor(.indigo)
         }
         .foregroundColor(.primary)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 20))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 27))
         .onAppear { pingModel.startPinging() }
         .onDisappear { pingModel.stopPinging() }
     }

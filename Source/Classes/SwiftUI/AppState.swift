@@ -25,10 +25,10 @@ struct AppError: Identifiable {
 @MainActor
 class AppState: ObservableObject {
     // --- 核心修改 1：将 Tab 的定义移到这里 ---
-        enum Tab {
-            case channels
-            case messages
-        }
+    enum Tab {
+        case channels
+        case messages
+    }
     
     @Published var isConnected: Bool = false
     @Published var isConnecting: Bool = false
@@ -41,7 +41,7 @@ class AppState: ObservableObject {
     
     // --- 核心修改 1：添加一个新的 @Published 属性来存储未读消息数 ---
     @Published var unreadMessageCount: Int = 0
-        
+    
     // --- 核心修改 2：添加一个属性来跟踪当前显示的 Tab ---
     @Published var currentTab: Tab = .channels // 默认是频道列表
     
@@ -49,8 +49,8 @@ class AppState: ObservableObject {
     
     static let shared = AppState()
     private init() {
-            setupObservers()
-        }
+        setupObservers()
+    }
     
     private func setupObservers() {
         let center = NotificationCenter.default
@@ -82,6 +82,7 @@ class AppState: ObservableObject {
             .sink { [weak self] _ in
                 print("🔴 AppState: Connection Closed")
                 self?.isConnecting = false
+                self?.isReconnecting = false
                 self?.isConnected = false
                 self?.serverDisplayName = nil
                 self?.unreadMessageCount = 0
@@ -107,6 +108,8 @@ class AppState: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
                 self?.isConnecting = false
+                self?.isReconnecting = false
+                self?.isConnected = false
                 // 解析 ObjC 传来的 userInfo
                 if let userInfo = notification.userInfo,
                    let title = userInfo["title"] as? String,
@@ -149,6 +152,8 @@ class AppState: ObservableObject {
         // 调用 ObjC 的 disconnect 方法，这会将 _isUserInitiatedDisconnect 设为 YES
         // 从而停止重连循环，并触发 Closed 通知回到主页
         MUConnectionController.shared()?.disconnectFromServer()
+        self.isConnecting = false
+        self.isReconnecting = false
     }
     private var toastWorkItem: DispatchWorkItem?
 }
