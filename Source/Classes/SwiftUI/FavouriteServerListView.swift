@@ -14,6 +14,7 @@ struct FavouriteServerListNavigationConfig: NavigationConfigurable {
 struct FavouriteServerRowView: View {
     let server: MUFavouriteServer
     @StateObject private var pingModel: ServerPingModel
+    @ObservedObject var certModel = CertificateModel.shared
     
     init(server: MUFavouriteServer) {
         self.server = server
@@ -34,6 +35,20 @@ struct FavouriteServerRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "person.fill")
                         Text(userName)
+
+                        if let certRef = server.certificateRef {
+                            if certModel.isCertificateValid(certRef) {
+                                // 证书有效：绿色盾牌
+                                Image(systemName: "checkmark.shield.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.green)
+                            } else {
+                                // 证书失效 (丢失)：黄色警告盾牌
+                                Image(systemName: "exclamationmark.shield.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.yellow)
+                            }
+                        }
                     }
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
@@ -75,7 +90,12 @@ struct FavouriteServerRowView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 27))
-        .onAppear { pingModel.startPinging() }
+        .onAppear {
+            pingModel.startPinging()
+            if certModel.certificates.isEmpty {
+                certModel.refreshCertificates()
+            }
+        }
         .onDisappear { pingModel.stopPinging() }
     }
 }
@@ -142,11 +162,13 @@ struct FavouriteServerListContentView: View {
     private func connectToServer(_ server: MUFavouriteServer) {
         AppState.shared.serverDisplayName = server.displayName
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        
         MUConnectionController.shared()?.connet(
             toHostname: server.hostName,
             port: UInt(server.port),
             withUsername: server.userName,
             andPassword: server.password,
+            certificateRef: server.certificateRef,
             displayName: server.displayName
         )
     }

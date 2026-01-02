@@ -14,10 +14,17 @@ struct FavouriteServerEditView: View {
     @State private var userName: String
     @State private var password: String
     @EnvironmentObject private var navigationManager: NavigationManager
+    @ObservedObject private var certModel = CertificateModel.shared
     
     let server: MUFavouriteServer?
     let onSave: (MUFavouriteServer) -> Void
     private var isEditMode: Bool { server != nil }
+    private var hasCertificateRecord: Bool { server?.certificateRef != nil }
+    
+    private var isLocked: Bool {
+        guard let ref = server?.certificateRef else { return false }
+        return certModel.isCertificateValid(ref)
+    }
     
     init(server: MUFavouriteServer?, onSave: @escaping (MUFavouriteServer) -> Void) {
         self.server = server
@@ -31,61 +38,120 @@ struct FavouriteServerEditView: View {
     }
     
     var body: some View {
-        // 使用原生 Form 替代自定义的 ZStack/VStack
         Form {
-            Section(header: Text("Server Details")) {
-                // Label + Input 的原生组合方式
+            // 1. Server Details Section
+            Section(header: Text("Server Details"), footer: detailsFooter) {
+                // Description (始终可改)
                 HStack {
                     Text("Description")
                         .foregroundColor(.primary)
                     Spacer()
                     TextField("Mumble Server", text: $displayName)
-                        .multilineTextAlignment(.trailing) // 右对齐，符合 iOS 设置页风格
+                        .multilineTextAlignment(.trailing)
                         .foregroundColor(.secondary)
                 }
                 
+                // Address (锁定逻辑)
                 HStack {
                     Text("Address")
                         .foregroundColor(.primary)
                     Spacer()
-                    TextField("Hostname or IP", text: $hostName)
-                        .multilineTextAlignment(.trailing)
-                        .keyboardType(.URL)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled(true)
-                        .foregroundColor(.secondary)
+                    if isLocked {
+                        lockedField(text: hostName)
+                    } else {
+                        TextField("Hostname or IP", text: $hostName)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.URL)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled(true)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
+                // Port (锁定逻辑)
                 HStack {
                     Text("Port")
                         .foregroundColor(.primary)
                     Spacer()
-                    TextField("64738", text: $port)
-                        .multilineTextAlignment(.trailing)
-                        .keyboardType(.numberPad)
-                        .foregroundColor(.secondary)
+                    if isLocked {
+                        lockedField(text: port)
+                    } else {
+                        TextField("64738", text: $port)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numberPad)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             
-            Section(header: Text("Authentication")) {
+            // 2. Authentication Section
+            Section(header: Text("Authentication"), footer: authFooter) {
+                // Username (锁定逻辑)
                 HStack {
                     Text("Username")
                         .foregroundColor(.primary)
                     Spacer()
-                    TextField(UserDefaults.standard.string(forKey: "DefaultUserName") ?? "User", text: $userName)
-                        .multilineTextAlignment(.trailing)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled(true)
-                        .foregroundColor(.secondary)
+                    if isLocked {
+                        lockedField(text: userName)
+                    } else {
+                        TextField(UserDefaults.standard.string(forKey: "DefaultUserName") ?? "User", text: $userName)
+                            .multilineTextAlignment(.trailing)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled(true)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
+                // Password (锁定逻辑)
                 HStack {
                     Text("Password")
                         .foregroundColor(.primary)
                     Spacer()
-                    SecureField("Optional", text: $password)
-                        .multilineTextAlignment(.trailing)
-                        .foregroundColor(.secondary)
+                    if isLocked {
+                        lockedField(text: "••••••")
+                    } else {
+                        SecureField("Optional", text: $password)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // 3. Status Section (显示证书状态)
+            if hasCertificateRecord {
+                Section {
+                    if isLocked {
+                        // 正常状态：绿色盾牌
+                        HStack {
+                            Image(systemName: "checkmark.shield.fill")
+                                .foregroundColor(.green)
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Registered Server")
+                                    .font(.headline)
+                                Text("This server profile is bound to a secure certificate. Core details are locked.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        // 异常状态：黄色盾牌
+                        HStack {
+                            Image(systemName: "exclamationmark.shield.fill")
+                                .foregroundColor(.yellow)
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Certificate Missing")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Text("The certificate bound to this server cannot be found. Authentication may fail, but you can now edit the server details.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
             }
         }
@@ -97,10 +163,47 @@ struct FavouriteServerEditView: View {
                     saveServer()
                 }
                 .fontWeight(.semibold)
-                .disabled(hostName.isEmpty) // 地址为空时禁用保存
+                .disabled(hostName.isEmpty)
             }
         }
+        .onAppear {
+            // 确保证书状态是最新的
+            certModel.refreshCertificates()
+        }
     }
+    
+    // MARK: - Helper Views
+    
+    private func lockedField(text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "lock.fill")
+                .font(.caption)
+                .foregroundColor(.green.opacity(0.8))
+            Text(text)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private var detailsFooter: some View {
+        if isLocked {
+            Text("Address and Port are locked because this server is registered with a secure certificate.")
+        } else if hasCertificateRecord {
+            Text("Fields are unlocked because the associated certificate is missing.")
+        }
+        // 如果都不满足，ViewBuilder 会自动返回 EmptyView
+    }
+    
+    @ViewBuilder
+    private var authFooter: some View {
+        if isLocked {
+            Text("Identity fields are locked to maintain certificate integrity.")
+        } else if hasCertificateRecord {
+            Text("You can update your username/password since the original certificate is lost.")
+        }
+    }
+    
+    // MARK: - Save Logic
     
     private func saveServer() {
         let serverToSave: MUFavouriteServer
@@ -116,6 +219,16 @@ struct FavouriteServerEditView: View {
         serverToSave.port = UInt(port) ?? 64738
         serverToSave.userName = userName.isEmpty ? nil : userName
         serverToSave.password = password.isEmpty ? nil : password
+        
+        if serverToSave.certificateRef == nil, let user = serverToSave.userName, let host = serverToSave.hostName {
+            let potentialCertName = "\(user)@\(host)" // e.g. "UserA@mumble.com" (这是之前生成证书时的命名规则)
+            
+            // 尝试在证书库里找找有没有同名的
+            if let matchRef = CertificateModel.shared.findCertificateReference(name: potentialCertName) {
+                print("♻️ Auto-matched existing certificate for \(potentialCertName)")
+                serverToSave.certificateRef = matchRef
+            }
+        }
         
         onSave(serverToSave)
     }

@@ -4,7 +4,9 @@ import SwiftUI
 
 struct ChannelListView: View {
     @StateObject private var serverManager = ServerModelManager()
+    @ObservedObject var appState = AppState.shared
     @State private var showingPrefs = false
+    @State private var showingCertInfo = false
     
     // --- 核心修改 1：注入 NavigationManager ---
     @EnvironmentObject var navigationManager: NavigationManager
@@ -15,122 +17,166 @@ struct ChannelListView: View {
 
     var body: some View {
         ZStack {
-            // 背景由其子视图 ChannelView 提供
+            // 背景由 ChannelView 内部提供
             ChannelView(serverManager: serverManager)
+            
+            if appState.isRegistering {
+                ZStack {
+                    // 半透明背景，遮住底下的列表可能变空的过程
+                    Color.black.opacity(0.6)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.large)
+                            .tint(.white)
+                        
+                        VStack(spacing: 8) {
+                            Text("Registering...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            Text("Generating certificate and reconnecting")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding(.horizontal, 48).padding(.vertical, 32)
+                    .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 32))
+                    .shadow(radius: 10)
+                }
+                .transition(.opacity)
+                .zIndex(9999) // 确保在最上层
+            }
         }
         .navigationBarBackButtonHidden(true)
+        // 注意：这里 serverName 可能是可选的，提供默认值
         .navigationTitle(Text(serverManager.serverName ?? "Channel"))
         .navigationBarTitleDisplayMode(.inline)
+        // 隐藏系统默认背景，使用自定义渐变
         .toolbarBackground(.hidden, for: .navigationBar)
-        .background(Color.clear)
         .toolbar {
-            // 左上角按钮组
-            ToolbarItemGroup(placement: .navigationBarLeading) {
-                HStack(alignment: .center, spacing: 0) {
-                    // Self-Deafen 按钮
-                    Button(action: {
-                        hapticGenerator.impactOccurred()
-                        serverManager.toggleSelfDeafen()
-                    }) {
-                        ZStack {
-                            Image(systemName: serverManager.connectedUserState?.isSelfDeafened == true ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                                .resizable() // 允许调整大小
-                                .aspectRatio(contentMode: .fit) // 保持比例
-                                .frame(width: 24, height: 24) // 强制固定图标渲染尺寸
-                                .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
-                        }
-                        .frame(width: 40, height: 44) // 增大点击热区，并固定整个按钮容器的宽度
-                        .contentShape(Rectangle()) // 确保点击区域填满 40x44
-                    }
-                    // Self-Mute 按钮
-                    Button(action: {
-                        hapticGenerator.impactOccurred()
-                        serverManager.toggleSelfMute()
-                    }) {
-                        ZStack {
-                            Image(systemName: serverManager.connectedUserState?.isSelfMuted == true ? "mic.slash.fill" : "mic.fill")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 24, height: 24)
-                                .foregroundColor(serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary)
-                        }
-                        .frame(width: 40, height: 44) // 同样的固定容器宽度
-                        .contentShape(Rectangle())
-                    }
-                }
-                .tint(.primary)
-            }
-
-            // 右上角按钮组
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                HStack(alignment: .center, spacing: 16) {
-                    // “更多”菜单按钮 - 保留图标样式
-                    Menu {
-                        // 1. 切换视图模式
-                        Button(action: {
-                            serverManager.toggleMode()
-                        }) {
-                            Label("Switch View Mode", systemImage: "arrow.left.arrow.right")
-                        }
-                                            
-                        Divider()
-                                            
-                        // 2. 设置
-                        Button(action: {
-                            showingPrefs = true
-                        }) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
-                                            
-                        Divider()
-                                            
-                        // 3. 其他功能占位
-                        Button(action: { /* TODO */ }) {
-                            Label("Access Tokens", systemImage: "key")
-                        }
-                                            
-                        Button(action: { /* TODO */ }) {
-                            Label("Certificates", systemImage: "lock.shield")
-                        }
-                                            
-                    } label: {
-                        // 菜单的触发图标
-                        Image(systemName: "ellipsis")
-                            .frame(width: 30, height: 30) // 增加一点点击热区
-                            .contentShape(Rectangle())
-                    }
-                    
-                    // “离开”按钮
-                    Button(action: {
-                        hapticGenerator.impactOccurred()
-                        initiateDisconnect()
-                    }) {
-                        Image(systemName: "phone.down.fill")
-                            .foregroundColor(.red) // 使用红色以示警告
-                    }
-                }
-                .tint(.primary)
-                .padding(.horizontal,8)
-            }
+            leadingToolbarItems
+            trailingToolbarItems
         }
-        .background(Color.clear)
         .sheet(isPresented: $showingPrefs) {
             NavigationStack {
                 PreferencesView()
             }
         }
+        .sheet(isPresented: $showingCertInfo) {
+            ServerCertificateDetailView()
+        }
+    }
+    
+    // MARK: - Extracted Toolbar Views
+    
+    // 左侧工具栏：静音/耳聋按钮
+    @ToolbarContentBuilder
+    private var leadingToolbarItems: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigationBarLeading) {
+            HStack(alignment: .center, spacing: 0) {
+                Button(action: {
+                    hapticGenerator.impactOccurred()
+                    serverManager.toggleSelfDeafen()
+                }) {
+                    ZStack {
+                        // 使用可选链安全访问 connectedUserState
+                        Image(systemName: serverManager.connectedUserState?.isSelfDeafened == true ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
+                    }
+                    .frame(width: 40, height: 44)
+                    .contentShape(Rectangle())
+                }
+                
+                Button(action: {
+                    hapticGenerator.impactOccurred()
+                    serverManager.toggleSelfMute()
+                }) {
+                    ZStack {
+                        Image(systemName: serverManager.connectedUserState?.isSelfMuted == true ? "mic.slash.fill" : "mic.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary)
+                    }
+                    .frame(width: 40, height: 44)
+                    .contentShape(Rectangle())
+                }
+            }
+            .tint(.primary)
+        }
+    }
+    
+    // 右侧工具栏：菜单和断开连接
+    @ToolbarContentBuilder
+    private var trailingToolbarItems: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigationBarTrailing) {
+            HStack(alignment: .center, spacing: 16) {
+                // 菜单按钮
+                Menu {
+                    menuContent
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
+                }
+                
+                // 断开连接按钮
+                Button(action: {
+                    hapticGenerator.impactOccurred()
+                    initiateDisconnect()
+                }) {
+                    Image(systemName: "phone.down.fill")
+                        .foregroundColor(.red)
+                }
+            }
+            .tint(.primary)
+            .padding(.horizontal, 8)
+        }
+    }
+    
+    // 菜单内容 (进一步提取以降低复杂度)
+    @ViewBuilder
+    private var menuContent: some View {
+        Button(action: { serverManager.toggleMode() }) {
+            Label("Switch View Mode", systemImage: "arrow.left.arrow.right")
+        }
+        
+        Divider()
+        
+        // --- 核心互斥逻辑 ---
+        if let currentUser = serverManager.connectedUserState {
+            // 这里假设 isAuthenticated 是属性(Boolean)，如果是方法请改为 isAuthenticated()
+            // 根据 MumbleKit 通常习惯，OC boolean property 映射为 Swift 属性
+            if currentUser.isAuthenticated {
+                Button(action: { showingCertInfo = true }) {
+                    Label("View Certificate", systemImage: "lock.doc")
+                }
+            } else {
+                Button(action: { serverManager.registerSelf() }) {
+                    Label("Register User", systemImage: "person.badge.plus")
+                }
+            }
+        } else {
+            // 如果 userState 还没准备好，默认显示注册或者什么都不显示
+            Button(action: { serverManager.registerSelf() }) {
+                Label("Register User", systemImage: "person.badge.plus")
+            }
+        }
+        
+        Button(action: { showingPrefs = true }) {
+            Label("Settings", systemImage: "gearshape")
+        }
     }
 
-    @ViewBuilder private func serverMenuButtons() -> some View {
-        Button("Switch View Mode") { serverManager.toggleMode() }; Divider()
-        Button("Settings", systemImage: "gearshape") {
-                showingPrefs = true
-        };Divider()
-        Button("Access Tokens") { /* TODO */ }; Button("Certificates") { /* TODO */ }; Divider()
-        Button("Cancel", role: .cancel) {}
-    }
-
-    @State private var disconnectObserver: Any?; private func initiateDisconnect() {
+    // MARK: - Logic
+    
+    @State private var disconnectObserver: Any?
+    
+    private func initiateDisconnect() {
         guard disconnectObserver == nil else { print("🟡 Disconnect sequence already in progress."); return }
         notificationHaptic.prepare()
         notificationHaptic.notificationOccurred(.warning)
@@ -143,5 +189,9 @@ struct ChannelListView: View {
             }
         }
         MUConnectionController.shared()?.disconnectFromServer()
+    }
+    private func registerUserOnServer() {
+        // 调用 serverManager 的注册逻辑
+        serverManager.registerSelf()
     }
 }

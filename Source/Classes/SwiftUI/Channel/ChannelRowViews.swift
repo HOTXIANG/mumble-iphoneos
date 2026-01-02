@@ -50,7 +50,7 @@ struct UserRowView: View {
                     if state.isSelfDeafened { Image(systemName: "speaker.slash.fill").foregroundColor(.red) }
                     else if state.isMutedOrDeafened { Image(systemName: "mic.slash.fill").foregroundColor(.orange) }
                     if state.isPrioritySpeaker { Image(systemName: "star.fill").foregroundColor(.yellow) }
-                    if state.isAuthenticated { Image(systemName: "lock.shield.fill").foregroundColor(.green) }
+                    if state.isAuthenticated { Image(systemName: "checkmark.shield.fill").foregroundColor(.green) }
                 }
             }
             .font(.system(size: 16))

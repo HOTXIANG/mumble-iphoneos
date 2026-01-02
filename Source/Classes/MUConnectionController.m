@@ -37,6 +37,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     NSUInteger                 _port;
     NSString                   *_username;
     NSString                   *_password;
+    NSData                     *_certificateRef;
     NSString                   *_displayName;
     
     BOOL            _isUserInitiatedDisconnect;
@@ -51,6 +52,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 @end
 
 @implementation MUConnectionController
+@synthesize currentCertificateRef = _certificateRef; // 将内部变量 _certificateRef 暴露为只读属性
 
 + (MUConnectionController *) sharedController {
     static MUConnectionController *nc;
@@ -72,11 +74,17 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     return _serverModel;
 }
 
-- (void) connetToHostname:(NSString *)hostName port:(NSUInteger)port withUsername:(NSString *)userName andPassword:(NSString *)password displayName:(NSString *)displayName {
+- (void) connetToHostname:(NSString *)hostName
+                     port:(NSUInteger)port
+             withUsername:(NSString *)userName
+              andPassword:(NSString *)password
+           certificateRef:(NSData *)certRef
+              displayName:(NSString *)displayName {
     _hostname = [hostName copy];
     _port = port;
     _username = [userName copy];
     _password = [password copy];
+    _certificateRef = [certRef copy];
     _displayName = [displayName copy];
     
     // 重置重试计数
@@ -169,9 +177,23 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     _serverRoot = [[MUServerRootViewController alloc] initWithConnection:_connection andServerModel:_serverModel];
     
     NSData *certPersistentId = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
-    if (certPersistentId != nil) {
-        NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:certPersistentId];
+    
+    if (_certificateRef != nil) {
+        // 如果这个服务器有专属证书，就用它
+        NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:_certificateRef];
         [_connection setCertificateChain:certChain];
+        NSLog(@"🔐 Using server-specific certificate for connection.");
+    } else {
+        // 如果没有专属证书，再回退到全局默认 (可选，或者直接匿名)
+        // 建议：如果你想要彻底隔离，这里可以删掉 fallback，让其直接匿名
+        NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
+        if (globalCert) {
+            NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:globalCert];
+            [_connection setCertificateChain:certChain];
+            NSLog(@"🔐 Using global default certificate.");
+        } else {
+            NSLog(@"👤 Connecting anonymously (No certificate).");
+        }
     }
     
     [_connection connectToHost:_hostname port:_port];
@@ -249,8 +271,8 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     }
     
     // --- 核心修复：重试逻辑 ---
-    // 如果重试超过 3 次，就放弃并报错
-    if (_retryCount >= 3) {
+    // 如果重试超过 10 次，就放弃并报错
+    if (_retryCount >= 10) {
         NSLog(@"❌ Max retries reached (%ld). Giving up.", (long)_retryCount);
         [self postErrorWithTitle:NSLocalizedString(@"Connection Failed", nil)
                          message:NSLocalizedString(@"Unable to reconnect to server after multiple attempts.", nil)];
@@ -258,7 +280,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     }
     
     _retryCount++;
-    NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/3)...", (long)_retryCount);
+    NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/10)...", (long)_retryCount);
     
     // 通知 UI 显示 "Reconnecting..."
     NSDictionary *info = @{ @"isReconnecting": @(YES) };
@@ -271,7 +293,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     _connection = nil;
     
     [_reconnectTimer invalidate];
-    _reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:3.0 target:self selector:@selector(performReconnect) userInfo:nil repeats:NO];
+    _reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(performReconnect) userInfo:nil repeats:NO];
 }
 
 - (void) performReconnect {
@@ -302,6 +324,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 - (void) connection:(MKConnection *)conn rejectedWithReason:(MKRejectReason)reason explanation:(NSString *)explanation {
     NSString *title = NSLocalizedString(@"Connection Rejected", nil);
     NSString *msg = @"Unknown reason";
+    
     switch (reason) {
         case MKRejectReasonNone: msg = NSLocalizedString(@"No reason", nil); break;
         case MKRejectReasonWrongVersion: msg = @"Client/server version mismatch"; break;
@@ -311,6 +334,27 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         case MKRejectReasonUsernameInUse: msg = NSLocalizedString(@"Username already in use", nil); break;
         case MKRejectReasonServerIsFull: msg = NSLocalizedString(@"Server is full", nil); break;
         case MKRejectReasonNoCertificate: msg = NSLocalizedString(@"A certificate is needed", nil); break;
+    }
+    
+    if (reason == MKRejectReasonUsernameInUse) {
+        // 检查：如果当前没有使用证书 (未注册/匿名)
+        if (self.currentCertificateRef == nil) {
+            NSLog(@"⚠️ Username in use (Unregistered). Aborting retry and showing guidance.");
+            
+            // 构建引导注册的提示信息
+            title = NSLocalizedString(@"Username Already in Use", nil);
+            msg = NSLocalizedString(@"Your username is still active from a previous session.\nSince you are not registered, you cannot disconnect the old session immediately.\n\nTip: If you are seeing this from reconnecting, register your user on the server to allow instant reconnection in the future.", nil);
+            
+            // 直接报错显示弹窗，不进行自动重连
+            [self postErrorWithTitle:title message:msg];
+            return;
+        } else {
+            // 如果已注册 (有证书)，继续尝试自动重连 (等待 Ghost Session 被顶掉)
+            NSLog(@"⚠️ Username in use (Registered). Waiting for server to kick old session... Retrying.");
+            NSError *err = [NSError errorWithDomain:@"Mumble" code:reason userInfo:@{NSLocalizedDescriptionKey: @"Username already in use (Ghost Session)"}];
+            [self connection:conn closedWithError:err];
+            return;
+        }
     }
     
     if (explanation && explanation.length > 0 && ![explanation isEqualToString:msg]) {

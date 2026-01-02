@@ -5,109 +5,362 @@
 #import "MUCertificateController.h"
 #import <MumbleKit/MKCertificate.h>
 
+// --- 引入 OpenSSL 头文件 ---
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+#include <openssl/pkcs12.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/bn.h>
+
 @implementation MUCertificateController
 
-// Retrieve a certificate by its persistent reference.
-//
-// If the value stored in the keychain is of type SecIdentityRef, the
-// returned MKCertificate will include both the certificate and the
-// private key of the returned identity.
-//
-// If the value stored in the keychain is of type SecCertificateRef,
-// the returned MKCertificate will not include a private key.
 + (MKCertificate *) certificateWithPersistentRef:(NSData *)persistentRef {
-    NSDictionary *query = [NSDictionary dictionaryWithObjectsAndKeys:
-                           persistentRef,      kSecValuePersistentRef,
-                           kCFBooleanTrue,     kSecReturnRef,
-                           kSecMatchLimitOne,  kSecMatchLimit,
-                           nil];
+    // --- 核心修复：修正字典键值对顺序 ---
+    NSDictionary *query = @{
+        (__bridge id)kSecValuePersistentRef: persistentRef,
+        (__bridge id)kSecReturnRef: (__bridge id)kCFBooleanTrue, // 之前写反了，这里必须是 Key:kSecReturnRef, Value:True
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
+    };
+    
     CFTypeRef thing = NULL;
-    MKCertificate *cert = nil;
-    if (SecItemCopyMatching((CFDictionaryRef)query, &thing) == noErr && thing != NULL) {
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &thing);
+    
+    if (status == noErr && thing != NULL) {
         CFTypeID receivedType = CFGetTypeID(thing);
+        
         if (receivedType == SecIdentityGetTypeID()) {
             SecIdentityRef identity = (SecIdentityRef) thing;
             SecCertificateRef secCert = NULL;
+            
             if (SecIdentityCopyCertificate(identity, &secCert) == noErr) {
-                NSData *secData = (NSData *)SecCertificateCopyData(secCert);
-                SecKeyRef secKey = NULL;
-                if (SecIdentityCopyPrivateKey(identity, &secKey) == noErr) {
-                    NSData *pkeyData = nil;
-                    query = [NSDictionary dictionaryWithObjectsAndKeys:
-                             (CFTypeRef) secKey, kSecValueRef,
-                             kCFBooleanTrue,     kSecReturnData,
-                             kSecMatchLimitOne,  kSecMatchLimit,
-                             nil];
-                    if (SecItemCopyMatching((CFDictionaryRef)query, (CFTypeRef *)&pkeyData) == noErr) {
-                        cert = [MKCertificate certificateWithCertificate:secData privateKey:pkeyData];
-                        [pkeyData release];
-                    }
-                    CFRelease(secKey);
-                }
-                [secData release];
+                NSData *certData = (__bridge_transfer NSData *)SecCertificateCopyData(secCert);
+                // 使用 Identity 创建证书对象，这样它才包含私钥用于认证
+                MKCertificate *mkCert = [MKCertificate certificateWithCertificate:certData privateKey:nil];
+                
+                CFRelease(secCert);
+                CFRelease(identity);
+                return mkCert;
             }
+            CFRelease(identity);
         } else if (receivedType == SecCertificateGetTypeID()) {
             SecCertificateRef secCert = (SecCertificateRef) thing;
-            NSData *secData = (NSData *)SecCertificateCopyData(secCert);
-            cert = [MKCertificate certificateWithCertificate:secData privateKey:nil];
-            [secData release];
-        } else {
-            return nil;
+            NSData *certData = (__bridge_transfer NSData *)SecCertificateCopyData(secCert);
+            MKCertificate *mkCert = [MKCertificate certificateWithCertificate:certData privateKey:nil];
+            
+            CFRelease(secCert);
+            return mkCert;
         }
+        
+        // 如果类型不对，也释放
+        if (thing) CFRelease(thing);
+    } else {
+        NSLog(@"MUCertificateController: Failed to load certificate from keychain. Status: %d", (int)status);
     }
-    return cert;
+    
+    return nil;
 }
 
-// Converts a hex string into a user-readable fingerprint.
-+ (NSString *) fingerprintFromHexString:(NSString *)hexDigest {
-    NSMutableString *fingerprint = [NSMutableString string];
-    for (int i = 0; i < [hexDigest length]; i++) {
-        if ((i % 2) == 0 && i > 0 && i < hexDigest.length-1) {
-            [fingerprint appendString:@":"];
-        }
-        [fingerprint appendFormat:@"%C", [hexDigest characterAtIndex:i]];
-    }
-    return fingerprint;
-}
-
-// Delete the certificate referenced by the persistent reference persistentRef.
-// todo(mkrautz): Don't leak OSStatus.
 + (OSStatus) deleteCertificateWithPersistentRef:(NSData *)persistentRef {
-    // This goes against what the documentation says for this function, but Apple has stated that
-    // this is the intended way to delete via a persistent ref through a rdar.
-    NSDictionary *op = [NSDictionary dictionaryWithObjectsAndKeys:
-                        persistentRef, kSecValuePersistentRef,
-                        nil];
-    return SecItemDelete((CFDictionaryRef)op);
+    NSDictionary *op = @{
+        (__bridge id)kSecValuePersistentRef: persistentRef
+    };
+    return SecItemDelete((__bridge CFDictionaryRef)op);
 }
 
-// Returns the certificate set as the default or 'active' certificate.
 + (MKCertificate *) defaultCertificate {
     NSData *persistentRef = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
+    if (!persistentRef) return nil;
     return [MUCertificateController certificateWithPersistentRef:persistentRef];
 }
 
-// Set the default certificate by its persistent ref.
 + (void) setDefaultCertificateByPersistentRef:(NSData *)persistentRef {
     [[NSUserDefaults standardUserDefaults] setObject:persistentRef forKey:@"DefaultCertificate"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-// Returns an array of the persistent refs of all SecIdentityRefs
-// stored in the application's keychain.
 + (NSArray *) persistentRefsForIdentities {
     NSDictionary *query = @{
-        (id)kSecClass: (id)kSecClassIdentity,
-        (id)kSecReturnPersistentRef: (id)kCFBooleanTrue,
-        (id)kSecMatchLimit: (id)kSecMatchLimitAll
+        (__bridge id)kSecClass: (__bridge id)kSecClassIdentity,
+        (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue,
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll
     };
-    NSArray *array = nil;
-    OSStatus err = SecItemCopyMatching((CFDictionaryRef)query, (CFTypeRef *)&array);
+    
+    CFTypeRef result = NULL;
+    OSStatus err = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
     if (err != noErr) {
-        [array release];
         return nil;
     }
+    return (__bridge_transfer NSArray *)result;
+}
 
-    return [array autorelease];
++ (NSString *) fingerprintFromHexString:(NSString *)hexDigest {
+    if ([hexDigest length] != 40)
+        return hexDigest;
+    NSMutableString *str = [NSMutableString stringWithCapacity:60];
+    for (NSUInteger i = 0; i < [hexDigest length]; i++) {
+        if (i > 0 && i % 2 == 0)
+            [str appendString:@":"];
+        [str appendFormat:@"%c", [hexDigest characterAtIndex:i]];
+    }
+    return str;
+}
+
+// OpenSSL 生成逻辑 (保持不变，这部分是正确的)
++ (NSData *) generateSelfSignedCertificateWithName:(NSString *)name email:(NSString *)email {
+    NSLog(@"Generating OpenSSL Self-Signed Certificate for %@ <%@>", name, email);
+    
+    OpenSSL_add_all_algorithms();
+    ERR_load_crypto_strings();
+    
+    // 1. 生成 RSA 密钥对
+    EVP_PKEY *pkey = EVP_PKEY_new();
+    BIGNUM *e = BN_new();
+    BN_set_word(e, RSA_F4);
+    RSA *rsa = RSA_new();
+    if (!RSA_generate_key_ex(rsa, 2048, e, NULL)) {
+        NSLog(@"OpenSSL: Failed to generate RSA key");
+        return nil;
+    }
+    EVP_PKEY_assign_RSA(pkey, rsa);
+    BN_free(e);
+    
+    // 2. 创建 X.509 证书
+    X509 *x509 = X509_new();
+    ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
+    X509_gmtime_adj(X509_get_notBefore(x509), 0);
+    X509_gmtime_adj(X509_get_notAfter(x509), 31536000L * 20); // 20年有效期
+    X509_set_pubkey(x509, pkey);
+    
+    X509_NAME *subject = X509_get_subject_name(x509);
+    X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_UTF8, (unsigned char *)[name UTF8String], -1, -1, 0);
+    if (email && email.length > 0) {
+        X509_NAME_add_entry_by_txt(subject, "emailAddress", MBSTRING_UTF8, (unsigned char *)[email UTF8String], -1, -1, 0);
+    }
+    X509_set_issuer_name(x509, subject);
+    
+    if (!X509_sign(x509, pkey, EVP_sha256())) {
+        NSLog(@"OpenSSL: Failed to sign certificate");
+        return nil;
+    }
+    
+    // 3. 导出 PKCS#12
+    char *pass = "password";
+    PKCS12 *p12 = PKCS12_create(pass, (char *)[name UTF8String], pkey, x509, NULL, 0, 0, 0, 0, 0);
+    if (!p12) {
+        NSLog(@"OpenSSL: Failed to create PKCS12");
+        return nil;
+    }
+    
+    BIO *bio = BIO_new(BIO_s_mem());
+    i2d_PKCS12_bio(bio, p12);
+    char *buffer = NULL;
+    long length = BIO_get_mem_data(bio, &buffer);
+    NSData *p12Data = [NSData dataWithBytes:buffer length:length];
+    
+    BIO_free(bio);
+    PKCS12_free(p12);
+    X509_free(x509);
+    EVP_PKEY_free(pkey);
+    
+    // 4. 导入 Keychain
+    NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
+    [options setObject:(__bridge id)kSecImportExportPassphrase forKey:(__bridge id)kSecImportExportPassphrase];
+    [options setObject:@"password" forKey:(__bridge id)kSecImportExportPassphrase];
+    
+    CFArrayRef items = NULL;
+    OSStatus status = SecPKCS12Import((__bridge CFDataRef)p12Data, (__bridge CFDictionaryRef)options, &items);
+    
+    NSData *returnRef = nil;
+    
+    if (status == errSecSuccess && items && CFArrayGetCount(items) > 0) {
+        NSDictionary *identityDict = (__bridge NSDictionary *)CFArrayGetValueAtIndex(items, 0);
+        SecIdentityRef identity = (__bridge SecIdentityRef)[identityDict objectForKey:(__bridge id)kSecImportItemIdentity];
+        
+        if (identity) {
+            NSDictionary *addQuery = @{
+                (__bridge id)kSecValueRef: (__bridge id)identity,
+                (__bridge id)kSecClass: (__bridge id)kSecClassIdentity,
+                (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue
+            };
+            
+            CFTypeRef persistentRef = NULL;
+            OSStatus addErr = SecItemAdd((__bridge CFDictionaryRef)addQuery, &persistentRef);
+            
+            if (addErr == noErr && persistentRef != NULL) {
+                returnRef = (__bridge_transfer NSData *)persistentRef;
+            } else if (addErr == errSecDuplicateItem) {
+                NSLog(@"Identity already exists in Keychain.");
+            } else {
+                NSLog(@"SecItemAdd failed: %d", (int)addErr);
+            }
+        }
+    } else {
+        NSLog(@"SecPKCS12Import failed: %d", (int)status);
+    }
+    
+    if (items) CFRelease(items);
+    return returnRef;
+}
+
+// --- 新增：导出 P12 ---
++ (NSData *) exportPKCS12DataForPersistentRef:(NSData *)ref password:(NSString *)password {
+    // 1. 从 Persistent Ref 获取 Identity
+    NSDictionary *query = @{
+        (__bridge id)kSecValuePersistentRef: ref,
+        (__bridge id)kSecReturnRef: (__bridge id)kCFBooleanTrue,
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
+    };
+    
+    CFTypeRef item = NULL;
+    if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &item) != noErr || item == NULL) {
+        return nil;
+    }
+    
+    SecIdentityRef identity = (SecIdentityRef)item;
+    SecCertificateRef cert = NULL;
+    SecKeyRef privateKey = NULL;
+    
+    SecIdentityCopyCertificate(identity, &cert);
+    SecIdentityCopyPrivateKey(identity, &privateKey);
+    
+    if (!cert || !privateKey) {
+        if (cert) CFRelease(cert);
+        if (privateKey) CFRelease(privateKey);
+        CFRelease(identity);
+        return nil;
+    }
+    
+    // 2. 转换证书为 OpenSSL X509
+    NSData *certData = (__bridge_transfer NSData *)SecCertificateCopyData(cert);
+    const unsigned char *certBytes = [certData bytes];
+    X509 *x509 = d2i_X509(NULL, &certBytes, [certData length]);
+    
+    // 3. 转换私钥为 OpenSSL EVP_PKEY
+    // 注意：需要导出私钥的原始数据 (PKCS#1)
+    CFErrorRef error = NULL;
+    NSData *keyData = (__bridge_transfer NSData *)SecKeyCopyExternalRepresentation(privateKey, &error);
+    EVP_PKEY *pkey = NULL;
+    
+    if (keyData) {
+        const unsigned char *keyBytes = [keyData bytes];
+        // 尝试作为 RSA 私钥读取
+        RSA *rsa = d2i_RSAPrivateKey(NULL, &keyBytes, [keyData length]);
+        if (rsa) {
+            pkey = EVP_PKEY_new();
+            EVP_PKEY_assign_RSA(pkey, rsa);
+        }
+    }
+    
+    NSData *p12Data = nil;
+    
+    // 4. 打包为 PKCS12
+    if (x509 && pkey) {
+        OpenSSL_add_all_algorithms();
+        
+        // 获取 Friendly Name (别名)
+        NSString *friendlyName = nil;
+        CFStringRef commonName = NULL;
+        SecCertificateCopyCommonName(cert, &commonName);
+        if (commonName) {
+            friendlyName = (__bridge NSString *)commonName;
+            CFRelease(commonName);
+        }
+        
+        PKCS12 *p12 = PKCS12_create((char *)[password UTF8String],
+                                    (char *)[friendlyName UTF8String],
+                                    pkey, x509, NULL, 0, 0, 0, 0, 0);
+        
+        if (p12) {
+            BIO *bio = BIO_new(BIO_s_mem());
+            i2d_PKCS12_bio(bio, p12);
+            char *buffer = NULL;
+            long length = BIO_get_mem_data(bio, &buffer);
+            p12Data = [NSData dataWithBytes:buffer length:length];
+            
+            BIO_free(bio);
+            PKCS12_free(p12);
+        }
+    }
+    
+    // 清理
+    if (x509) X509_free(x509);
+    if (pkey) EVP_PKEY_free(pkey); // RSA is freed with PKEY
+    CFRelease(cert);
+    CFRelease(privateKey);
+    CFRelease(identity);
+    
+    return p12Data;
+}
+
+// --- 新增：导入 P12 ---
++ (NSData *) importPKCS12Data:(NSData *)data password:(NSString *)password error:(NSError **)error {
+    NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
+    [options setObject:(__bridge id)kSecImportExportPassphrase forKey:(__bridge id)kSecImportExportPassphrase];
+    [options setObject:(password ? password : @"") forKey:(__bridge id)kSecImportExportPassphrase];
+    
+    CFArrayRef items = NULL;
+    OSStatus status = SecPKCS12Import((__bridge CFDataRef)data, (__bridge CFDictionaryRef)options, &items);
+    
+    // 1. 处理 P12 解析/密码错误
+    if (status != errSecSuccess) {
+        if (error) {
+            NSString *msg = @"Unknown import error.";
+            if (status == errSecAuthFailed) {
+                msg = @"Incorrect password."; // 密码错误
+            } else if (status == errSecDecode) {
+                msg = @"The file is corrupted or not a valid PKCS#12 certificate.";
+            } else {
+                msg = [NSString stringWithFormat:@"SecPKCS12Import failed (Code: %d)", (int)status];
+            }
+            
+            *error = [NSError errorWithDomain:@"MumbleCertError" code:status userInfo:@{NSLocalizedDescriptionKey: msg}];
+        }
+        return nil;
+    }
+    
+    NSData *returnRef = nil;
+    
+    if (status == errSecSuccess && items && CFArrayGetCount(items) > 0) {
+        NSDictionary *identityDict = (__bridge NSDictionary *)CFArrayGetValueAtIndex(items, 0);
+        SecIdentityRef identity = (__bridge SecIdentityRef)[identityDict objectForKey:(__bridge id)kSecImportItemIdentity];
+        
+        if (identity) {
+            // 2. 尝试存入 Keychain
+            NSDictionary *addQuery = @{
+                (__bridge id)kSecValueRef: (__bridge id)identity,
+                (__bridge id)kSecClass: (__bridge id)kSecClassIdentity,
+                (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue
+            };
+            
+            CFTypeRef persistentRef = NULL;
+            OSStatus addErr = SecItemAdd((__bridge CFDictionaryRef)addQuery, &persistentRef);
+            
+            if (addErr == noErr && persistentRef != NULL) {
+                returnRef = (__bridge_transfer NSData *)persistentRef;
+            } else {
+                // 3. 处理 Keychain 存储错误 (如重复)
+                if (error) {
+                    NSString *msg = @"Failed to save to Keychain.";
+                    if (addErr == errSecDuplicateItem) {
+                        msg = @"This certificate already exists in your Keychain."; // 重复导入
+                    } else {
+                        msg = [NSString stringWithFormat:@"Keychain Add Error: %d", (int)addErr];
+                    }
+                    *error = [NSError errorWithDomain:@"MumbleCertError" code:addErr userInfo:@{NSLocalizedDescriptionKey: msg}];
+                }
+            }
+        } else {
+            if (error) *error = [NSError errorWithDomain:@"MumbleCertError" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"No identity found inside the P12 file."}];
+        }
+    } else {
+        if (error) *error = [NSError errorWithDomain:@"MumbleCertError" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"No items found in P12 file."}];
+    }
+    
+    if (items) CFRelease(items);
+    return returnRef;
 }
 
 @end

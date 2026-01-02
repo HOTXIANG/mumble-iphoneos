@@ -212,19 +212,19 @@ struct PreferencesView: View {
             // --- 音频部分 ---
             Section(header: Text("Audio")) {
                 VStack(alignment: .leading) {
-                    Label("Master Volume", systemImage: "speaker.wave.3.fill")
+                    Label("Master Volume", systemImage: "speaker.wave.3")
                         .padding(.vertical, 4)
                     HStack {
-                        Image(systemName: "speaker.fill")
+                        Image(systemName: "speaker")
                         Slider(value: $outputVolume, in: 0...1) { editing in
                             if !editing { PreferencesModel.shared.notifySettingsChanged() }
                         }
-                        Image(systemName: "speaker.wave.3.fill")
+                        Image(systemName: "speaker.wave.3")
                     }.padding(.vertical, 8)
                 }
                 
                 NavigationLink(destination: AudioTransmissionSettingsView()) {
-                    Label("Transmission", systemImage: "mic.fill")
+                    Label("Transmission", systemImage: "mic")
                 }
                 
                 NavigationLink(destination: AudioQualitySettingsView()) {
@@ -237,18 +237,20 @@ struct PreferencesView: View {
             }
             
             // --- 身份与证书 ---
-            Section(header: Text("Identity")) {
-                // 跳转到旧的 ObjC 证书管理界面
-                NavigationLink(destination: ObjectiveCViewWrapper(controllerType: .certificates)) {
-                    Label("Certificates", systemImage: "lock.shield")
-                }
+            NavigationLink(destination: CertificatePreferencesView()) {
+                Label("Certificates", systemImage: "checkmark.shield")
             }
             
             // --- 关于 ---
             Section {
-                Text("Mumble for iOS")
+                NavigationLink(destination: AboutView()) {
+                    Label("About Mumble", systemImage: "info.circle")
+                }
+            } footer: {
+                let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+                Text("Mumble iOS v\(version)")
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .foregroundColor(.secondary)
+                    .padding(.top)
             }
         }
         .navigationTitle("Settings")

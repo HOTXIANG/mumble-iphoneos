@@ -18,6 +18,8 @@
 #import "MUConnectionController.h"
 #import "MUServerViewController.h"
 #import "MUTextMessageProcessor.h"
+#import "MUCertificateChainBuilder.h"
+#import "MUCertificateController.h"
 #import "MUCertificatePreferencesViewController.h"
 
 // 导入 MumbleKit

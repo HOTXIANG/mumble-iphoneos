@@ -15,4 +15,12 @@
 + (MKCertificate *) defaultCertificate;
 
 + (NSArray *) persistentRefsForIdentities;
+
++ (NSData *) generateSelfSignedCertificateWithName:(NSString *)name email:(NSString *)email;
+
+// 导出指定身份为 P12 数据
++ (NSData *) exportPKCS12DataForPersistentRef:(NSData *)ref password:(NSString *)password;
+
+// 导入 P12 数据到 Keychain
++ (NSData *) importPKCS12Data:(NSData *)data password:(NSString *)password error:(NSError **)error;
 @end

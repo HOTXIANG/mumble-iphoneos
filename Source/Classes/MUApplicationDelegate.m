@@ -129,7 +129,12 @@
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password displayName:nil];
+        [connController connetToHostname:hostname
+                                    port:port ? [port integerValue] : 64738
+                            withUsername:username
+                             andPassword:password
+                          certificateRef:nil
+                             displayName:nil];
         return YES;
     }
     return NO;
@@ -145,7 +150,12 @@
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname port:port ? [port integerValue] : 64738 withUsername:username andPassword:password displayName:nil];
+        [connController connetToHostname:hostname
+                                    port:port ? [port integerValue] : 64738
+                            withUsername:username
+                             andPassword:password
+                          certificateRef:nil
+                             displayName:nil];
         return YES;
     }
     return NO;

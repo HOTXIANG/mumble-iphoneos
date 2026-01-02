@@ -10,6 +10,7 @@ static FMDatabase *db = nil;
 @interface MUDatabase ()
 + (NSString *) filePath;
 + (void) moveOldDatabases;
++ (id) nilToNull:(id)obj;
 @end
 
 @implementation MUDatabase
@@ -54,6 +55,10 @@ static FMDatabase *db = nil;
     }
 }
 
++ (id) nilToNull:(id)obj {
+    return obj ? obj : [NSNull null];
+}
+
 // Initialize the database.
 + (void) initializeDatabase {
     NSLog(@"Initializing database with SQLite version: %@", [FMDatabase sqliteLibVersion]);
@@ -82,6 +87,24 @@ static FMDatabase *db = nil;
                       @" `port` INTEGER DEFAULT 64738,"
                       @" `username` TEXT,"
                       @" `password` TEXT)"];
+    
+    BOOL columnExists = NO;
+    FMResultSet *rs = [db executeQuery:@"PRAGMA table_info(favourites)"];
+    while ([rs next]) {
+        NSString *columnName = [rs stringForColumn:@"name"];
+        if ([@"certificate_ref" isEqualToString:columnName]) {
+            columnExists = YES;
+            break;
+        }
+    }
+    [rs close];
+    
+    if (!columnExists) {
+        NSLog(@"MUDatabase: Upgrading table 'favourites' adding column 'certificate_ref'...");
+        if (![db executeUpdate:@"ALTER TABLE `favourites` ADD COLUMN `certificate_ref` BLOB"]) {
+            NSLog(@"MUDatabase: Failed to add column certificate_ref: %@", [db lastErrorMessage]);
+        }
+    }
 
     [db executeUpdate:@"CREATE TABLE IF NOT EXISTS `cert` "
                       @"(`id` INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -113,39 +136,37 @@ static FMDatabase *db = nil;
 
 // Tear down the database
 + (void) teardown {
-    
+    [db close];
+    db = nil;
 }
 
 // Store a single favourite
 + (void) storeFavourite:(MUFavouriteServer *)favServ {
-    // If the favourite already has a primary key, update the currently stored entity
+    if (!db) return;
+
     if ([favServ hasPrimaryKey]) {
-        [db executeUpdate:@"UPDATE `favourites` SET `name`=?, `hostname`=?, `port`=?, `username`=?, `password`=? WHERE `id`=?",
-            [favServ displayName],
-            [favServ hostName],
-            [NSString stringWithFormat:@"%lu", (unsigned long)[favServ port]],
-            [favServ userName],
-            [favServ password],
+        [db executeUpdate:@"UPDATE `favourites` SET `name`=?, `hostname`=?, `port`=?, `username`=?, `password`=?, `certificate_ref`=? WHERE `id`=?",
+            [self nilToNull:[favServ displayName]],
+            [self nilToNull:[favServ hostName]],
+            [NSNumber numberWithUnsignedInteger:[favServ port]],
+            [self nilToNull:[favServ userName]],
+            [self nilToNull:[favServ password]],
+            [self nilToNull:[favServ certificateRef]], // 新增
             [NSNumber numberWithInteger:[favServ primaryKey]]];
-    // If it isn't already stored, store it and update the object's pkey.
     } else {
-        // We're already inside a transaction if we were called from within
-        // storeFavourites. If that isn't the case, make sure we start a new
-        // transaction.
-        BOOL newTransaction = ![db isInTransaction];
-        if (newTransaction)
-            [db beginTransaction];
-        [db executeUpdate:@"INSERT INTO `favourites` (`name`, `hostname`, `port`, `username`, `password`) VALUES (?, ?, ?, ?, ?)",
-            [favServ displayName],
-            [favServ hostName],
-            [NSString stringWithFormat:@"%lu", (unsigned long)[favServ port]],
-            [favServ userName],
-            [favServ password]];
+        [db executeUpdate:@"INSERT INTO `favourites` (`name`, `hostname`, `port`, `username`, `password`, `certificate_ref`) VALUES (?, ?, ?, ?, ?, ?)",
+            [self nilToNull:[favServ displayName]],
+            [self nilToNull:[favServ hostName]],
+            [NSNumber numberWithUnsignedInteger:[favServ port]],
+            [self nilToNull:[favServ userName]],
+            [self nilToNull:[favServ password]],
+            [self nilToNull:[favServ certificateRef]]]; // 新增
+
         FMResultSet *res = [db executeQuery:@"SELECT last_insert_rowid()"];
-        [res next];
-        [favServ setPrimaryKey:[res intForColumnIndex:0]];
-        if (newTransaction)
-            [db commit];
+        if ([res next]) {
+            [favServ setPrimaryKey:[res intForColumnIndex:0]];
+        }
+        [res close];
     }
 }
 
@@ -167,7 +188,10 @@ static FMDatabase *db = nil;
 // Fetch all favourites
 + (NSMutableArray *) fetchAllFavourites {
     NSMutableArray *favs = [[NSMutableArray alloc] init];
-    FMResultSet *res = [db executeQuery:@"SELECT `id`, `name`, `hostname`, `port`, `username`, `password` FROM `favourites`"];
+    if (!db) return favs;
+    
+    // 记得查询 certificate_ref
+    FMResultSet *res = [db executeQuery:@"SELECT `id`, `name`, `hostname`, `port`, `username`, `password`, `certificate_ref` FROM `favourites`"];
     while ([res next]) {
         MUFavouriteServer *fs = [[MUFavouriteServer alloc] init];
         [fs setPrimaryKey:[res intForColumnIndex:0]];
@@ -176,6 +200,7 @@ static FMDatabase *db = nil;
         [fs setPort:[res intForColumnIndex:3]];
         [fs setUserName:[res stringForColumnIndex:4]];
         [fs setPassword:[res stringForColumnIndex:5]];
+        [fs setCertificateRef:[res dataForColumnIndex:6]]; // 读取证书引用
         [favs addObject:fs];
     }
     [res close];

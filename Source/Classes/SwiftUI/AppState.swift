@@ -35,6 +35,9 @@ class AppState: ObservableObject {
     @Published var isReconnecting: Bool = false
     @Published var activeError: AppError?
     @Published var activeToast: AppToast?
+    @Published var isRegistering: Bool = false
+    
+    var pendingRegistration = false
     
     // --- 核心修改：添加一个属性来临时存储服务器的显示名称 ---
     @Published var serverDisplayName: String? = nil
@@ -59,18 +62,41 @@ class AppState: ObservableObject {
         center.publisher(for: NSNotification.Name("MUConnectionOpenedNotification"))
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
+                guard let self = self else { return }
+                
                 print("🟢 AppState: Connection Opened")
                 if let userInfo = notification.userInfo,
                    let displayName = userInfo["displayName"] as? String {
-                    self?.serverDisplayName = displayName
+                    self.serverDisplayName = displayName
+                }
+                
+                if self.pendingRegistration {
+                    print("🔄 Reconnection successful. Executing pending registration...")
+                    
+                    // 延迟 0.5 秒确保连接稳定
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if let model = MUConnectionController.shared()?.serverModel {
+                            // 发送 Mumble 协议的注册指令
+                            model.registerConnectedUser()
+                        }
+                        // 重置标记
+                        self.pendingRegistration = false
+                        
+                        withAnimation {
+                            self.isRegistering = false
+                        }
+                    }
+                } else {
+                    // 如果不是注册流程，确保遮罩关闭
+                    self.isRegistering = false
                 }
                 
                 withAnimation(.spring()) {
-                    self?.isConnected = true
+                    self.isConnected = true
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     withAnimation(.easeOut(duration: 0.3)) {
-                        self?.isConnecting = false
+                        self.isConnecting = false
                     }
                 }
             }
@@ -80,12 +106,19 @@ class AppState: ObservableObject {
         center.publisher(for: NSNotification.Name("MUConnectionClosedNotification"))
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
+                guard let self = self else { return }
+    
+                if self.isRegistering {
+                    print("🔵 AppState: Keeping UI alive for registration process (ignoring disconnect)")
+                    return
+                }
+                
                 print("🔴 AppState: Connection Closed")
-                self?.isConnecting = false
-                self?.isReconnecting = false
-                self?.isConnected = false
-                self?.serverDisplayName = nil
-                self?.unreadMessageCount = 0
+                self.isConnecting = false
+                self.isReconnecting = false
+                self.isConnected = false
+                self.serverDisplayName = nil
+                self.unreadMessageCount = 0
             }
             .store(in: &cancellables)
         
@@ -93,12 +126,16 @@ class AppState: ObservableObject {
         center.publisher(for: NSNotification.Name("MUConnectionConnectingNotification"))
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
+                guard let self = self else { return }
+                // 如果正在注册，不需要显示常规的 Connecting 状态，因为会有遮罩
+                if self.isRegistering { return }
+                
                 let isReconnecting = (notification.userInfo?["isReconnecting"] as? Bool) ?? false
                 
                 print("🟡 AppState: Connecting... (Reconnecting: \(isReconnecting))")
                 withAnimation {
-                    self?.isConnecting = true
-                    self?.isReconnecting = isReconnecting
+                    self.isConnecting = true
+                    self.isReconnecting = isReconnecting
                 }
             }
             .store(in: &cancellables)
@@ -107,15 +144,18 @@ class AppState: ObservableObject {
         center.publisher(for: NSNotification.Name("MUConnectionErrorNotification"))
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
-                self?.isConnecting = false
-                self?.isReconnecting = false
-                self?.isConnected = false
+                guard let self = self else { return }
+                
+                self.isConnecting = false
+                self.isReconnecting = false
+                self.isConnected = false
+                self.pendingRegistration = false
                 // 解析 ObjC 传来的 userInfo
                 if let userInfo = notification.userInfo,
                    let title = userInfo["title"] as? String,
                    let msg = userInfo["message"] as? String {
                     print("⚠️ AppState: Error - \(title): \(msg)")
-                    self?.activeError = AppError(title: title, message: msg)
+                    self.activeError = AppError(title: title, message: msg)
                 }
             }
             .store(in: &cancellables)
@@ -154,6 +194,7 @@ class AppState: ObservableObject {
         MUConnectionController.shared()?.disconnectFromServer()
         self.isConnecting = false
         self.isReconnecting = false
+        self.pendingRegistration = false
     }
     private var toastWorkItem: DispatchWorkItem?
 }

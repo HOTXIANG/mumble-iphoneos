@@ -158,6 +158,7 @@
                                port:[favServ port]
                             withUsername:userName
                         andPassword:[favServ password]
+                     certificateRef:[favServ certificateRef]
                         displayName:[favServ displayName]];
         [[self tableView] deselectRowAtIndexPath:indexPath animated:YES];
     }]];

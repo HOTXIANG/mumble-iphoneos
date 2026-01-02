@@ -19,7 +19,7 @@ struct WelcomeNavigationConfig: NavigationConfigurable {
         [NavigationBarItem(systemImage: "gearshape", action: onPreferences)]
     }
     var rightBarItems: [NavigationBarItem] {
-        [NavigationBarItem(systemImage: "info.circle", action: onAbout)]
+        []
     }
 }
 
@@ -141,11 +141,19 @@ struct WelcomeContentView: View {
         AppState.shared.serverDisplayName = hostname
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         
+        // 尝试从收藏夹查找匹配的证书
+        var certRef: Data? = nil
+        let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
+        if let match = allFavs.first(where: { $0.hostName == hostname && $0.port == UInt(port) && $0.userName == username }) {
+            certRef = match.certificateRef
+        }
+        
         MUConnectionController.shared()?.connet(
             toHostname: hostname,
             port: UInt(port),
             withUsername: username,
             andPassword: "",
+            certificateRef: certRef,
             displayName: displayName
         )
     }
@@ -201,11 +209,6 @@ struct WelcomeView: MumbleContentView {
                 NavigationStack {
                     PreferencesView()
                 }
-            }
-            .alert("About", isPresented: $showingAbout) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Mumble for iOS\nRefactored with SwiftUI")
             }
     }
 }

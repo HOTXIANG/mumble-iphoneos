@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-@interface MUFavouriteServer : NSObject <NSCopying>
+@interface MUFavouriteServer : NSObject {
+    NSData          *_certificateRef;
+}
 
 - (id) initWithDisplayName:(NSString *)displayName hostName:(NSString *)hostName port:(NSUInteger)port userName:(NSString *)userName password:(NSString *)passWord;
 - (id) init;
@@ -13,6 +15,7 @@
 @property (assign)  NSUInteger  port;
 @property (copy)    NSString    *userName;
 @property (copy)    NSString    *password;
+@property (nonatomic, retain) NSData *certificateRef;
 
 - (BOOL) hasPrimaryKey;
 - (NSComparisonResult) compare:(MUFavouriteServer *)favServ;
