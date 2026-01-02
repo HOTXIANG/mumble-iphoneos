@@ -103,9 +103,7 @@
 		F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C62E216A7F000AA092 /* Assets.xcassets */; };
 		F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56722E0F711A00D76B49 /* MessagesView.swift */; };
 		F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */; };
-		F2FF567B2E0F711A00D76B49 /* ServerChannelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56732E0F711A00D76B49 /* ServerChannelView.swift */; };
 		F2FF567C2E0F711A00D76B49 /* ChannelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56712E0F711A00D76B49 /* ChannelView.swift */; };
-		F2FF567D2E0F711A00D76B49 /* ChannelRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56702E0F711A00D76B49 /* ChannelRowViews.swift */; };
 		F2FF567E2E0F711A00D76B49 /* ChannelDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */; };
 		F2FF567F2E0F711A00D76B49 /* ServerModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */; };
 		F2FF568A2E0F81EE00D76B49 /* ChannelListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */; };
@@ -359,10 +357,8 @@
 		F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = NeoMumble.icon; path = Resources/NeoMumble.icon; sourceTree = "<group>"; };
 		F2FBE1C62E216A7F000AA092 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelDataModels.swift; sourceTree = "<group>"; };
-		F2FF56702E0F711A00D76B49 /* ChannelRowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelRowViews.swift; sourceTree = "<group>"; };
 		F2FF56712E0F711A00D76B49 /* ChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelView.swift; sourceTree = "<group>"; };
 		F2FF56722E0F711A00D76B49 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
-		F2FF56732E0F711A00D76B49 /* ServerChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerChannelView.swift; sourceTree = "<group>"; };
 		F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelManager.swift; sourceTree = "<group>"; };
 		F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelNotificationManager.swift; sourceTree = "<group>"; };
 		F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelListView.swift; sourceTree = "<group>"; };
@@ -735,10 +731,8 @@
 				F2E9CC062F07A3EF00464F79 /* ServerCertificateDetailView.swift */,
 				F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */,
 				F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */,
-				F2FF56702E0F711A00D76B49 /* ChannelRowViews.swift */,
 				F2FF56712E0F711A00D76B49 /* ChannelView.swift */,
 				F2FF56722E0F711A00D76B49 /* MessagesView.swift */,
-				F2FF56732E0F711A00D76B49 /* ServerChannelView.swift */,
 				F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */,
 				F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */,
 			);
@@ -1005,9 +999,7 @@
 				F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */,
 				F28C6B332EE87C4C00DE9CD2 /* LanDiscoveryModel.swift in Sources */,
 				F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */,
-				F2FF567B2E0F711A00D76B49 /* ServerChannelView.swift in Sources */,
 				F2FF567C2E0F711A00D76B49 /* ChannelView.swift in Sources */,
-				F2FF567D2E0F711A00D76B49 /* ChannelRowViews.swift in Sources */,
 				F28C6B2B2EE871F000DE9CD2 /* ServerPingModel.swift in Sources */,
 				F2FF567E2E0F711A00D76B49 /* ChannelDataModels.swift in Sources */,
 				F2FF567F2E0F711A00D76B49 /* ServerModelManager.swift in Sources */,

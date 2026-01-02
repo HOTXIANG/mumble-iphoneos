@@ -14,6 +14,8 @@ class ServerModelManager: ObservableObject {
     // --- 核心修改 1：添加一个新的 @Published 属性来存储服务器名称 ---
     @Published var serverName: String? = nil
     
+    @Published var collapsedChannelIds: Set<Int> = []
+    
     private var muteStateBeforeDeafen: Bool = false
     private var serverModel: MKServerModel?
     private var userIndexMap: [UInt: Int] = [:]
@@ -792,6 +794,37 @@ class ServerModelManager: ObservableObject {
                     displayName: newFav.displayName
                 )
             }
+        }
+    }
+    
+    func toggleChannelCollapse(_ channelId: Int) {
+        if collapsedChannelIds.contains(channelId) {
+            collapsedChannelIds.remove(channelId)
+        } else {
+            collapsedChannelIds.insert(channelId)
+        }
+    }
+    
+    func isChannelCollapsed(_ channelId: Int) -> Bool {
+        return collapsedChannelIds.contains(channelId)
+    }
+    
+    // 辅助方法：获取排序后的子频道
+    func getSortedSubChannels(for channel: MKChannel) -> [MKChannel] {
+        guard let subChannels = channel.channels() as? [MKChannel] else { return [] }
+        return subChannels.sorted { c1, c2 in
+            if c1.position() != c2.position() {
+                return c1.position() < c2.position()
+            }
+            return (c1.channelName() ?? "") < (c2.channelName() ?? "")
+        }
+    }
+    
+    // 辅助方法：获取排序后的用户
+    func getSortedUsers(for channel: MKChannel) -> [MKUser] {
+        guard let users = channel.users() as? [MKUser] else { return [] }
+        return users.sorted { u1, u2 in
+            return (u1.userName() ?? "") < (u2.userName() ?? "")
         }
     }
 }
