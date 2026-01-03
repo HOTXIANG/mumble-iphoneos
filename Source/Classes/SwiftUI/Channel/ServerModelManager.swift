@@ -632,11 +632,6 @@ class ServerModelManager: ObservableObject {
                 channel
             )
     }
-    func toggleMode() {
-        viewMode = (
-            viewMode == .server
-        ) ? .channel : .server; rebuildModelArray()
-    }
     func toggleSelfMute() {
         guard let user = serverModel?.connectedUser() else {
             return

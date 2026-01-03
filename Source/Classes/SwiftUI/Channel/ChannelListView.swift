@@ -141,12 +141,6 @@ struct ChannelListView: View {
     // 菜单内容 (进一步提取以降低复杂度)
     @ViewBuilder
     private var menuContent: some View {
-        Button(action: { serverManager.toggleMode() }) {
-            Label("Switch View Mode", systemImage: "arrow.left.arrow.right")
-        }
-        
-        Divider()
-        
         // --- 核心互斥逻辑 ---
         if let currentUser = serverManager.connectedUserState {
             // 这里假设 isAuthenticated 是属性(Boolean)，如果是方法请改为 isAuthenticated()
@@ -166,6 +160,8 @@ struct ChannelListView: View {
                 Label("Register User", systemImage: "person.badge.plus")
             }
         }
+        
+        Divider()
         
         Button(action: { showingPrefs = true }) {
             Label("Settings", systemImage: "gearshape")

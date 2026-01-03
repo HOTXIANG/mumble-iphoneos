@@ -172,9 +172,9 @@ struct ChannelTreeRow: View {
                         .frame(width: CGFloat(level * 16))
                     
                     // [区域 2] 箭头点击区 (跟随缩进移动)
-                    // 宽度 = 箭头视觉宽度(16) + 适当的点击热区余量(比如共 30)
+                    // 宽度 = 箭头视觉宽度(16) + 适当的点击热区余量(比如共 50)
                     Color.clear
-                        .frame(width: 30, height: kContentHeight + kRowPaddingV * 2)
+                        .frame(width: 50, height: kContentHeight + kRowPaddingV * 2)
                         .contentShape(Rectangle()) // 确保透明区域可点击
                         .onTapGesture {
                             toggleCollapse()
