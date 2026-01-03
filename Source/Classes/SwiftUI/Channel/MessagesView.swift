@@ -8,13 +8,21 @@ private struct NotificationMessageView: View {
     let message: ChatMessage
     
     var body: some View {
-        Text(message.attributedMessage)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundColor(.secondary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color(uiColor: .systemGray5), in: Capsule())
-            .frame(maxWidth: .infinity, alignment: .center)
+        HStack(spacing: 6) {
+            Text(message.attributedMessage)
+                .fontWeight(.medium)
+            
+            // 显示时间
+            Text(message.timestamp, style: .time)
+                .font(.caption2)
+                .opacity(0.6)
+        }
+        .font(.system(size: 13, weight: .medium))
+        .foregroundColor(.secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(uiColor: .systemGray5), in: Capsule())
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
@@ -98,7 +106,6 @@ private struct FullscreenImageView: View {
 // 消息气泡现在接收一个 ChatMessage 对象
 private struct MessageBubbleView: View {
     let message: ChatMessage
-    
     let onImageTap: (UIImage) -> Void
     
     var body: some View {
@@ -106,42 +113,24 @@ private struct MessageBubbleView: View {
             alignment: message.isSentBySelf ? .trailing : .leading,
             spacing: 4
         ) {
-            // 只为非自己发送的消息显示发送者名称
+            // 发送者名称
             if !message.isSentBySelf {
-                Text(
-                    message.senderName
-                )
-                .font(
-                    .system(
-                        size: 14,
-                        weight: .semibold
-                    )
-                )
-                .padding(
-                    .leading,
-                    4
-                )
+                Text(message.senderName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .padding(.leading, 4)
             }
             
-            // 消息内容和图片
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
+            // 消息内容气泡
+            VStack(alignment: .leading, spacing: 6) {
                 if !message.plainTextMessage.isEmpty {
                     Text(message.attributedMessage)
                         .tint(.pink)
-                        .shadow(color: Color.black, radius: 8)
                         .textSelection(.enabled)
                 }
-                // 显示图片
                 if !message.images.isEmpty {
-                    ForEach(
-                        0..<message.images.count,
-                        id: \.self
-                    ) { index in
+                    ForEach(0..<message.images.count, id: \.self) { index in
                         Button(action: {
-                            // --- 核心修改 3：当图片被点击时，调用回调 ---
                             onImageTap(message.images[index])
                         }) {
                             Image(uiImage: message.images[index])
@@ -151,35 +140,20 @@ private struct MessageBubbleView: View {
                     }
                 }
             }
-            .padding(
-                .horizontal,
-                !message.images.isEmpty ? 8 : 10
-            )
-            .padding(
-                .vertical,
-                8
-            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
             .background(
-                message.isSentBySelf ? Color.accentColor : .primary,
-                in: RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
-                )
+                message.isSentBySelf ? Color.accentColor : Color(uiColor: .systemGray4),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
-            .foregroundColor(message.isSentBySelf ? .white : .black)
+            .foregroundColor(message.isSentBySelf ? .white : .primary)
+            
+            Text(message.timestamp, style: .time)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4)
         }
-        .foregroundColor(
-            .primary
-        )
-        .font(
-            .system(
-                size: 15
-            )
-        )
-        .frame(
-            maxWidth: .infinity,
-            alignment: message.isSentBySelf ? .trailing : .leading
-        )
+        .frame(maxWidth: .infinity, alignment: message.isSentBySelf ? .trailing : .leading)
     }
 }
 

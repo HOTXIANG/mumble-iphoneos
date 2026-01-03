@@ -7,6 +7,44 @@
 
 import SwiftUI
 
+struct NotificationSettingsView: View {
+    @AppStorage("NotificationNotifyUserMessages") var notifyUserMessages: Bool = true
+    @AppStorage("NotificationNotifySystemMessages") var notifySystemMessages: Bool = true
+    
+    var body: some View {
+        Form {
+            Section(header: Text("Push Notifications"), footer: Text("Notifications will be sent when the app is in the background.")) {
+                Toggle("User Messages", isOn: $notifyUserMessages)
+                Toggle("System Messages", isOn: $notifySystemMessages)
+            }
+            
+            Section {
+                Button("Test Notification") {
+                    // 发送一个测试通知（延迟5秒，方便用户切到后台测试）
+                    let content = UNMutableNotificationContent()
+                    content.title = "Test Notification"
+                    content.body = "This is a test message from Mumble."
+                    content.sound = .default
+                    
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+                    let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+                    
+                    UNUserNotificationCenter.current().add(request)
+                }
+            }
+        }
+        .navigationTitle("Notifications")
+        .onAppear {
+            // 进入页面时检查/请求权限
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+                if let error = error {
+                    print("Notification permission error: \(error)")
+                }
+            }
+        }
+    }
+}
+
 // 1. 传输模式设置视图
 struct AudioTransmissionSettingsView: View {
     @AppStorage("AudioTransmitMethod") var transmitMethod: String = "vad"
@@ -233,6 +271,13 @@ struct PreferencesView: View {
                 
                 NavigationLink(destination: AdvancedAudioSettingsView()) {
                     Label("Advanced & Network", systemImage: "slider.horizontal.3")
+                }
+            }
+            
+            // --- 通知部分 ---
+            Section(header: Text("Notifications")) {
+                NavigationLink(destination: NotificationSettingsView()) {
+                    Label("Push Notifications", systemImage: "bell.badge")
                 }
             }
             

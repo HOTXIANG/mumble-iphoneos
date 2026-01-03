@@ -1,6 +1,9 @@
 // 文件: ServerModelManager.swift (已添加 serverName 属性)
 
 import SwiftUI
+import UserNotifications
+import AudioToolbox
+import ActivityKit
 
 @MainActor
 class ServerModelManager: ObservableObject {
@@ -21,6 +24,7 @@ class ServerModelManager: ObservableObject {
     private var userIndexMap: [UInt: Int] = [:]
     private var channelIndexMap: [UInt: Int] = [:]
     private var delegateWrapper: ServerModelDelegateWrapper?
+    private var liveActivity: Activity<MumbleActivityAttributes>?
     
     enum ViewMode {
         case server,
@@ -35,7 +39,12 @@ class ServerModelManager: ObservableObject {
     func activate() {
         print(
             "🚀 ServerModelManager: ACTIVATE - Activating model and notifications."
-        ); setupServerModel(); setupNotifications()
+        ); setupServerModel();
+        setupNotifications()
+        
+        requestNotificationAccess()
+        
+        startLiveActivity()
     }
     deinit {
         print(
@@ -43,6 +52,47 @@ class ServerModelManager: ObservableObject {
         ); NotificationCenter.default.removeObserver(
             self
         )
+    }
+    
+    private func requestNotificationAccess() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            if granted {
+                print("🔔 Notifications authorized")
+            } else if let error = error {
+                print("🚫 Notifications permission error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func sendLocalNotification(title: String, body: String) {
+        // 1. 如果应用在前台，直接播放音效
+        if UIApplication.shared.applicationState == .active {
+            // 1007 是 iOS 标准的三全音 (Tri-tone) 提示音
+            // 使用 AlertSound 可以在静音模式下触发震动
+            AudioServicesPlayAlertSound(1000)
+            return
+        }
+        
+        // 2. 如果应用在后台，发送带有默认音效的系统通知
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ Failed to schedule notification: \(error)")
+            }
+        }
+    }
+    
+    private var currentNotificationTitle: String {
+        if let currentChannelName = serverModel?.connectedUser()?.channel()?.channelName() {
+            return currentChannelName
+        }
+        return serverName ?? "Mumble"
     }
     
     private func setupServerModel() {
@@ -91,9 +141,108 @@ class ServerModelManager: ObservableObject {
         
         // --- 核心修改 3：在清理时，重置 serverName ---
         serverName = nil
+        
+        endLiveActivity()
+    }
+    
+    private func startLiveActivity() {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        
+        // 初始状态
+        let initialContentState = MumbleActivityAttributes.ContentState(
+            speakers: [],
+            userCount: 0,
+            channelName: "Connecting...",
+            isSelfMuted: true,
+            isSelfDeafened: false
+        )
+        
+        let attributes = MumbleActivityAttributes(serverName: serverName ?? "Mumble")
+        
+        do {
+            let activity = try Activity.request(
+                attributes: attributes,
+                content: .init(state: initialContentState, staleDate: nil),
+                pushType: nil
+            )
+            self.liveActivity = activity
+            print("🏝️ Live Activity Started")
+            
+            // 立即更新一次准确数据
+            updateLiveActivity()
+        } catch {
+            print("❌ Failed to start Live Activity: \(error)")
+        }
+    }
+    
+    private func updateLiveActivity() {
+        guard let activity = liveActivity else { return }
+        
+        // 1. 获取基础信息
+        let channelName = currentNotificationTitle
+        var userCount = 0
+        var speakers: [String] = []
+        var isSelfMuted = true
+        var isSelfDeafened = false
+        
+        if let connectedUser = serverModel?.connectedUser() {
+            // 2. 获取自我状态
+            isSelfMuted = connectedUser.isSelfMuted()
+            isSelfDeafened = connectedUser.isSelfDeafened()
+            
+            if let currentChannel = connectedUser.channel() {
+                // 3. 获取人数
+                if let users = currentChannel.users() as? [MKUser] {
+                    userCount = users.count
+                    
+                    // 4. 获取所有正在说话的人 (talkState > 0)
+                    // 我们过滤掉自己，或者保留自己（看需求，通常显示自己也在说话比较好）
+                    let speakingUsers = users.filter { $0.talkState().rawValue > 0 }
+                    speakers = speakingUsers.compactMap { $0.userName() }
+                }
+            }
+        }
+        
+        // 5. 构建新状态
+        let contentState = MumbleActivityAttributes.ContentState(
+            speakers: speakers,
+            userCount: userCount,
+            channelName: channelName,
+            isSelfMuted: isSelfMuted,
+            isSelfDeafened: isSelfDeafened
+        )
+        
+        // 6. 更新
+        Task {
+            await activity.update(
+                ActivityContent(state: contentState, staleDate: nil)
+            )
+        }
+    }
+    
+    private func endLiveActivity() {
+        guard let activity = liveActivity else { return }
+        
+        let finalContentState = MumbleActivityAttributes.ContentState(
+            speakers: [],
+            userCount: 0,
+            channelName: "Disconnected",
+            isSelfMuted: false,
+            isSelfDeafened: false
+        )
+        
+        Task {
+            await activity.end(
+                ActivityContent(state: finalContentState, staleDate: nil),
+                dismissalPolicy: .immediate
+            )
+            self.liveActivity = nil
+        }
     }
     
     private nonisolated func setupNotifications() {
+        NotificationCenter.default.removeObserver(self)
+        
         NotificationCenter.default
             .addObserver(
                 forName: ServerModelNotificationManager.rebuildModelNotification,
@@ -161,27 +310,100 @@ class ServerModelManager: ObservableObject {
         NotificationCenter.default.addObserver(
             forName: ServerModelNotificationManager.userMovedNotification,
             object: nil,
-            queue: nil // 在后台队列接收
+            queue: nil
         ) { [weak self] notification in
             guard let userInfo = notification.userInfo,
                   let user = userInfo["user"] as? MKUser,
                   let channel = userInfo["channel"] as? MKChannel else { return }
             
-            // 1. 在进入异步任务前，提取所有需要的数据为“值类型”
             let movingUserSession = user.session()
-            let newChannelName = channel.channelName() ?? "Unknown Channel"
+            let movingUserName = user.userName() ?? "Unknown"
+            let destChannelName = channel.channelName() ?? "Unknown Channel"
+            let destChannelId = channel.channelId()
             
-            // 2. 将这些安全的值传递进主线程任务
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                guard let connectedUser = self.serverModel?.connectedUser() else { return }
                 
-                // 在安全的上下文里获取 connectedUserSession
-                let connectedUserSession = self.serverModel?.connectedUser().session()
-                
-                // 只有当移动的用户是当前用户时，才显示通知
-                if movingUserSession == connectedUserSession {
-                    self.addChannelJoinNotification(channelName: newChannelName)
+                // 1. 如果是我自己移动，总是显示
+                if movingUserSession == connectedUser.session() {
+                    self.addSystemNotification("You joined channel \(destChannelName)")
+                    return
                 }
+                
+                // 2. 如果是别人移动，判断是否与我有关
+                // 我们需要找出该用户“原本”所在的频道
+                // 由于 `rebuildModelArray` 还没运行，此时的 `modelItems` 还是旧的状态，
+                // 我们可以从中反向查找用户所属的频道。
+                
+                guard let myCurrentChannelId = connectedUser.channel()?.channelId() else { return }
+                
+                // 查找用户在旧列表中的位置
+                guard let userIndex = self.userIndexMap[movingUserSession] else {
+                    // 如果找不到用户（极少见），为了保险起见，如果不确定来源就不显示，或只显示进入我频道的
+                    if destChannelId == myCurrentChannelId {
+                        self.addSystemNotification("\(movingUserName) joined your channel")
+                    }
+                    return
+                }
+                
+                // 向上遍历寻找父频道
+                var originChannelId: UInt?
+                let userItem = self.modelItems[userIndex]
+                
+                for i in stride(from: userIndex - 1, through: 0, by: -1) {
+                    let item = self.modelItems[i]
+                    // 找到缩进层级比用户小1（或更小）的第一个频道，即为父频道
+                    if item.type == .channel && item.indentLevel < userItem.indentLevel {
+                        if let ch = item.object as? MKChannel {
+                            originChannelId = ch.channelId()
+                        }
+                        break
+                    }
+                }
+                
+                // 判定逻辑：
+                // A. 用户原本就在我的频道 (离开) -> 显示
+                // B. 用户移动到了我的频道 (进入) -> 显示
+                // C. 其他情况 (别人的频道之间互相移动) -> 隐藏
+                
+                let isLeavingMyChannel = (originChannelId == myCurrentChannelId)
+                let isEnteringMyChannel = (destChannelId == myCurrentChannelId)
+                
+                if isLeavingMyChannel {
+                    self.addSystemNotification("\(movingUserName) moved to \(destChannelName)")
+                } else if isEnteringMyChannel {
+                    // 这种情况下，通常显示 "Joined your channel" 或者 "Moved to [Current Channel Name]"
+                    self.addSystemNotification("\(movingUserName) moved to \(destChannelName)")
+                }
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: ServerModelNotificationManager.userJoinedNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let user = userInfo["user"] as? MKUser else { return }
+            
+            let userName = user.userName() ?? "Unknown User"
+            Task { @MainActor [weak self] in
+                self?.addSystemNotification("\(userName) connected")
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: ServerModelNotificationManager.userLeftNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let user = userInfo["user"] as? MKUser else { return }
+            
+            let userName = user.userName() ?? "Unknown User"
+            Task { @MainActor [weak self] in
+                self?.addSystemNotification("\(userName) disconnected")
             }
         }
         
@@ -241,53 +463,70 @@ class ServerModelManager: ObservableObject {
         }
     }
     
-    // 新增：一个用于将纯文本转换为 AttributedString 的辅助函数
-        private func attributedString(from plainText: String) -> AttributedString {
-            do {
-                // 使用 Markdown 解析器来自动识别链接
-                // `inlineOnlyPreservingWhitespace` 选项能最好地保留原始文本的格式
-                return try AttributedString(markdown: plainText, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
-            } catch {
-                // 如果 Markdown 解析失败，则返回一个普通的字符串
-                print("Could not parse markdown: \(error)")
-                return AttributedString(plainText)
-            }
+    private func addSystemNotification(_ text: String) {
+        let notificationMessage = ChatMessage(
+            id: UUID(),
+            type: .notification,
+            senderName: "System",
+            attributedMessage: AttributedString(text),
+            images: [],
+            timestamp: Date(),
+            isSentBySelf: false
+        )
+        messages.append(notificationMessage)
+        
+        if UserDefaults.standard.bool(forKey: "NotificationNotifySystemMessages") {
+            sendLocalNotification(title: currentNotificationTitle, body: text)
         }
+    }
+    
+    // 新增：一个用于将纯文本转换为 AttributedString 的辅助函数
+    private func attributedString(from plainText: String) -> AttributedString {
+        do {
+            // 使用 Markdown 解析器来自动识别链接
+            // `inlineOnlyPreservingWhitespace` 选项能最好地保留原始文本的格式
+            return try AttributedString(markdown: plainText, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
+        } catch {
+            // 如果 Markdown 解析失败，则返回一个普通的字符串
+            print("Could not parse markdown: \(error)")
+            return AttributedString(plainText)
+        }
+    }
     
     // --- 核心修改 2：添加一个创建系统通知的新方法 ---
-        private func addChannelJoinNotification(channelName: String) {
-            let text = "You have joined the channel: \(channelName)"
-            let notificationMessage = ChatMessage(
-                id: UUID(),
-                type: .notification, // 类型为系统通知
-                senderName: "System", // 发送者为系统
-                attributedMessage: AttributedString(text),
-                images: [],
-                timestamp: Date(),
-                isSentBySelf: false
-            )
-            messages.append(notificationMessage)
-        }
+    private func addChannelJoinNotification(channelName: String) {
+        let text = "You have joined the channel: \(channelName)"
+        let notificationMessage = ChatMessage(
+            id: UUID(),
+            type: .notification, // 类型为系统通知
+            senderName: "System", // 发送者为系统
+            attributedMessage: AttributedString(text),
+            images: [],
+            timestamp: Date(),
+            isSentBySelf: false
+        )
+        messages.append(notificationMessage)
+    }
     
     // 替换为系统级、更健壮的 Data URI 解析方法
     private nonisolated func dataFromDataURLString(_ dataURLString: String) -> Data? {
-            guard dataURLString.hasPrefix("data:"), let commaRange = dataURLString.range(of: ",") else {
-                return nil
-            }
-            
-            var base64String = String(dataURLString[commaRange.upperBound...])
-            
-            // 1. 移除所有空白和换行符
-            base64String = base64String.components(separatedBy: .whitespacesAndNewlines).joined()
-            
-            // 2. 进行 URL 解码 (以防万一)
-            base64String = base64String.removingPercentEncoding ?? base64String
-            
-            return Data(base64Encoded: base64String, options: .ignoreUnknownCharacters)
+        guard dataURLString.hasPrefix("data:"), let commaRange = dataURLString.range(of: ",") else {
+            return nil
         }
+        
+        var base64String = String(dataURLString[commaRange.upperBound...])
+        
+        // 1. 移除所有空白和换行符
+        base64String = base64String.components(separatedBy: .whitespacesAndNewlines).joined()
+        
+        // 2. 进行 URL 解码 (以防万一)
+        base64String = base64String.removingPercentEncoding ?? base64String
+        
+        return Data(base64Encoded: base64String, options: .ignoreUnknownCharacters)
+    }
     
     // --- 核心修改 3：添加处理和发送消息的新方法 ---
-        
+    
     private func handleReceivedMessage(
         senderName: String,
         plainText: String,
@@ -295,24 +534,7 @@ class ServerModelManager: ObservableObject {
         senderSession: UInt,
         connectedUserSession: UInt?
     ) {
-        let images = imageData.compactMap { data -> UIImage? in
-            guard let image = UIImage(data: data) else {
-                print(
-                    "🔴 DEBUG (Image): UIImage(data:) returned nil for data of size \(data.count) bytes."
-                )
-                return nil
-            }
-            // 诊断点：如果 UIImage 成功创建，打印它的尺寸
-            print(
-                "✅✅✅ DEBUG (Image): Successfully created UIImage with size \(image.size)"
-            )
-            return image
-        }
-                
-        print(
-            "--- 🖼️ Image Parsing End. Found \(images.count) valid UIImages. 🖼️ ---"
-        )
-                
+        let images = imageData.compactMap { UIImage(data: $0) }
         let chatMessage = ChatMessage(
             id: UUID(),
             type: .userMessage,
@@ -323,12 +545,25 @@ class ServerModelManager: ObservableObject {
             isSentBySelf: senderSession == connectedUserSession
         )
         messages.append(chatMessage)
+        
+        // 1. 默认只推送别人的消息
+        let isSentBySelf = (senderSession == connectedUserSession)
+        
+        // 2. 检查设置: 默认如果没有设置过，视为开启 (true)
+        let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+        
+        if !isSentBySelf && notifyEnabled {
+            // 推送内容： "Sender: Message Content"
+            let bodyText = plainText.isEmpty ? "[Image]" : plainText
+            let notificationBody = "\(senderName): \(bodyText)"
+            sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
+        }
     }
-
+    
     // --- 核心修改：修复 sendTextMessage 方法 ---
     func sendTextMessage(_ text: String) {
         guard let serverModel = serverModel, !text.isEmpty else { return }
-          
+        
         // --- 核心修改 2：发送消息前，先修剪文本 ---
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
@@ -337,14 +572,14 @@ class ServerModelManager: ObservableObject {
         let htmlMessage = MUTextMessageProcessor.processedHTML(
             fromPlainTextMessage: trimmedText
         )
-            
+        
         // 使用编译器提示的、正确的初始化方法
         let message = MKTextMessage(string: htmlMessage)
-            
+        
         if let userChannel = serverModel.connectedUser()?.channel() {
             serverModel.send(message, to: userChannel)
         }
-            
+        
         // 立即在UI上显示自己发送的消息，体验更流畅
         let selfMessage = ChatMessage(
             id: UUID(),
@@ -362,27 +597,27 @@ class ServerModelManager: ObservableObject {
         guard let serverModel = serverModel else { return }
         
         // 将 CPU 密集型任务（压缩和编码）放到后台线程执行
-                let compressedData = await Task.detached(priority: .userInitiated) {
-                    let maxSizeInBytes = 60 * 1024 // Mumble 消息大小上限
-                    return self.compressImage(image, toTargetSizeInBytes: maxSizeInBytes)
-                }.value
-                
-                guard let imageData = compressedData else {
-                    print("🔴 Error: Could not convert compressed UIImage to JPEG data.")
-                    return
-                }
-                
-                let base64String = imageData.base64EncodedString()
-                let dataURI = "data:image/jpeg;base64,\(base64String)"
-                let htmlMessage = "<img src=\"\(dataURI)\" />"
-                let message = MKTextMessage(string: htmlMessage)
-                
-                if let userChannel = serverModel.connectedUser()?.channel() {
-                    serverModel.send(message, to: userChannel)
-                }
-                
-                // 立即在UI上显示自己发送的图片 (UI更新会自动回到主线程)
-                let finalImage = UIImage(data: imageData) ?? image
+        let compressedData = await Task.detached(priority: .userInitiated) {
+            let maxSizeInBytes = 60 * 1024 // Mumble 消息大小上限
+            return self.compressImage(image, toTargetSizeInBytes: maxSizeInBytes)
+        }.value
+        
+        guard let imageData = compressedData else {
+            print("🔴 Error: Could not convert compressed UIImage to JPEG data.")
+            return
+        }
+        
+        let base64String = imageData.base64EncodedString()
+        let dataURI = "data:image/jpeg;base64,\(base64String)"
+        let htmlMessage = "<img src=\"\(dataURI)\" />"
+        let message = MKTextMessage(string: htmlMessage)
+        
+        if let userChannel = serverModel.connectedUser()?.channel() {
+            serverModel.send(message, to: userChannel)
+        }
+        
+        // 立即在UI上显示自己发送的图片 (UI更新会自动回到主线程)
+        let finalImage = UIImage(data: imageData) ?? image
         let selfMessage = ChatMessage(
             id: UUID(),
             type: .userMessage,
@@ -394,62 +629,62 @@ class ServerModelManager: ObservableObject {
             timestamp: Date(),
             isSentBySelf: true
         )
-                messages.append(selfMessage)
-        }
-
-        // 新增一个私有辅助函数，用于压缩图片
+        messages.append(selfMessage)
+    }
+    
+    // 新增一个私有辅助函数，用于压缩图片
     private nonisolated func compressImage(_ image: UIImage, toTargetSizeInBytes targetSize: Int) -> Data? {
         let imageData = image.jpegData(compressionQuality: 1.0)
-            
-            // 如果图片本来就小于目标大小，直接返回最高质量的JPEG数据
-            if let data = imageData, data.count <= targetSize {
-                return data
-            }
-
-            // --- 使用二分搜索寻找最佳压缩质量 ---
-            var minQuality: CGFloat = 0.0
-            var maxQuality: CGFloat = 1.0
-            var bestImageData: Data?
-
-            for _ in 0..<8 { // 8次迭代足以达到很高的精度
-                let currentQuality = (minQuality + maxQuality) / 2
-                guard let data = image.jpegData(compressionQuality: currentQuality) else { continue }
-                
-                if data.count <= targetSize {
-                    // 这是一个可行的方案，保存它，然后尝试寻找更高质量的方案
-                    bestImageData = data
-                    minQuality = currentQuality
-                } else {
-                    // 图片还是太大，降低质量上限
-                    maxQuality = currentQuality
-                }
-            }
-
-            // 如果通过降低质量找到了一个可行的方案，就返回它
-            if let finalData = bestImageData {
-                 print("✅ Compressed image with quality \(minQuality) to \(finalData.count) bytes.")
-                return finalData
-            }
-
-            // --- 如果最低质量依然过大，则开始降低分辨率 ---
-            // (这种情况很少见，但作为备用方案)
-            var scale: CGFloat = 0.9
-            var resizedImage = image
-            while let newImage = resizedImage.resized(by: scale),
-                  let data = newImage.jpegData(compressionQuality: 0.75), // 使用一个较高的质量
-                  data.count > targetSize && scale > 0.1 {
-                resizedImage = newImage
-                scale -= 0.1
-            }
-            
-            if let finalImage = resizedImage.resized(by: scale) {
-                 print("⚠️ Image too large, had to resize by scale \(scale).")
-                return finalImage.jpegData(compressionQuality: 0.75)
-            }
-            
-            // 最终的备用方案：返回最低质量的原始图片数据
-            return image.jpegData(compressionQuality: 0.0)
+        
+        // 如果图片本来就小于目标大小，直接返回最高质量的JPEG数据
+        if let data = imageData, data.count <= targetSize {
+            return data
         }
+        
+        // --- 使用二分搜索寻找最佳压缩质量 ---
+        var minQuality: CGFloat = 0.0
+        var maxQuality: CGFloat = 1.0
+        var bestImageData: Data?
+        
+        for _ in 0..<8 { // 8次迭代足以达到很高的精度
+            let currentQuality = (minQuality + maxQuality) / 2
+            guard let data = image.jpegData(compressionQuality: currentQuality) else { continue }
+            
+            if data.count <= targetSize {
+                // 这是一个可行的方案，保存它，然后尝试寻找更高质量的方案
+                bestImageData = data
+                minQuality = currentQuality
+            } else {
+                // 图片还是太大，降低质量上限
+                maxQuality = currentQuality
+            }
+        }
+        
+        // 如果通过降低质量找到了一个可行的方案，就返回它
+        if let finalData = bestImageData {
+            print("✅ Compressed image with quality \(minQuality) to \(finalData.count) bytes.")
+            return finalData
+        }
+        
+        // --- 如果最低质量依然过大，则开始降低分辨率 ---
+        // (这种情况很少见，但作为备用方案)
+        var scale: CGFloat = 0.9
+        var resizedImage = image
+        while let newImage = resizedImage.resized(by: scale),
+              let data = newImage.jpegData(compressionQuality: 0.75), // 使用一个较高的质量
+              data.count > targetSize && scale > 0.1 {
+            resizedImage = newImage
+            scale -= 0.1
+        }
+        
+        if let finalImage = resizedImage.resized(by: scale) {
+            print("⚠️ Image too large, had to resize by scale \(scale).")
+            return finalImage.jpegData(compressionQuality: 0.75)
+        }
+        
+        // 最终的备用方案：返回最低质量的原始图片数据
+        return image.jpegData(compressionQuality: 0.0)
+    }
     
     func updateUserBySession(
         _ session: UInt
@@ -487,6 +722,7 @@ class ServerModelManager: ObservableObject {
         }
         objectWillChange
             .send() // 同样，讲话状态变化也需要通知刷新
+        updateLiveActivity()
     }
     private func updateUserItemState(
         item: ChannelNavigationItem,
@@ -537,6 +773,7 @@ class ServerModelManager: ObservableObject {
                 object: item.object
             ); modelItems[index] = newItem
         }
+        updateLiveActivity()
     }
     func rebuildModelArray() {
         guard let serverModel = serverModel else {
@@ -573,6 +810,7 @@ class ServerModelManager: ObservableObject {
                 }
             }
         }
+        updateLiveActivity()
     }
     private func addChannelTreeToModel(
         channel: MKChannel,
@@ -649,6 +887,8 @@ class ServerModelManager: ObservableObject {
         updateUserBySession(
             user.session()
         )
+        
+        updateLiveActivity()
     }
     func toggleSelfDeafen() {
         guard let user = serverModel?.connectedUser() else {
@@ -683,6 +923,8 @@ class ServerModelManager: ObservableObject {
         updateUserBySession(
             user.session()
         )
+        
+        updateLiveActivity()
     }
     var connectedUserState: UserState? {
         guard let connectedUserItem = modelItems.first(
