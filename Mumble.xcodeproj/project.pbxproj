@@ -95,8 +95,6 @@
 		F2DF4AA02E1FB2AD00A0C166 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF4A962E1FB2A800A0C166 /* AppState.swift */; };
 		F2E9CBEB2F06ECFE00464F79 /* CertificateModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CBE92F06ECF400464F79 /* CertificateModel.swift */; };
 		F2E9CBEE2F06ED3100464F79 /* CertificatePreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CBED2F06ED1600464F79 /* CertificatePreferencesView.swift */; };
-		F2E9CBFA2F06EFD000464F79 /* MUCertificateChainBuilder.m in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CBF72F06EFD000464F79 /* MUCertificateChainBuilder.m */; };
-		F2E9CBFB2F06EFD000464F79 /* MUCertificateController.m in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CBF92F06EFD000464F79 /* MUCertificateController.m */; };
 		F2E9CC042F06FB7800464F79 /* MUFavouriteServer.m in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC032F06FB7800464F79 /* MUFavouriteServer.m */; };
 		F2E9CC072F07A40300464F79 /* ServerCertificateDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC062F07A3EF00464F79 /* ServerCertificateDetailView.swift */; };
 		F2E9CC0C2F07D00600464F79 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC0A2F07D00000464F79 /* AboutView.swift */; };
@@ -362,10 +360,6 @@
 		F2DF4A962E1FB2A800A0C166 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		F2E9CBE92F06ECF400464F79 /* CertificateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateModel.swift; sourceTree = "<group>"; };
 		F2E9CBED2F06ED1600464F79 /* CertificatePreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePreferencesView.swift; sourceTree = "<group>"; };
-		F2E9CBF62F06EFD000464F79 /* MUCertificateChainBuilder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUCertificateChainBuilder.h; sourceTree = "<group>"; };
-		F2E9CBF72F06EFD000464F79 /* MUCertificateChainBuilder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUCertificateChainBuilder.m; sourceTree = "<group>"; };
-		F2E9CBF82F06EFD000464F79 /* MUCertificateController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUCertificateController.h; sourceTree = "<group>"; };
-		F2E9CBF92F06EFD000464F79 /* MUCertificateController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUCertificateController.m; sourceTree = "<group>"; };
 		F2E9CC022F06FB7800464F79 /* MUFavouriteServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUFavouriteServer.h; sourceTree = "<group>"; };
 		F2E9CC032F06FB7800464F79 /* MUFavouriteServer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUFavouriteServer.m; sourceTree = "<group>"; };
 		F2E9CC062F07A3EF00464F79 /* ServerCertificateDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerCertificateDetailView.swift; sourceTree = "<group>"; };
@@ -471,10 +465,6 @@
 				28BE998718CFCDE600910551 /* MUServerTableViewCell.m */,
 				28A2AEBF14788BE300F3B83F /* MUColor.h */,
 				28A2AEC014788BE300F3B83F /* MUColor.m */,
-				F2E9CBF62F06EFD000464F79 /* MUCertificateChainBuilder.h */,
-				F2E9CBF72F06EFD000464F79 /* MUCertificateChainBuilder.m */,
-				F2E9CBF82F06EFD000464F79 /* MUCertificateController.h */,
-				F2E9CBF92F06EFD000464F79 /* MUCertificateController.m */,
 				2822AC0414878AC500E9DB17 /* MUConnectionController.h */,
 				2822AC0514878AC500E9DB17 /* MUConnectionController.m */,
 				28F79C6E147973D40003B8BA /* MUUserStateAcessoryView.h */,
@@ -1069,8 +1059,6 @@
 				28BF81D2139AFFD50078B722 /* MUCertificateDiskImportViewController.m in Sources */,
 				F2AD3A642E0E2F7900FC7006 /* MumbleContentView.swift in Sources */,
 				F28C6AFF2EE71A9A00DE9CD2 /* ToastView.swift in Sources */,
-				F2E9CBFA2F06EFD000464F79 /* MUCertificateChainBuilder.m in Sources */,
-				F2E9CBFB2F06EFD000464F79 /* MUCertificateController.m in Sources */,
 				280D9ADA13EAFAAE003B64A0 /* MUServerRootViewController.m in Sources */,
 				283363DB13EF154C00A04F04 /* MUAudioTransmissionPreferencesViewController.m in Sources */,
 				28A2AEC114788BE300F3B83F /* MUColor.m in Sources */,

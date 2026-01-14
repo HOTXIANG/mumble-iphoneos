@@ -86,6 +86,7 @@ struct ChannelListView: View {
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 24, height: 24)
                             .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
+                            .contentTransition(.symbolEffect(.replace))
                     }
                     .frame(width: 40, height: 44)
                     .contentShape(Rectangle())
@@ -101,6 +102,7 @@ struct ChannelListView: View {
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 24, height: 24)
                             .foregroundColor(serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary)
+                            .contentTransition(.symbolEffect(.replace))
                     }
                     .frame(width: 40, height: 44)
                     .contentShape(Rectangle())

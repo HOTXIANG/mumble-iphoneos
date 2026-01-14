@@ -394,20 +394,21 @@ struct UserRowView: View {
                         Image(systemName: "speaker.slash.fill")
                             .foregroundColor(.yellow)
                             .font(.caption)
+                            .transition(.symbolEffect(.appear))
                     }
                     if user.isSelfDeafened() {
-                        Image(systemName: "speaker.slash.fill").foregroundColor(.red).font(.caption)
-                        Image(systemName: "mic.slash.fill").foregroundColor(.red).font(.caption)
+                        Image(systemName: "speaker.slash.fill").foregroundColor(.red).font(.caption).transition(.symbolEffect(.appear))
+                        Image(systemName: "mic.slash.fill").foregroundColor(.red).font(.caption).transition(.symbolEffect(.appear))
                     } else if user.isSelfMuted() {
-                        Image(systemName: "mic.slash.fill").foregroundColor(.orange).font(.caption)
+                        Image(systemName: "mic.slash.fill").foregroundColor(.orange).font(.caption).transition(.symbolEffect(.appear))
                     }
                     
                     if user.isPrioritySpeaker() {
-                        Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption)
+                        Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption).transition(.symbolEffect(.appear))
                     }
                     
                     if user.isAuthenticated() {
-                        Image(systemName: "checkmark.shield.fill").foregroundColor(.green).font(.caption)
+                        Image(systemName: "checkmark.shield.fill").foregroundColor(.green).font(.caption).transition(.symbolEffect(.appear))
                     }
                 }
             }
