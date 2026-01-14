@@ -108,6 +108,8 @@ struct ChannelView: View {
 
 struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
+    @State private var showingAudioSettings = false
+    @State private var selectedUserForConfig: MKUser? = nil
     
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -115,7 +117,15 @@ struct ServerChannelView: View {
                 Color.clear.frame(height: 10)
                 
                 if let root = MUConnectionController.shared()?.serverModel?.rootChannel() {
-                    ChannelTreeRow(channel: root, level: 0, serverManager: serverManager)
+                    ChannelTreeRow(
+                        channel: root,
+                        level: 0,
+                        serverManager: serverManager,
+                        onUserTap: { user in
+                            self.selectedUserForConfig = user
+                            self.showingAudioSettings = true
+                        }
+                    )
                 } else {
                     VStack(spacing: 12) {
                         ProgressView().tint(.white)
@@ -143,6 +153,16 @@ struct ServerChannelView: View {
             )
             .ignoresSafeArea()
         )
+        .sheet(isPresented: $showingAudioSettings) {
+            if let user = selectedUserForConfig {
+                UserAudioSettingsView(
+                    manager: serverManager,
+                    userSession: user.session(),
+                    userName: user.userName() ?? "User"
+                )
+                .presentationDetents([.fraction(0.3)])
+            }
+        }
     }
 }
 
@@ -152,6 +172,8 @@ struct ChannelTreeRow: View {
     let channel: MKChannel
     let level: Int
     @ObservedObject var serverManager: ServerModelManager
+    
+    let onUserTap: (MKUser) -> Void
     
     private let haptic = UISelectionFeedbackGenerator()
     
@@ -218,19 +240,26 @@ struct ChannelTreeRow: View {
                 // 1. 用户
                 let users = serverManager.getSortedUsers(for: channel)
                 ForEach(users, id: \.self) { user in
-                    UserRowView(user: user, level: level + 1, serverManager: serverManager)
-                        .contextMenu {
-                            Button {} label: { Label("User Info", systemImage: "person.circle") }
-                        }
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                    UserRowView(
+                        user: user,
+                        level: level + 1,
+                        serverManager: serverManager,
+                        onTap: { onUserTap(user) }
+                    )
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                 }
                 
                 // 2. 子频道 (递归)
                 let subChannels = serverManager.getSortedSubChannels(for: channel)
                 ForEach(subChannels, id: \.self) { subChannel in
-                    ChannelTreeRow(channel: subChannel, level: level + 1, serverManager: serverManager)
+                    ChannelTreeRow(
+                        channel: subChannel,
+                        level: level + 1,
+                        serverManager: serverManager,
+                        onUserTap: onUserTap
+                    )
                 }
             }
         }
@@ -343,46 +372,100 @@ struct UserRowView: View {
     let level: Int
     @ObservedObject var serverManager: ServerModelManager
     
+    let onTap: () -> Void
+    
     var body: some View {
-        HStack(spacing: 6) {
-            // 缩进: level*16 + 箭头位(16) + 图标位(20)的微调
-            Spacer().frame(width: CGFloat(level * 16) + 24)
-            
-            // Avatar
-            AvatarView(talkingState: isTalking ? .talking : .silent)
-            
-            // 用户名
-            Text(user.userName() ?? "Unknown")
-                .font(.system(size: kFontSize, weight: .medium))
-                .foregroundColor(isMyself ? .cyan : .primary)
-                .shadow(radius: isMyself ? 1 : 0)
-                .lineLimit(1)
-            
-            Spacer()
-            
-            // 状态图标
-            HStack(spacing: 8) {
-                if user.isSelfDeafened() {
-                    Image(systemName: "speaker.slash.fill").foregroundColor(.red).font(.caption)
-                    Image(systemName: "mic.slash.fill").foregroundColor(.red).font(.caption)
-                } else if user.isSelfMuted() {
-                    Image(systemName: "mic.slash.fill").foregroundColor(.orange).font(.caption)
-                }
+        ZStack(alignment: .leading) {
+            HStack(spacing: 6) {
+                // 缩进: level*16 + 箭头位(16) + 图标位(20)的微调
+                Spacer().frame(width: CGFloat(level * 16) + 24)
                 
-                if user.isPrioritySpeaker() {
-                    Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption)
-                }
+                // Avatar
+                AvatarView(talkingState: isTalking ? .talking : .silent)
                 
-                if user.isAuthenticated() {
-                    Image(systemName: "checkmark.shield.fill").foregroundColor(.green).font(.caption)
+                // 用户名
+                Text(user.userName() ?? "Unknown")
+                    .font(.system(size: kFontSize, weight: .medium))
+                    .foregroundColor(isMyself ? .cyan : .primary)
+                    .shadow(radius: isMyself ? 1 : 0)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                // 状态图标
+                HStack(spacing: 8) {
+                    if user.isLocalMuted() {
+                        Image(systemName: "speaker.slash.fill")
+                            .foregroundColor(.yellow)
+                            .font(.caption)
+                    }
+                    if user.isSelfDeafened() {
+                        Image(systemName: "speaker.slash.fill").foregroundColor(.red).font(.caption)
+                        Image(systemName: "mic.slash.fill").foregroundColor(.red).font(.caption)
+                    } else if user.isSelfMuted() {
+                        Image(systemName: "mic.slash.fill").foregroundColor(.orange).font(.caption)
+                    }
+                    
+                    if user.isPrioritySpeaker() {
+                        Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption)
+                    }
+                    
+                    if user.isAuthenticated() {
+                        Image(systemName: "checkmark.shield.fill").foregroundColor(.green).font(.caption)
+                    }
                 }
             }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, kRowPaddingV)
-        .glassEffect(.clear.interactive().tint(isMyself ? Color.indigo.opacity(0.5) : Color.indigo.opacity(0.0)), in: .rect(cornerRadius: 12))
-        .contextMenu {
-            Button(action: {}) { Label("User Info", systemImage: "person.circle") }
+            .padding(.horizontal, 12)
+            .padding(.vertical, kRowPaddingV)
+            .glassEffect(.clear.interactive().tint(isMyself ? Color.indigo.opacity(0.5) : Color.indigo.opacity(0.0)), in: .rect(cornerRadius: 12))
+            .contextMenu {
+                Button(action: {}) { Label("User Info", systemImage: "person.circle") }
+            }
+            
+            HStack(spacing: 0) {
+                // 避开前面的缩进区域，确保点击的是内容部分
+                Spacer().frame(width: CGFloat(level * 16))
+                
+                Menu {
+                    // Menu Header
+                    Text(user.userName() ?? "User")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    Divider()
+                    
+                    // Action 1: 本地静音/取消静音
+                    Button {
+                        serverManager.toggleLocalUserMute(session: user.session())
+                    } label: {
+                        if user.isLocalMuted() {
+                            Label("Unmute Locally", systemImage: "speaker.wave.2.fill")
+                        } else {
+                            Label("Mute Locally", systemImage: "speaker.slash.fill")
+                        }
+                    }
+                    
+                    // Action 2: 打开详细音频设置
+                    Button {
+                        onTap()
+                    } label: {
+                        Label("Audio Settings...", systemImage: "slider.horizontal.3")
+                    }
+                    
+                    Divider()
+                    
+                    // Action 3: 用户信息 (占位)
+                    Button {
+                        // Show User Info Logic
+                    } label: {
+                        Label("User Info", systemImage: "person.circle")
+                    }
+                    
+                } label: {
+                    Color.clear
+                }
+                .contentShape(Rectangle()) // 确保透明区域可点击
+            }
         }
     }
     

@@ -54,6 +54,8 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 @implementation MUConnectionController
 @synthesize currentCertificateRef = _certificateRef; // 将内部变量 _certificateRef 暴露为只读属性
 
+@synthesize connection = _connection;
+
 + (MUConnectionController *) sharedController {
     static MUConnectionController *nc;
     static dispatch_once_t token;

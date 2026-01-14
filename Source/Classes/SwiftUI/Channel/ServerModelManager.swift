@@ -19,6 +19,8 @@ class ServerModelManager: ObservableObject {
     
     @Published var collapsedChannelIds: Set<Int> = []
     
+    @Published public var userVolumes: [UInt: Float] = [:]
+    
     private var muteStateBeforeDeafen: Bool = false
     private var serverModel: MKServerModel?
     private var userIndexMap: [UInt: Int] = [:]
@@ -814,7 +816,10 @@ class ServerModelManager: ObservableObject {
                         index,
                         user
                     ) in users.enumerated() {
-                        let userName = user.userName() ?? "Unknown User"; let item = ChannelNavigationItem(
+                        applySavedUserPreferences(user: user)
+                        
+                        let userName = user.userName() ?? "Unknown User"
+                        let item = ChannelNavigationItem(
                             title: userName,
                             subtitle: "in \(currentChannel.channelName() ?? "Unknown Channel")",
                             type: .user,
@@ -1083,6 +1088,87 @@ class ServerModelManager: ObservableObject {
         return users.sorted { u1, u2 in
             return (u1.userName() ?? "") < (u2.userName() ?? "")
         }
+    }
+    
+    // MARK: - Local User Audio Control
+    
+    func setLocalUserVolume(session: UInt, volume: Float) {
+        guard let user = getUserBySession(session) else { return }
+        guard let serverHost = serverModel?.hostname() else { return }
+        
+        // 1. 更新内存中的状态
+        userVolumes[session] = volume
+        
+        // 2. 持久化保存 (同时保存当前的静音状态)
+        let isMuted = user.isLocalMuted()
+        LocalUserPreferences.shared.save(
+            volume: volume,
+            isLocalMuted: isMuted,
+            for: user.userName() ?? "",
+            on: serverHost
+        )
+        
+        if let connection = MUConnectionController.shared()?.connection {
+            connection.audioOutput?.setVolume(volume, forSession: session)
+        }
+        
+        // 3. 通知 UI 刷新
+        objectWillChange.send()
+    }
+    
+    /// 切换某个用户的本地屏蔽状态 (Local Mute / Ignore)
+    func toggleLocalUserMute(session: UInt) {
+        guard let user = getUserBySession(session) else { return }
+        guard let serverHost = serverModel?.hostname() else { return }
+        
+        let newMuteState = !user.isLocalMuted()
+        user.setLocalMuted(newMuteState)
+        
+        if let connection = MUConnectionController.shared()?.connection {
+            connection.audioOutput?.setMuted(newMuteState, forSession: session)
+        }
+        
+        let currentVol = userVolumes[session] ?? 1.0
+        
+        // 持久化
+        LocalUserPreferences.shared.save(
+            volume: currentVol,
+            isLocalMuted: newMuteState,
+            for: user.userName() ?? "",
+            on: serverHost
+        )
+        
+        // 通知 UI
+        objectWillChange.send()
+    }
+    
+    // 辅助：应用已保存的设置 (在 rebuildModelArray 中调用)
+    private func applySavedUserPreferences(user: MKUser) {
+        guard let serverHost = serverModel?.hostname(),
+              let name = user.userName() else { return }
+        
+        // 读取配置
+        let prefs = LocalUserPreferences.shared.load(for: name, on: serverHost)
+        
+        // 1. 应用自定义音量到内存字典
+        // 注意：我们不调用 user.setLocalVolume，只更新我们自己的逻辑字典
+        userVolumes[user.session()] = prefs.volume
+        
+        // 2. 应用屏蔽状态 (这个依然调用 MumbleKit，因为它支持)
+        if user.isLocalMuted() != prefs.isLocalMuted {
+            user.setLocalMuted(prefs.isLocalMuted)
+        }
+        
+        if let connection = MUConnectionController.shared()?.connection {
+            connection.audioOutput?.setVolume(prefs.volume, forSession: user.session())
+            connection.audioOutput?.setMuted(prefs.isLocalMuted, forSession: user.session())
+        }
+    }
+    
+    // 辅助：通过 Session 找 User
+    func getUserBySession(_ session: UInt) -> MKUser? {
+        guard let index = userIndexMap[session], index < modelItems.count else { return nil }
+        return modelItems[index].object as? MKUser
     }
 }
 

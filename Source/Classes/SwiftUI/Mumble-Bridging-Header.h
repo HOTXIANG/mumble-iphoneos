@@ -30,4 +30,9 @@
 #import <MumbleKit/MKUser.h>
 #import <MumbleKit/MKTextMessage.h>
 #import <MumbleKit/MKAudio.h>
+#import "MKAudioOutput.h"
 #import <MumbleKit/MKServerPinger.h>
+
+@interface MKUser (SwiftExposedPrivateMethods)
+- (void) setLocalMuted:(BOOL)flag;
+@end
