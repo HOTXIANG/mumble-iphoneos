@@ -19,6 +19,8 @@ class ServerModelManager: ObservableObject {
     
     @Published var collapsedChannelIds: Set<Int> = []
     
+    @Published public var userVolumes: [UInt: Float] = [:]
+    
     private var muteStateBeforeDeafen: Bool = false
     private var serverModel: MKServerModel?
     private var userIndexMap: [UInt: Int] = [:]
@@ -732,13 +734,24 @@ class ServerModelManager: ObservableObject {
             return
         }
         let item = modelItems[index]
-        if item.state?.isMutedOrDeafened == true {
-            item.talkingState = .passive; return
-        }
-        switch talkState.rawValue {
-        case 1,
-            2,
-            3: item.talkingState = .talking; default: item.talkingState = .passive
+        
+        let isServerMuted = item.state?.isMutedByServer ?? false
+        let isSelfMuted = item.state?.isSelfMuted ?? false
+        let isSelfDeafened = item.state?.isSelfDeafened ?? false
+        
+        // 如果是因为这些硬性原因导致无法说话，才强制设为 passive
+        if isServerMuted || isSelfMuted || isSelfDeafened {
+            item.talkingState = .passive
+            // 注意：这里不用 return，让代码往下走去更新 UI 也是安全的，但设为 passive 是对的
+        } else {
+            // 如果只是本地屏蔽 (isLocallyMuted)，代码会继续执行下面的 switch
+            // 从而正确更新 talkingState 为 .talking，实现“虽然听不到但能看到他在说”的效果
+            switch talkState.rawValue {
+            case 1, 2, 3:
+                item.talkingState = .talking
+            default:
+                item.talkingState = .passive
+            }
         }
         objectWillChange
             .send() // 同样，讲话状态变化也需要通知刷新
@@ -814,7 +827,10 @@ class ServerModelManager: ObservableObject {
                         index,
                         user
                     ) in users.enumerated() {
-                        let userName = user.userName() ?? "Unknown User"; let item = ChannelNavigationItem(
+                        applySavedUserPreferences(user: user)
+                        
+                        let userName = user.userName() ?? "Unknown User"
+                        let item = ChannelNavigationItem(
                             title: userName,
                             subtitle: "in \(currentChannel.channelName() ?? "Unknown Channel")",
                             type: .user,
@@ -1083,6 +1099,90 @@ class ServerModelManager: ObservableObject {
         return users.sorted { u1, u2 in
             return (u1.userName() ?? "") < (u2.userName() ?? "")
         }
+    }
+    
+    // MARK: - Local User Audio Control
+    
+    func setLocalUserVolume(session: UInt, volume: Float) {
+        guard let user = getUserBySession(session) else { return }
+        guard let serverHost = serverModel?.hostname() else { return }
+        
+        // 1. 更新内存中的状态
+        userVolumes[session] = volume
+        
+        // 2. 持久化保存 (同时保存当前的静音状态)
+        let isMuted = user.isLocalMuted()
+        LocalUserPreferences.shared.save(
+            volume: volume,
+            isLocalMuted: isMuted,
+            for: user.userName() ?? "",
+            on: serverHost
+        )
+        
+        if let connection = MUConnectionController.shared()?.connection {
+            // ✅ 调试日志：如果这里打印 nil，说明 MKConnection.m 的 Getter 没写对
+            print("🔊 Setting volume for \(session): \(volume) on output: \(String(describing: connection.audioOutput))")
+            
+            connection.audioOutput?.setVolume(volume, forSession: session)
+        }
+        
+        // 3. 通知 UI 刷新
+        objectWillChange.send()
+    }
+    
+    /// 切换某个用户的本地屏蔽状态 (Local Mute / Ignore)
+    func toggleLocalUserMute(session: UInt) {
+        guard let user = getUserBySession(session) else { return }
+        guard let serverHost = serverModel?.hostname() else { return }
+        
+        let newMuteState = !user.isLocalMuted()
+        user.setLocalMuted(newMuteState)
+        
+        if let connection = MUConnectionController.shared()?.connection {
+            connection.audioOutput?.setMuted(newMuteState, forSession: session)
+        }
+        
+        let currentVol = userVolumes[session] ?? 1.0
+        
+        // 持久化
+        LocalUserPreferences.shared.save(
+            volume: currentVol,
+            isLocalMuted: newMuteState,
+            for: user.userName() ?? "",
+            on: serverHost
+        )
+        
+        // 通知 UI
+        objectWillChange.send()
+    }
+    
+    // 辅助：应用已保存的设置 (在 rebuildModelArray 中调用)
+    private func applySavedUserPreferences(user: MKUser) {
+        guard let serverHost = serverModel?.hostname(),
+              let name = user.userName() else { return }
+        
+        // 读取配置
+        let prefs = LocalUserPreferences.shared.load(for: name, on: serverHost)
+        
+        // 1. 应用自定义音量到内存字典
+        // 注意：我们不调用 user.setLocalVolume，只更新我们自己的逻辑字典
+        userVolumes[user.session()] = prefs.volume
+        
+        // 2. 应用屏蔽状态 (这个依然调用 MumbleKit，因为它支持)
+        if user.isLocalMuted() != prefs.isLocalMuted {
+            user.setLocalMuted(prefs.isLocalMuted)
+        }
+        
+        if let connection = MUConnectionController.shared()?.connection {
+            connection.audioOutput?.setVolume(prefs.volume, forSession: user.session())
+            connection.audioOutput?.setMuted(prefs.isLocalMuted, forSession: user.session())
+        }
+    }
+    
+    // 辅助：通过 Session 找 User
+    func getUserBySession(_ session: UInt) -> MKUser? {
+        guard let index = userIndexMap[session], index < modelItems.count else { return nil }
+        return modelItems[index].object as? MKUser
     }
 }
 

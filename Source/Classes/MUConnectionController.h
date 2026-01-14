@@ -6,6 +6,7 @@
 
 // 前向声明 MKServerModel
 @class MKServerModel;
+@class MKConnection;
 
 extern NSString *MUConnectionOpenedNotification;  // 连接成功 (已有)
 extern NSString *MUConnectionClosedNotification;  // 连接关闭 (已有)
@@ -28,5 +29,7 @@ extern NSString *MUConnectionErrorNotification;
 - (void) disconnectFromServer;
 @property (nonatomic, readonly) MKServerModel *serverModel;
 @property (nonatomic, readonly) NSData *currentCertificateRef;
+
+@property (nonatomic, readonly) MKConnection *connection;
 
 @end
