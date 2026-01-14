@@ -17,21 +17,6 @@ struct NotificationSettingsView: View {
                 Toggle("User Messages", isOn: $notifyUserMessages)
                 Toggle("System Messages", isOn: $notifySystemMessages)
             }
-            
-            Section {
-                Button("Test Notification") {
-                    // 发送一个测试通知（延迟5秒，方便用户切到后台测试）
-                    let content = UNMutableNotificationContent()
-                    content.title = "Test Notification"
-                    content.body = "This is a test message from Mumble."
-                    content.sound = .default
-                    
-                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-                    let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
-                    
-                    UNUserNotificationCenter.current().add(request)
-                }
-            }
         }
         .navigationTitle("Notifications")
         .onAppear {

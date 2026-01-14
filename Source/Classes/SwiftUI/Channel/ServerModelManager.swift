@@ -25,6 +25,7 @@ class ServerModelManager: ObservableObject {
     private var channelIndexMap: [UInt: Int] = [:]
     private var delegateWrapper: ServerModelDelegateWrapper?
     private var liveActivity: Activity<MumbleActivityAttributes>?
+    private var keepAliveTimer: Timer?
     
     enum ViewMode {
         case server,
@@ -126,6 +127,9 @@ class ServerModelManager: ObservableObject {
         print(
             "🧹 ServerModelManager: CLEANUP"
         )
+        keepAliveTimer?.invalidate()
+        keepAliveTimer = nil
+        
         if let wrapper = delegateWrapper {
             serverModel?
                 .removeDelegate(
@@ -138,8 +142,6 @@ class ServerModelManager: ObservableObject {
         userIndexMap = [:]
         channelIndexMap = [:]
         isConnected = false
-        
-        // --- 核心修改 3：在清理时，重置 serverName ---
         serverName = nil
         
         endLiveActivity()
@@ -147,6 +149,8 @@ class ServerModelManager: ObservableObject {
     
     private func startLiveActivity() {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        
+        LiveActivityCleanup.forceEndAllActivitiesBlocking()
         
         // 初始状态
         let initialContentState = MumbleActivityAttributes.ContentState(
@@ -159,6 +163,11 @@ class ServerModelManager: ObservableObject {
         
         let attributes = MumbleActivityAttributes(serverName: serverName ?? "Mumble")
         
+        let initialContent = ActivityContent(
+            state: initialContentState,
+            staleDate: Date().addingTimeInterval(15.0)
+        )
+        
         do {
             let activity = try Activity.request(
                 attributes: attributes,
@@ -168,6 +177,12 @@ class ServerModelManager: ObservableObject {
             self.liveActivity = activity
             print("🏝️ Live Activity Started")
             
+            self.keepAliveTimer?.invalidate()
+            self.keepAliveTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.updateLiveActivity()
+                }
+            }
             // 立即更新一次准确数据
             updateLiveActivity()
         } catch {
@@ -210,6 +225,11 @@ class ServerModelManager: ObservableObject {
             channelName: channelName,
             isSelfMuted: isSelfMuted,
             isSelfDeafened: isSelfDeafened
+        )
+        
+        let content = ActivityContent(
+            state: contentState,
+            staleDate: Date().addingTimeInterval(15.0)
         )
         
         // 6. 更新
@@ -1062,6 +1082,37 @@ class ServerModelManager: ObservableObject {
         guard let users = channel.users() as? [MKUser] else { return [] }
         return users.sorted { u1, u2 in
             return (u1.userName() ?? "") < (u2.userName() ?? "")
+        }
+    }
+}
+
+@objc public class LiveActivityCleanup: NSObject {
+    
+    /// 阻塞式强制结束所有活动（专用于 App 终止时）
+    @objc public static func forceEndAllActivitiesBlocking() {
+        // iOS 16.1 之前不支持
+        guard #available(iOS 16.1, *) else { return }
+        
+        print("🛑 Force ending Live Activities (Blocking)...")
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        // 使用 detached 任务，脱离当前上下文，提高存活率
+        Task.detached(priority: .userInitiated) {
+            for activity in Activity<MumbleActivityAttributes>.activities {
+                print("🛑 Ending activity: \(activity.id)")
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            // 任务完成，发送信号
+            semaphore.signal()
+        }
+        
+        // ⚠️ 关键点：卡住主线程，最多等待 2.0 秒
+        // 这强迫系统不要立即杀掉进程，直到我们的清理请求发出去
+        let result = semaphore.wait(timeout: .now() + 2.0)
+        if result == .timedOut {
+            print("⚠️ LiveActivity cleanup timed out.")
+        } else {
+            print("✅ LiveActivity cleanup finished successfully.")
         }
     }
 }

@@ -20,9 +20,7 @@
     UIWindow                  *_window;
     UINavigationController    *_navigationController;
     BOOL                      _connectionActive;
-#ifdef MUMBLE_BETA_DIST
-    MUVersionChecker          *_verCheck;
-#endif
+
 }
 - (void) setupAudio;
 - (void) forceKeyboardLoad;
@@ -33,9 +31,6 @@
     NSTimeInterval _lastAudioRestartTime;
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-#ifdef MUMBLE_BETA_DIST
-    _verCheck = [[MUVersionChecker alloc] init];
-#endif
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(connectionOpened:) name:MUConnectionOpenedNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(connectionClosed:) name:MUConnectionClosedNotification object:nil];
@@ -101,7 +96,7 @@
         [[UITextField appearance] setKeyboardAppearance:UIKeyboardAppearanceDark];
     }
     
-    _window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+    /*_window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     if (@available(iOS 7, *)) {
     // XXX: don't do it system-wide just yet
     //    _window.tintColor = [UIColor whiteColor];
@@ -120,7 +115,7 @@
     SwiftRootViewControllerWrapper *swiftRoot = [[SwiftRootViewControllerWrapper alloc] init];
     [_window setRootViewController:swiftRoot];
     
-    [_window makeKeyAndVisible];
+    [_window makeKeyAndVisible];*/
 
     NSURL *url = [launchOptions objectForKey:UIApplicationLaunchOptionsURLKey];
     if ([[url scheme] isEqualToString:@"mumble"]) {
@@ -137,7 +132,7 @@
                              displayName:nil];
         return YES;
     }
-    return NO;
+    return YES;
 }
 
 - (BOOL) application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
@@ -163,6 +158,10 @@
 
 - (void) applicationWillTerminate:(UIApplication *)application {
     [MUDatabase teardown];
+    
+    if (@available(iOS 16.1, *)) {
+        [LiveActivityCleanup forceEndAllActivitiesBlocking];
+    }
 }
 
 - (void) setupAudio {

@@ -12,6 +12,7 @@
 #import "MULegalViewController.h"
 
 // 导入其他必要的类
+#import "MUApplicationDelegate.h"
 #import "MUImage.h"
 #import "MUFavouriteServer.h"
 #import "MUDatabase.h"

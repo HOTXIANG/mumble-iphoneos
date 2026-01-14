@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		0EEEF3B42DF1E5450042C0A8 /* libFMDB-IOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EEEF35C2DF1DC6D0042C0A8 /* libFMDB-IOS.a */; platformFilter = ios; };
 		0EF3A4672DC2573900028454 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2861C2AD116BE9B5002B8514 /* AudioToolbox.framework */; };
-		1D60589B0D05DD56006BFB54 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; };
 		2801C35B11CA9F1A00E664E8 /* MUPreferencesViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 2801C35A11CA9F1A00E664E8 /* MUPreferencesViewController.m */; };
 		280256381510D70D00178B08 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 280256361510D70D00178B08 /* Localizable.strings */; };
 		2802AC0014C9E948000983A5 /* MUDataURL.m in Sources */ = {isa = PBXBuildFile; fileRef = 2802ABFF14C9E948000983A5 /* MUDataURL.m */; };
@@ -26,7 +25,6 @@
 		2846C7D616F4A09000739FD8 /* MUServerButton.m in Sources */ = {isa = PBXBuildFile; fileRef = 2846C7D516F4A08F00739FD8 /* MUServerButton.m */; };
 		2858A580123B9E5700A82155 /* MUCertificateCell.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2858A57F123B9E5700A82155 /* MUCertificateCell.xib */; };
 		2858A5AD123BA08D00A82155 /* MUCertificateCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 2858A5AC123BA08D00A82155 /* MUCertificateCell.m */; };
-		2858DBA31233E31B000D6F75 /* MUVersionChecker.m in Sources */ = {isa = PBXBuildFile; fileRef = 2858DBA21233E31B000D6F75 /* MUVersionChecker.m */; };
 		285AF26B1840DEE20065E339 /* MUAudioMixerDebugViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 285AF26A1840DEE20065E339 /* MUAudioMixerDebugViewController.m */; };
 		285D6B7F16BF02E900F239EB /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DF5F4DF0D08C38300B7A737 /* UIKit.framework */; };
 		285D6B8016BF02E900F239EB /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1D30AB110D05D00D00671497 /* Foundation.framework */; };
@@ -49,7 +47,6 @@
 		28990AB1132FDA540034B406 /* libMumbleKit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 28990AB0132FDA540034B406 /* libMumbleKit.a */; };
 		289CBA18125693040015E58E /* MUServerViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 289CBA17125693040015E58E /* MUServerViewController.m */; };
 		28A2AEC114788BE300F3B83F /* MUColor.m in Sources */ = {isa = PBXBuildFile; fileRef = 28A2AEC014788BE300F3B83F /* MUColor.m */; };
-		28AD733F0D9D9553002E5188 /* MainWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 28AD733E0D9D9553002E5188 /* MainWindow.xib */; };
 		28ADA303148A3E3B00C55E51 /* MUAudioQualityPreferencesViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28ADA302148A3E3B00C55E51 /* MUAudioQualityPreferencesViewController.m */; };
 		28BE998818CFCDE600910551 /* MUServerTableViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 28BE998718CFCDE600910551 /* MUServerTableViewCell.m */; };
 		28BF81D2139AFFD50078B722 /* MUCertificateDiskImportViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28BF81D1139AFFD50078B722 /* MUCertificateDiskImportViewController.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
@@ -64,6 +61,7 @@
 		28F79C73147991490003B8BA /* MUAccessTokenViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79C72147991480003B8BA /* MUAccessTokenViewController.m */; };
 		28F79CA9147AB62B0003B8BA /* MUNotificationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79CA8147AB6280003B8BA /* MUNotificationController.m */; };
 		28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */; };
+		F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34AC2F1729BF00420631 /* MumbleApp.swift */; };
 		F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* Launch Screen.storyboard */; };
 		F266899C2EE8A46A008FC7EB /* iTunesArtwork.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689942EE8A46A008FC7EB /* iTunesArtwork.png */; };
 		F266899D2EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689972EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png */; };
@@ -256,8 +254,6 @@
 		2858A57F123B9E5700A82155 /* MUCertificateCell.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MUCertificateCell.xib; sourceTree = "<group>"; };
 		2858A5AB123BA08D00A82155 /* MUCertificateCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUCertificateCell.h; sourceTree = "<group>"; };
 		2858A5AC123BA08D00A82155 /* MUCertificateCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUCertificateCell.m; sourceTree = "<group>"; };
-		2858DBA11233E31B000D6F75 /* MUVersionChecker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUVersionChecker.h; sourceTree = "<group>"; };
-		2858DBA21233E31B000D6F75 /* MUVersionChecker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUVersionChecker.m; sourceTree = "<group>"; };
 		285AF2691840DEE20065E339 /* MUAudioMixerDebugViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUAudioMixerDebugViewController.h; sourceTree = "<group>"; };
 		285AF26A1840DEE20065E339 /* MUAudioMixerDebugViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUAudioMixerDebugViewController.m; sourceTree = "<group>"; };
 		285D6B7316BF027A00F239EB /* MUTextMessageProcessorTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MUTextMessageProcessorTest.h; path = Tests/MUTextMessageProcessorTest.h; sourceTree = "<group>"; };
@@ -277,7 +273,6 @@
 		2861C2AD116BE9B5002B8514 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		286A3C9E158BB17E00C817D1 /* MUAudioSidetonePreferencesViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUAudioSidetonePreferencesViewController.h; sourceTree = "<group>"; };
 		286A3C9F158BB17E00C817D1 /* MUAudioSidetonePreferencesViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUAudioSidetonePreferencesViewController.m; sourceTree = "<group>"; };
-		286A3CAE158CEB5A00C817D1 /* MainWindow~iPad.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = "MainWindow~iPad.xib"; sourceTree = "<group>"; };
 		286E925E148452A000B13593 /* MUVoiceActivitySetupViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUVoiceActivitySetupViewController.h; sourceTree = "<group>"; };
 		286E925F148452A000B13593 /* MUVoiceActivitySetupViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUVoiceActivitySetupViewController.m; sourceTree = "<group>"; };
 		287639F711D29D99009DB8B6 /* MUCertificateCreationProgressView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUCertificateCreationProgressView.h; sourceTree = "<group>"; };
@@ -305,7 +300,6 @@
 		289CBA17125693040015E58E /* MUServerViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUServerViewController.m; sourceTree = "<group>"; };
 		28A2AEBF14788BE300F3B83F /* MUColor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUColor.h; sourceTree = "<group>"; };
 		28A2AEC014788BE300F3B83F /* MUColor.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUColor.m; sourceTree = "<group>"; };
-		28AD733E0D9D9553002E5188 /* MainWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = MainWindow.xib; path = ../MainWindow.xib; sourceTree = "<group>"; };
 		28ADA301148A3E3B00C55E51 /* MUAudioQualityPreferencesViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUAudioQualityPreferencesViewController.h; sourceTree = "<group>"; };
 		28ADA302148A3E3B00C55E51 /* MUAudioQualityPreferencesViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUAudioQualityPreferencesViewController.m; sourceTree = "<group>"; };
 		28BE998618CFCDE600910551 /* MUServerTableViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUServerTableViewCell.h; sourceTree = "<group>"; };
@@ -332,9 +326,9 @@
 		28F79CA8147AB6280003B8BA /* MUNotificationController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUNotificationController.m; sourceTree = "<group>"; };
 		28F9E1BD15EBDF2400D52001 /* MURemoteControlServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MURemoteControlServer.h; sourceTree = "<group>"; };
 		28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MURemoteControlServer.m; sourceTree = "<group>"; };
-		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = Source/main.m; sourceTree = "<group>"; };
 		32CA4F630368D1EE00C91783 /* Mumble.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Mumble.pch; path = Source/Mumble.pch; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Source/Info.plist; plistStructureDefinitionIdentifier = "com.apple.xcode.plist.structure-definition.iphone.info-plist"; sourceTree = "<group>"; };
+		F25F34AC2F1729BF00420631 /* MumbleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleApp.swift; sourceTree = "<group>"; };
 		F26689922EE89F20008FC7EB /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
 		F26689942EE8A46A008FC7EB /* iTunesArtwork.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = iTunesArtwork.png; path = Resources/iTunesArtwork.png; sourceTree = "<group>"; };
 		F26689952EE8A46A008FC7EB /* LOGO.psd */ = {isa = PBXFileReference; lastKnownFileType = file; name = LOGO.psd; path = Resources/LOGO.psd; sourceTree = "<group>"; };
@@ -459,8 +453,6 @@
 				2872F7C4124668880078C0B1 /* Certificates */,
 				28BF8E1C11D93A1900B72770 /* Database */,
 				2838EA0C1293165700035C5D /* Preferences */,
-				28AD733E0D9D9553002E5188 /* MainWindow.xib */,
-				286A3CAE158CEB5A00C817D1 /* MainWindow~iPad.xib */,
 				F26689922EE89F20008FC7EB /* Launch Screen.storyboard */,
 				2861C25D116BE905002B8514 /* MUApplicationDelegate.h */,
 				2861C25E116BE905002B8514 /* MUApplicationDelegate.m */,
@@ -470,8 +462,6 @@
 				287BA33F11B97EEE0010E031 /* MUFavouriteServerListController.m */,
 				287BA3A411B996D90010E031 /* MUFavouriteServerEditViewController.h */,
 				287BA3A511B996D90010E031 /* MUFavouriteServerEditViewController.m */,
-				2858DBA11233E31B000D6F75 /* MUVersionChecker.h */,
-				2858DBA21233E31B000D6F75 /* MUVersionChecker.m */,
 				288B55DE1252903300563A28 /* MUServerCertificateTrustViewController.h */,
 				288B55DF1252903300563A28 /* MUServerCertificateTrustViewController.m */,
 				28F0198F1364585B00E402F6 /* MUServerCell.h */,
@@ -724,7 +714,6 @@
 			children = (
 				8D1107310486CEB800E47090 /* Info.plist */,
 				32CA4F630368D1EE00C91783 /* Mumble.pch */,
-				29B97316FDCFA39411CA2CEA /* main.m */,
 			);
 			name = "Other Sources";
 			sourceTree = "<group>";
@@ -789,6 +778,7 @@
 				F2AD3A5B2E0E2F3500FC7006 /* MumbleNavigationView.swift */,
 				F2C0EE372E0E11F900B80B44 /* WelcomeView.swift */,
 				F2DF4A962E1FB2A800A0C166 /* AppState.swift */,
+				F25F34AC2F1729BF00420631 /* MumbleApp.swift */,
 				F2DBFD1B2E0E2216004EFA06 /* Mumble-Bridging-Header.h */,
 			);
 			path = SwiftUI;
@@ -1002,7 +992,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				28AD733F0D9D9553002E5188 /* MainWindow.xib in Resources */,
 				F266899C2EE8A46A008FC7EB /* iTunesArtwork.png in Resources */,
 				F266899D2EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png in Resources */,
 				F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */,
@@ -1061,7 +1050,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1D60589B0D05DD56006BFB54 /* main.m in Sources */,
 				2861C276116BE905002B8514 /* MUApplicationDelegate.m in Sources */,
 				287BA29011B96C960010E031 /* MUDatabase.m in Sources */,
 				287BA33B11B97C470010E031 /* MUFavouriteServer.m in Sources */,
@@ -1071,7 +1059,6 @@
 				F2AD3A762E0E40BD00FC7006 /* FavouriteServerEditView.swift in Sources */,
 				2801C35B11CA9F1A00E664E8 /* MUPreferencesViewController.m in Sources */,
 				287639F911D29D99009DB8B6 /* MUCertificateCreationProgressView.m in Sources */,
-				2858DBA31233E31B000D6F75 /* MUVersionChecker.m in Sources */,
 				2858A5AD123BA08D00A82155 /* MUCertificateCell.m in Sources */,
 				F28C6B372EE87C6300DE9CD2 /* RecentServerManager.swift in Sources */,
 				288D6B60123D08EE00D37EDE /* MUCertificateViewController.m in Sources */,
@@ -1087,6 +1074,7 @@
 				F2E9CC042F06FB7800464F79 /* MUFavouriteServer.m in Sources */,
 				F2E9CC072F07A40300464F79 /* ServerCertificateDetailView.swift in Sources */,
 				28F019911364585C00E402F6 /* MUServerCell.m in Sources */,
+				F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */,
 				F2E9CBEE2F06ED3100464F79 /* CertificatePreferencesView.swift in Sources */,
 				28BF81D2139AFFD50078B722 /* MUCertificateDiskImportViewController.m in Sources */,
 				F2AD3A642E0E2F7900FC7006 /* MumbleContentView.swift in Sources */,
@@ -1231,7 +1219,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
-				ONLY_ACTIVE_ARCH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
 				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
@@ -1273,7 +1261,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
-				ONLY_ACTIVE_ARCH = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
 				PROVISIONING_PROFILE = "";
 				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
