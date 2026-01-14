@@ -108,7 +108,6 @@ struct ChannelView: View {
 
 struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
-    @State private var showingAudioSettings = false
     @State private var selectedUserForConfig: MKUser? = nil
     
     var body: some View {
@@ -123,7 +122,6 @@ struct ServerChannelView: View {
                         serverManager: serverManager,
                         onUserTap: { user in
                             self.selectedUserForConfig = user
-                            self.showingAudioSettings = true
                         }
                     )
                 } else {
@@ -153,15 +151,13 @@ struct ServerChannelView: View {
             )
             .ignoresSafeArea()
         )
-        .sheet(isPresented: $showingAudioSettings) {
-            if let user = selectedUserForConfig {
-                UserAudioSettingsView(
-                    manager: serverManager,
-                    userSession: user.session(),
-                    userName: user.userName() ?? "User"
-                )
-                .presentationDetents([.fraction(0.3)])
-            }
+        .sheet(item: $selectedUserForConfig) { user in
+            UserAudioSettingsView(
+                manager: serverManager,
+                userSession: user.session(),
+                userName: user.userName() ?? "User"
+            )
+            .presentationDetents([.medium])
         }
     }
 }
@@ -422,49 +418,51 @@ struct UserRowView: View {
                 Button(action: {}) { Label("User Info", systemImage: "person.circle") }
             }
             
-            HStack(spacing: 0) {
-                // 避开前面的缩进区域，确保点击的是内容部分
-                Spacer().frame(width: CGFloat(level * 16))
-                
-                Menu {
-                    // Menu Header
-                    Text(user.userName() ?? "User")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+            if !isMyself {
+                HStack(spacing: 0) {
+                    // 避开前面的缩进区域，确保点击的是内容部分
+                    Spacer().frame(width: CGFloat(level * 16))
                     
-                    Divider()
-                    
-                    // Action 1: 本地静音/取消静音
-                    Button {
-                        serverManager.toggleLocalUserMute(session: user.session())
-                    } label: {
-                        if user.isLocalMuted() {
-                            Label("Unmute Locally", systemImage: "speaker.wave.2.fill")
-                        } else {
-                            Label("Mute Locally", systemImage: "speaker.slash.fill")
+                    Menu {
+                        // Menu Header
+                        Text(user.userName() ?? "User")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        Divider()
+                        
+                        // Action 1: 本地静音/取消静音
+                        Button {
+                            serverManager.toggleLocalUserMute(session: user.session())
+                        } label: {
+                            if user.isLocalMuted() {
+                                Label("Unmute Locally", systemImage: "speaker.wave.2.fill")
+                            } else {
+                                Label("Mute Locally", systemImage: "speaker.slash.fill")
+                            }
                         }
-                    }
-                    
-                    // Action 2: 打开详细音频设置
-                    Button {
-                        onTap()
+                        
+                        // Action 2: 打开详细音频设置
+                        Button {
+                            onTap()
+                        } label: {
+                            Label("Audio Settings...", systemImage: "slider.horizontal.3")
+                        }
+                        
+                        Divider()
+                        
+                        // Action 3: 用户信息 (占位)
+                        Button {
+                            // Show User Info Logic
+                        } label: {
+                            Label("User Info", systemImage: "person.circle")
+                        }
+                        
                     } label: {
-                        Label("Audio Settings...", systemImage: "slider.horizontal.3")
+                        Color.clear
                     }
-                    
-                    Divider()
-                    
-                    // Action 3: 用户信息 (占位)
-                    Button {
-                        // Show User Info Logic
-                    } label: {
-                        Label("User Info", systemImage: "person.circle")
-                    }
-                    
-                } label: {
-                    Color.clear
+                    .contentShape(Rectangle()) // 确保透明区域可点击
                 }
-                .contentShape(Rectangle()) // 确保透明区域可点击
             }
         }
     }
@@ -505,5 +503,11 @@ struct ResizeHandle: View {
                 .cornerRadius(2)
         }
         .onHover { hovering in withAnimation { isHovering = hovering } }
+    }
+}
+
+extension MKUser: Identifiable {
+    public var id: UInt {
+        return session()
     }
 }

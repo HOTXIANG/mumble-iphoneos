@@ -734,13 +734,24 @@ class ServerModelManager: ObservableObject {
             return
         }
         let item = modelItems[index]
-        if item.state?.isMutedOrDeafened == true {
-            item.talkingState = .passive; return
-        }
-        switch talkState.rawValue {
-        case 1,
-            2,
-            3: item.talkingState = .talking; default: item.talkingState = .passive
+        
+        let isServerMuted = item.state?.isMutedByServer ?? false
+        let isSelfMuted = item.state?.isSelfMuted ?? false
+        let isSelfDeafened = item.state?.isSelfDeafened ?? false
+        
+        // 如果是因为这些硬性原因导致无法说话，才强制设为 passive
+        if isServerMuted || isSelfMuted || isSelfDeafened {
+            item.talkingState = .passive
+            // 注意：这里不用 return，让代码往下走去更新 UI 也是安全的，但设为 passive 是对的
+        } else {
+            // 如果只是本地屏蔽 (isLocallyMuted)，代码会继续执行下面的 switch
+            // 从而正确更新 talkingState 为 .talking，实现“虽然听不到但能看到他在说”的效果
+            switch talkState.rawValue {
+            case 1, 2, 3:
+                item.talkingState = .talking
+            default:
+                item.talkingState = .passive
+            }
         }
         objectWillChange
             .send() // 同样，讲话状态变化也需要通知刷新
@@ -1109,6 +1120,9 @@ class ServerModelManager: ObservableObject {
         )
         
         if let connection = MUConnectionController.shared()?.connection {
+            // ✅ 调试日志：如果这里打印 nil，说明 MKConnection.m 的 Getter 没写对
+            print("🔊 Setting volume for \(session): \(volume) on output: \(String(describing: connection.audioOutput))")
+            
             connection.audioOutput?.setVolume(volume, forSession: session)
         }
         
