@@ -238,7 +238,6 @@ struct ChannelTreeRow: View {
                 ForEach(users, id: \.self) { user in
                     UserRowView(
                         user: user,
-                        level: level + 1,
                         serverManager: serverManager,
                         onTap: { onUserTap(user) }
                     )
@@ -365,7 +364,6 @@ struct ChannelRowView: View {
 
 struct UserRowView: View {
     let user: MKUser
-    let level: Int
     @ObservedObject var serverManager: ServerModelManager
     
     let onTap: () -> Void
@@ -378,11 +376,24 @@ struct UserRowView: View {
         return user.localVolume
     }
     
+    private var dynamicLevel: Int {
+        var depth = 0
+        var current = user.channel()
+        // 只要还有父频道，就说明层级+1 (Root 的 parent 为 nil)
+        while let parent = current?.parent() {
+            depth += 1
+            current = parent
+        }
+        return depth
+    }
+    
     var body: some View {
         ZStack(alignment: .leading) {
             HStack(spacing: 6) {
+                let level = dynamicLevel
+                let indentWidth = CGFloat(level * 16) + 24
                 // 缩进: level*16 + 箭头位(16) + 图标位(20)的微调
-                Spacer().frame(width: CGFloat(level * 16) + 24)
+                Spacer().frame(width: indentWidth)
                 
                 // Avatar
                 AvatarView(talkingState: isTalking ? .talking : .silent)
@@ -446,6 +457,7 @@ struct UserRowView: View {
             
             if !isMyself {
                 HStack(spacing: 0) {
+                    let level = dynamicLevel
                     // 避开前面的缩进区域，确保点击的是内容部分
                     Spacer().frame(width: CGFloat(level * 16))
                     

@@ -1,9 +1,86 @@
-// 文件: MessagesView.swift (最终版)
+// 文件: MessagesView.swift
 
 import SwiftUI
 import PhotosUI
+import QuickLook
+import UIKit
 
-// 新的系统通知视图
+// MARK: - 1. 容器控制器 (UIKit 层)
+// 负责管理 QLPreviewController、点击关闭手势以及解决黑屏问题
+class PreviewContainerController: UIViewController, UIGestureRecognizerDelegate {
+    var fileURL: URL?
+    var onDismiss: (() -> Void)?
+    
+    private let qlController = QLPreviewController()
+    
+    // 自定义 Coordinator 来处理数据源
+    class Coordinator: NSObject, QLPreviewControllerDataSource {
+        let parent: PreviewContainerController
+        init(_ parent: PreviewContainerController) { self.parent = parent }
+        
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+            return (parent.fileURL ?? URL(fileURLWithPath: "")) as QLPreviewItem
+        }
+    }
+    
+    private var coordinator: Coordinator?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        
+        // 1. 配置 QuickLook
+        coordinator = Coordinator(self)
+        qlController.dataSource = coordinator
+        
+        addChild(qlController)
+        view.addSubview(qlController.view)
+        qlController.view.frame = view.bounds
+        qlController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        qlController.didMove(toParent: self)
+    }
+}
+
+// MARK: - 2. 全屏淡入淡出弹出器 (UIViewControllerRepresentable)
+// 这是一个不可见的 View，专门负责用 UIKit 的方式 present 我们的预览控制器
+struct FullScreenPreviewPresenter: UIViewControllerRepresentable {
+    @Binding var item: MessagesView.IdentifiableURL?
+    
+    func makeUIViewController(context: Context) -> UIViewController {
+        return UIViewController() // 这是一个空的锚点控制器
+    }
+    
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        // 1. 如果有 item 且当前未弹出 -> 执行弹出
+        if let item = item {
+            if uiViewController.presentedViewController == nil {
+                let previewVC = PreviewContainerController()
+                previewVC.fileURL = item.url
+                
+                // ✅ 关键配置：全屏覆盖 + 淡入淡出
+                previewVC.modalPresentationStyle = .overFullScreen
+                previewVC.modalTransitionStyle = .crossDissolve
+                
+                // 处理关闭回调
+                previewVC.onDismiss = {
+                    self.item = nil
+                }
+                
+                uiViewController.present(previewVC, animated: true)
+            }
+        }
+        // 2. 如果 item 为空 且当前已弹出 -> 执行关闭
+        else {
+            if uiViewController.presentedViewController != nil {
+                uiViewController.dismiss(animated: true)
+            }
+        }
+    }
+}
+
+// MARK: - 3. 辅助视图 (通知 & 气泡)
+
 private struct NotificationMessageView: View {
     let message: ChatMessage
     
@@ -11,8 +88,6 @@ private struct NotificationMessageView: View {
         HStack(spacing: 6) {
             Text(message.attributedMessage)
                 .fontWeight(.medium)
-            
-            // 显示时间
             Text(message.timestamp, style: .time)
                 .font(.caption2)
                 .opacity(0.6)
@@ -26,84 +101,6 @@ private struct NotificationMessageView: View {
     }
 }
 
-private struct FullscreenImageView: View {
-    let image: UIImage
-    // 使用 @Environment 来获取系统提供的“关闭”功能
-    @Environment(\.dismiss) var dismiss
-    
-    @State private var scale: CGFloat = 1.0
-    @GestureState private var gestureScale: CGFloat = 1.0
-    @State private var offset: CGSize = .zero
-    @GestureState private var gestureOffset: CGSize = .zero
-
-    var body: some View {
-            ZStack {
-                // 底层：黑色的背景，添加单击退出的手势
-                Color.black
-                    .opacity(0.8)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.smooth(duration: 0.5)){
-                            scale = 1.0
-                            offset = .zero
-                        }
-                        dismiss()
-                    }
-
-                // 顶层：图片
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    // --- 核心修改 2：应用最终的缩放和偏移 ---
-                    // ZStack 会自动将图片居中，我们只需要应用手势产生的变化即可
-                    .scaleEffect(scale * gestureScale)
-                    .offset(offset + gestureOffset)
-                    .onTapGesture {
-                        withAnimation(.smooth(duration: 0.5)){
-                            scale = 1.0
-                            offset = .zero
-                        }
-                        dismiss()
-                    }
-                    // --- 核心修改 3：添加组合手势 ---
-                    .gesture(
-                        // 拖动手势（平移）
-                        DragGesture()
-                            .updating($gestureOffset) { value, state, _ in
-                                state = value.translation
-                            }
-                            .onEnded { value in
-                                // 当拖动结束时，将手势的偏移量“固化”到最终的偏移量中
-                                offset.width += value.translation.width
-                                offset.height += value.translation.height
-                            }
-                            .simultaneously(with:
-                                // 缩放手势
-                                MagnificationGesture()
-                                    .updating($gestureScale) { value, state, _ in
-                                        state = value
-                                    }
-                                    .onEnded { value in
-                                        // 当缩放结束时，将手势的缩放比例“固化”到最终的缩放比例中
-                                        scale *= value
-                                        
-                                        // 添加动画，并限制缩放范围
-                                        withAnimation(.smooth()) {
-                                            if scale < 1.0 {
-                                                scale = 1.0
-                                                offset = .zero // 缩小时自动弹回居中
-                                            } else if scale > 3.0 {
-                                                scale = 3.0
-                                            }
-                                        }
-                                    }
-                            )
-                    )
-            }
-        }
-}
-
-// 消息气泡现在接收一个 ChatMessage 对象
 private struct MessageBubbleView: View {
     let message: ChatMessage
     let onImageTap: (UIImage) -> Void
@@ -113,7 +110,6 @@ private struct MessageBubbleView: View {
             alignment: message.isSentBySelf ? .trailing : .leading,
             spacing: 4
         ) {
-            // 发送者名称
             if !message.isSentBySelf {
                 Text(message.senderName)
                     .font(.system(size: 13, weight: .semibold))
@@ -121,7 +117,6 @@ private struct MessageBubbleView: View {
                     .padding(.leading, 4)
             }
             
-            // 消息内容气泡
             VStack(alignment: .leading, spacing: 6) {
                 if !message.plainTextMessage.isEmpty {
                     Text(message.attributedMessage)
@@ -134,8 +129,10 @@ private struct MessageBubbleView: View {
                             onImageTap(message.images[index])
                         }) {
                             Image(uiImage: message.images[index])
-                                .resizable().aspectRatio(contentMode: .fit)
-                                .frame(maxWidth: 200).cornerRadius(8)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: 200)
+                                .cornerRadius(8)
                         }
                     }
                 }
@@ -157,22 +154,28 @@ private struct MessageBubbleView: View {
     }
 }
 
+// MARK: - 4. 主视图 MessagesView
+
 struct MessagesView: View {
     @ObservedObject var serverManager: ServerModelManager
     @State private var newMessage = ""
     @FocusState private var isTextFieldFocused: Bool
-    @State private var selectedPhotoItem: PhotosPickerItem?
-    @State private var selectedImageForPreview: UIImage?
-    @State private var isSendingImage = false
     
-    @State private var fullscreenImage: UIImage?
+    // 图片发送选择状态
+    @State private var selectedImageForSend: UIImage?
+    
+    // 图片预览状态
+    struct IdentifiableURL: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
+    @State private var previewItem: IdentifiableURL?
     
     private let bottomID = "bottomOfMessages"
     
     var body: some View {
-        ZStack(
-            alignment: .bottom
-        ){
+        ZStack(alignment: .bottom) {
+            // 背景
             LinearGradient(
                 gradient: Gradient(colors: [
                     Color(red: 0.20, green: 0.20, blue: 0.25),
@@ -182,30 +185,27 @@ struct MessagesView: View {
                 endPoint: .bottom
             ).ignoresSafeArea()
             
+            // 消息列表
             ScrollViewReader { proxy in
                 ScrollView {
-                    // 消息列表容器
                     LazyVStack(alignment: .leading, spacing: 16) {
                         ForEach(serverManager.messages) { message in
                             switch message.type {
                             case .userMessage:
                                 MessageBubbleView(
                                     message: message,
-                                    onImageTap: { tappedImage in
-                                        fullscreenImage = tappedImage
+                                    onImageTap: { img in
+                                        handleImageTap(image: img)
                                     }
                                 )
                             case .notification:
                                 NotificationMessageView(message: message)
                             }
                         }
-                        // 底部锚点，用于自动滚动
                         Spacer().frame(height: 10).id(bottomID)
                     }
                     .padding()
                 }
-                // ✅ 核心修复 1: 使用 safeAreaInset 放置输入栏
-                // 这会让 SwiftUI 自动处理键盘弹出时的布局挤压，并自动给 ScrollView 底部加 Padding
                 .safeAreaInset(edge: .bottom) {
                     TextInputBar(
                         text: $newMessage,
@@ -213,56 +213,64 @@ struct MessagesView: View {
                         onSendText: sendTextMessage,
                         onSendImage: { image in
                             isTextFieldFocused = false
-                            selectedImageForPreview = image
+                            selectedImageForSend = image
                         }
                     )
                     .background(.clear)
                 }
-                // 交互式关闭键盘
                 .scrollDismissesKeyboard(.interactively)
-                
-                // 监听新消息，自动滚动到底部
-                .onChange(of: serverManager.messages) {
-                    scrollToBottom(proxy: proxy)
-                }
-                // ✅ 核心修复 2: 监听键盘弹出（焦点获取），自动滚动到底部
-                // 当键盘弹起改变了视图高度时，我们需要手动修正一下滚动位置
+                .onChange(of: serverManager.messages) { scrollToBottom(proxy: proxy) }
                 .onChange(of: isTextFieldFocused) { focused in
                     if focused {
-                        // 延迟一点点，等待键盘动画开始后再滚动
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                             scrollToBottom(proxy: proxy)
                         }
                     }
                 }
-                .onAppear {
-                    // 进入页面时滚动到底部
-                    scrollToBottom(proxy: proxy, animated: false)
-                }
+                .onAppear { scrollToBottom(proxy: proxy, animated: false) }
             }
+            
+            // ✅ 挂载全屏淡入淡出弹出器
+            // 这是一个不可见的 0x0 视图，它负责监听状态并执行 UIKit 弹出
+            FullScreenPreviewPresenter(item: $previewItem)
+                .frame(width: 0, height: 0)
         }
-        // 当键盘出现或消失时，应用动画
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTextFieldFocused)
-        // 图片确认 Sheet 保持不变
-        .sheet(item: $selectedImageForPreview) { image in
+        
+        // 发送图片弹窗 (保持 Sheet 不变，因为它是上下文相关的)
+        .sheet(item: $selectedImageForSend) { image in
             ImageConfirmationView(
                 image: image,
-                onCancel: { selectedImageForPreview = nil },
+                onCancel: { selectedImageForSend = nil },
                 onSend: { imageToSend in
                     await sendImageMessage(image: imageToSend)
-                    selectedImageForPreview = nil
+                    selectedImageForSend = nil
                 }
             )
             .presentationDetents([.medium , .large])
         }
-        .fullScreenCover(item: $fullscreenImage) { image in
-            FullscreenImageView(image: image)
+    }
+    
+    // MARK: - Logic Helpers
+    
+    private func handleImageTap(image: UIImage) {
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileName = "mumble_preview_\(UUID().uuidString).jpg"
+        let fileURL = tempDir.appendingPathComponent(fileName)
+        
+        Task.detached(priority: .userInitiated) {
+            if let data = image.jpegData(compressionQuality: 1.0) {
+                try? data.write(to: fileURL)
+                
+                await MainActor.run {
+                    self.previewItem = IdentifiableURL(url: fileURL)
+                }
+            }
         }
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         if serverManager.messages.isEmpty { return }
-        
         if animated {
             withAnimation(.spring(response: 0.3, dampingFraction: 1.0)) {
                 proxy.scrollTo(bottomID, anchor: .bottom)
@@ -271,50 +279,48 @@ struct MessagesView: View {
             proxy.scrollTo(bottomID, anchor: .bottom)
         }
     }
-
-    // --- 核心修改 3：发送消息方法现在调用 serverManager ---
+    
     private func sendTextMessage() {
-            guard !newMessage.isEmpty else { return }
-            serverManager.sendTextMessage(newMessage)
-            newMessage = ""
-        }
-        
+        guard !newMessage.isEmpty else { return }
+        serverManager.sendTextMessage(newMessage)
+        newMessage = ""
+    }
+    
     private func sendImageMessage(image: UIImage) async {
         await serverManager.sendImageMessage(image: image)
-        }
+    }
 }
+
+// MARK: - Helper Views
 
 private struct ImageConfirmationView: View {
     let image: UIImage
     let onCancel: () -> Void
     let onSend: (UIImage) async -> Void
     @State private var isSending = false
-
+    
     var body: some View {
-        // 不再使用 NavigationView，让视图更紧凑
         VStack(spacing: 16) {
             if isSending {
-                // 加载状态
                 ProgressView("Compressing and Sending...")
-                    .padding(.vertical, 80) // 给加载视图一个合适的高度
+                    .padding(.vertical, 80)
             } else {
-                // 预览状态
                 Text("Confirm Image")
                     .font(.headline)
                     .padding(.top, 20)
-                    
+                
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .cornerRadius(12) // 给图片预览也加上圆角
+                    .cornerRadius(12)
                     .padding(.horizontal)
-
+                
                 HStack(spacing: 20) {
                     Button("Cancel", role: .cancel, action: onCancel)
                         .buttonStyle(.bordered)
                         .controlSize(.large)
                         .glassEffect(.clear.interactive())
-                        
+                    
                     Button("Send") {
                         Task {
                             isSending = true
@@ -328,7 +334,6 @@ private struct ImageConfirmationView: View {
             }
         }
         .padding(.bottom)
-        // 在发送过程中，禁止用户通过向下滑动来关闭弹窗
         .interactiveDismissDisabled(isSending)
     }
 }
@@ -338,88 +343,53 @@ private struct TextInputBar: View {
     @FocusState.Binding var isFocused: Bool
     let onSendText: () -> Void
     let onSendImage: (UIImage) async -> Void
-    
     @State private var selectedPhoto: PhotosPickerItem?
-    @State private var editorHeight: CGFloat = 40
     
     var body: some View {
         GlassEffectContainer(spacing: 10.0) {
-            HStack(
-                alignment: .bottom,
-                spacing: 10.0
-            ) {
+            HStack(alignment: .bottom, spacing: 10.0) {
                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.indigo)
                         .frame(width: 40, height: 40)
-                    //.background(.regularMaterial, in: Circle())
                         .glassEffect(.clear.interactive())
                 }
                 .onChange(of: selectedPhoto) {
                     Task {
-                        if let data = try? await selectedPhoto?.loadTransferable(
-                            type: Data.self
-                        ),
+                        if let data = try? await selectedPhoto?.loadTransferable(type: Data.self),
                            let image = UIImage(data: data) {
                             await onSendImage(image)
                         }
-                        // 选择后重置，以便可以再次选择同一张图片
                         selectedPhoto = nil
                     }
                 }
+                
                 TextField("Type a message...", text: $text, axis: .vertical)
                     .focused($isFocused)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                //.background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 20.0))
                     .frame(minHeight: 40)
                 
-                Button(
-                    action: onSendText
-                ) {
-                    Image(
-                        systemName: "arrow.up"
-                    ).font(
-                        .system(
-                            size: 17,
-                            weight: .semibold
-                        )
-                    ).foregroundColor(
-                        .white
-                    ).frame(
-                        width: 40,
-                        height: 40
-                    )
-                    .glassEffect(.regular.tint(text.isEmpty ? .gray.opacity(0.7) : .blue.opacity(0.7)).interactive())
-                    /*.background(Circle()
-                     .fill(.regularMaterial)
-                     .overlay(
-                     Circle()
-                     .fill(text.isEmpty ? Color.gray.opacity(0.5) : Color.blue.opacity(0.7))
-                     )
-                     )*/
+                Button(action: onSendText) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .glassEffect(.regular.tint(text.isEmpty ? .gray.opacity(0.7) : .blue.opacity(0.7)).interactive())
                 }
-                .disabled(
-                    text.isEmpty
-                )
-            }.padding(
-                .horizontal
-            ).padding(
-                .vertical,
-                8
-            ).background(
-                Color.clear
-            )
+                .disabled(text.isEmpty)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(Color.clear)
         }
     }
 }
 
 extension UIImage: Identifiable {
-    public var id: String {
-        return UUID().uuidString
-    }
+    public var id: String { return UUID().uuidString }
 }
 
 extension CGSize {

@@ -366,7 +366,8 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     [self postErrorWithTitle:title message:msg];
 }
 
-- (void) serverModel:(MKServerModel *)model joinedServerAsUser:(MKUser *)user {
+- (void) serverModel:(MKServerModel *)model joinedServerAsUser:(MKUser *)user withWelcomeMessage:(MKTextMessage *)welcomeMessage {
+    // 1. 存储用户名
     [MUDatabase storeUsername:[user userName] forServerWithHostname:[model hostname] port:[model port]];
     
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -374,11 +375,13 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     BOOL shouldMute = [defaults boolForKey:[self muteStateKey]];
     BOOL shouldDeaf = [defaults boolForKey:[self deafStateKey]];
     
+    // 2. 恢复静音状态
     if (shouldMute || shouldDeaf) {
         if (shouldDeaf) shouldMute = YES;
         [model setSelfMuted:shouldMute andSelfDeafened:shouldDeaf];
     }
     
+    // 3. 恢复上次频道
     if (lastChannelId > 0) {
         MKChannel *targetChannel = [model channelWithId:lastChannelId];
         if (targetChannel) {
@@ -386,16 +389,34 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         }
     }
     
+    // 4. 隐藏连接界面并通知 SwiftUI
     [self hideConnectingViewWithCompletion:^{
         dispatch_async(dispatch_get_main_queue(), ^{
             NSString *displayTitle = self->_displayName;
             if (!displayTitle || [displayTitle length] == 0) {
                 displayTitle = self->_hostname;
             }
-            NSDictionary *userInfo = nil;
+            
+            NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
             if (displayTitle) {
-                userInfo = @{ @"displayName": displayTitle };
+                userInfo[@"displayName"] = displayTitle;
             }
+            
+            // ✅ 新增：将欢迎消息放入 userInfo 传给 Swift
+            if (welcomeMessage) {
+                // MumbleKit 的 MKTextMessage 通常有一个 plainTextString 方法或者直接取 string (HTML)
+                // 这里我们尝试取纯文本，如果没有则取原始 HTML string
+                NSString *msgContent = [welcomeMessage plainTextString];
+                if (!msgContent) {
+                    if ([welcomeMessage respondsToSelector:@selector(message)]) {
+                        msgContent = [welcomeMessage performSelector:@selector(message)];
+                    }
+                }
+                if (msgContent) {
+                    userInfo[@"welcomeMessage"] = msgContent;
+                }
+            }
+            
             [[NSNotificationCenter defaultCenter] postNotificationName:@"MUConnectionReadyForSwiftUI"
                                                                 object:self
                                                               userInfo:userInfo];

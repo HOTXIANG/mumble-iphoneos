@@ -395,11 +395,7 @@ class ServerModelManager: ObservableObject {
                         }
                     }
                 }
-                
-                // --- B. ✅✅✅ 核心修复：重建列表以更新缩进和位置 ✅✅✅ ---
-                // 用户已经移动到了新频道，现在我们重建 UI 列表。
-                // rebuildModelArray 会遍历新的频道树，自动将该用户放置在
-                // 正确的子频道下方，并赋予正确的 indentLevel。
+                try? await Task.sleep(nanoseconds: 150_000_000)
                 self.rebuildModelArray()
             }
         }
@@ -505,8 +501,44 @@ class ServerModelManager: ObservableObject {
         )
     }
     
-    @objc private func handleConnectionOpened() {
+    @objc private func handleConnectionOpened(_ notification: Notification) {
         print("✅ Connection Opened - Triggering Restore")
+        
+        let userInfo = notification.userInfo
+        
+        Task { @MainActor in
+            // 1. 设置服务器显示名称 (原有逻辑)
+            if let extractedDisplayName = userInfo?["displayName"] as? String {
+                AppState.shared.serverDisplayName = extractedDisplayName
+            }
+            
+            // 2. 插入欢迎消息
+            if let welcomeText = userInfo?["welcomeMessage"] as? String, !welcomeText.isEmpty {
+                // 简单的去重防止重复显示
+                let lastMsg = self.messages.last?.attributedMessage.description
+                if lastMsg == nil || !lastMsg!.contains(welcomeText) {
+                    let welcomeMsg = ChatMessage(
+                        id: UUID(),
+                        type: .notification, // 使用通知样式
+                        senderName: "Server", // 发送者显示为 Server
+                        attributedMessage: self.attributedString(from: welcomeText),
+                        images: [],
+                        timestamp: Date(),
+                        isSentBySelf: false
+                    )
+                    self.messages.append(welcomeMsg)
+                }
+            }
+            
+            // 3. 清理旧状态并重新加载 (原有逻辑)
+            self.cleanup()
+            self.setupServerModel()
+            
+            // 稍微延迟一下，确保 MKUser 对象都已就位后恢复偏好
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.restoreAllUserPreferences()
+            }
+        }
         //稍微延迟一下，确保 MKUser 对象都已就位
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.restoreAllUserPreferences()
@@ -899,18 +931,11 @@ class ServerModelManager: ObservableObject {
         if let usersArray = channel.users(),
            let rawUsers = usersArray as? [MKUser] {
             
-            // ✅ 双重校验：过滤掉那些 "channel属性已经变了，但还残留在当前channel列表里" 的用户
-            // 这一步直接剔除了 "赖在 Root 频道列表里不走" 的幽灵数据
-            let validatedUsers = rawUsers.filter { user in
-                return user.channel()?.channelId() == channel.channelId()
-            }
-            
-            // 使用过滤后的列表来计算人数和渲染
-            channelItem.userCount = validatedUsers.count
+            channelItem.userCount = rawUsers.count
             channelIndexMap[channel.channelId()] = modelItems.count
             modelItems.append(channelItem)
             
-            for user in validatedUsers {
+            for user in rawUsers {
                 // 顺便确保配置被应用 (之前的修复)
                 applySavedUserPreferences(user: user)
                 
@@ -1141,11 +1166,12 @@ class ServerModelManager: ObservableObject {
     // 辅助方法：获取排序后的用户
     func getSortedUsers(for channel: MKChannel) -> [MKUser] {
         guard let users = channel.users() as? [MKUser] else { return [] }
-        
+
         let validatedUsers = users.filter { user in
             return user.channel()?.channelId() == channel.channelId()
         }
         
+        // 使用 validatedUsers 进行排序
         return validatedUsers.sorted { u1, u2 in
             return (u1.userName() ?? "") < (u2.userName() ?? "")
         }
