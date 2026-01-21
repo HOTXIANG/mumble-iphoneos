@@ -675,97 +675,138 @@ class ServerModelManager: ObservableObject {
         messages.append(selfMessage)
     }
     
-    func sendImageMessage(image: UIImage) async {
-        guard let serverModel = serverModel else { return }
-        
-        // 将 CPU 密集型任务（压缩和编码）放到后台线程执行
-        let compressedData = await Task.detached(priority: .userInitiated) {
-            let maxSizeInBytes = 60 * 1024 // Mumble 消息大小上限
-            return self.compressImage(image, toTargetSizeInBytes: maxSizeInBytes)
-        }.value
-        
-        guard let imageData = compressedData else {
-            print("🔴 Error: Could not convert compressed UIImage to JPEG data.")
+    func sendImageMessage(image: UIImage, isHighQuality: Bool) async {
+        if isHighQuality {
+            // ✅ 高画质模式：从 1MB 开始，失败后缓慢降级
+            // 适用于：已知服务器支持大图，或者对方也是 NeoMumble 客户端
+            await attemptSendImage(image: image, targetSize: 1024 * 1024, decayRate: 0.9) // 每次降 10%
+        } else {
+            // ✅ 兼容模式 (默认)：死守 128KB 防线
+            // 适用于：需要让 PC 端 Mumble 也能看到图
+            // 考虑到 Base64 开销，目标设为 90KB 比较稳妥 (90 * 1.33 ≈ 120KB)
+            await attemptSendImage(image: image, targetSize: 90 * 1024, decayRate: 0.9)
+        }
+    }
+    // 递归尝试发送函数
+    private func attemptSendImage(image: UIImage, targetSize: Int, decayRate: Double) async {
+        // 保底 20KB，再小没意义了
+        guard targetSize > 20 * 1024 else {
+            print("❌ Image too small to compress further. Give up.")
             return
         }
         
-        let base64String = imageData.base64EncodedString()
-        let dataURI = "data:image/jpeg;base64,\(base64String)"
-        let htmlMessage = "<img src=\"\(dataURI)\" />"
-        let message = MKTextMessage(string: htmlMessage)
+        print("🚀 [High Quality] Attempting size: \(targetSize / 1024) KB")
         
-        if let userChannel = serverModel.connectedUser()?.channel() {
-            serverModel.send(message, to: userChannel)
+        // 1. 压缩
+        guard let data = await smartCompress(image: image, to: targetSize) else { return }
+        
+        // 2. 构造消息
+        let base64Str = data.base64EncodedString()
+        let htmlBody = "<img src=\"data:image/jpeg;base64,\(base64Str)\" />"
+        let msg = MKTextMessage(plainText: htmlBody)
+        
+        // 3. 监听失败
+        let failName = Notification.Name("MUMessageSendFailed")
+        let task = Task {
+            if let channel = self.serverModel?.connectedUser()?.channel() {
+                self.serverModel?.send(msg, to: channel)
+            }
+            try? await Task.sleep(nanoseconds: 800 * 1_000_000) // 等待 0.8s
         }
         
-        // 立即在UI上显示自己发送的图片 (UI更新会自动回到主线程)
-        let finalImage = UIImage(data: imageData) ?? image
-        let selfMessage = ChatMessage(
-            id: UUID(),
-            type: .userMessage,
-            senderName: serverModel
-                .connectedUser()?
-                .userName() ?? "Me",
-            attributedMessage: AttributedString(""),
-            images: [finalImage],
-            timestamp: Date(),
-            isSentBySelf: true
-        )
-        messages.append(selfMessage)
+        var didFail = false
+        let observer = NotificationCenter.default.addObserver(forName: failName, object: nil, queue: .main) { _ in
+            didFail = true
+        }
+        _ = await task.result
+        NotificationCenter.default.removeObserver(observer)
+        
+        // 4. 判定
+        if didFail {
+            print("⚠️ Send failed. Reducing size by 10%...")
+            // 核心修改：每次只降 10% (targetSize * 0.9)
+            let newTarget = Int(Double(targetSize) * decayRate)
+            await attemptSendImage(image: image, targetSize: newTarget, decayRate: decayRate)
+        } else {
+            print("✅ Send success!")
+            await appendLocalMessage(image: image)
+        }
     }
     
-    // 新增一个私有辅助函数，用于压缩图片
-    private nonisolated func compressImage(_ image: UIImage, toTargetSizeInBytes targetSize: Int) -> Data? {
-        let imageData = image.jpegData(compressionQuality: 1.0)
-        
-        // 如果图片本来就小于目标大小，直接返回最高质量的JPEG数据
-        if let data = imageData, data.count <= targetSize {
+    // 辅助：本地回显
+    private func appendLocalMessage(image: UIImage) async {
+        await MainActor.run {
+            let localMessage = ChatMessage(
+                id: UUID(),
+                type: .userMessage,
+                senderName: self.serverModel?.connectedUser()?.userName() ?? "Me",
+                attributedMessage: AttributedString(""),
+                images: [image],
+                timestamp: Date(),
+                isSentBySelf: true
+            )
+            self.messages.append(localMessage)
+        }
+    }
+    
+    // MARK: - 智能压缩算法 (二分法 + Resize)
+    private func smartCompress(image: UIImage, to maxBytes: Int) async -> Data? {
+        // 1. 预检查：如果原图已经很小，直接返回
+        if let data = image.jpegData(compressionQuality: 1.0), data.count <= maxBytes {
             return data
         }
         
-        // --- 使用二分搜索寻找最佳压缩质量 ---
+        // 2. 二分法查找最佳压缩比 (只调整质量，不调整分辨率)
         var minQuality: CGFloat = 0.0
         var maxQuality: CGFloat = 1.0
-        var bestImageData: Data?
+        var bestData: Data? = nil
         
-        for _ in 0..<8 { // 8次迭代足以达到很高的精度
-            let currentQuality = (minQuality + maxQuality) / 2
-            guard let data = image.jpegData(compressionQuality: currentQuality) else { continue }
-            
-            if data.count <= targetSize {
-                // 这是一个可行的方案，保存它，然后尝试寻找更高质量的方案
-                bestImageData = data
-                minQuality = currentQuality
-            } else {
-                // 图片还是太大，降低质量上限
-                maxQuality = currentQuality
+        // 最多尝试 6 次二分查找 (精度足以达到 0.015)
+        for _ in 0..<6 {
+            let midQuality = (minQuality + maxQuality) / 2
+            if let data = image.jpegData(compressionQuality: midQuality) {
+                if data.count <= maxBytes {
+                    bestData = data // 暂存这个可用的结果
+                    minQuality = midQuality // 尝试更好的质量
+                } else {
+                    maxQuality = midQuality // 质量太高了，降低
+                }
             }
         }
         
-        // 如果通过降低质量找到了一个可行的方案，就返回它
-        if let finalData = bestImageData {
-            print("✅ Compressed image with quality \(minQuality) to \(finalData.count) bytes.")
-            return finalData
+        // 3. 如果二分法找到了符合大小的数据，直接返回
+        if let data = bestData {
+            return data
         }
         
-        // --- 如果最低质量依然过大，则开始降低分辨率 ---
-        // (这种情况很少见，但作为备用方案)
-        var scale: CGFloat = 0.9
-        var resizedImage = image
-        while let newImage = resizedImage.resized(by: scale),
-              let data = newImage.jpegData(compressionQuality: 0.75), // 使用一个较高的质量
-              data.count > targetSize && scale > 0.1 {
-            resizedImage = newImage
-            scale -= 0.1
-        }
+        // 4. 兜底方案：如果质量降到 0 还是太大，说明分辨率太高，必须 Resize
+        // 强制缩放到较小的尺寸 (比如长边 1024)
+        print("⚠️ Quality compression failed. Resizing image...")
+        let resizedImage = resizeImage(image: image, targetSize: CGSize(width: 1024, height: 1024))
         
-        if let finalImage = resizedImage.resized(by: scale) {
-            print("⚠️ Image too large, had to resize by scale \(scale).")
-            return finalImage.jpegData(compressionQuality: 0.75)
-        }
+        // 对缩放后的图片再次尝试低质量压缩
+        return resizedImage.jpegData(compressionQuality: 0.5)
+    }
+ 
+    // 辅助：保持比例缩放图片
+    private func resizeImage(image: UIImage, targetSize: CGSize) -> UIImage {
+        let size = image.size
         
-        // 最终的备用方案：返回最低质量的原始图片数据
-        return image.jpegData(compressionQuality: 0.0)
+        let widthRatio  = targetSize.width  / size.width
+        let heightRatio = targetSize.height / size.height
+        
+        // 取较小的比例，确保长宽都在 targetSize 内
+        let ratio = min(widthRatio, heightRatio)
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        
+        let rect = CGRect(origin: .zero, size: newSize)
+        
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: rect)
+        let newImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        return newImage ?? image
     }
     
     func updateUserBySession(

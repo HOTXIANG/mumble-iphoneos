@@ -47,33 +47,71 @@ class PreviewContainerController: UIViewController, UIGestureRecognizerDelegate 
 struct FullScreenPreviewPresenter: UIViewControllerRepresentable {
     @Binding var item: MessagesView.IdentifiableURL?
     
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+    
+    class Coordinator: NSObject {
+        var parent: FullScreenPreviewPresenter
+        var currentURL: URL? // 记录当前正在显示的 URL
+        
+        init(parent: FullScreenPreviewPresenter) {
+            self.parent = parent
+        }
+    }
+    
     func makeUIViewController(context: Context) -> UIViewController {
         return UIViewController() // 这是一个空的锚点控制器
     }
     
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        // 1. 如果有 item 且当前未弹出 -> 执行弹出
+        context.coordinator.parent = self
+        
+        let newURL = item?.url
+        let oldURL = context.coordinator.currentURL
+        
+        // 🛑 核心修复：去重检查
+        // 如果新 URL 和旧 URL 一样，说明数据没变，这次更新只是因为键盘弹起/布局变化引起的。
+        // 直接返回，不要执行任何弹出/关闭逻辑。
+        if newURL == oldURL {
+            return
+        }
+        
+        // 更新记录
+        context.coordinator.currentURL = newURL
+        
+        // 1. 弹出逻辑
         if let item = item {
-            if uiViewController.presentedViewController == nil {
+            // 异步执行，避免视图更新冲突
+            DispatchQueue.main.async {
+                // 双重检查：确保 item 还在，且没有正在显示的弹窗
+                guard self.item != nil, uiViewController.presentedViewController == nil else { return }
+                
+                // 窗口检测：防止在后台或切换频道时弹出
+                if uiViewController.view.window == nil { return }
+                
                 let previewVC = PreviewContainerController()
                 previewVC.fileURL = item.url
-                
-                // ✅ 关键配置：全屏覆盖 + 淡入淡出
                 previewVC.modalPresentationStyle = .overFullScreen
                 previewVC.modalTransitionStyle = .crossDissolve
                 
-                // 处理关闭回调
                 previewVC.onDismiss = {
+                    // 关闭时清空状态
                     self.item = nil
+                    // 重要：手动同步 Coordinator 状态，防止下次误判
+                    context.coordinator.currentURL = nil
                 }
                 
                 uiViewController.present(previewVC, animated: true)
             }
         }
-        // 2. 如果 item 为空 且当前已弹出 -> 执行关闭
+        // 2. 关闭逻辑
         else {
+            // 只有当当前确实有弹窗时，才执行关闭
             if uiViewController.presentedViewController != nil {
-                uiViewController.dismiss(animated: true)
+                DispatchQueue.main.async {
+                    uiViewController.dismiss(animated: true)
+                }
             }
         }
     }
@@ -96,7 +134,7 @@ private struct NotificationMessageView: View {
         .foregroundColor(.secondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color(uiColor: .systemGray5), in: Capsule())
+        .background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .frame(maxWidth: .infinity, alignment: .center)
     }
 }
@@ -242,8 +280,8 @@ struct MessagesView: View {
             ImageConfirmationView(
                 image: image,
                 onCancel: { selectedImageForSend = nil },
-                onSend: { imageToSend in
-                    await sendImageMessage(image: imageToSend)
+                onSend: { imageToSend,isHighQuality  in
+                    await serverManager.sendImageMessage(image: imageToSend, isHighQuality: isHighQuality)
                     selectedImageForSend = nil
                 }
             )
@@ -286,8 +324,8 @@ struct MessagesView: View {
         newMessage = ""
     }
     
-    private func sendImageMessage(image: UIImage) async {
-        await serverManager.sendImageMessage(image: image)
+    private func sendImageMessage(image: UIImage, isHighQuality: Bool) async {
+        await serverManager.sendImageMessage(image: image, isHighQuality: isHighQuality)
     }
 }
 
@@ -296,11 +334,12 @@ struct MessagesView: View {
 private struct ImageConfirmationView: View {
     let image: UIImage
     let onCancel: () -> Void
-    let onSend: (UIImage) async -> Void
+    let onSend: (UIImage, Bool) async -> Void
     @State private var isSending = false
+    @State private var isHighQuality = false
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             if isSending {
                 ProgressView("Compressing and Sending...")
                     .padding(.vertical, 80)
@@ -315,6 +354,23 @@ private struct ImageConfirmationView: View {
                     .cornerRadius(12)
                     .padding(.horizontal)
                 
+                Toggle(isOn: $isHighQuality) {
+                    VStack(alignment: .leading) {
+                        Text("High Quality Mode")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text("Less Compressed (May fail on PC)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(Color(uiColor: .secondarySystemBackground))
+                .cornerRadius(12)
+                .padding(.horizontal)
+                
                 HStack(spacing: 20) {
                     Button("Cancel", role: .cancel, action: onCancel)
                         .buttonStyle(.bordered)
@@ -324,7 +380,7 @@ private struct ImageConfirmationView: View {
                     Button("Send") {
                         Task {
                             isSending = true
-                            await onSend(image)
+                            await onSend(image, isHighQuality)
                         }
                     }
                     .buttonStyle(.borderedProminent)

@@ -477,6 +477,9 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 }
 - (void) serverModelTextMessageTooLongError:(MKServerModel *)model {
     [self postMessage:NSLocalizedString(@"Message too long", nil) type:@"error"];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"MUMessageSendFailed"
+                                                        object:nil
+                                                      userInfo:@{@"reason": @"permissionDenied"}];
 }
 - (void) serverModelTemporaryChannelError:(MKServerModel *)model {
     [self postMessage:NSLocalizedString(@"Not permitted in temporary channel", nil) type:@"error"];
