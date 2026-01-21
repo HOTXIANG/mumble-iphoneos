@@ -93,9 +93,9 @@ struct UserAudioSettingsView: View {
     }
     
     private func loadCurrentState() {
+        self.volume = manager.userVolumes[userSession] ?? 1.0
+        
         if let user = manager.getUserBySession(userSession) {
-            // 从 Manager 的字典中读取音量 (如果没有则为 1.0)
-            self.volume = manager.userVolumes[userSession] ?? 1.0
             // 从 MKUser 读取真实的屏蔽状态
             self.isMuted = user.isLocalMuted()
         }

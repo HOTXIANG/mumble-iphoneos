@@ -5,6 +5,10 @@ import UserNotifications
 import AudioToolbox
 import ActivityKit
 
+struct UnsafeTransfer<T>: @unchecked Sendable {
+    let value: T
+}
+
 @MainActor
 class ServerModelManager: ObservableObject {
     @Published var modelItems: [ChannelNavigationItem] = []
@@ -131,6 +135,8 @@ class ServerModelManager: ObservableObject {
         )
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
+        
+        userVolumes.removeAll()
         
         if let wrapper = delegateWrapper {
             serverModel?
@@ -338,66 +344,63 @@ class ServerModelManager: ObservableObject {
                   let user = userInfo["user"] as? MKUser,
                   let channel = userInfo["channel"] as? MKChannel else { return }
             
-            let movingUserSession = user.session()
-            let movingUserName = user.userName() ?? "Unknown"
-            let destChannelName = channel.channelName() ?? "Unknown Channel"
-            let destChannelId = channel.channelId()
+            let userTransfer = UnsafeTransfer(value: user)
+            let channelTransfer = UnsafeTransfer(value: channel)
             
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                guard let connectedUser = self.serverModel?.connectedUser() else { return }
                 
-                // 1. 如果是我自己移动，总是显示
-                if movingUserSession == connectedUser.session() {
-                    self.addSystemNotification("You joined channel \(destChannelName)")
-                    return
-                }
+                let safeUser = userTransfer.value
+                let safeChannel = channelTransfer.value
                 
-                // 2. 如果是别人移动，判断是否与我有关
-                // 我们需要找出该用户“原本”所在的频道
-                // 由于 `rebuildModelArray` 还没运行，此时的 `modelItems` 还是旧的状态，
-                // 我们可以从中反向查找用户所属的频道。
+                // --- A. 先执行通知判断逻辑 (依赖旧的 modelItems 状态) ---
+                // 我们需要利用还没刷新的 modelItems 来判断用户之前在哪，
+                // 从而决定是否发送 "Moved to..." 通知。
                 
-                guard let myCurrentChannelId = connectedUser.channel()?.channelId() else { return }
+                let movingUserSession = safeUser.session()
+                let movingUserName = safeUser.userName() ?? "Unknown"
+                let destChannelName = safeChannel.channelName() ?? "Unknown Channel"
+                let destChannelId = safeChannel.channelId()
                 
-                // 查找用户在旧列表中的位置
-                guard let userIndex = self.userIndexMap[movingUserSession] else {
-                    // 如果找不到用户（极少见），为了保险起见，如果不确定来源就不显示，或只显示进入我频道的
-                    if destChannelId == myCurrentChannelId {
-                        self.addSystemNotification("\(movingUserName) joined your channel")
-                    }
-                    return
-                }
-                
-                // 向上遍历寻找父频道
-                var originChannelId: UInt?
-                let userItem = self.modelItems[userIndex]
-                
-                for i in stride(from: userIndex - 1, through: 0, by: -1) {
-                    let item = self.modelItems[i]
-                    // 找到缩进层级比用户小1（或更小）的第一个频道，即为父频道
-                    if item.type == .channel && item.indentLevel < userItem.indentLevel {
-                        if let ch = item.object as? MKChannel {
-                            originChannelId = ch.channelId()
+                if let connectedUser = self.serverModel?.connectedUser() {
+                    // 1. 如果是我自己移动，总是显示
+                    if movingUserSession == connectedUser.session() {
+                        self.addSystemNotification("You moved to channel \(destChannelName)")
+                    } else {
+                        // 2. 如果是别人移动，判断是否与我有关
+                        let myCurrentChannelId = connectedUser.channel()?.channelId()
+                        
+                        // 查找用户在旧列表中的位置 (Origin)
+                        if let userIndex = self.userIndexMap[movingUserSession] {
+                            // 向上遍历寻找父频道
+                            var originChannelId: UInt?
+                            let userItem = self.modelItems[userIndex]
+                            for i in stride(from: userIndex - 1, through: 0, by: -1) {
+                                let item = self.modelItems[i]
+                                if item.type == .channel && item.indentLevel < userItem.indentLevel {
+                                    if let ch = item.object as? MKChannel {
+                                        originChannelId = ch.channelId()
+                                    }
+                                    break
+                                }
+                            }
+                            
+                            // 判定逻辑
+                            let isLeavingMyChannel = (originChannelId == myCurrentChannelId)
+                            let isEnteringMyChannel = (destChannelId == myCurrentChannelId)
+                            
+                            if isLeavingMyChannel || isEnteringMyChannel {
+                                self.addSystemNotification("\(movingUserName) moved to \(destChannelName)")
+                            }
                         }
-                        break
                     }
                 }
                 
-                // 判定逻辑：
-                // A. 用户原本就在我的频道 (离开) -> 显示
-                // B. 用户移动到了我的频道 (进入) -> 显示
-                // C. 其他情况 (别人的频道之间互相移动) -> 隐藏
-                
-                let isLeavingMyChannel = (originChannelId == myCurrentChannelId)
-                let isEnteringMyChannel = (destChannelId == myCurrentChannelId)
-                
-                if isLeavingMyChannel {
-                    self.addSystemNotification("\(movingUserName) moved to \(destChannelName)")
-                } else if isEnteringMyChannel {
-                    // 这种情况下，通常显示 "Joined your channel" 或者 "Moved to [Current Channel Name]"
-                    self.addSystemNotification("\(movingUserName) moved to \(destChannelName)")
-                }
+                // --- B. ✅✅✅ 核心修复：重建列表以更新缩进和位置 ✅✅✅ ---
+                // 用户已经移动到了新频道，现在我们重建 UI 列表。
+                // rebuildModelArray 会遍历新的频道树，自动将该用户放置在
+                // 正确的子频道下方，并赋予正确的 indentLevel。
+                self.rebuildModelArray()
             }
         }
         
@@ -409,9 +412,18 @@ class ServerModelManager: ObservableObject {
             guard let userInfo = notification.userInfo,
                   let user = userInfo["user"] as? MKUser else { return }
             
-            let userName = user.userName() ?? "Unknown User"
+            let userTransfer = UnsafeTransfer(value: user)
+            
             Task { @MainActor [weak self] in
-                self?.addSystemNotification("\(userName) connected")
+                guard let self = self else { return }
+                
+                let safeUser = userTransfer.value
+                self.applySavedUserPreferences(user: safeUser)
+                
+                let userName = safeUser.userName() ?? "Unknown User"
+                self.addSystemNotification("\(userName) connected")
+                
+                self.rebuildModelArray()
             }
         }
         
@@ -465,6 +477,7 @@ class ServerModelManager: ObservableObject {
                 }
             }
         }
+        
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("MUConnectionOpenedNotification"),
             object: nil,
@@ -482,6 +495,21 @@ class ServerModelManager: ObservableObject {
                 self?.cleanup()
                 self?.setupServerModel()
             }
+        }
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleConnectionOpened),
+            name: NSNotification.Name("MUConnectionOpenedNotification"), // 确保这个名字和 ObjC 定义的一致
+            object: nil
+        )
+    }
+    
+    @objc private func handleConnectionOpened() {
+        print("✅ Connection Opened - Triggering Restore")
+        //稍微延迟一下，确保 MKUser 对象都已就位
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.restoreAllUserPreferences()
         }
     }
     
@@ -852,43 +880,60 @@ class ServerModelManager: ObservableObject {
         channel: MKChannel,
         indentLevel: Int
     ) {
-        let channelName = channel.channelName() ?? "Unknown Channel"; let channelDescription = channel.channelDescription(); let channelItem = ChannelNavigationItem(
+        let channelName = channel.channelName() ?? "Unknown Channel"
+        let channelDescription = channel.channelDescription()
+        let channelItem = ChannelNavigationItem(
             title: channelName,
             subtitle: channelDescription,
             type: .channel,
             indentLevel: indentLevel,
             object: channel
-        ); if let connectedUser = serverModel?.connectedUser(),
-              let userChannel = connectedUser.channel(),
-              userChannel
-            .channelId() == channel
-            .channelId() {
+        )
+        
+        if let connectedUser = serverModel?.connectedUser(),
+           let userChannel = connectedUser.channel(),
+           userChannel.channelId() == channel.channelId() {
             channelItem.isConnectedUserChannel = true
-        }; var userCount = 0; if let usersArray = channel.users(),
-                                 let users = usersArray as? [MKUser] {
-            userCount = users.count; channelItem.userCount = userCount; channelIndexMap[channel.channelId()] = modelItems.count; modelItems
-                .append(
-                    channelItem
-                ); for user in users {
-                    let userName = user.userName() ?? "Unknown User"; let userItem = ChannelNavigationItem(
-                        title: userName,
-                        subtitle: "in \(channelName)",
-                        type: .user,
-                        indentLevel: indentLevel + 1,
-                        object: user
-                    ); updateUserItemState(
-                        item: userItem,
-                        user: user
-                    ); userIndexMap[user.session()] = modelItems.count; modelItems.append(
-                        userItem
-                    )
-                }
-        } else {
-            channelItem.userCount = 0; channelIndexMap[channel.channelId()] = modelItems.count; modelItems
-                .append(
-                    channelItem
+        };
+
+        if let usersArray = channel.users(),
+           let rawUsers = usersArray as? [MKUser] {
+            
+            // ✅ 双重校验：过滤掉那些 "channel属性已经变了，但还残留在当前channel列表里" 的用户
+            // 这一步直接剔除了 "赖在 Root 频道列表里不走" 的幽灵数据
+            let validatedUsers = rawUsers.filter { user in
+                return user.channel()?.channelId() == channel.channelId()
+            }
+            
+            // 使用过滤后的列表来计算人数和渲染
+            channelItem.userCount = validatedUsers.count
+            channelIndexMap[channel.channelId()] = modelItems.count
+            modelItems.append(channelItem)
+            
+            for user in validatedUsers {
+                // 顺便确保配置被应用 (之前的修复)
+                applySavedUserPreferences(user: user)
+                
+                let userName = user.userName() ?? "Unknown User"
+                let userItem = ChannelNavigationItem(
+                    title: userName,
+                    subtitle: "in \(channelName)",
+                    type: .user,
+                    indentLevel: indentLevel + 1,
+                    object: user
                 )
-        }; if let channelsArray = channel.channels(),
+                updateUserItemState(item: userItem, user: user)
+                userIndexMap[user.session()] = modelItems.count
+                modelItems.append(userItem)
+            }
+        } else {
+            // 没有用户的情况
+            channelItem.userCount = 0
+            channelIndexMap[channel.channelId()] = modelItems.count
+            modelItems.append(channelItem)
+        }
+        
+        if let channelsArray = channel.channels(),
               let subChannels = channelsArray as? [MKChannel] {
             for subChannel in subChannels {
                 addChannelTreeToModel(
@@ -1096,7 +1141,12 @@ class ServerModelManager: ObservableObject {
     // 辅助方法：获取排序后的用户
     func getSortedUsers(for channel: MKChannel) -> [MKUser] {
         guard let users = channel.users() as? [MKUser] else { return [] }
-        return users.sorted { u1, u2 in
+        
+        let validatedUsers = users.filter { user in
+            return user.channel()?.channelId() == channel.channelId()
+        }
+        
+        return validatedUsers.sorted { u1, u2 in
             return (u1.userName() ?? "") < (u2.userName() ?? "")
         }
     }
@@ -1109,6 +1159,8 @@ class ServerModelManager: ObservableObject {
         
         // 1. 更新内存中的状态
         userVolumes[session] = volume
+        
+        user.localVolume = volume
         
         // 2. 持久化保存 (同时保存当前的静音状态)
         let isMuted = user.isLocalMuted()
@@ -1156,6 +1208,28 @@ class ServerModelManager: ObservableObject {
         objectWillChange.send()
     }
     
+    func restoreAllUserPreferences() {
+        print("🔄 Restoring preferences for ALL users...")
+        guard let root = serverModel?.rootChannel() else { return }
+        recursiveRestore(channel: root)
+    }
+    
+    private func recursiveRestore(channel: MKChannel) {
+        // 1. 恢复当前频道的用户
+        if let users = channel.users() as? [MKUser] {
+            for user in users {
+                applySavedUserPreferences(user: user)
+            }
+        }
+        
+        // 2. 递归子频道
+        if let subs = channel.channels() as? [MKChannel] {
+            for sub in subs {
+                recursiveRestore(channel: sub)
+            }
+        }
+    }
+    
     // 辅助：应用已保存的设置 (在 rebuildModelArray 中调用)
     private func applySavedUserPreferences(user: MKUser) {
         guard let serverHost = serverModel?.hostname(),
@@ -1167,6 +1241,7 @@ class ServerModelManager: ObservableObject {
         // 1. 应用自定义音量到内存字典
         // 注意：我们不调用 user.setLocalVolume，只更新我们自己的逻辑字典
         userVolumes[user.session()] = prefs.volume
+        user.localVolume = prefs.volume
         
         // 2. 应用屏蔽状态 (这个依然调用 MumbleKit，因为它支持)
         if user.isLocalMuted() != prefs.isLocalMuted {

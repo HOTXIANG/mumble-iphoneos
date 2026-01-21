@@ -263,7 +263,7 @@ struct ChannelTreeRow: View {
     
     // 辅助属性：判断是否真的有内容
     private var hasContent: Bool {
-        let userCount = (channel.users() as? [MKUser])?.count ?? 0
+        let userCount = serverManager.getSortedUsers(for: channel).count
         let subChannelCount = (channel.channels() as? [MKChannel])?.count ?? 0
         return userCount > 0 || subChannelCount > 0
     }
@@ -351,13 +351,13 @@ struct ChannelRowView: View {
     }
     
     private var hasChildren: Bool {
-        let uCount = (channel.users() as? [MKUser])?.count ?? 0
+        let uCount = serverManager.getSortedUsers(for: channel).count
         let cCount = (channel.channels() as? [MKChannel])?.count ?? 0
         return uCount > 0 || cCount > 0
     }
     
     private var userCount: Int {
-        (channel.users() as? [MKUser])?.count ?? 0
+        return serverManager.getSortedUsers(for: channel).count
     }
 }
 
@@ -369,6 +369,14 @@ struct UserRowView: View {
     @ObservedObject var serverManager: ServerModelManager
     
     let onTap: () -> Void
+    
+    private var currentVolume: Float {
+        if let vol = serverManager.userVolumes[user.session()] {
+            return vol
+        }
+        
+        return user.localVolume
+    }
     
     var body: some View {
         ZStack(alignment: .leading) {
@@ -385,6 +393,23 @@ struct UserRowView: View {
                     .foregroundColor(isMyself ? .cyan : .primary)
                     .shadow(radius: isMyself ? 1 : 0)
                     .lineLimit(1)
+                
+                if abs(currentVolume - 1.0) > 0.01 {
+                    Text("\(Int(currentVolume * 100))%")
+                        .font(.system(size: 9, weight: .bold))
+                    // 大于 100% 橙色，小于 100% 灰色
+                        .foregroundColor(currentVolume > 1.0 ? .orange : .gray)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.3))
+                                .overlay(
+                                    Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                                )
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                }
                 
                 Spacer()
                 
