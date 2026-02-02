@@ -568,6 +568,10 @@ class ServerModelManager: ObservableObject {
                 guard let self = self else { return }
                 let connectedUserSession = self.serverModel?.connectedUser()?.session()
                 
+                if senderSession == connectedUserSession {
+                    return
+                }
+                
                 // 1. 先调用 handleReceivedMessage，它会创建并添加 chatMessage 到数组
                 self.handleReceivedMessage(
                     senderName: senderName,
