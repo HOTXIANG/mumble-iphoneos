@@ -26,6 +26,7 @@ class ServerModelManager: ObservableObject {
     
     @Published public var userVolumes: [UInt: Float] = [:]
     
+    private var observerTokens: [NSObjectProtocol] = []
     private var muteStateBeforeDeafen: Bool = false
     private var serverModel: MKServerModel?
     private var userIndexMap: [UInt: Int] = [:]
@@ -60,6 +61,17 @@ class ServerModelManager: ObservableObject {
         ); NotificationCenter.default.removeObserver(
             self
         )
+    }
+    
+    private func removeObservers() {
+        // 1. 移除 Block 类型的监听器
+        for token in observerTokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+        observerTokens.removeAll()
+        
+        // 2. 移除 Selector 类型的监听器 (self)
+        NotificationCenter.default.removeObserver(self)
     }
     
     private func setupSystemMute() {
@@ -175,6 +187,7 @@ class ServerModelManager: ObservableObject {
         systemMuteManager.cleanup()
         endLiveActivity()
         
+        removeObservers()
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
     }
     
@@ -380,127 +393,61 @@ class ServerModelManager: ObservableObject {
         }
     }
     
-    private nonisolated func setupNotifications() {
-        NotificationCenter.default.removeObserver(self)
+    private func setupNotifications() {
+        // 1. 先清理旧的，防止叠加
+        removeObservers()
         
-        NotificationCenter.default
-            .addObserver(
-                forName: ServerModelNotificationManager.rebuildModelNotification,
-                object: nil,
-                queue: nil
-            ) {
-                [weak self] _ in Task {
-                    @MainActor in self?
-                        .rebuildModelArray()
-                }
-            }
-        NotificationCenter.default
-            .addObserver(
-                forName: ServerModelNotificationManager.userStateUpdatedNotification,
-                object: nil,
-                queue: nil
-            ) {
-                [weak self] notification in guard let userInfo = notification.userInfo,
-                                                  let userSession = userInfo["userSession"] as? UInt else {
-                    return
-                }; Task {
-                    @MainActor in self?
-                        .updateUserBySession(
-                            userSession
-                        )
-                }
-            }
-        NotificationCenter.default
-            .addObserver(
-                forName: ServerModelNotificationManager.userTalkStateChangedNotification,
-                object: nil,
-                queue: nil
-            ) {
-                [weak self] notification in guard let userInfo = notification.userInfo,
-                                                  let userSession = userInfo["userSession"] as? UInt,
-                                                  let talkState = userInfo["talkState"] as? MKTalkState else {
-                    return
-                }; Task {
-                    @MainActor in self?
-                        .updateUserTalkingState(
-                            userSession: userSession,
-                            talkState: talkState
-                        )
-                }
-            }
-        NotificationCenter.default
-            .addObserver(
-                forName: ServerModelNotificationManager.channelRenamedNotification,
-                object: nil,
-                queue: nil
-            ) {
-                [weak self] notification in guard let userInfo = notification.userInfo,
-                                                  let channelId = userInfo["channelId"] as? UInt,
-                                                  let newName = userInfo["newName"] as? String else {
-                    return
-                }; Task {
-                    @MainActor in self?
-                        .updateChannelName(
-                            channelId: channelId,
-                            newName: newName
-                        )
-                }
-            }
+        let center = NotificationCenter.default
         
-        NotificationCenter.default.addObserver(
-            forName: ServerModelNotificationManager.userMovedNotification,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            guard let userInfo = notification.userInfo,
-                  let user = userInfo["user"] as? MKUser,
-                  let channel = userInfo["channel"] as? MKChannel else { return }
-            
+        // 2. 注册并保存令牌
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.rebuildModelNotification, object: nil, queue: nil) { [weak self] _ in
+            Task { @MainActor in self?.rebuildModelArray() }
+        })
+        
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userStateUpdatedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo, let userSession = userInfo["userSession"] as? UInt else { return }
+            Task { @MainActor in self?.updateUserBySession(userSession) }
+        })
+        
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userTalkStateChangedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo, let userSession = userInfo["userSession"] as? UInt, let talkState = userInfo["talkState"] as? MKTalkState else { return }
+            Task { @MainActor in self?.updateUserTalkingState(userSession: userSession, talkState: talkState) }
+        })
+        
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.channelRenamedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo, let channelId = userInfo["channelId"] as? UInt, let newName = userInfo["newName"] as? String else { return }
+            Task { @MainActor in self?.updateChannelName(channelId: channelId, newName: newName) }
+        })
+        
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userMovedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser, let channel = userInfo["channel"] as? MKChannel else { return }
             let userTransfer = UnsafeTransfer(value: user)
             let channelTransfer = UnsafeTransfer(value: channel)
-            
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                
                 let safeUser = userTransfer.value
                 let safeChannel = channelTransfer.value
-                
-                // --- A. 先执行通知判断逻辑 (依赖旧的 modelItems 状态) ---
-                // 我们需要利用还没刷新的 modelItems 来判断用户之前在哪，
-                // 从而决定是否发送 "Moved to..." 通知。
-                
                 let movingUserSession = safeUser.session()
                 let movingUserName = safeUser.userName() ?? "Unknown"
                 let destChannelName = safeChannel.channelName() ?? "Unknown Channel"
                 let destChannelId = safeChannel.channelId()
-                
                 if let connectedUser = self.serverModel?.connectedUser() {
-                    // 1. 如果是我自己移动，总是显示
                     if movingUserSession == connectedUser.session() {
                         self.addSystemNotification("You moved to channel \(destChannelName)")
                     } else {
-                        // 2. 如果是别人移动，判断是否与我有关
                         let myCurrentChannelId = connectedUser.channel()?.channelId()
-                        
-                        // 查找用户在旧列表中的位置 (Origin)
                         if let userIndex = self.userIndexMap[movingUserSession] {
-                            // 向上遍历寻找父频道
                             var originChannelId: UInt?
                             let userItem = self.modelItems[userIndex]
                             for i in stride(from: userIndex - 1, through: 0, by: -1) {
                                 let item = self.modelItems[i]
                                 if item.type == .channel && item.indentLevel < userItem.indentLevel {
-                                    if let ch = item.object as? MKChannel {
-                                        originChannelId = ch.channelId()
-                                    }
+                                    if let ch = item.object as? MKChannel { originChannelId = ch.channelId() }
                                     break
                                 }
                             }
-                            
-                            // 判定逻辑
                             let isLeavingMyChannel = (originChannelId == myCurrentChannelId)
                             let isEnteringMyChannel = (destChannelId == myCurrentChannelId)
-                            
                             if isLeavingMyChannel || isEnteringMyChannel {
                                 self.addSystemNotification("\(movingUserName) moved to \(destChannelName)")
                             }
@@ -510,51 +457,29 @@ class ServerModelManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 self.rebuildModelArray()
             }
-        }
+        })
         
-        NotificationCenter.default.addObserver(
-            forName: ServerModelNotificationManager.userJoinedNotification,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            guard let userInfo = notification.userInfo,
-                  let user = userInfo["user"] as? MKUser else { return }
-            
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userJoinedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser else { return }
             let userTransfer = UnsafeTransfer(value: user)
-            
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                
                 let safeUser = userTransfer.value
                 self.applySavedUserPreferences(user: safeUser)
-                
                 let userName = safeUser.userName() ?? "Unknown User"
                 self.addSystemNotification("\(userName) connected")
-                
                 self.rebuildModelArray()
             }
-        }
+        })
         
-        NotificationCenter.default.addObserver(
-            forName: ServerModelNotificationManager.userLeftNotification,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            guard let userInfo = notification.userInfo,
-                  let user = userInfo["user"] as? MKUser else { return }
-            
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userLeftNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser else { return }
             let userName = user.userName() ?? "Unknown User"
-            Task { @MainActor [weak self] in
-                self?.addSystemNotification("\(userName) disconnected")
-            }
-        }
+            Task { @MainActor [weak self] in self?.addSystemNotification("\(userName) disconnected") }
+        })
         
-        // --- 核心修改 2：添加对新消息通知的监听 ---
-        NotificationCenter.default.addObserver(
-            forName: ServerModelNotificationManager.textMessageReceivedNotification,
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
+        // 核心修复：消息去重 + 监听器管理
+        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.textMessageReceivedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo,
                   let message = userInfo["message"] as? MKTextMessage,
                   let user = userInfo["user"] as? MKUser else { return }
@@ -568,11 +493,12 @@ class ServerModelManager: ObservableObject {
                 guard let self = self else { return }
                 let connectedUserSession = self.serverModel?.connectedUser()?.session()
                 
+                // 🛑 防止双重显示：如果是自己发的消息，直接忽略
                 if senderSession == connectedUserSession {
+                    print("🚫 Ignoring echoed message from self to prevent duplicate.")
                     return
                 }
                 
-                // 1. 先调用 handleReceivedMessage，它会创建并添加 chatMessage 到数组
                 self.handleReceivedMessage(
                     senderName: senderName,
                     plainText: plainText,
@@ -581,38 +507,27 @@ class ServerModelManager: ObservableObject {
                     connectedUserSession: connectedUserSession
                 )
                 
-                // 2. 现在，我们可以安全地检查刚刚被添加的消息
-                // 我们只需要判断这次消息是不是自己发送的即可
-                let isSentBySelf = (senderSession == connectedUserSession)
-                if AppState.shared.currentTab != .messages && !isSentBySelf {
+                if AppState.shared.currentTab != .messages {
                     AppState.shared.unreadMessageCount += 1
                 }
             }
-        }
+        })
         
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("MUConnectionOpenedNotification"),
-            object: nil,
-            queue: nil
-        ) { [weak self] notification in
-            
+        observerTokens.append(center.addObserver(forName: NSNotification.Name("MUConnectionOpenedNotification"), object: nil, queue: nil) { [weak self] notification in
             let userInfo = notification.userInfo
             let extractedDisplayName = userInfo?["displayName"] as? String
-            
             Task { @MainActor [weak self] in
-                if let name = extractedDisplayName {
-                    AppState.shared.serverDisplayName = name
-                }
-                
+                if let name = extractedDisplayName { AppState.shared.serverDisplayName = name }
                 self?.cleanup()
                 self?.setupServerModel()
             }
-        }
+        })
         
-        NotificationCenter.default.addObserver(
+        // 保留原有的 Selector 监听 (这个可以用 removeObserver(self) 移除)
+        center.addObserver(
             self,
             selector: #selector(handleConnectionOpened),
-            name: NSNotification.Name("MUConnectionOpenedNotification"), // 确保这个名字和 ObjC 定义的一致
+            name: NSNotification.Name("MUConnectionOpenedNotification"),
             object: nil
         )
     }
