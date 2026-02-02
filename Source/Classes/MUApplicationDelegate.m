@@ -257,7 +257,12 @@
     
     MKAudio *audio = [MKAudio sharedAudio];
     [audio updateAudioSettings:&settings];
-    [audio restart];
+    if (_connectionActive || [audio isRunning]) {
+        NSLog(@"[DEBUG] 🔧 Settings changed while active. Restarting audio engine...");
+        [audio restart];
+    } else {
+        NSLog(@"[DEBUG] 💤 Settings updated, but audio engine is idle. Skipping start.");
+    }
     
     NSLog(@"[DEBUG] ✅ setupAudio FINISHED. Engine should be running.");
 }
@@ -318,8 +323,8 @@
     //
     // For regular backgrounding, we usually don't turn off the audio system, and
     // we won't have to start it again.
-    if (![[MKAudio sharedAudio] isRunning]) {
-        NSLog(@"MumbleApplicationDelegate: MKAudio not running. Starting it.");
+    if (_connectionActive && ![[MKAudio sharedAudio] isRunning]) {
+        NSLog(@"MumbleApplicationDelegate: Connection active but MKAudio not running. Starting it.");
         [[MKAudio sharedAudio] start];
         
 #if ENABLE_REMOTE_CONTROL
