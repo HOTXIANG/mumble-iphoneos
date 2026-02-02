@@ -14,6 +14,7 @@ class ServerModelManager: ObservableObject {
     @Published var modelItems: [ChannelNavigationItem] = []
     @Published var viewMode: ViewMode = .server
     @Published var isConnected: Bool = false
+    @Published var isLocalAudioTestRunning: Bool = false
     
     // --- 核心修改 1：添加 @Published 数组来存储聊天消息 ---
     @Published var messages: [ChatMessage] = []
@@ -32,6 +33,8 @@ class ServerModelManager: ObservableObject {
     private var delegateWrapper: ServerModelDelegateWrapper?
     private var liveActivity: Activity<MumbleActivityAttributes>?
     private var keepAliveTimer: Timer?
+    private let systemMuteManager = SystemMuteManager()
+    private var isRestoringMuteState = false
     
     enum ViewMode {
         case server,
@@ -44,14 +47,12 @@ class ServerModelManager: ObservableObject {
         )
     }
     func activate() {
-        print(
-            "🚀 ServerModelManager: ACTIVATE - Activating model and notifications."
-        ); setupServerModel();
+        print("🚀 ServerModelManager: ACTIVATE - Activating model and notifications.")
+        setupServerModel();
         setupNotifications()
-        
         requestNotificationAccess()
-        
-        startLiveActivity()
+        setupSystemMute()
+        setupAudioRouteObservation()
     }
     deinit {
         print(
@@ -59,6 +60,29 @@ class ServerModelManager: ObservableObject {
         ); NotificationCenter.default.removeObserver(
             self
         )
+    }
+    
+    private func setupSystemMute() {
+        systemMuteManager.onSystemMuteChanged = { [weak self] isSystemMuted in
+            guard let self = self, let user = self.serverModel?.connectedUser() else { return }
+            
+            // ✅ 核心修复：如果正在恢复状态（路由切换中），忽略系统的“自动开麦”通知
+            // 这防止了系统重置硬件状态时，反过来把 App 的状态也带偏了
+            if self.isRestoringMuteState {
+                print("🔒 Route changing: Ignoring system mute notification (\(isSystemMuted)) to preserve App state.")
+                return
+            }
+            
+            // 只有当 Mumble 内部状态不一致时才更新
+            if user.isSelfMuted() != isSystemMuted {
+                print("🔄 Sync: System(\(isSystemMuted)) -> App")
+                self.serverModel?.setSelfMuted(isSystemMuted, andSelfDeafened: user.isSelfDeafened())
+                self.updateUserBySession(user.session())
+                self.updateLiveActivity()
+            }
+        }
+        
+        systemMuteManager.activate()
     }
     
     private func requestNotificationAccess() {
@@ -127,22 +151,18 @@ class ServerModelManager: ObservableObject {
         }
         
         rebuildModelArray()
+        startLiveActivity()
     }
     
     func cleanup() {
-        print(
-            "🧹 ServerModelManager: CLEANUP"
-        )
+        print("🧹 ServerModelManager: CLEANUP")
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
         
         userVolumes.removeAll()
         
         if let wrapper = delegateWrapper {
-            serverModel?
-                .removeDelegate(
-                    wrapper
-                )
+            serverModel?.removeDelegate(wrapper)
         }
         delegateWrapper = nil
         serverModel = nil
@@ -152,7 +172,99 @@ class ServerModelManager: ObservableObject {
         isConnected = false
         serverName = nil
         
+        systemMuteManager.cleanup()
         endLiveActivity()
+        
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
+    }
+    
+    // MARK: - Audio Route Handling (Hot-swap Support)
+    
+    private func setupAudioRouteObservation() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioRouteChanged),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+    }
+    
+    @objc private func handleAudioRouteChanged(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+        
+        print("🎧 Audio Route Changed. Reason: \(reason.rawValue)")
+        
+        switch reason {
+        case .newDeviceAvailable:
+            // 🔒 1. 立即上锁，防止重启期间系统发出的“开麦”通知把 App 状态带偏
+            self.isRestoringMuteState = true
+            
+            print("🎧 New Device Detected. Scheduling Full Reactivation...")
+            
+            Task { @MainActor in
+                // ⏳ 2. 等待蓝牙握手 (1.5秒)
+                // AirPods Pro 连接过程：蓝牙连接 -> A2DP 路由 -> HFP (麦克风) 路由。
+                // 必须要等 HFP 路由完全建立，AVAudioApplication 才能控制它。
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                
+                // 🔄 3. 重启 SystemMuteManager (Cleanup -> Activate)
+                // 这相当于重新注册了一遍闭麦手势监听
+                self.systemMuteManager.cleanup()
+                self.systemMuteManager.activate()
+                
+                // 📲 4. 强制把 App 的状态“刷”给新耳机
+                if let user = self.serverModel?.connectedUser() {
+                    let targetState = user.isSelfMuted()
+                    print("🔄 Syncing App State (\(targetState)) to New Hardware...")
+                    self.systemMuteManager.setSystemMute(targetState)
+                }
+                
+                // 🔓 5. 解锁
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                self.isRestoringMuteState = false
+            }
+            
+        case .oldDeviceUnavailable, .categoryChange:
+            break
+            
+        default:
+            break
+        }
+    }
+    
+    private func enforceAppMuteStateToSystem() {
+        guard let user = serverModel?.connectedUser() else {
+            self.isRestoringMuteState = false
+            return
+        }
+        
+        // 1. 获取 App 当前的真实意图（是静音还是开麦）
+        let shouldBeMuted = user.isSelfMuted()
+        
+        print("🔄 Route changed. Locking state and enforcing: \(shouldBeMuted)...")
+        
+        Task { @MainActor in
+            // 2. 稍微等待，让音频链路和蓝牙握手稳定
+            // 0.5秒通常足够覆盖 AirPods 连接时的系统重置动作
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+            
+            // 3. 再次确认用户还在
+            if let freshUser = self.serverModel?.connectedUser() {
+                // 使用 App 之前的状态，强行覆盖系统状态
+                self.systemMuteManager.setSystemMute(shouldBeMuted)
+                print("✅ Enforced state to System: \(shouldBeMuted)")
+            }
+            
+            // 4. 解锁，恢复正常监听
+            // 稍微再延迟一点点解锁，确保刚才的 setSystemMute 不会被误判为外部变更
+            try? await Task.sleep(nanoseconds: 500_000_000) // +0.5s
+            self.isRestoringMuteState = false
+            print("🔓 Route change handling complete. State lock released.")
+        }
     }
     
     private func startLiveActivity() {
@@ -1018,58 +1130,44 @@ class ServerModelManager: ObservableObject {
             )
     }
     func toggleSelfMute() {
-        guard let user = serverModel?.connectedUser() else {
-            return
-        }
+        guard let user = serverModel?.connectedUser() else { return }
+        
         // 当用户听障时，不允许单独取消静音
-        if user
-            .isSelfDeafened() {
-            return
-        }
-        serverModel?
-            .setSelfMuted(
-                !user.isSelfMuted(),
-                andSelfDeafened: user.isSelfDeafened()
-            )
+        if user.isSelfDeafened() { return }
+        
+        let newMuteState = !user.isSelfMuted()
+        
+        serverModel?.setSelfMuted(newMuteState, andSelfDeafened: user.isSelfDeafened())
+        
         updateUserBySession(
             user.session()
         )
         
+        systemMuteManager.setSystemMute(newMuteState)
+        
         updateLiveActivity()
     }
     func toggleSelfDeafen() {
-        guard let user = serverModel?.connectedUser() else {
-            return
-        }
+        guard let user = serverModel?.connectedUser() else { return }
         
         // 判断当前是否处于听障状态
         let currentlyDeafened = user.isSelfDeafened()
         
         if currentlyDeafened {
-            // 如果是，说明用户想要【取消听障】
-            // 我们将使用【之前保存的】静音状态来恢复
-            serverModel?
-                .setSelfMuted(
-                    self.muteStateBeforeDeafen,
-                    andSelfDeafened: false
-                )
+            // 取消听障 -> 恢复旧状态
+            serverModel?.setSelfMuted(self.muteStateBeforeDeafen, andSelfDeafened: false)
+            // ✅ 同步恢复后的状态给系统
+            systemMuteManager.setSystemMute(self.muteStateBeforeDeafen)
         } else {
-            // 如果否，说明用户想要【开启听障】
-            // 我们先【保存】当前的静音状态
-            self.muteStateBeforeDeafen = user
-                .isSelfMuted()
-            // 然后强制进入静音和听障状态
-            serverModel?
-                .setSelfMuted(
-                    true,
-                    andSelfDeafened: true
-                )
+            // 开启听障 -> 强制静音
+            self.muteStateBeforeDeafen = user.isSelfMuted()
+            serverModel?.setSelfMuted(true, andSelfDeafened: true)
+            // ✅ 强制系统静音
+            systemMuteManager.setSystemMute(true)
         }
         
         // 无论哪种情况，都立刻主动刷新UI
-        updateUserBySession(
-            user.session()
-        )
+        updateUserBySession(user.session())
         
         updateLiveActivity()
     }
@@ -1207,7 +1305,7 @@ class ServerModelManager: ObservableObject {
     // 辅助方法：获取排序后的用户
     func getSortedUsers(for channel: MKChannel) -> [MKUser] {
         guard let users = channel.users() as? [MKUser] else { return [] }
-
+        
         let validatedUsers = users.filter { user in
             return user.channel()?.channelId() == channel.channelId()
         }
@@ -1215,6 +1313,46 @@ class ServerModelManager: ObservableObject {
         // 使用 validatedUsers 进行排序
         return validatedUsers.sorted { u1, u2 in
             return (u1.userName() ?? "") < (u2.userName() ?? "")
+        }
+    }
+    
+    // MARK: - Audio Control for Settings / Audio Wizard
+    
+    /// 进入设置界面时调用：临时开启麦克风
+    func startAudioTest() {
+        // 如果当前已经连接了服务器，说明麦克风本来就开着，不需要做任何事
+        if self.isConnected || isLocalAudioTestRunning {
+            return
+        }
+        
+        print("🎤 Starting Local Audio for Settings/Testing...")
+        isLocalAudioTestRunning = true
+        // 调用 ObjC 的 MKAudio
+        MKAudio.shared().restart()
+    }
+    
+    /// 退出设置界面时调用：关闭麦克风
+    func stopAudioTest() {
+        // 如果当前连接着服务器，绝对不能关麦，否则通话断了
+        if self.isConnected {
+            print("🎤 Connected to server, keeping audio active.")
+            return
+        }
+        
+        if !isLocalAudioTestRunning {
+            return
+        }
+        
+        print("🎤 Stopping Local Audio (Settings closed)...")
+        isLocalAudioTestRunning = false
+        // 关闭引擎并释放 AudioSession
+        MKAudio.shared().stop()
+        
+        // 显式停用 Session 以消除橙色点
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("⚠️ Failed to deactivate session: \(error)")
         }
     }
     

@@ -195,6 +195,7 @@ struct WelcomeView: MumbleContentView {
     @State private var showingPreferences = false
     @State private var showingAbout = false
     @EnvironmentObject var navigationManager: NavigationManager
+    @EnvironmentObject var serverManager: ServerModelManager
     
     var navigationConfig: any NavigationConfigurable {
         WelcomeNavigationConfig(
@@ -205,9 +206,12 @@ struct WelcomeView: MumbleContentView {
     
     var contentBody: some View {
         WelcomeContentView()
-            .sheet(isPresented: $showingPreferences) {
+            .sheet(isPresented: $showingPreferences, onDismiss: {
+                serverManager.stopAudioTest()
+            }) {
                 NavigationStack {
                     PreferencesView()
+                        .environmentObject(serverManager)
                 }
             }
     }
@@ -253,6 +257,8 @@ struct MumbleNavigationModifier: ViewModifier {
 struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
     
+    @StateObject private var serverManager = ServerModelManager()
+    
     // iPhone 使用的单一导航管理器
     @StateObject private var navigationManager = NavigationManager()
     
@@ -270,6 +276,7 @@ struct AppRootView: View {
                 iPhoneLayout
             }
         }
+        .environmentObject(serverManager)
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
         .overlay(alignment: .top) {
             if let toast = appState.activeToast {
@@ -311,6 +318,9 @@ struct AppRootView: View {
         }
         .alert(item: $appState.activeError) { error in
             Alert(title: Text(error.title), message: Text(error.message), dismissButton: .default(Text("OK")))
+        }
+        .onAppear {
+            serverManager.activate()
         }
         .animation(.default, value: appState.isConnecting)
         .animation(.spring(), value: appState.isConnected)

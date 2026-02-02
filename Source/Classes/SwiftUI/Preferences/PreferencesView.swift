@@ -224,6 +224,7 @@ struct AdvancedAudioSettingsView: View {
 
 // 4. 主设置入口视图
 struct PreferencesView: View {
+    @EnvironmentObject var serverManager: ServerModelManager
     @AppStorage("AudioOutputVolume") var outputVolume: Double = 1.0
     @Environment(\.dismiss) var dismiss
     
@@ -291,6 +292,9 @@ struct PreferencesView: View {
                     dismiss()
                 }
             }
+        }
+        .onAppear {
+            serverManager.startAudioTest()
         }
     }
 }

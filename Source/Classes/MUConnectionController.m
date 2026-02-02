@@ -10,9 +10,11 @@
 #import "MUDatabase.h"
 #import "Mumble-Swift.h"
 
+#import <MumbleKit/MKAudio.h>
 #import <MumbleKit/MKConnection.h>
 #import <MumbleKit/MKServerModel.h>
 #import <MumbleKit/MKCertificate.h>
+#import <AVFoundation/AVFoundation.h>
 
 NSString *MUConnectionOpenedNotification = @"MUConnectionOpenedNotification";
 NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
@@ -68,6 +70,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 - (id) init {
     if ((self = [super init])) {
         _retryCount = 0;
+        [[MKAudio sharedAudio] stop];
     }
     return self;
 }
@@ -82,6 +85,15 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
               andPassword:(NSString *)password
            certificateRef:(NSData *)certRef
               displayName:(NSString *)displayName {
+    
+    BOOL wasConnected = (_connection != nil || _serverModel != nil);
+    
+    if (wasConnected) {
+        NSLog(@"🔄 Switching servers: Force disconnecting previous session...");
+        // 模拟用户点击断开：这会停止线程、发送 Bye 消息、清理状态
+        [self disconnectFromServer];
+    }
+    
     _hostname = [hostName copy];
     _port = port;
     _username = [userName copy];
@@ -93,7 +105,15 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     _retryCount = 0;
     
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
-    [self establishConnection];
+    
+    if (wasConnected) {
+        NSLog(@"⏳ Waiting 0.5s for socket cleanup...");
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self establishConnection];
+        });
+    } else {
+        [self establishConnection];
+    }
 }
 
 - (BOOL) isConnected {
@@ -164,7 +184,8 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 }
 
 - (void) establishConnection {
-    // 这里不再重置 _retryCount，因为它在循环重试中需要累加
+    NSLog(@"🎤 Starting Audio Engine for connection...");
+    [[MKAudio sharedAudio] restart];
     // 只有在 connetToHostname 中才重置为 0
     _isUserInitiatedDisconnect = NO;
     
@@ -177,9 +198,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     [_serverModel addDelegate:self];
     
     _serverRoot = [[MUServerRootViewController alloc] initWithConnection:_connection andServerModel:_serverModel];
-    
-    NSData *certPersistentId = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
-    
+
     if (_certificateRef != nil) {
         // 如果这个服务器有专属证书，就用它
         NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:_certificateRef];
@@ -222,6 +241,16 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     dispatch_async(dispatch_get_main_queue(), ^{
         [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionClosedNotification object:nil];
     });
+    
+    NSLog(@"🎤 Stopping Audio Engine (Release Mic)...");
+    [[MKAudio sharedAudio] stop];
+    
+    // 显式停用 Session，确保系统状态栏的橙色点立即消失
+    NSError *error = nil;
+    [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
+    if (error) {
+        NSLog(@"⚠️ Failed to deactivate AudioSession: %@", error.localizedDescription);
+    }
 }
             
 - (void) postErrorWithTitle:(NSString *)title message:(NSString *)message {
