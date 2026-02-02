@@ -245,17 +245,23 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionClosedNotification object:nil];
     });
     
-    NSLog(@"🎤 Stopping Audio Engine (Release Mic)...");
-    [[MKAudio sharedAudio] stop];
-    
-    // 显式停用 Session，确保系统状态栏的橙色点立即消失
-    NSError *error = nil;
-    [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
-    if (error) {
-        NSLog(@"⚠️ Failed to deactivate AudioSession: %@", error.localizedDescription);
-    }
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        NSLog(@"🎤 [Async] Stopping Audio Engine (Release Mic)...");
+        [[MKAudio sharedAudio] stop];
+        
+        // 显式停用 Session，消除橙色点
+        // 这个操作涉及系统 IPC 通信，是造成卡顿的主要原因
+        NSError *error = nil;
+        [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
+        
+        if (error) {
+            NSLog(@"⚠️ [Async] Failed to deactivate AudioSession: %@", error.localizedDescription);
+        } else {
+            NSLog(@"✅ [Async] Audio session deactivated successfully.");
+        }
+    });
 }
-            
+
 - (void) postErrorWithTitle:(NSString *)title message:(NSString *)message {
     NSDictionary *userInfo = @{ @"title": title, @"message": message };
     dispatch_async(dispatch_get_main_queue(), ^{

@@ -1336,7 +1336,9 @@ class ServerModelManager: ObservableObject {
         print("🎤 Starting Local Audio for Settings/Testing...")
         isLocalAudioTestRunning = true
         // 调用 ObjC 的 MKAudio
-        MKAudio.shared().restart()
+        Task.detached(priority: .userInitiated) {
+            MKAudio.shared().restart()
+        }
     }
     
     /// 退出设置界面时调用：关闭麦克风
@@ -1354,13 +1356,15 @@ class ServerModelManager: ObservableObject {
         print("🎤 Stopping Local Audio (Settings closed)...")
         isLocalAudioTestRunning = false
         // 关闭引擎并释放 AudioSession
-        MKAudio.shared().stop()
-        
-        // 显式停用 Session 以消除橙色点
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            print("⚠️ Failed to deactivate session: \(error)")
+        Task.detached(priority: .userInitiated) {
+            MKAudio.shared().stop()
+            
+            // 显式停用 Session 以消除橙色点
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            } catch {
+                print("⚠️ Failed to deactivate session: \(error)")
+            }
         }
     }
     
