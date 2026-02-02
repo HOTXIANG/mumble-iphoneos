@@ -184,10 +184,13 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 }
 
 - (void) establishConnection {
-    NSLog(@"🎤 Starting Audio Engine for connection...");
-    [[MKAudio sharedAudio] restart];
     // 只有在 connetToHostname 中才重置为 0
     _isUserInitiatedDisconnect = NO;
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        NSLog(@"🎤 [Async] Starting Audio Engine...");
+        [[MKAudio sharedAudio] restart];
+    });
     
     _connection = [[MKConnection alloc] init];
     [_connection setDelegate:self];

@@ -646,14 +646,22 @@ class ServerModelManager: ObservableObject {
             self.cleanup()
             self.setupServerModel()
             
-            // 稍微延迟一下，确保 MKUser 对象都已就位后恢复偏好
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.restoreAllUserPreferences()
+            Task.detached(priority: .userInitiated) {
+                // 稍微等待 UI 动画完成 (例如进入频道的 Push 动画)
+                try? await Task.sleep(nanoseconds: 600_000_000) // 0.6s
+                
+                // 回到主线程执行具体的恢复逻辑
+                await MainActor.run {
+                    print("♻️ [Async] Restoring user preferences...")
+                    self.restoreAllUserPreferences()
+                    
+                    // 初始进入时的状态同步
+                    if let user = self.serverModel?.connectedUser(), user.isSelfMuted() {
+                        print("🔒 [Async] Initial Sync: Enforcing System Mute")
+                        self.systemMuteManager.setSystemMute(true)
+                    }
+                }
             }
-        }
-        //稍微延迟一下，确保 MKUser 对象都已就位
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.restoreAllUserPreferences()
         }
     }
     
@@ -1416,10 +1424,12 @@ class ServerModelManager: ObservableObject {
     func restoreAllUserPreferences() {
         print("🔄 Restoring preferences for ALL users...")
         guard let root = serverModel?.rootChannel() else { return }
-        recursiveRestore(channel: root)
+        Task { @MainActor in
+            await recursiveRestore(channel: root)
+        }
     }
     
-    private func recursiveRestore(channel: MKChannel) {
+    private func recursiveRestore(channel: MKChannel) async {
         // 1. 恢复当前频道的用户
         if let users = channel.users() as? [MKUser] {
             for user in users {
@@ -1427,10 +1437,12 @@ class ServerModelManager: ObservableObject {
             }
         }
         
+        await Task.yield()
+        
         // 2. 递归子频道
         if let subs = channel.channels() as? [MKChannel] {
             for sub in subs {
-                recursiveRestore(channel: sub)
+                await recursiveRestore(channel: sub)
             }
         }
     }
