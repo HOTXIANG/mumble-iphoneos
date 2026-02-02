@@ -13,6 +13,8 @@ struct FavouriteServerEditView: View {
     @State private var port: String
     @State private var userName: String
     @State private var password: String
+    
+    @Environment(\.dismiss) var dismiss
     @EnvironmentObject private var navigationManager: NavigationManager
     @ObservedObject private var certModel = CertificateModel.shared
     
@@ -158,6 +160,12 @@ struct FavouriteServerEditView: View {
         .navigationTitle(isEditMode ? "Edit Favourite" : "New Favourite")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") {
+                    dismiss()
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Done") {
                     saveServer()

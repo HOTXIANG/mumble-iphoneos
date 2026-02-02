@@ -103,6 +103,10 @@ struct FavouriteServerRowView: View {
 struct FavouriteServerListContentView: View {
     var navigationManager: NavigationManager
     
+    @Binding var showingSheet: Bool
+    @Binding var editingServer: MUFavouriteServer?
+    var refreshTrigger: UUID
+    
     @State private var favouriteServers: [MUFavouriteServer] = []
     @State private var serverToDelete: MUFavouriteServer?
     @State private var showingDeleteAlert = false
@@ -135,6 +139,9 @@ struct FavouriteServerListContentView: View {
             }
         }
         .onAppear {
+            loadFavouriteServers()
+        }
+        .onChange(of: refreshTrigger) { _ in
             loadFavouriteServers()
         }
         .alert("Delete Favourite", isPresented: $showingDeleteAlert, presenting: serverToDelete) { server in
@@ -203,18 +210,42 @@ struct FavouriteServerListContentView: View {
     }
     
     private func editServer(_ server: MUFavouriteServer) {
-        navigationManager.navigate(to: .swiftUI(.favouriteServerEdit(primaryKey: server.primaryKey)))
+        editingServer = server
+        showingSheet = true
     }
 }
 
 struct FavouriteServerListView: MumbleContentView {
     @EnvironmentObject var navigationManager: NavigationManager
+    
+    @State private var showingSheet = false
+    @State private var editingServer: MUFavouriteServer?
+    @State private var refreshTrigger = UUID()
+    
     var navigationConfig: any NavigationConfigurable {
         FavouriteServerListNavigationConfig(onAdd: {
-            navigationManager.navigate(to: .swiftUI(.favouriteServerEdit(primaryKey: nil)))
+            editingServer = nil
+            showingSheet = true
         })
     }
     var contentBody: some View {
-        FavouriteServerListContentView(navigationManager: navigationManager)
+        FavouriteServerListContentView(
+            navigationManager: navigationManager,
+            showingSheet: $showingSheet,
+            editingServer: $editingServer,
+            refreshTrigger: refreshTrigger
+        )
+
+        .sheet(isPresented: $showingSheet) {
+            NavigationStack {
+                FavouriteServerEditView(server: editingServer) { savedServer in
+                    // 保存回调
+                    MUDatabase.storeFavourite(savedServer)
+                    showingSheet = false
+                    // 触发列表刷新
+                    refreshTrigger = UUID()
+                }
+            }
+        }
     }
 }
