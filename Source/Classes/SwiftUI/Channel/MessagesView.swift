@@ -4,6 +4,7 @@ import SwiftUI
 import PhotosUI
 import QuickLook
 import UIKit
+import UniformTypeIdentifiers
 
 // MARK: - 1. 容器控制器 (UIKit 层)
 // 负责管理 QLPreviewController、点击关闭手势以及解决黑屏问题
@@ -202,6 +203,8 @@ struct MessagesView: View {
     // 图片发送选择状态
     @State private var selectedImageForSend: UIImage?
     
+    @State private var isDragTargeted = false
+    
     // 图片预览状态
     struct IdentifiableURL: Identifiable {
         let id = UUID()
@@ -275,6 +278,10 @@ struct MessagesView: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isTextFieldFocused)
         
+        .onDrop(of: [.image], isTargeted: $isDragTargeted) { providers in
+            handleDrop(providers: providers)
+        }
+        
         // 发送图片弹窗 (保持 Sheet 不变，因为它是上下文相关的)
         .sheet(item: $selectedImageForSend) { image in
             ImageConfirmationView(
@@ -290,6 +297,25 @@ struct MessagesView: View {
     }
     
     // MARK: - Logic Helpers
+    
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        var found = false
+        for provider in providers {
+            if provider.canLoadObject(ofClass: UIImage.self) {
+                found = true
+                provider.loadObject(ofClass: UIImage.self) { image, error in
+                    guard let uiImage = image as? UIImage else { return }
+                    Task { @MainActor in
+                        // 赋值给 selectedImageForSend 会自动触发 Sheet
+                        self.selectedImageForSend = uiImage
+                    }
+                }
+                // 找到第一个图片后就可以返回了，暂不支持一次拖多张
+                break
+            }
+        }
+        return found
+    }
     
     private func handleImageTap(image: UIImage) {
         let tempDir = FileManager.default.temporaryDirectory
