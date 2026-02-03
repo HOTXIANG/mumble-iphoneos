@@ -51,6 +51,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 - (void) showConnectingView;
 - (void) hideConnectingView;
 - (void) hideConnectingViewWithCompletion:(void(^)(void))completion;
+@property (nonatomic, strong, readwrite) NSString *lastWelcomeMessage;
 @end
 
 @implementation MUConnectionController
@@ -86,6 +87,8 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
            certificateRef:(NSData *)certRef
               displayName:(NSString *)displayName {
     
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
+    
     BOOL wasConnected = (_connection != nil || _serverModel != nil);
     
     if (wasConnected) {
@@ -108,9 +111,8 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     
     if (wasConnected) {
         NSLog(@"⏳ Waiting 0.5s for socket cleanup...");
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [self establishConnection];
-        });
+
+        [self performSelector:@selector(establishConnection) withObject:nil afterDelay:0.5];
     } else {
         [self establishConnection];
     }
@@ -442,17 +444,15 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
             
             // ✅ 新增：将欢迎消息放入 userInfo 传给 Swift
             if (welcomeMessage) {
-                // MumbleKit 的 MKTextMessage 通常有一个 plainTextString 方法或者直接取 string (HTML)
-                // 这里我们尝试取纯文本，如果没有则取原始 HTML string
                 NSString *msgContent = [welcomeMessage plainTextString];
                 if (!msgContent) {
                     if ([welcomeMessage respondsToSelector:@selector(message)]) {
                         msgContent = [welcomeMessage performSelector:@selector(message)];
                     }
                 }
-                if (msgContent) {
-                    userInfo[@"welcomeMessage"] = msgContent;
-                }
+                self.lastWelcomeMessage = msgContent; // 存起来！
+            } else {
+                self.lastWelcomeMessage = nil;
             }
             
             [[NSNotificationCenter defaultCenter] postNotificationName:@"MUConnectionReadyForSwiftUI"

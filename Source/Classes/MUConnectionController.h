@@ -27,6 +27,7 @@ extern NSString *MUConnectionErrorNotification;
               displayName:(NSString *)displayName;
 - (BOOL) isConnected;
 - (void) disconnectFromServer;
+@property (nonatomic, strong, readonly) NSString *lastWelcomeMessage;
 @property (nonatomic, readonly) MKServerModel *serverModel;
 @property (nonatomic, readonly) NSData *currentCertificateRef;
 

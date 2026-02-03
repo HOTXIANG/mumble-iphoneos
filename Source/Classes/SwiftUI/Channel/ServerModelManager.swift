@@ -9,6 +9,40 @@ struct UnsafeTransfer<T>: @unchecked Sendable {
     let value: T
 }
 
+private class ObserverTokenHolder {
+    private var tokens: [NSObjectProtocol] = []
+    
+    func add(_ token: NSObjectProtocol) {
+        tokens.append(token)
+    }
+    
+    func removeAll() {
+        for token in tokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+        tokens.removeAll()
+    }
+    
+    deinit {
+        removeAll()
+    }
+}
+
+private final class DelegateToken {
+    private let model: MKServerModel
+    private let wrapper: ServerModelDelegateWrapper
+    
+    init(model: MKServerModel, wrapper: ServerModelDelegateWrapper) {
+        self.model = model
+        self.wrapper = wrapper
+    }
+    
+    deinit {
+        // 在这里执行清理是安全的，因为它访问的是自己的常量属性
+        model.removeDelegate(wrapper)
+    }
+}
+
 @MainActor
 class ServerModelManager: ObservableObject {
     @Published var modelItems: [ChannelNavigationItem] = []
@@ -26,7 +60,8 @@ class ServerModelManager: ObservableObject {
     
     @Published public var userVolumes: [UInt: Float] = [:]
     
-    private var observerTokens: [NSObjectProtocol] = []
+    private let tokenHolder = ObserverTokenHolder()
+    private var delegateToken: DelegateToken?
     private var muteStateBeforeDeafen: Bool = false
     private var serverModel: MKServerModel?
     private var userIndexMap: [UInt: Int] = [:]
@@ -56,22 +91,16 @@ class ServerModelManager: ObservableObject {
         setupAudioRouteObservation()
     }
     deinit {
-        print(
-            "🔴 ServerModelManager: DEINIT"
-        ); NotificationCenter.default.removeObserver(
-            self
-        )
+        print("🔴 ServerModelManager: DEINIT")
+        NotificationCenter.default.removeObserver(self)
     }
     
-    private func removeObservers() {
-        // 1. 移除 Block 类型的监听器
-        for token in observerTokens {
-            NotificationCenter.default.removeObserver(token)
-        }
-        observerTokens.removeAll()
+    func markAsRead() {
+        // 1. 清除 App 内红点
+        AppState.shared.unreadMessageCount = 0
         
-        // 2. 移除 Selector 类型的监听器 (self)
-        NotificationCenter.default.removeObserver(self)
+        // 2. 清除 iOS 系统通知中心的推送
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
     }
     
     private func setupSystemMute() {
@@ -144,13 +173,35 @@ class ServerModelManager: ObservableObject {
             return
         }
         
-        serverModel = model
-        delegateWrapper = ServerModelDelegateWrapper()
-        model.addDelegate(delegateWrapper!)
+        guard let newModel = connectionController.serverModel else {
+            print("⚠️ ServerModel not ready. Retrying in 0.5s...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.setupServerModel()
+            }
+            return
+        }
+        
+        if self.serverModel === newModel {
+            print("✅ ServerModel identity match. Skipping setup to prevent duplicates.")
+            // 兜底：如果界面是空的，强制刷新一下
+            if self.modelItems.isEmpty { rebuildModelArray() }
+            return
+        }
+        
+        if self.serverModel != nil {
+            print("🔄 Switching Server Model. Performing cleanup...")
+            self.cleanup()
+        }
+        
+        print("🔗 Binding new ServerModel...")
+        self.serverModel = newModel
+        
+        let wrapper = ServerModelDelegateWrapper()
+        newModel.addDelegate(wrapper)
+        self.delegateToken = DelegateToken(model: model, wrapper: wrapper)
+        
         isConnected = true
         
-        // ✅ 极简逻辑：直接去 Recent 列表里查名字
-        // 因为 connectionOpened 已经执行过了，Recent 列表此刻肯定是最新的
         let currentHost = model.hostname() ?? ""
         let currentPort = Int(model.port())
         
@@ -158,8 +209,27 @@ class ServerModelManager: ObservableObject {
             print("📖 ServerModelManager: Resolved name from Recents: '\(savedName)'")
             self.serverName = savedName
         } else {
-            // 理论上不应该进这里，除非 Recent 保存慢了，那就兜底显示域名
             self.serverName = currentHost
+        }
+        
+        if let welcomeText = connectionController.lastWelcomeMessage, !welcomeText.isEmpty {
+            let lastMsg = self.messages.last?.attributedMessage.description
+            if lastMsg == nil || !lastMsg!.contains(welcomeText) {
+                let welcomeMsg = ChatMessage(
+                    id: UUID(),
+                    type: .notification,
+                    senderName: "Server",
+                    attributedMessage: self.attributedString(from: welcomeText),
+                    images: [],
+                    timestamp: Date(),
+                    isSentBySelf: false
+                )
+                self.messages.append(welcomeMsg)
+            }
+        } else if messages.isEmpty {
+            // 兜底显示
+            let hostDisplayName = serverName ?? currentHost
+            addSystemNotification("Connected to \(hostDisplayName)")
         }
         
         rebuildModelArray()
@@ -167,17 +237,14 @@ class ServerModelManager: ObservableObject {
     }
     
     func cleanup() {
-        print("🧹 ServerModelManager: CLEANUP")
+        print("🧹 ServerModelManager: CLEANUP (Data Only)")
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
         
         userVolumes.removeAll()
         
-        if let wrapper = delegateWrapper {
-            serverModel?.removeDelegate(wrapper)
-        }
-        delegateWrapper = nil
-        serverModel = nil
+        self.delegateToken = nil
+        self.serverModel = nil
         modelItems = []
         userIndexMap = [:]
         channelIndexMap = [:]
@@ -186,9 +253,6 @@ class ServerModelManager: ObservableObject {
         
         systemMuteManager.cleanup()
         endLiveActivity()
-        
-        removeObservers()
-        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
     }
     
     // MARK: - Audio Route Handling (Hot-swap Support)
@@ -395,31 +459,33 @@ class ServerModelManager: ObservableObject {
     
     private func setupNotifications() {
         // 1. 先清理旧的，防止叠加
-        removeObservers()
+        tokenHolder.removeAll()
+        
+        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("MUConnectionOpenedNotification"), object: nil)
         
         let center = NotificationCenter.default
         
         // 2. 注册并保存令牌
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.rebuildModelNotification, object: nil, queue: nil) { [weak self] _ in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.rebuildModelNotification, object: nil, queue: nil) { [weak self] _ in
             Task { @MainActor in self?.rebuildModelArray() }
         })
         
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userStateUpdatedNotification, object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userStateUpdatedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let userSession = userInfo["userSession"] as? UInt else { return }
             Task { @MainActor in self?.updateUserBySession(userSession) }
         })
         
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userTalkStateChangedNotification, object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userTalkStateChangedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let userSession = userInfo["userSession"] as? UInt, let talkState = userInfo["talkState"] as? MKTalkState else { return }
             Task { @MainActor in self?.updateUserTalkingState(userSession: userSession, talkState: talkState) }
         })
         
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.channelRenamedNotification, object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.channelRenamedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let channelId = userInfo["channelId"] as? UInt, let newName = userInfo["newName"] as? String else { return }
             Task { @MainActor in self?.updateChannelName(channelId: channelId, newName: newName) }
         })
         
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userMovedNotification, object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userMovedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser, let channel = userInfo["channel"] as? MKChannel else { return }
             let userTransfer = UnsafeTransfer(value: user)
             let channelTransfer = UnsafeTransfer(value: channel)
@@ -459,7 +525,7 @@ class ServerModelManager: ObservableObject {
             }
         })
         
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userJoinedNotification, object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userJoinedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser else { return }
             let userTransfer = UnsafeTransfer(value: user)
             Task { @MainActor [weak self] in
@@ -472,14 +538,14 @@ class ServerModelManager: ObservableObject {
             }
         })
         
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.userLeftNotification, object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userLeftNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser else { return }
             let userName = user.userName() ?? "Unknown User"
             Task { @MainActor [weak self] in self?.addSystemNotification("\(userName) disconnected") }
         })
         
         // 核心修复：消息去重 + 监听器管理
-        observerTokens.append(center.addObserver(forName: ServerModelNotificationManager.textMessageReceivedNotification, object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.textMessageReceivedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo,
                   let message = userInfo["message"] as? MKTextMessage,
                   let user = userInfo["user"] as? MKUser else { return }
@@ -493,7 +559,6 @@ class ServerModelManager: ObservableObject {
                 guard let self = self else { return }
                 let connectedUserSession = self.serverModel?.connectedUser()?.session()
                 
-                // 🛑 防止双重显示：如果是自己发的消息，直接忽略
                 if senderSession == connectedUserSession {
                     print("🚫 Ignoring echoed message from self to prevent duplicate.")
                     return
@@ -513,23 +578,7 @@ class ServerModelManager: ObservableObject {
             }
         })
         
-        observerTokens.append(center.addObserver(forName: NSNotification.Name("MUConnectionOpenedNotification"), object: nil, queue: nil) { [weak self] notification in
-            let userInfo = notification.userInfo
-            let extractedDisplayName = userInfo?["displayName"] as? String
-            Task { @MainActor [weak self] in
-                if let name = extractedDisplayName { AppState.shared.serverDisplayName = name }
-                self?.cleanup()
-                self?.setupServerModel()
-            }
-        })
-        
-        // 保留原有的 Selector 监听 (这个可以用 removeObserver(self) 移除)
-        center.addObserver(
-            self,
-            selector: #selector(handleConnectionOpened),
-            name: NSNotification.Name("MUConnectionOpenedNotification"),
-            object: nil
-        )
+        center.addObserver(self, selector: #selector(handleConnectionOpened), name: NSNotification.Name("MUConnectionOpenedNotification"), object: nil)
     }
     
     @objc private func handleConnectionOpened(_ notification: Notification) {
@@ -538,31 +587,11 @@ class ServerModelManager: ObservableObject {
         let userInfo = notification.userInfo
         
         Task { @MainActor in
-            // 1. 设置服务器显示名称 (原有逻辑)
+            // 设置服务器显示名称
             if let extractedDisplayName = userInfo?["displayName"] as? String {
                 AppState.shared.serverDisplayName = extractedDisplayName
             }
             
-            // 2. 插入欢迎消息
-            if let welcomeText = userInfo?["welcomeMessage"] as? String, !welcomeText.isEmpty {
-                // 简单的去重防止重复显示
-                let lastMsg = self.messages.last?.attributedMessage.description
-                if lastMsg == nil || !lastMsg!.contains(welcomeText) {
-                    let welcomeMsg = ChatMessage(
-                        id: UUID(),
-                        type: .notification, // 使用通知样式
-                        senderName: "Server", // 发送者显示为 Server
-                        attributedMessage: self.attributedString(from: welcomeText),
-                        images: [],
-                        timestamp: Date(),
-                        isSentBySelf: false
-                    )
-                    self.messages.append(welcomeMsg)
-                }
-            }
-            
-            // 3. 清理旧状态并重新加载 (原有逻辑)
-            self.cleanup()
             self.setupServerModel()
             
             Task.detached(priority: .userInitiated) {
@@ -648,6 +677,53 @@ class ServerModelManager: ObservableObject {
     
     // --- 核心修改 3：添加处理和发送消息的新方法 ---
     
+    // 带有去重功能的消息添加方法
+    private func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [UIImage] = []) {
+        // 去重逻辑
+        if let lastMsg = messages.last {
+            let isSameContent = (lastMsg.attributedMessage.description == text) || (lastMsg.attributedMessage.description == attributedString(from: text).description)
+            let isSameSender = (lastMsg.senderName == senderName)
+            let isRecent = Date().timeIntervalSince(lastMsg.timestamp) < 0.01
+            
+            if isSameSender && isSameContent && isRecent {
+                return
+            }
+        }
+        
+        let newMessage = ChatMessage(
+            id: UUID(),
+            type: .userMessage, // 直接指定枚举 case
+            senderName: senderName,
+            attributedMessage: attributedString(from: text),
+            images: images,
+            timestamp: Date(),
+            isSentBySelf: isSentBySelf
+        )
+        messages.append(newMessage)
+    }
+    
+    // ✅ 修复：专用函数添加通知消息
+    private func appendNotificationMessage(text: String, senderName: String) {
+        // 简单去重
+        if let lastMsg = messages.last {
+            let isSameContent = (lastMsg.attributedMessage.description == text) || (lastMsg.attributedMessage.description == attributedString(from: text).description)
+            if lastMsg.senderName == senderName && isSameContent {
+                return
+            }
+        }
+        
+        let newMessage = ChatMessage(
+            id: UUID(),
+            type: .notification, // 直接指定枚举 case
+            senderName: senderName,
+            attributedMessage: attributedString(from: text),
+            images: [],
+            timestamp: Date(),
+            isSentBySelf: false
+        )
+        messages.append(newMessage)
+    }
+    
     private func handleReceivedMessage(
         senderName: String,
         plainText: String,
@@ -656,22 +732,21 @@ class ServerModelManager: ObservableObject {
         connectedUserSession: UInt?
     ) {
         let images = imageData.compactMap { UIImage(data: $0) }
-        let chatMessage = ChatMessage(
-            id: UUID(),
-            type: .userMessage,
+        
+        appendUserMessage(
             senderName: senderName,
-            attributedMessage: attributedString(from: plainText),
-            images: images,
-            timestamp: Date(),
-            isSentBySelf: senderSession == connectedUserSession
+            text: plainText,
+            isSentBySelf: senderSession == connectedUserSession,
+            images: images
         )
-        messages.append(chatMessage)
         
         // 1. 默认只推送别人的消息
         let isSentBySelf = (senderSession == connectedUserSession)
         
         // 2. 检查设置: 默认如果没有设置过，视为开启 (true)
         let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+        
+        let isViewingMessages = (AppState.shared.currentTab == .messages)
         
         if !isSentBySelf && notifyEnabled {
             // 推送内容： "Sender: Message Content"
