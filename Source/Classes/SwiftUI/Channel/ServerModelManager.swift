@@ -592,6 +592,11 @@ class ServerModelManager: ObservableObject {
                 AppState.shared.serverDisplayName = extractedDisplayName
             }
             
+            if let welcomeText = userInfo?["welcomeMessage"] as? String, !welcomeText.isEmpty {
+                // 这里也使用带返回值的添加方法，但通常欢迎语不需要发通知
+                self.appendNotificationMessage(text: welcomeText, senderName: "Server")
+            }
+            
             self.setupServerModel()
             
             Task.detached(priority: .userInitiated) {
@@ -614,18 +619,10 @@ class ServerModelManager: ObservableObject {
     }
     
     private func addSystemNotification(_ text: String) {
-        let notificationMessage = ChatMessage(
-            id: UUID(),
-            type: .notification,
-            senderName: "System",
-            attributedMessage: AttributedString(text),
-            images: [],
-            timestamp: Date(),
-            isSentBySelf: false
-        )
-        messages.append(notificationMessage)
+        let didAppend = appendNotificationMessage(text: text, senderName: "System")
         
-        if UserDefaults.standard.bool(forKey: "NotificationNotifySystemMessages") {
+        // 只有真的添加了系统消息，才发通知
+        if didAppend && UserDefaults.standard.bool(forKey: "NotificationNotifySystemMessages") {
             sendLocalNotification(title: currentNotificationTitle, body: text)
         }
     }
@@ -678,7 +675,8 @@ class ServerModelManager: ObservableObject {
     // --- 核心修改 3：添加处理和发送消息的新方法 ---
     
     // 带有去重功能的消息添加方法
-    private func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [UIImage] = []) {
+    @discardableResult
+    private func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [UIImage] = []) -> Bool {
         // 去重逻辑
         if let lastMsg = messages.last {
             let isSameContent = (lastMsg.attributedMessage.description == text) || (lastMsg.attributedMessage.description == attributedString(from: text).description)
@@ -686,7 +684,8 @@ class ServerModelManager: ObservableObject {
             let isRecent = Date().timeIntervalSince(lastMsg.timestamp) < 0.01
             
             if isSameSender && isSameContent && isRecent {
-                return
+                print("🚫 [Dedup] Ignored duplicate message from \(senderName)")
+                return false // ⚠️ 是重复消息，返回 false
             }
         }
         
@@ -700,21 +699,22 @@ class ServerModelManager: ObservableObject {
             isSentBySelf: isSentBySelf
         )
         messages.append(newMessage)
+        return true
     }
     
     // ✅ 修复：专用函数添加通知消息
-    private func appendNotificationMessage(text: String, senderName: String) {
-        // 简单去重
+    @discardableResult
+    private func appendNotificationMessage(text: String, senderName: String) -> Bool {
         if let lastMsg = messages.last {
             let isSameContent = (lastMsg.attributedMessage.description == text) || (lastMsg.attributedMessage.description == attributedString(from: text).description)
             if lastMsg.senderName == senderName && isSameContent {
-                return
+                return false
             }
         }
         
         let newMessage = ChatMessage(
             id: UUID(),
-            type: .notification, // 直接指定枚举 case
+            type: .notification,
             senderName: senderName,
             attributedMessage: attributedString(from: text),
             images: [],
@@ -722,37 +722,32 @@ class ServerModelManager: ObservableObject {
             isSentBySelf: false
         )
         messages.append(newMessage)
+        return true
     }
     
-    private func handleReceivedMessage(
-        senderName: String,
-        plainText: String,
-        imageData: [Data],
-        senderSession: UInt,
-        connectedUserSession: UInt?
-    ) {
+    private func handleReceivedMessage(senderName: String, plainText: String, imageData: [Data], senderSession: UInt, connectedUserSession: UInt?) {
         let images = imageData.compactMap { UIImage(data: $0) }
         
-        appendUserMessage(
+        // ✅ 核心修复：获取返回值
+        let didAppend = appendUserMessage(
             senderName: senderName,
             text: plainText,
             isSentBySelf: senderSession == connectedUserSession,
             images: images
         )
         
-        // 1. 默认只推送别人的消息
-        let isSentBySelf = (senderSession == connectedUserSession)
-        
-        // 2. 检查设置: 默认如果没有设置过，视为开启 (true)
-        let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
-        
-        let isViewingMessages = (AppState.shared.currentTab == .messages)
-        
-        if !isSentBySelf && notifyEnabled {
-            // 推送内容： "Sender: Message Content"
-            let bodyText = plainText.isEmpty ? "[Image]" : plainText
-            let notificationBody = "\(senderName): \(bodyText)"
-            sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
+        // 只有当消息真的被添加了 (didAppend == true)，才处理后续通知
+        if didAppend {
+            let isSentBySelf = (senderSession == connectedUserSession)
+            let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+            let isViewingMessages = (AppState.shared.currentTab == .messages)
+            
+            // 只有不是自己发的、开启了通知、且没在看消息页面时，才发通知
+            if !isSentBySelf && notifyEnabled && !isViewingMessages {
+                let bodyText = plainText.isEmpty ? "[Image]" : plainText
+                let notificationBody = "\(senderName): \(bodyText)"
+                sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
+            }
         }
     }
     
