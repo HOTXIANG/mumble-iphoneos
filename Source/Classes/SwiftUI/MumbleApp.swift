@@ -30,6 +30,11 @@ struct MumbleApp: App {
                     print("🚀 MumbleApp: SwiftUI Lifecycle Started")
                     UNUserNotificationCenter.current().delegate = notificationDelegate
                 }
+                // Handoff 接力：当其他设备的 Mumble 正在连接服务器时，本设备可以接力
+                .onContinueUserActivity(MumbleHandoffActivityType) { userActivity in
+                    print("📲 MumbleApp: Received Handoff activity")
+                    HandoffManager.shared.handleIncomingActivity(userActivity)
+                }
         }
         .onChange(of: scenePhase) { newPhase in
             // 你可以在这里处理生命周期，慢慢替代 AppDelegate 里的逻辑

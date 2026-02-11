@@ -239,9 +239,20 @@ class ServerModelManager: ObservableObject {
         rebuildModelArray()
         startLiveActivity()
         
+        // 发布 Handoff Activity，让其他设备可以接力
+        publishHandoffActivity()
+        
         // 服务器模型绑定成功后，才激活音频相关的监听
         setupSystemMute()
         setupAudioRouteObservation()
+        
+        // 监听 Handoff 恢复用户音频偏好的通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHandoffRestoreUserPreferences),
+            name: MumbleHandoffRestoreUserPreferencesNotification,
+            object: nil
+        )
     }
     
     func cleanup() {
@@ -261,7 +272,17 @@ class ServerModelManager: ObservableObject {
         
         systemMuteManager.cleanup()
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: MumbleHandoffRestoreUserPreferencesNotification, object: nil)
         endLiveActivity()
+        
+        // 停止广播 Handoff Activity
+        HandoffManager.shared.invalidateActivity()
+    }
+    
+    // MARK: - Handoff User Preferences Restore
+    
+    @objc private func handleHandoffRestoreUserPreferences() {
+        restoreAllUserPreferences()
     }
     
     // MARK: - Audio Route Handling (Hot-swap Support)
@@ -381,6 +402,63 @@ class ServerModelManager: ObservableObject {
         }
     }
     
+    // MARK: - Handoff (接力)
+    
+    /// 发布 Handoff Activity，让其他设备可以接力
+    private func publishHandoffActivity() {
+        guard let model = serverModel,
+              let connectedUser = model.connectedUser() else { return }
+        
+        let hostname = model.hostname() ?? ""
+        let port = Int(model.port())
+        let username = connectedUser.userName() ?? ""
+        let channelId = connectedUser.channel()?.channelId()
+        let channelName = connectedUser.channel()?.channelName()
+        let isSelfMuted = connectedUser.isSelfMuted()
+        let isSelfDeafened = connectedUser.isSelfDeafened()
+        
+        // 收集当前所有用户的本地音频设置（非默认值的）
+        var audioSettings: [HandoffUserAudioSetting] = []
+        if let rootChannel = model.rootChannel() {
+            collectUserAudioSettings(in: rootChannel, settings: &audioSettings)
+        }
+        
+        HandoffManager.shared.publishActivity(
+            hostname: hostname,
+            port: port,
+            username: username,
+            password: nil, // 不传递密码以保安全，收藏中已有密码的服务器会自动使用
+            channelId: channelId != nil ? Int(channelId!) : nil,
+            channelName: channelName,
+            displayName: serverName,
+            isSelfMuted: isSelfMuted,
+            isSelfDeafened: isSelfDeafened,
+            userAudioSettings: audioSettings
+        )
+    }
+    
+    /// 递归收集所有用户的本地音频设置
+    private func collectUserAudioSettings(in channel: MKChannel, settings: inout [HandoffUserAudioSetting]) {
+        if let users = channel.users() as? [MKUser] {
+            for user in users {
+                let volume = userVolumes[user.session()] ?? 1.0
+                let isMuted = user.isLocalMuted()
+                if let name = user.userName() {
+                    settings.append(HandoffUserAudioSetting(
+                        userName: name,
+                        volume: volume,
+                        isLocalMuted: isMuted
+                    ))
+                }
+            }
+        }
+        if let subChannels = channel.channels() as? [MKChannel] {
+            for sub in subChannels {
+                collectUserAudioSettings(in: sub, settings: &settings)
+            }
+        }
+    }
+    
     private func startLiveActivity() {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         
@@ -472,6 +550,26 @@ class ServerModelManager: ObservableObject {
                 ActivityContent(state: contentState, staleDate: nil)
             )
         }
+        
+        // 7. 同步更新 Handoff Activity 的音频状态
+        updateHandoffAudioState()
+    }
+    
+    /// 收集当前用户音频设置并更新 Handoff Activity
+    private func updateHandoffAudioState() {
+        guard let model = serverModel,
+              let connectedUser = model.connectedUser() else { return }
+        
+        var audioSettings: [HandoffUserAudioSetting] = []
+        if let rootChannel = model.rootChannel() {
+            collectUserAudioSettings(in: rootChannel, settings: &audioSettings)
+        }
+        
+        HandoffManager.shared.updateActivityAudioState(
+            isSelfMuted: connectedUser.isSelfMuted(),
+            isSelfDeafened: connectedUser.isSelfDeafened(),
+            userAudioSettings: audioSettings
+        )
     }
     
     private func endLiveActivity() {
@@ -537,6 +635,11 @@ class ServerModelManager: ObservableObject {
                 if let connectedUser = self.serverModel?.connectedUser() {
                     if movingUserSession == connectedUser.session() {
                         self.addSystemNotification("You moved to channel \(destChannelName)")
+                        // 更新 Handoff Activity 的频道信息
+                        HandoffManager.shared.updateActivityChannel(
+                            channelId: Int(destChannelId),
+                            channelName: destChannelName
+                        )
                     } else {
                         let myCurrentChannelId = connectedUser.channel()?.channelId()
                         if let userIndex = self.userIndexMap[movingUserSession] {

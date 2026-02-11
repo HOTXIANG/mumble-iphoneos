@@ -95,6 +95,7 @@
 		F2E9CC042F06FB7800464F79 /* MUFavouriteServer.m in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC032F06FB7800464F79 /* MUFavouriteServer.m */; };
 		F2E9CC072F07A40300464F79 /* ServerCertificateDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC062F07A3EF00464F79 /* ServerCertificateDetailView.swift */; };
 		F2E9CC0C2F07D00600464F79 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC0A2F07D00000464F79 /* AboutView.swift */; };
+		F2ECCD992F3D283100AEA117 /* HandoffManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ECCD982F3D283100AEA117 /* HandoffManager.swift */; };
 		F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C62E216A7F000AA092 /* Assets.xcassets */; };
 		F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56722E0F711A00D76B49 /* MessagesView.swift */; };
 		F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */; };
@@ -356,6 +357,7 @@
 		F2E9CC032F06FB7800464F79 /* MUFavouriteServer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUFavouriteServer.m; sourceTree = "<group>"; };
 		F2E9CC062F07A3EF00464F79 /* ServerCertificateDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerCertificateDetailView.swift; sourceTree = "<group>"; };
 		F2E9CC0A2F07D00000464F79 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		F2ECCD982F3D283100AEA117 /* HandoffManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffManager.swift; sourceTree = "<group>"; };
 		F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = NeoMumble.icon; path = Resources/NeoMumble.icon; sourceTree = "<group>"; };
 		F2FBE1C62E216A7F000AA092 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelDataModels.swift; sourceTree = "<group>"; };
@@ -712,6 +714,7 @@
 				F2FF56772E0F711A00D76B49 /* Channel */,
 				F2AD3A742E0E40B300FC7006 /* FavouriteServerEditView.swift */,
 				F2AD3A702E0E408700FC7006 /* FavouriteServerListView.swift */,
+				F2ECCD982F3D283100AEA117 /* HandoffManager.swift */,
 				F2AD3A6C2E0E31E500FC7006 /* SwiftRootViewController.swift */,
 				F2AD3A672E0E2FBA00FC7006 /* MumbleUIComponents.swift */,
 				F2AD3A622E0E2F7300FC7006 /* MumbleContentView.swift */,
@@ -1000,6 +1003,7 @@
 				F2FF567F2E0F711A00D76B49 /* ServerModelManager.swift in Sources */,
 				F28C6AF02EE6E55300DE9CD2 /* PreferencesView.swift in Sources */,
 				F28C6AEC2EE6E52F00DE9CD2 /* PreferencesModel.swift in Sources */,
+				F2ECCD992F3D283100AEA117 /* HandoffManager.swift in Sources */,
 				F2FF568A2E0F81EE00D76B49 /* ChannelListView.swift in Sources */,
 				28F08365147F369200DC126F /* MUAudioBarViewCell.m in Sources */,
 				28BE998818CFCDE600910551 /* MUServerTableViewCell.m in Sources */,
