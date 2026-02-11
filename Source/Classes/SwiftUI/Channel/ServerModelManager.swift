@@ -674,24 +674,12 @@ class ServerModelManager: ObservableObject {
     
     // --- 核心修改 3：添加处理和发送消息的新方法 ---
     
-    // 带有去重功能的消息添加方法
+    // 消息添加方法
     @discardableResult
     private func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [UIImage] = []) -> Bool {
-        // 去重逻辑
-        if let lastMsg = messages.last {
-            let isSameContent = (lastMsg.attributedMessage.description == text) || (lastMsg.attributedMessage.description == attributedString(from: text).description)
-            let isSameSender = (lastMsg.senderName == senderName)
-            let isRecent = Date().timeIntervalSince(lastMsg.timestamp) < 0.01
-            
-            if isSameSender && isSameContent && isRecent {
-                print("🚫 [Dedup] Ignored duplicate message from \(senderName)")
-                return false // ⚠️ 是重复消息，返回 false
-            }
-        }
-        
         let newMessage = ChatMessage(
             id: UUID(),
-            type: .userMessage, // 直接指定枚举 case
+            type: .userMessage,
             senderName: senderName,
             attributedMessage: attributedString(from: text),
             images: images,
@@ -740,10 +728,10 @@ class ServerModelManager: ObservableObject {
         if didAppend {
             let isSentBySelf = (senderSession == connectedUserSession)
             let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
-            let isViewingMessages = (AppState.shared.currentTab == .messages)
             
-            // 只有不是自己发的、开启了通知、且没在看消息页面时，才发通知
-            if !isSentBySelf && notifyEnabled && !isViewingMessages {
+            // 只有不是自己发的、且开启了通知，才发通知
+            // sendLocalNotification 内部会根据 applicationState 判断：前台播放音效，后台发系统推送
+            if !isSentBySelf && notifyEnabled {
                 let bodyText = plainText.isEmpty ? "[Image]" : plainText
                 let notificationBody = "\(senderName): \(bodyText)"
                 sendLocalNotification(title: currentNotificationTitle, body: notificationBody)

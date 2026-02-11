@@ -3,7 +3,7 @@
 import SwiftUI
 
 struct ChannelListView: View {
-    @StateObject private var serverManager = ServerModelManager()
+    @EnvironmentObject var serverManager: ServerModelManager
     @ObservedObject var appState = AppState.shared
     @State private var showingPrefs = false
     @State private var showingCertInfo = false

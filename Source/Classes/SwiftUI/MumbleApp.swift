@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct MumbleApp: App {
@@ -16,6 +17,9 @@ struct MumbleApp: App {
     
     // 监听环境变化，用于处理 Scene 相位（后台/前台）
     @Environment(\.scenePhase) var scenePhase
+    
+    /// 处理用户点击系统通知后跳转到聊天界面
+    @StateObject private var notificationDelegate = NotificationDelegate()
 
     var body: some Scene {
         WindowGroup {
@@ -24,6 +28,7 @@ struct MumbleApp: App {
                 .environmentObject(AppState.shared) // 建议注入 AppState，防止子视图崩溃
                 .onAppear {
                     print("🚀 MumbleApp: SwiftUI Lifecycle Started")
+                    UNUserNotificationCenter.current().delegate = notificationDelegate
                 }
         }
         .onChange(of: scenePhase) { newPhase in
@@ -32,5 +37,29 @@ struct MumbleApp: App {
                 // 例如：触发清理操作
             }
         }
+    }
+}
+
+/// 单独的 UNUserNotificationCenterDelegate，用于处理通知点击事件
+class NotificationDelegate: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
+    /// 用户点击了系统通知 → 自动跳转到聊天界面
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Task { @MainActor in
+            AppState.shared.currentTab = .messages
+        }
+        completionHandler()
+    }
+    
+    /// App 在前台收到通知时不弹 banner（前台已有音效提示）
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([])
     }
 }

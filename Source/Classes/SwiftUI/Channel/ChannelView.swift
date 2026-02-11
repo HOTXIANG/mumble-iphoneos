@@ -65,7 +65,7 @@ struct ChannelView: View {
                         .background(globalGradient)
                 }
                 .onChange(of: appState.currentTab) {
-                    if appState.currentTab == .messages { appState.unreadMessageCount = 0 }
+                    if appState.currentTab == .messages { serverManager.markAsRead() }
                 }
                 .onAppear { configureTabBarAppearance() }
             }
