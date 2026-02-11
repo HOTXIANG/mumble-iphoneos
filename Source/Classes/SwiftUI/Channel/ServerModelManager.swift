@@ -87,8 +87,12 @@ class ServerModelManager: ObservableObject {
         setupServerModel();
         setupNotifications()
         requestNotificationAccess()
-        setupSystemMute()
-        setupAudioRouteObservation()
+        // SystemMute 和 AudioRoute 只在实际连接到服务器后才激活，
+        // 避免在欢迎界面插入耳机时触发麦克风激活
+        if serverModel != nil {
+            setupSystemMute()
+            setupAudioRouteObservation()
+        }
     }
     deinit {
         print("🔴 ServerModelManager: DEINIT")
@@ -234,6 +238,10 @@ class ServerModelManager: ObservableObject {
         
         rebuildModelArray()
         startLiveActivity()
+        
+        // 服务器模型绑定成功后，才激活音频相关的监听
+        setupSystemMute()
+        setupAudioRouteObservation()
     }
     
     func cleanup() {
@@ -252,12 +260,15 @@ class ServerModelManager: ObservableObject {
         serverName = nil
         
         systemMuteManager.cleanup()
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
         endLiveActivity()
     }
     
     // MARK: - Audio Route Handling (Hot-swap Support)
     
     private func setupAudioRouteObservation() {
+        // 先移除旧的，防止重复注册
+        NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAudioRouteChanged),
@@ -267,6 +278,9 @@ class ServerModelManager: ObservableObject {
     }
     
     @objc private func handleAudioRouteChanged(_ notification: Notification) {
+        // 未连接到服务器时不处理音频路由变化
+        guard serverModel != nil else { return }
+        
         guard let userInfo = notification.userInfo,
               let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
@@ -305,7 +319,30 @@ class ServerModelManager: ObservableObject {
                 self.isRestoringMuteState = false
             }
             
-        case .oldDeviceUnavailable, .categoryChange:
+        case .oldDeviceUnavailable:
+            // 🔒 拔耳机：同样需要上锁并恢复闭麦状态
+            self.isRestoringMuteState = true
+            
+            print("🎧 Device Removed. Restoring mute state...")
+            
+            Task { @MainActor in
+                // 等待音频路由切换稳定
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                
+                self.systemMuteManager.cleanup()
+                self.systemMuteManager.activate()
+                
+                if let user = self.serverModel?.connectedUser() {
+                    let targetState = user.isSelfMuted()
+                    print("🔄 Syncing App State (\(targetState)) to Speaker after device removal...")
+                    self.systemMuteManager.setSystemMute(targetState)
+                }
+                
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                self.isRestoringMuteState = false
+            }
+            
+        case .categoryChange:
             break
             
         default:

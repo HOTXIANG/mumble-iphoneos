@@ -15,6 +15,7 @@
 #import <MumbleKit/MKServerModel.h>
 #import <MumbleKit/MKCertificate.h>
 #import <AVFoundation/AVFoundation.h>
+#import <Network/Network.h>
 
 NSString *MUConnectionOpenedNotification = @"MUConnectionOpenedNotification";
 NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
@@ -45,6 +46,9 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     BOOL            _isUserInitiatedDisconnect;
     NSTimer         *_reconnectTimer;
     NSInteger       _retryCount; // 重试计数器
+    
+    nw_path_monitor_t _pathMonitor;
+    BOOL              _networkWasSatisfied;
 }
 - (void) establishConnection;
 - (void) teardownConnection;
@@ -185,9 +189,50 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     }
 }
 
+- (void) startNetworkMonitor {
+    if (_pathMonitor) return;
+    
+    _pathMonitor = nw_path_monitor_create();
+    nw_path_monitor_set_queue(_pathMonitor, dispatch_get_main_queue());
+    _networkWasSatisfied = YES;
+    
+    __weak typeof(self) weakSelf = self;
+    nw_path_monitor_set_update_handler(_pathMonitor, ^(nw_path_t path) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        
+        BOOL isSatisfied = (nw_path_get_status(path) == nw_path_status_satisfied);
+        
+        if (!strongSelf->_networkWasSatisfied && isSatisfied) {
+            NSLog(@"🌐 Network restored. Triggering reconnect...");
+            // 网络恢复后，如果当前没有连接或连接已断开，则触发重连
+            if (strongSelf->_connection == nil && strongSelf->_hostname != nil && !strongSelf->_isUserInitiatedDisconnect) {
+                strongSelf->_retryCount = 0;
+                [strongSelf establishConnection];
+                NSDictionary *info = @{ @"isReconnecting": @(YES) };
+                [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil userInfo:info];
+            }
+        }
+        
+        strongSelf->_networkWasSatisfied = isSatisfied;
+    });
+    
+    nw_path_monitor_start(_pathMonitor);
+}
+
+- (void) stopNetworkMonitor {
+    if (_pathMonitor) {
+        nw_path_monitor_cancel(_pathMonitor);
+        _pathMonitor = nil;
+    }
+}
+
 - (void) establishConnection {
     // 只有在 connetToHostname 中才重置为 0
     _isUserInitiatedDisconnect = NO;
+    
+    // 启动网络监控
+    [self startNetworkMonitor];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
         NSLog(@"🎤 [Async] Starting Audio Engine...");
@@ -226,6 +271,8 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 }
 
 - (void) teardownConnection {
+    [self stopNetworkMonitor];
+    
     if (_serverModel) {
         [_serverModel removeDelegate:self];
         _serverModel = nil;
