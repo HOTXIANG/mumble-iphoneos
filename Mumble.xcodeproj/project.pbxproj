@@ -63,6 +63,7 @@
 		F220ECD12F30FB1A0017CCCC /* SystemMuteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */; };
 		F24EB79C2F3E3AB500904644 /* OpenSSL.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F24EB79B2F3E3AB500904644 /* OpenSSL.dylib */; platformFilters = (macos, ); };
 		F24EB79D2F3E3AB500904644 /* OpenSSL.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = F24EB79B2F3E3AB500904644 /* OpenSSL.dylib */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		F24EB7A02F3E3AB500904644 /* MumbleKit.framework in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 28990A90132FD9CC0034B406 /* MumbleKit.framework */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34AC2F1729BF00420631 /* MumbleApp.swift */; };
 		F25F34B22F17353F00420631 /* LocalUserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B02F17353500420631 /* LocalUserPreferences.swift */; };
 		F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */; };
@@ -220,6 +221,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				F24EB79D2F3E3AB500904644 /* OpenSSL.dylib in Embed Libraries */,
+				F24EB7A02F3E3AB500904644 /* MumbleKit.framework in Embed Libraries */,
 			);
 			name = "Embed Libraries";
 			runOnlyForDeploymentPostprocessing = 0;
