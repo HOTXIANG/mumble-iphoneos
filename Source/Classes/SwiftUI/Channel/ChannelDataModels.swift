@@ -91,7 +91,7 @@ struct ChatMessage: Identifiable, Equatable {
     let type: ChatMessageType // 新增的类型属性
     let senderName: String
     let attributedMessage: AttributedString
-    let images: [UIImage]
+    let images: [PlatformImage]
     let timestamp: Date
     let isSentBySelf: Bool
     

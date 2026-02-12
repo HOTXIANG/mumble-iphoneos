@@ -5,7 +5,7 @@
 //  Created by 王梓田 on 1/3/26.
 //
 
-#if !targetEnvironment(macCatalyst)
+#if os(iOS)
 import ActivityKit
 import SwiftUI
 

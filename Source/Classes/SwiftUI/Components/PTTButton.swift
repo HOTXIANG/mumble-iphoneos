@@ -20,7 +20,9 @@ struct PTTButton: View {
     @GestureState private var dragOffset: CGSize = .zero
     
     // 触感反馈
+    #if os(iOS)
     private let feedback = UIImpactFeedbackGenerator(style: .heavy)
+    #endif
     
     var body: some View {
         if transmitMethod == "ptt" {
@@ -71,7 +73,9 @@ struct PTTButton: View {
     
     private func startTransmitting() {
         isPressed = true
+        #if os(iOS)
         feedback.impactOccurred()
+        #endif
         // 调用底层 MumbleKit 开始传输
         MKAudio.shared()?.setForceTransmit(true)
     }

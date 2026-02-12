@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 struct NotificationSettingsView: View {
     @AppStorage("NotificationNotifyUserMessages") var notifyUserMessages: Bool = true
@@ -21,7 +22,12 @@ struct NotificationSettingsView: View {
         .navigationTitle("Notifications")
         .onAppear {
             // 进入页面时检查/请求权限
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            #if os(iOS)
+            let options: UNAuthorizationOptions = [.alert, .badge, .sound]
+            #else
+            let options: UNAuthorizationOptions = [.alert, .sound]
+            #endif
+            UNUserNotificationCenter.current().requestAuthorization(options: options) { granted, error in
                 if let error = error {
                     print("Notification permission error: \(error)")
                 }
@@ -285,9 +291,11 @@ struct PreferencesView: View {
             }
         }
         .navigationTitle("Settings")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Button("Done") {
                     dismiss()
                 }

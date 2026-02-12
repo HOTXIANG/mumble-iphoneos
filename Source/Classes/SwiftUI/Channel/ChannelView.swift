@@ -9,11 +9,33 @@ import SwiftUI
 
 // MARK: - Configuration Constants (UI 尺寸配置)
 
+#if os(macOS)
+private let kRowSpacing: CGFloat = 6.0    // 行与行之间的间隙
+private let kRowPaddingV: CGFloat = 4.0   // 行内部的垂直边距
+private let kContentHeight: CGFloat = 24.0 // 内容高度
+private let kFontSize: CGFloat = 13.0     // 字体大小
+private let kIconSize: CGFloat = 14.0     // 图标大小
+private let kIndentUnit: CGFloat = 12.0   // 每级缩进
+private let kRowPaddingH: CGFloat = 8.0   // 行内部的水平边距
+private let kHSpacing: CGFloat = 4.0      // 水平间距
+private let kArrowSize: CGFloat = 9.0     // 箭头大小
+private let kArrowWidth: CGFloat = 14.0   // 箭头占位宽度
+private let kChannelIconSize: CGFloat = 10.0
+private let kChannelIconWidth: CGFloat = 16.0
+#else
 private let kRowSpacing: CGFloat = 6.0    // 行与行之间的间隙
 private let kRowPaddingV: CGFloat = 6.0   // 行内部的垂直边距
 private let kContentHeight: CGFloat = 28.0 // 内容高度
 private let kFontSize: CGFloat = 16.0     // 字体大小
 private let kIconSize: CGFloat = 18.0     // 图标大小
+private let kIndentUnit: CGFloat = 16.0   // 每级缩进
+private let kRowPaddingH: CGFloat = 12.0  // 行内部的水平边距
+private let kHSpacing: CGFloat = 6.0      // 水平间距
+private let kArrowSize: CGFloat = 10.0    // 箭头大小
+private let kArrowWidth: CGFloat = 16.0   // 箭头占位宽度
+private let kChannelIconSize: CGFloat = 12.0
+private let kChannelIconWidth: CGFloat = 20.0
+#endif
 
 // MARK: - 1. Main Layout Container
 
@@ -94,6 +116,7 @@ struct ChannelView: View {
     }
     
     private func configureTabBarAppearance() {
+        #if os(iOS)
         let appearance = UITabBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.backgroundColor = UIColor.black.withAlphaComponent(0.5)
@@ -101,6 +124,7 @@ struct ChannelView: View {
         if #available(iOS 15.0, *) {
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
+        #endif
     }
 }
 
@@ -171,7 +195,7 @@ struct ChannelTreeRow: View {
     
     let onUserTap: (MKUser) -> Void
     
-    private let haptic = UISelectionFeedbackGenerator()
+    private let haptic = PlatformSelectionFeedback()
     
     var body: some View {
         Group {
@@ -187,19 +211,39 @@ struct ChannelTreeRow: View {
                     // [区域 1] 缩进占位符 (不可点击，透传给 List 选中或者无操作)
                     // 这里的宽度必须与 UI 层的缩进 Spacer 完全一致
                     Spacer()
-                        .frame(width: CGFloat(level * 16))
+                        .frame(width: CGFloat(level) * kIndentUnit)
                     
                     // [区域 2] 箭头点击区 (跟随缩进移动)
-                    // 宽度 = 箭头视觉宽度(16) + 适当的点击热区余量(比如共 50)
                     Color.clear
-                        .frame(width: 50, height: kContentHeight + kRowPaddingV * 2)
+                        .frame(width: kArrowWidth + 24, height: kContentHeight + kRowPaddingV * 2)
                         .contentShape(Rectangle()) // 确保透明区域可点击
                         .onTapGesture {
                             toggleCollapse()
                         }
                     
-                    // [区域 3] 频道内容点击区 -> 弹出菜单
-                    // 占据剩余的所有宽度
+                    // [区域 3] 频道内容点击区
+                    #if os(macOS)
+                    // macOS: 双击进入频道，右键上下文菜单
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: kContentHeight + kRowPaddingV * 2)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            joinChannel()
+                        }
+                        .contextMenu {
+                            Button {
+                                joinChannel()
+                            } label: {
+                                Label("Join Channel", systemImage: "arrow.right.to.line")
+                            }
+                            Button {
+                                // TODO: Show Info
+                            } label: {
+                                Label("Channel Info", systemImage: "info.circle")
+                            }
+                        }
+                    #else
+                    // iOS: 点击弹出菜单
                     Menu {
                         Text(channel.channelName() ?? "Channel")
                             .font(.subheadline)
@@ -224,6 +268,7 @@ struct ChannelTreeRow: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: kContentHeight + kRowPaddingV * 2)
                     .contentShape(Rectangle())
+                    #endif
                 }
             }
             // List Row 配置
@@ -292,30 +337,30 @@ struct ChannelRowView: View {
     let level: Int
     @ObservedObject var serverManager: ServerModelManager
     
-    private let haptic = UISelectionFeedbackGenerator()
+    private let haptic = PlatformSelectionFeedback()
     
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: kHSpacing) {
             // 1. 缩进
-            Spacer().frame(width: CGFloat(level * 16))
+            Spacer().frame(width: CGFloat(level) * kIndentUnit)
             
             // 2. 折叠箭头 (独立交互，不触发菜单)
             if hasChildren {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: kArrowSize, weight: .bold))
                     .foregroundColor(.gray)
                     .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-                    .frame(width: 16, height: kContentHeight)
+                    .frame(width: kArrowWidth, height: kContentHeight)
             } else {
-                Color.clear.frame(width: 16, height: kContentHeight)
+                Color.clear.frame(width: kArrowWidth, height: kContentHeight)
             }
             
             // 3. 频道信息区域
-            HStack(spacing: 6) {
+            HStack(spacing: kHSpacing) {
                 Image(systemName: "number")
                     .foregroundColor(isCurrentChannel ? .green : .secondary)
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 20, height: kContentHeight)
+                    .font(.system(size: kChannelIconSize, weight: .semibold))
+                    .frame(width: kChannelIconWidth, height: kContentHeight)
                 
                 Text(channel.channelName() ?? "Unknown")
                     .font(.system(size: kFontSize, weight: .medium))
@@ -335,9 +380,9 @@ struct ChannelRowView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, kRowPaddingH)
         .padding(.vertical, kRowPaddingV)
-        .glassEffect(.clear.interactive().tint(isCurrentChannel ? Color.blue.opacity(0.5) : Color.blue.opacity(0.0)), in: .rect(cornerRadius: 12))
+        .modifier(TintedGlassRowModifier(isHighlighted: isCurrentChannel, highlightColor: .blue))
     }
     
     private var isCurrentChannel: Bool {
@@ -389,10 +434,10 @@ struct UserRowView: View {
     
     var body: some View {
         ZStack(alignment: .leading) {
-            HStack(spacing: 6) {
+            HStack(spacing: kHSpacing) {
                 let level = dynamicLevel
-                let indentWidth = CGFloat(level * 16) + 24
-                // 缩进: level*16 + 箭头位(16) + 图标位(20)的微调
+                let indentWidth = CGFloat(level) * kIndentUnit + kArrowWidth + 4
+                // 缩进
                 Spacer().frame(width: indentWidth)
                 
                 // Avatar
@@ -448,18 +493,39 @@ struct UserRowView: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, kRowPaddingH)
             .padding(.vertical, kRowPaddingV)
-            .glassEffect(.clear.interactive().tint(isMyself ? Color.indigo.opacity(0.5) : Color.indigo.opacity(0.0)), in: .rect(cornerRadius: 12))
-            .contextMenu {
-                Button(action: {}) { Label("User Info", systemImage: "person.circle") }
-            }
+            .modifier(TintedGlassRowModifier(isHighlighted: isMyself, highlightColor: .indigo))
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: kContentHeight + kRowPaddingV * 2)
+                .contentShape(Rectangle())
+                .contextMenu {
+                    if !isMyself {
+                        Button {
+                            serverManager.toggleLocalUserMute(session: user.session())
+                        } label: {
+                            if user.isLocalMuted() {
+                                Label("Unmute Locally", systemImage: "speaker.wave.2.fill")
+                            } else {
+                                Label("Mute Locally", systemImage: "speaker.slash.fill")
+                            }
+                        }
+                        Button {
+                            onTap()
+                        } label: {
+                            Label("Audio Settings...", systemImage: "slider.horizontal.3")
+                        }
+                        Divider()
+                    }
+                    Button(action: {}) { Label("User Info", systemImage: "person.circle") }
+                }
             
+            #if os(iOS)
             if !isMyself {
                 HStack(spacing: 0) {
                     let level = dynamicLevel
                     // 避开前面的缩进区域，确保点击的是内容部分
-                    Spacer().frame(width: CGFloat(level * 16))
+                    Spacer().frame(width: CGFloat(level) * kIndentUnit)
                     
                     Menu {
                         // Menu Header
@@ -502,6 +568,7 @@ struct UserRowView: View {
                     .contentShape(Rectangle()) // 确保透明区域可点击
                 }
             }
+            #endif
         }
     }
     
@@ -523,7 +590,7 @@ private struct AvatarView: View {
     var body: some View {
         Image(systemName: "person.fill")
             .font(.system(size: kIconSize))
-            .foregroundColor(talkingState == .talking ? .green : Color(uiColor: .systemGray))
+            .foregroundColor(talkingState == .talking ? .green : .gray)
             .frame(width: kContentHeight, height: kContentHeight)
             .shadow(radius: talkingState == .talking ? 4 : 0)
     }

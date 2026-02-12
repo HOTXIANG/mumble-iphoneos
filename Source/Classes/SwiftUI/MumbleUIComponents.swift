@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 // 通用菜单行 - 已升级为 Liquid Glass 风格
 struct MenuRowView: View {
@@ -97,11 +99,14 @@ struct ListRowView: View {
 struct WelcomeHeaderView: View {
     var body: some View {
         VStack(spacing: 16) {
-            // ✅ 核心修复：添加 resizable 和 frame 限制
             Image("TransparentLogo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 300, height: 300)
+                #if os(macOS)
+                .frame(maxWidth: 120, maxHeight: 120)
+                #else
+                .frame(maxWidth: 200, maxHeight: 200)
+                #endif
                 .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
         }
     }

@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 // MARK: - Navigation Configurations
 
@@ -16,7 +18,11 @@ struct WelcomeNavigationConfig: NavigationConfigurable {
     
     var title: String { "Mumble" }
     var leftBarItems: [NavigationBarItem] {
+        #if os(macOS)
+        [] // macOS: Settings is in the app menu bar
+        #else
         [NavigationBarItem(systemImage: "gearshape", action: onPreferences)]
+        #endif
     }
     var rightBarItems: [NavigationBarItem] {
         []
@@ -36,8 +42,13 @@ struct WelcomeContentView: View {
         VStack(spacing: 0) {
             // 顶部 Logo 区域
             WelcomeHeaderView()
+                #if os(macOS)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+                #else
                 .padding(.top, 10)
                 .padding(.bottom, 20)
+                #endif
             
             VStack(spacing: 0) {
                 
@@ -69,7 +80,7 @@ struct WelcomeContentView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 16)
                     .contentShape(Rectangle()) // 修复点击热区问题
-                    .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 27))
+                    .modifier(GlassEffectModifier(cornerRadius: 27))
                 }
                 .padding(.horizontal, 20)
                 .buttonStyle(.plain)
@@ -125,7 +136,11 @@ struct WelcomeContentView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            #if os(iOS)
             .listStyle(.insetGrouped)
+            #else
+            .listStyle(.inset)
+            #endif
         }
         .background(Color.clear)
         .onAppear {
@@ -139,7 +154,7 @@ struct WelcomeContentView: View {
     private func connectTo(hostname: String, port: Int, username: String, displayName: String) {
         // 触发连接
         AppState.shared.serverDisplayName = hostname
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        PlatformImpactFeedback(style: .medium).impactOccurred()
         
         // 尝试从收藏夹查找匹配的证书
         var certRef: Data? = nil
@@ -216,7 +231,16 @@ struct WelcomeView: MumbleContentView {
                     PreferencesView()
                         .environmentObject(serverManager)
                 }
+                #if os(macOS)
+                .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
+                #endif
             }
+            #if os(macOS)
+            .onReceive(NotificationCenter.default.publisher(for: .mumbleShowSettings)) { _ in
+                guard !AppState.shared.isConnected else { return }
+                showingPreferences = true
+            }
+            #endif
     }
 }
 
@@ -226,9 +250,12 @@ struct MumbleNavigationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .navigationTitle(config.title)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItemGroup(placement: .navigationBarLeading) {
                     ForEach(Array(config.leftBarItems.enumerated()), id: \.offset) { _, item in
                         createBarButton(item)
@@ -239,6 +266,16 @@ struct MumbleNavigationModifier: ViewModifier {
                         createBarButton(item)
                     }
                 }
+                #else
+                ToolbarItemGroup(placement: .automatic) {
+                    ForEach(Array(config.leftBarItems.enumerated()), id: \.offset) { _, item in
+                        createBarButton(item)
+                    }
+                    ForEach(Array(config.rightBarItems.enumerated()), id: \.offset) { _, item in
+                        createBarButton(item)
+                    }
+                }
+                #endif
             }
     }
     
@@ -249,8 +286,12 @@ struct MumbleNavigationModifier: ViewModifier {
                 Text(NSLocalizedString(title, comment: ""))
             } else if let systemImage = item.systemImage {
                 Image(systemName: systemImage)
+                    #if os(macOS)
+                    .font(.system(size: 16))
+                    #endif
             }
         }
+        .buttonStyle(.borderless)
         .foregroundStyle(.primary)
     }
 }
@@ -273,13 +314,18 @@ struct AppRootView: View {
     var body: some View {
         // 内容区域
         Group {
+            #if os(iOS)
             if UIDevice.current.userInterfaceIdiom == .pad {
                 iPadLayout
             } else {
                 iPhoneLayout
             }
+            #else
+            iPadLayout
+            #endif
         }
         .environmentObject(serverManager)
+        .focusedValue(\.serverManager, serverManager)
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
         .overlay(alignment: .top) {
             if let toast = appState.activeToast {
@@ -308,11 +354,11 @@ struct AppRootView: View {
                             Text("Cancel")
                                 .font(.subheadline).fontWeight(.semibold).foregroundColor(.white)
                                 .padding(.horizontal, 32).padding(.vertical, 10)
-                                .glassEffect(.regular.tint(.red.opacity(0.5)).interactive(), in: Capsule())
                         }
+                        .modifier(RedGlassCapsuleModifier())
                     }
                     .padding(.horizontal, 64).padding(.vertical, 24)
-                    .glassEffect(.regular.interactive(),in: .rect(cornerRadius: 32))
+                    .modifier(GlassEffectModifier(cornerRadius: 32))
                     .shadow(radius: 10)
                 }
                 .ignoresSafeArea().zIndex(9999)
@@ -343,7 +389,7 @@ struct AppRootView: View {
                     .background(Color.clear)
             }
             .environmentObject(sidebarNavigationManager)
-            .navigationSplitViewColumnWidth(min: 320, ideal: 380)
+            .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
             .background(Color.clear)
         } detail: {
             ZStack {
@@ -407,7 +453,11 @@ struct AppRootView: View {
     private func destinationView(for destination: NavigationDestination, navigationManager: NavigationManager) -> some View {
         switch destination {
         case .objectiveC(let type):
+            #if os(iOS)
             ObjectiveCViewWrapper(controllerType: type)
+            #else
+            Text("Not available on macOS")
+            #endif
         case .swiftUI(let type):
             switch type {
             case .favouriteServerList:

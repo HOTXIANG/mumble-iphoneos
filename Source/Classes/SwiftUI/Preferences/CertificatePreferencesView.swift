@@ -64,9 +64,13 @@ struct CertificatePreferencesView: View {
                 Text("Set a password to protect the exported .p12 file.")
             })
             .sheet(isPresented: $showingShareSheet) {
+                #if os(iOS)
                 if let url = exportedFileURL {
                     ShareSheet(activityItems: [url])
                 }
+                #else
+                Text("Sharing not available on macOS")
+                #endif
             }
             // --- 删除功能 ---
             .alert("Delete Certificate?", isPresented: $showingDeleteConfirmation, presenting: certToDelete, actions: { cert in
@@ -114,7 +118,7 @@ struct CertificatePreferencesView: View {
     }
     
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
+        ToolbarItem(placement: .automatic) {
             Button(action: { showingImportPicker = true }) {
                 Label("Import", systemImage: "square.and.arrow.down")
             }
@@ -218,6 +222,7 @@ struct CertificateRow: View {
     }
 }
 
+#if os(iOS)
 struct ShareSheet: UIViewControllerRepresentable {
     var activityItems: [Any]
     var applicationActivities: [UIActivity]? = nil
@@ -229,6 +234,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 
 extension UTType {
     static var pkcs12: UTType {

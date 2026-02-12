@@ -59,11 +59,13 @@ class SystemMuteManager {
     func setSystemMute(_ isMuted: Bool) {
         guard #available(iOS 17.0, *) else { return }
         
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         // 只有 Session 激活时才能设置，否则会报错 "cannot control mic"
         if session.category != .playAndRecord {
             return
         }
+        #endif
         
         do {
             try AVAudioApplication.shared.setInputMuted(isMuted)

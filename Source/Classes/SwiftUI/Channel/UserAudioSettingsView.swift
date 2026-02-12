@@ -71,7 +71,9 @@ struct UserAudioSettingsView: View {
                 }
             }
             .navigationTitle(userName)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {

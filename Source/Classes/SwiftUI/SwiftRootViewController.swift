@@ -1,5 +1,6 @@
 // 文件: SwiftRootViewController.swift (正确的内容)
 
+#if os(iOS)
 import UIKit
 import SwiftUI
 
@@ -77,3 +78,4 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
         return false
     }
 }
+#endif // os(iOS)

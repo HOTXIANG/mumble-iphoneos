@@ -3,14 +3,12 @@
 // license that can be found in the LICENSE file.
 
 ARCHS = $(ARCHS_STANDARD)
-SDKROOT = iphoneos
+SDKROOT = auto
 
 MACOSX_DEPLOYMENT_TARGET = 14.0
-IPHONEOS_DEPLOYMENT_TARGET = 26.0
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
 
 CODE_SIGN_IDENTITY[sdk=iphoneos*] = iPhone Developer
-
-SUPPORTS_MACCATALYST = YES
 
 TARGETED_DEVICE_FAMILY = 1,2 // iPhone, iPad
 
@@ -60,6 +58,7 @@ GCC_PREFIX_HEADER = Source/Mumble.pch
 VALIDATE_PRODUCT = YES
 
 OTHER_LDFLAGS = -all_load -ObjC -lc++
+OTHER_LDFLAGS[sdk=macosx*] = -all_load -ObjC -lc++ "$(BUILT_PRODUCTS_DIR)/OpenSSL.dylib" -F"$(BUILT_PRODUCTS_DIR)" -framework MumbleKit
 
 ENABLE_BITCODE = NO
 

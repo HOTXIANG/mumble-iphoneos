@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 // 导航配置协议 (保持不变)
 protocol NavigationConfigurable {
@@ -47,8 +49,13 @@ struct MumbleNavigationView<Content: View>: View {
     var body: some View {
         content
             .navigationTitle(config.title)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #else
+            .toolbarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItemGroup(placement: .navigationBarLeading) {
                     ForEach(Array(config.leftBarItems.enumerated()), id: \.offset) { index, item in
                         createBarButton(item)
@@ -60,6 +67,19 @@ struct MumbleNavigationView<Content: View>: View {
                         createBarButton(item)
                     }
                 }
+                #else
+                ToolbarItemGroup(placement: .automatic) {
+                    ForEach(Array(config.leftBarItems.enumerated()), id: \.offset) { index, item in
+                        createBarButton(item)
+                    }
+                }
+                
+                ToolbarItemGroup(placement: .automatic) {
+                    ForEach(Array(config.rightBarItems.enumerated()), id: \.offset) { index, item in
+                        createBarButton(item)
+                    }
+                }
+                #endif
             }
     }
     
@@ -150,6 +170,7 @@ enum ObjectiveCControllerType: Hashable, Equatable {
 }
 
 // Objective-C 视图控制器包装器 (保持不变)
+#if os(iOS)
 struct ObjectiveCViewWrapper: UIViewControllerRepresentable {
     let controllerType: ObjectiveCControllerType
     
@@ -168,3 +189,4 @@ struct ObjectiveCViewWrapper: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
+#endif

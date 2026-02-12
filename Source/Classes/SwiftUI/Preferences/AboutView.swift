@@ -17,11 +17,19 @@ struct AboutView: View {
             // App 图标与版本区
             Section {
                 VStack(spacing: 4) {
+                    #if os(iOS)
                     Image(uiImage: UIImage(named: "TransparentLogo") ?? UIImage(systemName: "mic.circle.fill")!)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 160, height: 160)
                         .shadow(radius: 10)
+                    #else
+                    Image(nsImage: NSImage(named: "TransparentLogo") ?? NSImage(systemSymbolName: "mic.circle.fill", accessibilityDescription: nil)!)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 160, height: 160)
+                        .shadow(radius: 10)
+                    #endif
                     
                     VStack(spacing: 4) {
                         Text("Mumble for iOS")
@@ -83,6 +91,8 @@ struct AboutView: View {
             }
         }
         .navigationTitle("About")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }

@@ -3,10 +3,13 @@
 import SwiftUI
 import PhotosUI
 import QuickLook
+#if canImport(UIKit)
 import UIKit
+#endif
 import UniformTypeIdentifiers
 
 // MARK: - 1. QuickLook 预览包装器 (标准 SwiftUI 实现)
+#if os(iOS)
 struct QuickLookPreview: UIViewControllerRepresentable {
     let url: URL
     
@@ -38,6 +41,7 @@ struct QuickLookPreview: UIViewControllerRepresentable {
         }
     }
 }
+#endif
 
 // MARK: - 2. 预览状态模型
 struct PreviewItem: Identifiable {
@@ -51,7 +55,7 @@ struct MessagesView: View {
     
     // 状态管理中心
     @State private var previewItem: PreviewItem?
-    @State private var selectedImageForSend: UIImage? // ✅ 状态提升到这里
+    @State private var selectedImageForSend: PlatformImage? // ✅ 状态提升到这里
     
     var body: some View {
         ZStack {
@@ -66,10 +70,12 @@ struct MessagesView: View {
             Color.clear
                 .allowsHitTesting(false)
                 // 挂载查看大图 (QuickLook)
+                #if os(iOS)
                 .fullScreenCover(item: $previewItem) { item in
                     QuickLookPreview(url: item.url)
                         .ignoresSafeArea()
                 }
+                #endif
                 // ✅ 挂载发送确认框 (Sheet) - 现在它也稳定了！
                 .sheet(item: $selectedImageForSend) { image in
                     ImageConfirmationView(
@@ -85,7 +91,7 @@ struct MessagesView: View {
         }
     }
     
-    private func handleImageTap(image: UIImage) {
+    private func handleImageTap(image: PlatformImage) {
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "mumble_preview_\(UUID().uuidString).jpg"
         let fileURL = tempDir.appendingPathComponent(fileName)
@@ -107,8 +113,8 @@ struct MessagesList: View {
     @ObservedObject var serverManager: ServerModelManager
     
     // 回调函数
-    let onPreviewRequest: (UIImage) -> Void
-    let onImageSelected: (UIImage) -> Void // ✅ 新增：通知父视图有图片要发送
+    let onPreviewRequest: (PlatformImage) -> Void
+    let onImageSelected: (PlatformImage) -> Void // ✅ 新增：通知父视图有图片要发送
     
     @State private var newMessage = ""
     @FocusState private var isTextFieldFocused: Bool
@@ -131,7 +137,13 @@ struct MessagesList: View {
             // 消息列表
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
+                    LazyVStack(alignment: .leading, spacing: {
+                        #if os(macOS)
+                        return CGFloat(10)
+                        #else
+                        return CGFloat(16)
+                        #endif
+                    }()) {
                         ForEach(serverManager.messages) { message in
                             switch message.type {
                             case .userMessage:
@@ -183,9 +195,9 @@ struct MessagesList: View {
     // MARK: - Logic Helpers
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         for provider in providers {
-            if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { image, error in
-                    guard let uiImage = image as? UIImage else { return }
+            if provider.canLoadObject(ofClass: PlatformImage.self) {
+                provider.loadObject(ofClass: PlatformImage.self) { image, error in
+                    guard let uiImage = image as? PlatformImage else { return }
                     Task { @MainActor in
                         // ✅ 不再自己处理，而是向上汇报
                         onImageSelected(uiImage)
@@ -219,23 +231,28 @@ struct MessagesList: View {
 
 private struct NotificationMessageView: View {
     let message: ChatMessage
+    #if os(macOS)
+    private let textSize: CGFloat = 11
+    #else
+    private let textSize: CGFloat = 13
+    #endif
     var body: some View {
         HStack(spacing: 6) {
             Text(message.attributedMessage).fontWeight(.medium)
             Text(message.timestamp, style: .time).font(.caption2).opacity(0.6)
         }
-        .font(.system(size: 13, weight: .medium))
+        .font(.system(size: textSize, weight: .medium))
         .foregroundColor(.secondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color(uiColor: .systemGray5), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .background(Color.systemGray5, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
 private struct MessageBubbleView: View {
     let message: ChatMessage
-    let onImageTap: (UIImage) -> Void
+    let onImageTap: (PlatformImage) -> Void
     
     var body: some View {
         VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
@@ -247,12 +264,14 @@ private struct MessageBubbleView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 if !message.plainTextMessage.isEmpty {
-                    Text(message.attributedMessage).tint(.pink).textSelection(.enabled)
+                    Text(message.attributedMessage)
+                        .tint(.pink)
+                        .textSelection(.enabled)
                 }
                 if !message.images.isEmpty {
                     ForEach(0..<message.images.count, id: \.self) { index in
                         Button(action: { onImageTap(message.images[index]) }) {
-                            Image(uiImage: message.images[index])
+                            Image(platformImage: message.images[index])
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxWidth: 200)
@@ -264,7 +283,7 @@ private struct MessageBubbleView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
             .background(
-                message.isSentBySelf ? Color.accentColor : Color(uiColor: .systemGray4),
+                message.isSentBySelf ? Color.accentColor : Color.systemGray4,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
             .foregroundColor(message.isSentBySelf ? .white : .primary)
@@ -279,9 +298,9 @@ private struct MessageBubbleView: View {
 }
 
 private struct ImageConfirmationView: View {
-    let image: UIImage
+    let image: PlatformImage
     let onCancel: () -> Void
-    let onSend: (UIImage, Bool) async -> Void
+    let onSend: (PlatformImage, Bool) async -> Void
     @State private var isSending = false
     @State private var isHighQuality = false
     
@@ -295,7 +314,7 @@ private struct ImageConfirmationView: View {
                     .font(.headline)
                     .padding(.top, 20)
                 
-                Image(uiImage: image)
+                Image(platformImage: image)
                     .resizable()
                     .scaledToFit()
                     .cornerRadius(12)
@@ -314,7 +333,7 @@ private struct ImageConfirmationView: View {
                 .toggleStyle(SwitchToggleStyle(tint: .blue))
                 .padding(.horizontal, 20)
                 .padding(.vertical, 8)
-                .background(Color(uiColor: .secondarySystemBackground))
+                .background(Color.secondarySystemBackground)
                 .cornerRadius(12)
                 .padding(.horizontal)
                 
@@ -337,53 +356,129 @@ private struct TextInputBar: View {
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
     let onSendText: () -> Void
-    let onSendImage: (UIImage) async -> Void
+    let onSendImage: (PlatformImage) async -> Void
     @State private var selectedPhoto: PhotosPickerItem?
     
     var body: some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            modernBody
+        } else {
+            legacyBody
+        }
+    }
+    
+    // MARK: - iOS 26+ / macOS 26+ (GlassEffect)
+    
+    @available(iOS 26.0, macOS 26.0, *)
+    private var modernBody: some View {
         GlassEffectContainer(spacing: 10.0) {
             HStack(alignment: .bottom, spacing: 10.0) {
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.indigo)
-                        .frame(width: 40, height: 40)
-                        .glassEffect(.clear.interactive())
-                }
-                .onChange(of: selectedPhoto) {
-                    Task {
-                        if let data = try? await selectedPhoto?.loadTransferable(type: Data.self),
-                           let image = UIImage(data: data) {
-                            await onSendImage(image)
-                        }
-                        selectedPhoto = nil
-                    }
-                }
+                photoPickerView
+                    .glassEffect(.clear.interactive(), in: .circle)
                 
-                TextField("Type a message...", text: $text, axis: .vertical)
-                    .focused($isFocused)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                messageTextField
                     .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 20.0))
-                    .frame(minHeight: 40)
                 
-                Button(action: onSendText) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .glassEffect(.regular.tint(text.isEmpty ? .gray.opacity(0.7) : .blue.opacity(0.7)).interactive())
-                }
-                .disabled(text.isEmpty)
+                sendButton
+                    .glassEffect(.clear.interactive().tint(text.isEmpty ? .gray.opacity(0.7) : .blue.opacity(0.7)), in: .circle)
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
-            .background(Color.clear)
         }
+    }
+    
+    // MARK: - Fallback (Material)
+    
+    private var legacyBody: some View {
+        HStack(alignment: .bottom, spacing: 10.0) {
+            photoPickerView
+            
+            messageTextField
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+            
+            sendButton
+                .background(
+                    Circle()
+                        .fill(text.isEmpty ? Color.gray.opacity(0.5) : Color.blue)
+                )
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // MARK: - Shared Components
+    
+    private var photoPickerView: some View {
+        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+            Image(systemName: "photo.on.rectangle.angled")
+                #if os(macOS)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.indigo)
+                .frame(width: 24, height: 24)
+                .clipShape(Circle())
+                #else
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.indigo)
+                .frame(width: 40, height: 40)
+                #endif
+        }
+        .onChange(of: selectedPhoto) {
+            Task {
+                if let data = try? await selectedPhoto?.loadTransferable(type: Data.self),
+                   let image = PlatformImage(data: data) {
+                    await onSendImage(image)
+                }
+                selectedPhoto = nil
+            }
+        }
+    }
+    
+    private var messageTextField: some View {
+        TextField("Type a message...", text: $text, axis: .vertical)
+            .focused($isFocused)
+            #if os(macOS)
+            .font(.system(size: 12))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(minHeight: 16)
+            #else
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(minHeight: 40)
+            #endif
+            #if os(macOS)
+            .onSubmit { onSendText() }
+            .onKeyPress(.return, phases: .down) { keyPress in
+                if keyPress.modifiers.contains(.command) {
+                    text += "\n"
+                    return .handled
+                }
+                return .ignored
+            }
+            #endif
+    }
+    
+    private var sendButton: some View {
+        Button(action: onSendText) {
+            Image(systemName: "arrow.up")
+                #if os(macOS)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 24, height: 24)
+                .clipShape(Circle())
+                #else
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 40, height: 40)
+                #endif
+        }
+        .disabled(text.isEmpty)
     }
 }
 
-extension UIImage: Identifiable {
+extension PlatformImage: Identifiable {
     public var id: String { return UUID().uuidString }
 }
 

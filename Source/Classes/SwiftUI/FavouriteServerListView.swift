@@ -1,7 +1,9 @@
 // 文件: FavouriteServerListView.swift
 
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 import WidgetKit
 
 // MARK: - Identifiable wrapper（ObjC 的 MUFavouriteServer 无法直接遵循 Identifiable）
@@ -101,7 +103,7 @@ struct FavouriteServerRowView: View {
         .foregroundColor(.primary)
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 27))
+        .modifier(ClearGlassModifier(cornerRadius: 27))
         .onAppear {
             pingModel.startPinging()
             if certModel.certificates.isEmpty {
@@ -122,20 +124,54 @@ struct FavouriteServerListContentView: View {
     @State private var serverToDelete: MUFavouriteServer?
     @State private var showingDeleteAlert = false
     
-    private let successHaptic = UINotificationFeedbackGenerator()
+    private let successHaptic = PlatformNotificationFeedback()
     
     var body: some View {
-        ZStack {
+        Group {
             if favouriteServers.isEmpty {
                 emptyStateView
             } else {
+                #if os(macOS)
+                // macOS: ScrollView + LazyVStack (List 在 NavigationSplitView sidebar 中渲染不可靠)
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(favouriteServers, id: \.primaryKey) { server in
+                            FavouriteServerRowView(server: server)
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                                .onTapGesture { connectToServer(server) }
+                                .contextMenu {
+                                    Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
+                                    Button("Edit", systemImage: "pencil") { editServer(server) }
+                                    
+                                    if isServerPinned(server) {
+                                        Button("Remove from Widget", systemImage: "minus.square") {
+                                            unpinFromWidget(server)
+                                        }
+                                    } else {
+                                        Button("Add to Widget", systemImage: "plus.square.on.square") {
+                                            pinToWidget(server)
+                                        }
+                                    }
+                                    
+                                    Button("Delete", systemImage: "trash", role: .destructive) {
+                                        self.serverToDelete = server
+                                        self.showingDeleteAlert = true
+                                    }
+                                }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
+                }
+                #else
                 List {
                     ForEach(favouriteServers, id: \.primaryKey) { server in
                         Menu {
                             Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
                             Button("Edit", systemImage: "pencil") { editServer(server) }
                             
-                            // Widget 固定/取消固定
                             if isServerPinned(server) {
                                 Button("Remove from Widget", systemImage: "minus.square") {
                                     unpinFromWidget(server)
@@ -159,8 +195,22 @@ struct FavouriteServerListContentView: View {
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                #endif
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.20, green: 0.20, blue: 0.25),
+                    Color(red: 0.07, green: 0.07, blue: 0.10)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .onAppear {
             loadFavouriteServers()
         }
@@ -191,7 +241,7 @@ struct FavouriteServerListContentView: View {
     
     private func connectToServer(_ server: MUFavouriteServer) {
         AppState.shared.serverDisplayName = server.displayName
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        PlatformImpactFeedback(style: .medium).impactOccurred()
         
         MUConnectionController.shared()?.connet(
             toHostname: server.hostName,
@@ -212,11 +262,14 @@ struct FavouriteServerListContentView: View {
             // 强制转换为 Swift 数组并过滤无效对象
             let servers = nsArray.compactMap { $0 as? MUFavouriteServer }
             
+            print("📋 FavouriteServers: loaded \(servers.count) servers from database")
+            
             // 排序
             favouriteServers = servers.sorted {
                 ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
             }
         } else {
+            print("⚠️ FavouriteServers: fetchAllFavourites returned nil")
             favouriteServers = []
         }
     }
@@ -266,7 +319,7 @@ struct FavouriteServerListContentView: View {
         )
         WidgetDataManager.shared.pinServer(item)
         
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        PlatformNotificationFeedback().notificationOccurred(.success)
         withAnimation {
             AppState.shared.activeToast = AppToast(message: "Added to Widget", type: .success)
         }
@@ -312,22 +365,25 @@ struct FavouriteServerListView: MumbleContentView {
             refreshTrigger: refreshTrigger
         )
         // 新建收藏
-        .sheet(isPresented: $showingNewSheet) {
+        .sheet(isPresented: $showingNewSheet, onDismiss: {
+            // Sheet 完全关闭后再刷新列表，避免 macOS 上 SwiftUI 在 sheet 动画期间不传播状态
+            refreshTrigger = UUID()
+        }) {
             NavigationStack {
                 FavouriteServerEditView(server: nil) { savedServer in
                     MUDatabase.storeFavourite(savedServer)
                     showingNewSheet = false
-                    refreshTrigger = UUID()
                 }
             }
         }
         // 编辑收藏 —— 使用 .sheet(item:) 保证 server 一定非 nil
-        .sheet(item: $serverToEdit) { editable in
+        .sheet(item: $serverToEdit, onDismiss: {
+            refreshTrigger = UUID()
+        }) { editable in
             NavigationStack {
                 FavouriteServerEditView(server: editable.server) { savedServer in
                     MUDatabase.storeFavourite(savedServer)
                     serverToEdit = nil
-                    refreshTrigger = UUID()
                 }
             }
         }

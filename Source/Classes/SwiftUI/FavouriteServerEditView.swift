@@ -63,8 +63,10 @@ struct FavouriteServerEditView: View {
                     } else {
                         TextField("Hostname or IP", text: $hostName)
                             .multilineTextAlignment(.trailing)
+                            #if os(iOS)
                             .keyboardType(.URL)
                             .autocapitalization(.none)
+                            #endif
                             .autocorrectionDisabled(true)
                             .foregroundColor(.secondary)
                     }
@@ -80,7 +82,9 @@ struct FavouriteServerEditView: View {
                     } else {
                         TextField("64738", text: $port)
                             .multilineTextAlignment(.trailing)
+                            #if os(iOS)
                             .keyboardType(.numberPad)
+                            #endif
                             .foregroundColor(.secondary)
                     }
                 }
@@ -98,7 +102,9 @@ struct FavouriteServerEditView: View {
                     } else {
                         TextField(UserDefaults.standard.string(forKey: "DefaultUserName") ?? "User", text: $userName)
                             .multilineTextAlignment(.trailing)
+                            #if os(iOS)
                             .autocapitalization(.none)
+                            #endif
                             .autocorrectionDisabled(true)
                             .foregroundColor(.secondary)
                     }
@@ -158,15 +164,17 @@ struct FavouriteServerEditView: View {
             }
         }
         .navigationTitle(isEditMode ? "Edit Favourite" : "New Favourite")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     dismiss()
                 }
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Done") {
                     saveServer()
                 }

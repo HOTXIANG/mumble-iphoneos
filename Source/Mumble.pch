@@ -3,7 +3,12 @@
 // license that can be found in the LICENSE file.
 
 #ifdef __OBJC__
+#import <TargetConditionals.h>
+#if TARGET_OS_IOS
 @import UIKit;
+#else
+@import AppKit;
+#endif
 #endif
 
 #ifdef __OBJC__

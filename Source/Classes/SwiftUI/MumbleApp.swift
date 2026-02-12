@@ -8,12 +8,29 @@
 import SwiftUI
 import UserNotifications
 
+// MARK: - FocusedValue for menu bar access
+
+struct FocusedServerManagerKey: FocusedValueKey {
+    typealias Value = ServerModelManager
+}
+
+extension FocusedValues {
+    var serverManager: ServerModelManager? {
+        get { self[FocusedServerManagerKey.self] }
+        set { self[FocusedServerManagerKey.self] = newValue }
+    }
+}
+
 @main
 struct MumbleApp: App {
     // 关键点：使用 Adaptor 连接老的 Objective-C Delegate
     // 这样 AppDelegate 里的生命周期方法（如 didFinishLaunching）依然会被调用
     // 但是 UIWindow 的创建权交给了 SwiftUI
+    #if os(iOS)
     @UIApplicationDelegateAdaptor(MUApplicationDelegate.self) var appDelegate
+    #else
+    @NSApplicationDelegateAdaptor(MUMacApplicationDelegate.self) var appDelegate
+    #endif
     
     // 监听环境变化，用于处理 Scene 相位（后台/前台）
     @Environment(\.scenePhase) var scenePhase
@@ -46,6 +63,11 @@ struct MumbleApp: App {
                 // 例如：触发清理操作
             }
         }
+        #if os(macOS)
+        .commands {
+            MumbleMenuCommands()
+        }
+        #endif
     }
     
     // MARK: - Widget Deep Link 处理
@@ -78,7 +100,7 @@ struct MumbleApp: App {
         })
         
         AppState.shared.serverDisplayName = matchingFav?.displayName ?? hostname
-        #if !targetEnvironment(macCatalyst)
+        #if os(iOS)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
         
@@ -95,6 +117,74 @@ struct MumbleApp: App {
         // Widget 数据也由 RecentServerManager 自动同步
     }
 }
+
+// MARK: - macOS Menu Bar Commands
+#if os(macOS)
+struct MumbleMenuCommands: Commands {
+    @FocusedValue(\.serverManager) var serverManager
+    @ObservedObject private var appState = AppState.shared
+    
+    var body: some Commands {
+        // 替换默认的 "File" 菜单里不需要的项
+        CommandGroup(replacing: .newItem) {}
+        
+        // 移除 View 菜单中的 "Show Tab Bar" 和 "Show All Tabs"
+        CommandGroup(replacing: .toolbar) {}
+        
+        // "Server" 菜单
+        CommandMenu("Server") {
+            Button(serverManager?.connectedUserState?.isSelfMuted == true ? "Unmute" : "Mute") {
+                serverManager?.toggleSelfMute()
+            }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
+            .disabled(!appState.isConnected)
+            
+            Button(serverManager?.connectedUserState?.isSelfDeafened == true ? "Undeafen" : "Deafen") {
+                serverManager?.toggleSelfDeafen()
+            }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
+            .disabled(!appState.isConnected)
+            
+            Divider()
+            
+            if serverManager?.connectedUserState?.isAuthenticated == true {
+                Button("View Certificate") {
+                    NotificationCenter.default.post(name: .mumbleShowCertInfo, object: nil)
+                }
+                .disabled(!appState.isConnected)
+            } else {
+                Button("Register User") {
+                    serverManager?.registerSelf()
+                }
+                .disabled(!appState.isConnected)
+            }
+            
+            Divider()
+            
+            Button("Disconnect") {
+                NotificationCenter.default.post(name: .mumbleInitiateDisconnect, object: nil)
+            }
+            .keyboardShortcut("w", modifiers: [.command])
+            .disabled(!appState.isConnected)
+        }
+        
+        // "Mumble" 菜单 - 添加设置项
+        CommandGroup(after: .appSettings) {
+            Button("Settings...") {
+                NotificationCenter.default.post(name: .mumbleShowSettings, object: nil)
+            }
+            .keyboardShortcut(",", modifiers: [.command])
+        }
+    }
+}
+
+// Menu bar notification names
+extension Notification.Name {
+    static let mumbleShowSettings = Notification.Name("MumbleShowSettingsNotification")
+    static let mumbleShowCertInfo = Notification.Name("MumbleShowCertInfoNotification")
+    static let mumbleInitiateDisconnect = Notification.Name("MumbleInitiateDisconnectFromMenuNotification")
+}
+#endif
 
 /// 单独的 UNUserNotificationCenterDelegate，用于处理通知点击事件
 class NotificationDelegate: NSObject, ObservableObject, UNUserNotificationCenterDelegate {

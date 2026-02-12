@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+#import <TargetConditionals.h>
+#if TARGET_OS_IOS
+
 #import "MUImage.h"
 
 @implementation MUImage
@@ -70,3 +73,5 @@
 }
 
 @end
+
+#endif // TARGET_OS_IOS

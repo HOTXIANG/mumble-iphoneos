@@ -3,7 +3,9 @@
 // 当设备连接到 Mumble 服务器时，同一 iCloud 账户的其他设备可以通过 Handoff 快速加入同一服务器和频道
 
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 /// Handoff 使用的 NSUserActivity 类型标识符
 let MumbleHandoffActivityType = "info.mumble.Mumble.serverConnection"
@@ -131,7 +133,7 @@ class HandoffManager: NSObject, ObservableObject {
     
     /// 获取当前设备类型字符串（用于用户名后缀）
     static var deviceTypeSuffix: String {
-        #if targetEnvironment(macCatalyst)
+        #if os(macOS)
         return "Mac"
         #else
         if UIDevice.current.userInterfaceIdiom == .pad {
@@ -502,7 +504,7 @@ extension HandoffManager: NSUserActivityDelegate {
             
             // 显示 Toast 提示
             let deviceInfo: String
-            #if targetEnvironment(macCatalyst)
+            #if os(macOS)
             deviceInfo = "another device"
             #else
             deviceInfo = "another device"

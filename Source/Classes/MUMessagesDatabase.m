@@ -85,7 +85,11 @@
                 NSArray *imgDataArray = [dict objectForKey:@"images"];
                 NSMutableArray *imagesArray = [[NSMutableArray alloc] initWithCapacity:[imgDataArray count]];
                 for (NSData *data in imgDataArray) {
+#if TARGET_OS_IOS
                     [imagesArray addObject:[UIImage imageWithData:data]];
+#else
+                    [imagesArray addObject:[[NSImage alloc] initWithData:data]];
+#endif
                 }
                 txtMsg = [MUTextMessage textMessageWithHeading:[dict objectForKey:@"heading"]
                                                     andMessage:[dict objectForKey:@"msg"]

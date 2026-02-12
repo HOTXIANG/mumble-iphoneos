@@ -3,8 +3,10 @@
 // license that can be found in the LICENSE file.
 
 #import "MUConnectionController.h"
+#if TARGET_OS_IOS
 #import "MUServerRootViewController.h"
 #import "MUServerCertificateTrustViewController.h"
+#endif
 #import "MUCertificateController.h"
 #import "MUCertificateChainBuilder.h"
 #import "MUDatabase.h"
@@ -24,16 +26,24 @@ NSString *MUConnectionErrorNotification = @"MUConnectionErrorNotification";
 
 NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 
-@interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate, MUServerCertificateTrustViewControllerProtocol> {
+@interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate
+#if TARGET_OS_IOS
+    , MUServerCertificateTrustViewControllerProtocol
+#endif
+> {
     MKConnection               *_connection;
     MKServerModel              *_serverModel;
+#if TARGET_OS_IOS
     MUServerRootViewController *_serverRoot;
     UIViewController           *_parentViewController;
     UIAlertController          *_alertCtrl;
+#endif
     NSTimer                    *_timer;
     int                        _numDots;
 
+#if TARGET_OS_IOS
     UIAlertController          *_rejectAlertCtrl;
+#endif
     MKRejectReason             _rejectReason;
 
     NSString                   *_hostname;
@@ -138,11 +148,14 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         [_connection disconnect];
     }
     
+#if TARGET_OS_IOS
     [_serverRoot dismissViewControllerAnimated:YES completion:nil];
+#endif
     [self teardownConnection];
 }
 
 - (void) showConnectingView {
+#if TARGET_OS_IOS
     NSString *title = [NSString stringWithFormat:@"%@...", NSLocalizedString(@"Connecting", nil)];
     NSString *msg = [NSString stringWithFormat:
                      NSLocalizedString(@"Connecting to %@:%lu", @"Connecting to hostname:port"),
@@ -160,15 +173,18 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     }
     
     _timer = [NSTimer scheduledTimerWithTimeInterval:0.2f target:self selector:@selector(updateTitle) userInfo:nil repeats:YES];
+#endif
 }
 
 - (void) updateTitle {
+#if TARGET_OS_IOS
     if (_alertCtrl) {
         _numDots = (_numDots + 1) % 4;
         NSString *dots = @"";
         for (int i = 0; i < _numDots; i++) dots = [dots stringByAppendingString:@"."];
         _alertCtrl.title = [NSString stringWithFormat:@"%@%@", NSLocalizedString(@"Connecting", nil), dots];
     }
+#endif
 }
 
 - (void) hideConnectingView {
@@ -179,6 +195,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     [_timer invalidate];
     _timer = nil;
 
+#if TARGET_OS_IOS
     if (_alertCtrl != nil && _parentViewController != nil) {
         [_parentViewController dismissViewControllerAnimated:YES completion:completion];
         _alertCtrl = nil;
@@ -187,6 +204,11 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
             completion();
         }
     }
+#else
+    if (completion) {
+        completion();
+    }
+#endif
 }
 
 - (void) startNetworkMonitor {
@@ -247,7 +269,9 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     _serverModel = [[MKServerModel alloc] initWithConnection:_connection];
     [_serverModel addDelegate:self];
     
+#if TARGET_OS_IOS
     _serverRoot = [[MUServerRootViewController alloc] initWithConnection:_connection andServerModel:_serverModel];
+#endif
 
     if (_certificateRef != nil) {
         // 如果这个服务器有专属证书，就用它
@@ -284,9 +308,13 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         _connection = nil;
     }
     [_timer invalidate];
+#if TARGET_OS_IOS
     _serverRoot = nil;
+#endif
     
+#if TARGET_OS_IOS
     [[UIApplication sharedApplication] setApplicationIconBadgeNumber:0];
+#endif
     
     // --- 核心修复：发送关闭通知 ---
     // AppState 收到这个通知后，会将 isConnected 设为 false，从而让界面回到首页
@@ -300,6 +328,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         
         // 显式停用 Session，消除橙色点
         // 这个操作涉及系统 IPC 通信，是造成卡顿的主要原因
+#if TARGET_OS_IOS
         NSError *error = nil;
         [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
         
@@ -308,6 +337,7 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         } else {
             NSLog(@"✅ [Async] Audio session deactivated successfully.");
         }
+#endif
     });
 }
 
@@ -356,6 +386,14 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     
     if (_isUserInitiatedDisconnect) {
         [self teardownConnection];
+        return;
+    }
+    
+    // If the error is a codec incompatibility, don't retry — it will always fail
+    if ([[err domain] isEqualToString:@"MKConnection"]) {
+        NSLog(@"❌ Connection closed due to unrecoverable error: %@", [err localizedFailureReason] ?: [err localizedDescription]);
+        [self postErrorWithTitle:[err localizedDescription] ?: NSLocalizedString(@"Connection Failed", nil)
+                         message:[err localizedFailureReason] ?: NSLocalizedString(@"The connection was closed due to an error.", nil)];
         return;
     }
     
@@ -539,10 +577,12 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         [self postErrorWithTitle:NSLocalizedString(@"You were banned", nil) message:msg];
     }
 }
+#if TARGET_OS_IOS
 - (void) serverCertificateTrustViewControllerDidDismiss:(MUServerCertificateTrustViewController *)trustView {
     [self showConnectingView];
     [_connection reconnect];
 }
+#endif
 - (void) serverModel:(MKServerModel *)model userJoined:(MKUser *)user {}
 - (void) serverModel:(MKServerModel *)model userDisconnected:(MKUser *)user {}
 - (void) serverModel:(MKServerModel *)model userLeft:(MKUser *)user {}

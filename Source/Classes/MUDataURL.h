@@ -4,5 +4,7 @@
 
 @interface MUDataURL : NSObject
 + (NSData *) dataFromDataURL:(NSString *)dataURL;
+#if TARGET_OS_IOS
 + (UIImage *) imageFromDataURL:(NSString *)dataURL;
+#endif
 @end

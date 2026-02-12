@@ -3,7 +3,7 @@
 import SwiftUI
 import UserNotifications
 import AudioToolbox
-#if !targetEnvironment(macCatalyst)
+#if os(iOS)
 import ActivityKit
 #endif
 
@@ -69,7 +69,7 @@ class ServerModelManager: ObservableObject {
     private var userIndexMap: [UInt: Int] = [:]
     private var channelIndexMap: [UInt: Int] = [:]
     private var delegateWrapper: ServerModelDelegateWrapper?
-    #if !targetEnvironment(macCatalyst)
+    #if os(iOS)
     private var liveActivity: Activity<MumbleActivityAttributes>?
     #endif
     private var keepAliveTimer: Timer?
@@ -95,7 +95,9 @@ class ServerModelManager: ObservableObject {
         // 避免在欢迎界面插入耳机时触发麦克风激活
         if serverModel != nil {
             setupSystemMute()
+            #if os(iOS)
             setupAudioRouteObservation()
+            #endif
         }
     }
     deinit {
@@ -146,12 +148,20 @@ class ServerModelManager: ObservableObject {
     
     private func sendLocalNotification(title: String, body: String) {
         // 1. 如果应用在前台，直接播放音效
+        #if os(iOS)
         if UIApplication.shared.applicationState == .active {
             // 1007 是 iOS 标准的三全音 (Tri-tone) 提示音
             // 使用 AlertSound 可以在静音模式下触发震动
             AudioServicesPlayAlertSound(1000)
             return
         }
+        #else
+        // macOS: 检查应用是否活跃
+        if NSApplication.shared.isActive {
+            AudioServicesPlayAlertSound(1000)
+            return
+        }
+        #endif
         
         // 2. 如果应用在后台，发送带有默认音效的系统通知
         let content = UNMutableNotificationContent()
@@ -248,7 +258,9 @@ class ServerModelManager: ObservableObject {
         
         // 服务器模型绑定成功后，才激活音频相关的监听
         setupSystemMute()
+        #if os(iOS)
         setupAudioRouteObservation()
+        #endif
         
         // 监听 Handoff 恢复用户音频偏好的通知
         NotificationCenter.default.addObserver(
@@ -275,7 +287,9 @@ class ServerModelManager: ObservableObject {
         serverName = nil
         
         systemMuteManager.cleanup()
+        #if os(iOS)
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
+        #endif
         NotificationCenter.default.removeObserver(self, name: MumbleHandoffRestoreUserPreferencesNotification, object: nil)
         endLiveActivity()
         
@@ -291,6 +305,7 @@ class ServerModelManager: ObservableObject {
     
     // MARK: - Audio Route Handling (Hot-swap Support)
     
+    #if os(iOS)
     private func setupAudioRouteObservation() {
         // 先移除旧的，防止重复注册
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
@@ -374,6 +389,7 @@ class ServerModelManager: ObservableObject {
             break
         }
     }
+    #endif
     
     private func enforceAppMuteStateToSystem() {
         guard let user = serverModel?.connectedUser() else {
@@ -464,7 +480,7 @@ class ServerModelManager: ObservableObject {
     }
     
     private func startLiveActivity() {
-        #if !targetEnvironment(macCatalyst)
+        #if os(iOS)
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         
         LiveActivityCleanup.forceEndAllActivitiesBlocking()
@@ -509,7 +525,7 @@ class ServerModelManager: ObservableObject {
     }
     
     private func updateLiveActivity() {
-        #if !targetEnvironment(macCatalyst)
+        #if os(iOS)
         guard let activity = liveActivity else { return }
         
         // 1. 获取基础信息
@@ -581,7 +597,7 @@ class ServerModelManager: ObservableObject {
     }
     
     private func endLiveActivity() {
-        #if !targetEnvironment(macCatalyst)
+        #if os(iOS)
         guard let activity = liveActivity else { return }
         
         let finalContentState = MumbleActivityAttributes.ContentState(
@@ -826,7 +842,7 @@ class ServerModelManager: ObservableObject {
     
     // 消息添加方法
     @discardableResult
-    private func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [UIImage] = []) -> Bool {
+    private func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [PlatformImage] = []) -> Bool {
         let newMessage = ChatMessage(
             id: UUID(),
             type: .userMessage,
@@ -864,7 +880,7 @@ class ServerModelManager: ObservableObject {
     }
     
     private func handleReceivedMessage(senderName: String, plainText: String, imageData: [Data], senderSession: UInt, connectedUserSession: UInt?) {
-        let images = imageData.compactMap { UIImage(data: $0) }
+        let images = imageData.compactMap { PlatformImage(data: $0) }
         
         // ✅ 核心修复：获取返回值
         let didAppend = appendUserMessage(
@@ -922,7 +938,7 @@ class ServerModelManager: ObservableObject {
         messages.append(selfMessage)
     }
     
-    func sendImageMessage(image: UIImage, isHighQuality: Bool) async {
+    func sendImageMessage(image: PlatformImage, isHighQuality: Bool) async {
         if isHighQuality {
             // ✅ 高画质模式：从 1MB 开始，失败后缓慢降级
             // 适用于：已知服务器支持大图，或者对方也是 NeoMumble 客户端
@@ -935,7 +951,7 @@ class ServerModelManager: ObservableObject {
         }
     }
     // 递归尝试发送函数
-    private func attemptSendImage(image: UIImage, targetSize: Int, decayRate: Double) async {
+    private func attemptSendImage(image: PlatformImage, targetSize: Int, decayRate: Double) async {
         // 保底 20KB，再小没意义了
         guard targetSize > 20 * 1024 else {
             print("❌ Image too small to compress further. Give up.")
@@ -981,7 +997,7 @@ class ServerModelManager: ObservableObject {
     }
     
     // 辅助：本地回显
-    private func appendLocalMessage(image: UIImage) async {
+    private func appendLocalMessage(image: PlatformImage) async {
         await MainActor.run {
             let localMessage = ChatMessage(
                 id: UUID(),
@@ -997,7 +1013,7 @@ class ServerModelManager: ObservableObject {
     }
     
     // MARK: - 智能压缩算法 (二分法 + Resize)
-    private func smartCompress(image: UIImage, to maxBytes: Int) async -> Data? {
+    private func smartCompress(image: PlatformImage, to maxBytes: Int) async -> Data? {
         // 1. 预检查：如果原图已经很小，直接返回
         if let data = image.jpegData(compressionQuality: 1.0), data.count <= maxBytes {
             return data
@@ -1036,7 +1052,7 @@ class ServerModelManager: ObservableObject {
     }
  
     // 辅助：保持比例缩放图片
-    private func resizeImage(image: UIImage, targetSize: CGSize) -> UIImage {
+    private func resizeImage(image: PlatformImage, targetSize: CGSize) -> PlatformImage {
         let size = image.size
         
         let widthRatio  = targetSize.width  / size.width
@@ -1046,14 +1062,22 @@ class ServerModelManager: ObservableObject {
         let ratio = min(widthRatio, heightRatio)
         let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
         
+        #if os(iOS)
         let rect = CGRect(origin: .zero, size: newSize)
-        
         UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
         image.draw(in: rect)
         let newImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
-        
         return newImage ?? image
+        #else
+        let newImage = NSImage(size: newSize)
+        newImage.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: newSize),
+                   from: NSRect(origin: .zero, size: size),
+                   operation: .copy, fraction: 1.0)
+        newImage.unlockFocus()
+        return newImage
+        #endif
     }
     
     func updateUserBySession(
@@ -1486,12 +1510,14 @@ class ServerModelManager: ObservableObject {
         Task.detached(priority: .userInitiated) {
             MKAudio.shared().stop()
             
+            #if os(iOS)
             // 显式停用 Session 以消除橙色点
             do {
                 try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             } catch {
                 print("⚠️ Failed to deactivate session: \(error)")
             }
+            #endif
         }
     }
     
@@ -1613,7 +1639,7 @@ class ServerModelManager: ObservableObject {
     
     /// 阻塞式强制结束所有活动（专用于 App 终止时）
     @objc public static func forceEndAllActivitiesBlocking() {
-        #if !targetEnvironment(macCatalyst)
+        #if os(iOS)
         // iOS 16.1 之前不支持
         guard #available(iOS 16.1, *) else { return }
         
@@ -1642,8 +1668,9 @@ class ServerModelManager: ObservableObject {
     }
 }
 
-extension UIImage {
-    func resized(by scale: CGFloat) -> UIImage? {
+#if canImport(UIKit)
+extension PlatformImage {
+    func resized(by scale: CGFloat) -> PlatformImage? {
         let newSize = CGSize(width: self.size.width * scale, height: self.size.height * scale)
         UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
         self.draw(in: CGRect(origin: .zero, size: newSize))
@@ -1652,6 +1679,7 @@ extension UIImage {
         return newImage
     }
 }
+#endif
 
 extension Notification.Name {
     static let requestReconnect = Notification.Name("MURequestReconnect")

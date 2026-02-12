@@ -33,8 +33,10 @@
     return [[NSData alloc] initWithBase64EncodedString:base64data options:0];
 }
 
+#if TARGET_OS_IOS
 + (UIImage *) imageFromDataURL:(NSString *)dataURL {
     return [UIImage imageWithData:[MUDataURL dataFromDataURL:dataURL]];
 }
+#endif
 
 @end
