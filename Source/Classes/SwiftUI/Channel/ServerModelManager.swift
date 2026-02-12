@@ -428,6 +428,8 @@ class ServerModelManager: ObservableObject {
     private func publishHandoffActivity() {
         guard let model = serverModel,
               let connectedUser = model.connectedUser() else { return }
+
+        let shouldSyncLocalAudio = UserDefaults.standard.object(forKey: MumbleHandoffSyncLocalAudioSettingsKey) as? Bool ?? true
         
         let hostname = model.hostname() ?? ""
         let port = Int(model.port())
@@ -439,7 +441,7 @@ class ServerModelManager: ObservableObject {
         
         // 收集当前所有用户的本地音频设置（非默认值的）
         var audioSettings: [HandoffUserAudioSetting] = []
-        if let rootChannel = model.rootChannel() {
+        if shouldSyncLocalAudio, let rootChannel = model.rootChannel() {
             collectUserAudioSettings(in: rootChannel, settings: &audioSettings)
         }
         
@@ -583,9 +585,11 @@ class ServerModelManager: ObservableObject {
     private func updateHandoffAudioState() {
         guard let model = serverModel,
               let connectedUser = model.connectedUser() else { return }
+
+        let shouldSyncLocalAudio = UserDefaults.standard.object(forKey: MumbleHandoffSyncLocalAudioSettingsKey) as? Bool ?? true
         
         var audioSettings: [HandoffUserAudioSetting] = []
-        if let rootChannel = model.rootChannel() {
+        if shouldSyncLocalAudio, let rootChannel = model.rootChannel() {
             collectUserAudioSettings(in: rootChannel, settings: &audioSettings)
         }
         
@@ -1356,6 +1360,10 @@ class ServerModelManager: ObservableObject {
         guard let newCertRef = MUCertificateController.generateSelfSignedCertificate(withName: certName, email: "") else {
             print("❌ Failed to generate certificate during registration.")
             return
+        }
+
+        DispatchQueue.main.async {
+            CertificateModel.shared.refreshCertificates()
         }
         
         print("✅ Certificate generated. Binding to favourite server...")

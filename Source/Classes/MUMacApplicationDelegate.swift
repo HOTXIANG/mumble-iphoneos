@@ -9,8 +9,9 @@
 import AppKit
 import UserNotifications
 
+@MainActor
 class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
-    
+    private let minimumWindowSize = NSSize(width: 980, height: 680)
     private var connectionActive = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -62,10 +63,18 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         MUDatabase.initializeDatabase()
         
         print("🖥️ MUMacApplicationDelegate: Initialization complete (Opus enabled, database initialized)")
+        applyMinimumWindowSizeToAllWindows()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowDidBecomeMain(_:)),
+            name: NSWindow.didBecomeMainNotification,
+            object: nil
+        )
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         MUDatabase.teardown()
+        NotificationCenter.default.removeObserver(self)
     }
     
     @objc private func reloadPreferences() {
@@ -144,6 +153,27 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         audio?.update(&settings)
         if connectionActive || (audio?.isRunning() ?? false) {
             audio?.restart()
+        }
+    }
+
+    private func applyMinimumWindowSizeToAllWindows() {
+        for window in NSApp.windows {
+            applyMinimumWindowSize(to: window)
+        }
+    }
+
+    @objc private func handleWindowDidBecomeMain(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        applyMinimumWindowSize(to: window)
+    }
+
+    private func applyMinimumWindowSize(to window: NSWindow) {
+        window.minSize = minimumWindowSize
+        if window.frame.width < minimumWindowSize.width || window.frame.height < minimumWindowSize.height {
+            var frame = window.frame
+            frame.size.width = max(frame.size.width, minimumWindowSize.width)
+            frame.size.height = max(frame.size.height, minimumWindowSize.height)
+            window.setFrame(frame, display: true, animate: false)
         }
     }
 }

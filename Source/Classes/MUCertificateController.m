@@ -14,8 +14,104 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/bn.h>
+#include <TargetConditionals.h>
 
 @implementation MUCertificateController
+
++ (NSData *)persistentRefForIdentity:(SecIdentityRef)identity {
+    if (!identity) return nil;
+
+    NSDictionary *query = @{
+        (__bridge id)kSecValueRef: (__bridge id)identity,
+        (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue,
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
+    };
+
+    CFTypeRef persistentRef = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &persistentRef);
+    if (status == errSecSuccess && persistentRef != NULL) {
+        return (__bridge_transfer NSData *)persistentRef;
+    }
+    return nil;
+}
+
++ (SecIdentityRef)copyIdentityForPersistentRef:(NSData *)ref {
+    if (!ref) return NULL;
+
+    // First try: explicit identity query by persistent ref.
+    NSDictionary *identityQuery = @{
+        (__bridge id)kSecClass: (__bridge id)kSecClassIdentity,
+        (__bridge id)kSecValuePersistentRef: ref,
+        (__bridge id)kSecReturnRef: (__bridge id)kCFBooleanTrue,
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
+    };
+
+    CFTypeRef identityItem = NULL;
+    OSStatus identityStatus = SecItemCopyMatching((__bridge CFDictionaryRef)identityQuery, &identityItem);
+    if (identityStatus == errSecSuccess && identityItem && CFGetTypeID(identityItem) == SecIdentityGetTypeID()) {
+        return (SecIdentityRef)identityItem; // already retained by CopyMatching
+    }
+    if (identityItem) CFRelease(identityItem);
+
+    // Second try: generic query and type-check.
+    NSDictionary *genericQuery = @{
+        (__bridge id)kSecValuePersistentRef: ref,
+        (__bridge id)kSecReturnRef: (__bridge id)kCFBooleanTrue,
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
+    };
+
+    CFTypeRef item = NULL;
+    OSStatus itemStatus = SecItemCopyMatching((__bridge CFDictionaryRef)genericQuery, &item);
+    if (itemStatus != errSecSuccess || item == NULL) {
+        return NULL;
+    }
+
+    if (CFGetTypeID(item) == SecIdentityGetTypeID()) {
+        return (SecIdentityRef)item;
+    }
+
+    if (CFGetTypeID(item) == SecCertificateGetTypeID()) {
+        SecCertificateRef targetCert = (SecCertificateRef)item;
+        NSData *targetCertData = (__bridge_transfer NSData *)SecCertificateCopyData(targetCert);
+        CFRelease(item);
+
+        if (!targetCertData) return NULL;
+
+        NSDictionary *allIdentityQuery = @{
+            (__bridge id)kSecClass: (__bridge id)kSecClassIdentity,
+            (__bridge id)kSecReturnRef: (__bridge id)kCFBooleanTrue,
+            (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll
+        };
+
+        CFTypeRef allIdentities = NULL;
+        OSStatus allStatus = SecItemCopyMatching((__bridge CFDictionaryRef)allIdentityQuery, &allIdentities);
+        if (allStatus == errSecSuccess && allIdentities && CFGetTypeID(allIdentities) == CFArrayGetTypeID()) {
+            NSArray *identityArray = (__bridge NSArray *)allIdentities;
+            for (id obj in identityArray) {
+                SecIdentityRef candidate = (__bridge SecIdentityRef)obj;
+                if (CFGetTypeID(candidate) != SecIdentityGetTypeID()) {
+                    continue;
+                }
+
+                SecCertificateRef candidateCert = NULL;
+                if (SecIdentityCopyCertificate(candidate, &candidateCert) == errSecSuccess && candidateCert) {
+                    NSData *candidateData = (__bridge_transfer NSData *)SecCertificateCopyData(candidateCert);
+                    CFRelease(candidateCert);
+                    if (candidateData && [candidateData isEqualToData:targetCertData]) {
+                        CFRetain(candidate);
+                        CFRelease(allIdentities);
+                        return candidate;
+                    }
+                }
+            }
+        }
+        if (allIdentities) CFRelease(allIdentities);
+        return NULL;
+    }
+
+    CFRelease(item);
+    return NULL;
+}
 
 + (MKCertificate *) certificateWithPersistentRef:(NSData *)persistentRef {
     // --- 核心修复：修正字典键值对顺序 ---
@@ -167,7 +263,6 @@
     
     // 4. 导入 Keychain
     NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
-    [options setObject:(__bridge id)kSecImportExportPassphrase forKey:(__bridge id)kSecImportExportPassphrase];
     [options setObject:@"password" forKey:(__bridge id)kSecImportExportPassphrase];
     
     CFArrayRef items = NULL;
@@ -180,21 +275,27 @@
         SecIdentityRef identity = (__bridge SecIdentityRef)[identityDict objectForKey:(__bridge id)kSecImportItemIdentity];
         
         if (identity) {
-            NSDictionary *addQuery = @{
-                (__bridge id)kSecValueRef: (__bridge id)identity,
-                (__bridge id)kSecClass: (__bridge id)kSecClassIdentity,
-                (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue
-            };
-            
-            CFTypeRef persistentRef = NULL;
-            OSStatus addErr = SecItemAdd((__bridge CFDictionaryRef)addQuery, &persistentRef);
-            
-            if (addErr == noErr && persistentRef != NULL) {
-                returnRef = (__bridge_transfer NSData *)persistentRef;
-            } else if (addErr == errSecDuplicateItem) {
-                NSLog(@"Identity already exists in Keychain.");
-            } else {
-                NSLog(@"SecItemAdd failed: %d", (int)addErr);
+            returnRef = [self persistentRefForIdentity:identity];
+
+            if (!returnRef) {
+                NSDictionary *addQuery = @{
+                    (__bridge id)kSecValueRef: (__bridge id)identity,
+                    (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue
+                };
+
+                CFTypeRef persistentRef = NULL;
+                OSStatus addErr = SecItemAdd((__bridge CFDictionaryRef)addQuery, &persistentRef);
+
+                if (addErr == noErr && persistentRef != NULL) {
+                    returnRef = (__bridge_transfer NSData *)persistentRef;
+                } else if (addErr == errSecDuplicateItem) {
+                    returnRef = [self persistentRefForIdentity:identity];
+                    if (!returnRef) {
+                        NSLog(@"Identity already exists but persistent ref lookup failed.");
+                    }
+                } else {
+                    NSLog(@"SecItemAdd failed: %d", (int)addErr);
+                }
             }
         }
     } else {
@@ -207,24 +308,48 @@
 
 // --- 新增：导出 P12 ---
 + (NSData *) exportPKCS12DataForPersistentRef:(NSData *)ref password:(NSString *)password {
-    // 1. 从 Persistent Ref 获取 Identity
-    NSDictionary *query = @{
-        (__bridge id)kSecValuePersistentRef: ref,
-        (__bridge id)kSecReturnRef: (__bridge id)kCFBooleanTrue,
-        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne
-    };
-    
-    CFTypeRef item = NULL;
-    if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &item) != noErr || item == NULL) {
+    // 1. 从 Persistent Ref 获取 Identity（兼容历史 ref 类型）
+    SecIdentityRef identity = [self copyIdentityForPersistentRef:ref];
+    if (!identity) {
+        NSLog(@"MUCertificateController: export failed, cannot resolve identity from persistent ref.");
         return nil;
     }
-    
-    SecIdentityRef identity = (SecIdentityRef)item;
+
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
+    // 2. macOS 优先使用系统 PKCS12 导出，避免私钥外部表示格式差异导致失败
+    NSString *safePassword = password ? password : @"";
+    SecItemImportExportKeyParameters keyParams;
+    memset(&keyParams, 0, sizeof(keyParams));
+    keyParams.version = SEC_KEY_IMPORT_EXPORT_PARAMS_VERSION;
+    keyParams.passphrase = (__bridge CFTypeRef)safePassword;
+
+    CFDataRef exportedData = NULL;
+    OSStatus exportStatus = SecItemExport(identity, kSecFormatPKCS12, 0, &keyParams, &exportedData);
+    if (exportStatus == errSecSuccess && exportedData != NULL) {
+        NSData *result = (__bridge_transfer NSData *)exportedData;
+        CFRelease(identity);
+        return result;
+    } else {
+        NSLog(@"MUCertificateController: SecItemExport PKCS12 failed: %d, falling back to OpenSSL path.", (int)exportStatus);
+        if (exportedData) CFRelease(exportedData);
+    }
+#endif
+
+    // 3. 兜底路径：OpenSSL 组包（保留原逻辑）
     SecCertificateRef cert = NULL;
     SecKeyRef privateKey = NULL;
-    
-    SecIdentityCopyCertificate(identity, &cert);
-    SecIdentityCopyPrivateKey(identity, &privateKey);
+
+    if (SecIdentityCopyCertificate(identity, &cert) != errSecSuccess) {
+        NSLog(@"MUCertificateController: export fallback failed at SecIdentityCopyCertificate.");
+        CFRelease(identity);
+        return nil;
+    }
+    if (SecIdentityCopyPrivateKey(identity, &privateKey) != errSecSuccess) {
+        NSLog(@"MUCertificateController: export fallback failed at SecIdentityCopyPrivateKey.");
+        CFRelease(cert);
+        CFRelease(identity);
+        return nil;
+    }
     
     if (!cert || !privateKey) {
         if (cert) CFRelease(cert);
@@ -298,7 +423,6 @@
 // --- 新增：导入 P12 ---
 + (NSData *) importPKCS12Data:(NSData *)data password:(NSString *)password error:(NSError **)error {
     NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
-    [options setObject:(__bridge id)kSecImportExportPassphrase forKey:(__bridge id)kSecImportExportPassphrase];
     [options setObject:(password ? password : @"") forKey:(__bridge id)kSecImportExportPassphrase];
     
     CFArrayRef items = NULL;
@@ -329,27 +453,30 @@
         
         if (identity) {
             // 2. 尝试存入 Keychain
-            NSDictionary *addQuery = @{
-                (__bridge id)kSecValueRef: (__bridge id)identity,
-                (__bridge id)kSecClass: (__bridge id)kSecClassIdentity,
-                (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue
-            };
-            
-            CFTypeRef persistentRef = NULL;
-            OSStatus addErr = SecItemAdd((__bridge CFDictionaryRef)addQuery, &persistentRef);
-            
-            if (addErr == noErr && persistentRef != NULL) {
-                returnRef = (__bridge_transfer NSData *)persistentRef;
-            } else {
-                // 3. 处理 Keychain 存储错误 (如重复)
-                if (error) {
-                    NSString *msg = @"Failed to save to Keychain.";
-                    if (addErr == errSecDuplicateItem) {
-                        msg = @"This certificate already exists in your Keychain."; // 重复导入
-                    } else {
-                        msg = [NSString stringWithFormat:@"Keychain Add Error: %d", (int)addErr];
+            returnRef = [self persistentRefForIdentity:identity];
+
+            if (!returnRef) {
+                NSDictionary *addQuery = @{
+                    (__bridge id)kSecValueRef: (__bridge id)identity,
+                    (__bridge id)kSecReturnPersistentRef: (__bridge id)kCFBooleanTrue
+                };
+
+                CFTypeRef persistentRef = NULL;
+                OSStatus addErr = SecItemAdd((__bridge CFDictionaryRef)addQuery, &persistentRef);
+
+                if (addErr == noErr && persistentRef != NULL) {
+                    returnRef = (__bridge_transfer NSData *)persistentRef;
+                } else if (addErr == errSecDuplicateItem) {
+                    returnRef = [self persistentRefForIdentity:identity];
+                    if (!returnRef && error) {
+                        *error = [NSError errorWithDomain:@"MumbleCertError" code:addErr userInfo:@{NSLocalizedDescriptionKey: @"This certificate already exists in your Keychain."}];
                     }
-                    *error = [NSError errorWithDomain:@"MumbleCertError" code:addErr userInfo:@{NSLocalizedDescriptionKey: msg}];
+                } else {
+                    // 3. 处理 Keychain 存储错误
+                    if (error) {
+                        NSString *msg = [NSString stringWithFormat:@"Keychain Add Error: %d", (int)addErr];
+                        *error = [NSError errorWithDomain:@"MumbleCertError" code:addErr userInfo:@{NSLocalizedDescriptionKey: msg}];
+                    }
                 }
             }
         } else {

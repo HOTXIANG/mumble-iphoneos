@@ -7,6 +7,9 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 struct CertificatePreferencesView: View {
     @StateObject private var certModel = CertificateModel.shared
@@ -26,6 +29,8 @@ struct CertificatePreferencesView: View {
     @State private var showingExportPasswordAlert = false
     @State private var exportedFileURL: URL?
     @State private var showingShareSheet = false
+    @State private var exportResultMessage: String = ""
+    @State private var showingExportResultAlert = false
     
     // 删除相关
     @State private var certToDelete: CertificateItem?
@@ -36,11 +41,15 @@ struct CertificatePreferencesView: View {
             .navigationTitle("Certificates")
             .toolbar { toolbarContent }
             // --- 导入功能 ---
+            #if os(iOS)
             .fileImporter(isPresented: $showingImportPicker, allowedContentTypes: [.pkcs12], allowsMultipleSelection: false, onCompletion: handleImportSelection)
+            #endif
             .alert("Import Certificate", isPresented: $showingImportPasswordAlert, actions: {
                 SecureField("Password", text: $importPassword)
                 Button("Cancel", role: .cancel) {
+                    #if os(iOS)
                     selectedFileForImport?.stopAccessingSecurityScopedResource()
+                    #endif
                 }
                 Button("Import") {
                     performImport()
@@ -62,6 +71,11 @@ struct CertificatePreferencesView: View {
                 }
             }, message: {
                 Text("Set a password to protect the exported .p12 file.")
+            })
+            .alert("Export Result", isPresented: $showingExportResultAlert, actions: {
+                Button("OK", role: .cancel) {}
+            }, message: {
+                Text(exportResultMessage)
             })
             .sheet(isPresented: $showingShareSheet) {
                 #if os(iOS)
@@ -87,39 +101,59 @@ struct CertificatePreferencesView: View {
     }
     
     // MARK: - Subviews
-    
-    private var certificateList: some View {
-        List {
-            Section(header: Text("Saved Identities"), footer: footerText) {
-                if certModel.certificates.isEmpty {
-                    Text("No certificates found.")
-                        .foregroundColor(.secondary)
-                        .padding(.vertical)
-                } else {
-                    ForEach(certModel.certificates) { cert in
-                        CertificateRow(cert: cert)
-                            .contextMenu {
-                                Button {
-                                    prepareExport(cert)
-                                } label: {
-                                    Label("Export .p12", systemImage: "square.and.arrow.up")
-                                }
-                                
-                                Button(role: .destructive) {
-                                    prepareDelete(cert)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+
+    @ViewBuilder
+    private var certificateContent: some View {
+        Section(header: Text("Saved Identities"), footer: footerText) {
+            if certModel.certificates.isEmpty {
+                Text("No certificates found.")
+                    .foregroundColor(.secondary)
+                    .padding(.vertical)
+            } else {
+                ForEach(certModel.certificates) { cert in
+                    CertificateRow(cert: cert)
+                        .contextMenu {
+                            Button {
+                                prepareExport(cert)
+                            } label: {
+                                Label("Export .p12", systemImage: "square.and.arrow.up")
                             }
-                    }
+                            
+                            Button(role: .destructive) {
+                                prepareDelete(cert)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                 }
             }
         }
     }
     
+    private var certificateList: some View {
+        Group {
+            #if os(macOS)
+            Form {
+                certificateContent
+            }
+            .formStyle(.grouped)
+            #else
+            List {
+                certificateContent
+            }
+            #endif
+        }
+    }
+    
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
-            Button(action: { showingImportPicker = true }) {
+            Button(action: {
+                #if os(macOS)
+                openImportPanelMacOS()
+                #else
+                showingImportPicker = true
+                #endif
+            }) {
                 Label("Import", systemImage: "square.and.arrow.down")
             }
         }
@@ -132,7 +166,11 @@ struct CertificatePreferencesView: View {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "hand.tap.fill")
                     .font(.caption)
+                #if os(macOS)
+                Text("Right-click a certificate to Export or Delete.")
+                #else
                 Text("Long press on a certificate to Export or Delete.")
+                #endif
             }
             .foregroundColor(.gray)
             .font(.caption)
@@ -160,7 +198,9 @@ struct CertificatePreferencesView: View {
     private func performImport() {
         if let url = selectedFileForImport {
             let success = certModel.importCertificate(from: url, password: importPassword)
+            #if os(iOS)
             url.stopAccessingSecurityScopedResource()
+            #endif
             
             if !success {
                 // 延迟显示错误，避免 Alert 冲突
@@ -178,13 +218,91 @@ struct CertificatePreferencesView: View {
     }
     
     private func performExport() {
-        if let cert = certToExport {
-            if let url = certModel.exportCertificate(cert, password: exportPassword) {
-                self.exportedFileURL = url
-                self.showingShareSheet = true
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.performExport()
             }
+            return
+        }
+
+        guard let cert = certToExport else { return }
+
+        guard let tempURL = certModel.exportCertificate(cert, password: exportPassword) else {
+            print("❌ Export failed: unable to generate PKCS12 for \(cert.name)")
+            exportResultMessage = "Failed to export certificate. Please verify this identity still contains a valid private key."
+            showingExportResultAlert = true
+            return
+        }
+
+        #if os(macOS)
+        do {
+            let savePanel = NSSavePanel()
+            savePanel.canCreateDirectories = true
+            savePanel.allowedContentTypes = [.pkcs12]
+            savePanel.nameFieldStringValue = cert.name.replacingOccurrences(of: "/", with: "_") + ".p12"
+            savePanel.title = "Export Certificate"
+            savePanel.message = "Choose where to save the exported .p12 file."
+
+            let response = savePanel.runModal()
+            guard response == .OK, let destinationURL = savePanel.url else {
+                print("ℹ️ Export cancelled by user for \(cert.name)")
+                try? FileManager.default.removeItem(at: tempURL)
+                return
+            }
+
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            try FileManager.default.copyItem(at: tempURL, to: destinationURL)
+
+            print("✅ Export succeeded: \(destinationURL.path)")
+            exportResultMessage = "Certificate exported to:\n\(destinationURL.path)"
+            showingExportResultAlert = true
+        } catch {
+            print("❌ Export save failed: \(error.localizedDescription)")
+            exportResultMessage = "Failed to save exported file:\n\(error.localizedDescription)"
+            showingExportResultAlert = true
+        }
+        #else
+        self.exportedFileURL = tempURL
+        self.showingShareSheet = true
+        #endif
+        
+        do {
+            try FileManager.default.removeItem(at: tempURL)
+        } catch {
+            print("ℹ️ Failed to remove temporary export file: \(error.localizedDescription)")
         }
     }
+
+    #if os(macOS)
+    private func openImportPanelMacOS() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.openImportPanelMacOS()
+            }
+            return
+        }
+
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pkcs12]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.title = "Import Certificate"
+        panel.message = "Choose a .p12 certificate file to import."
+
+        let response = panel.runModal()
+        guard response == .OK, let url = panel.url else {
+            print("ℹ️ Import cancelled by user")
+            return
+        }
+
+        self.selectedFileForImport = url
+        self.importPassword = ""
+        self.showingImportPasswordAlert = true
+    }
+    #endif
     
     private func prepareDelete(_ cert: CertificateItem) {
         self.certToDelete = cert

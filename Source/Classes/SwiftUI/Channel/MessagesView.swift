@@ -52,12 +52,22 @@ struct PreviewItem: Identifiable {
     let url: URL
 }
 
+#if os(macOS)
+struct MacImagePreviewItem: Identifiable {
+    let id = UUID()
+    let image: PlatformImage
+}
+#endif
+
 // MARK: - 3. 主容器 (Stable Container)
 struct MessagesView: View {
     let serverManager: ServerModelManager
     
     // 状态管理中心
     @State private var previewItem: PreviewItem?
+    #if os(macOS)
+    @State private var macPreviewItem: MacImagePreviewItem?
+    #endif
     @State private var selectedImageForSend: PlatformImage? // ✅ 状态提升到这里
     
     var body: some View {
@@ -78,6 +88,10 @@ struct MessagesView: View {
                     QuickLookPreview(url: item.url)
                         .ignoresSafeArea()
                 }
+                #else
+                .sheet(item: $macPreviewItem) { item in
+                    MacImagePreviewView(image: item.image)
+                }
                 #endif
                 // ✅ 挂载发送确认框 (Sheet) - 现在它也稳定了！
                 .sheet(item: $selectedImageForSend) { image in
@@ -95,6 +109,9 @@ struct MessagesView: View {
     }
     
     private func handleImageTap(image: PlatformImage) {
+        #if os(macOS)
+        macPreviewItem = MacImagePreviewItem(image: image)
+        #else
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "mumble_preview_\(UUID().uuidString).jpg"
         let fileURL = tempDir.appendingPathComponent(fileName)
@@ -107,8 +124,36 @@ struct MessagesView: View {
                 }
             }
         }
+        #endif
     }
 }
+
+#if os(macOS)
+private struct MacImagePreviewView: View {
+    let image: PlatformImage
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.9)
+                .ignoresSafeArea()
+
+            ScrollView([.horizontal, .vertical]) {
+                Image(platformImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 1400, maxHeight: 1000)
+                    .padding(24)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") { dismiss() }
+            }
+        }
+    }
+}
+#endif
 
 // MARK: - 4. 消息列表 (Dynamic Content)
 // 这个视图负责监听数据变化和 UI 刷新
@@ -280,6 +325,8 @@ private struct MessageBubbleView: View {
                                 .frame(maxWidth: 200)
                                 .cornerRadius(8)
                         }
+                        .buttonStyle(.plain)
+                        .cornerRadius(8)
                     }
                 }
             }
@@ -311,7 +358,8 @@ private struct ImageConfirmationView: View {
         VStack(spacing: 20) {
             if isSending {
                 ProgressView("Compressing and Sending...")
-                    .padding(.vertical, 80)
+                    .padding(.vertical, 60)
+                    .padding(.horizontal, 80)
             } else {
                 Text("Confirm Image")
                     .font(.headline)
@@ -417,9 +465,9 @@ private struct TextInputBar: View {
         PhotosPicker(selection: $selectedPhoto, matching: .images) {
             Image(systemName: "photo.on.rectangle.angled")
                 #if os(macOS)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.indigo)
-                .frame(width: 40, height: 40)
+                .frame(width: 32, height: 32)
                 #else
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.indigo)
@@ -427,7 +475,7 @@ private struct TextInputBar: View {
                 #endif
         }
         #if os(macOS)
-        .frame(width: 40, height: 40)
+        .frame(width: 32, height: 32)
         #else
         .frame(width: 40, height: 40)
         #endif
@@ -449,9 +497,10 @@ private struct TextInputBar: View {
             .focused($isFocused)
             #if os(macOS)
             .font(.system(size: 12))
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .frame(minHeight: 40)
+            .frame(minHeight: 32)
+            .textFieldStyle(.plain)
             #else
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -472,10 +521,10 @@ private struct TextInputBar: View {
                 guard keyPress.modifiers.contains(.command) else { return .ignored }
                 return handleMacPasteFromPasteboard() ? .handled : .ignored
             }
-            #endif
             .onPasteCommand(of: [.image]) { providers in
                 handlePastedImages(providers)
             }
+            #endif
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
@@ -544,9 +593,9 @@ private struct TextInputBar: View {
         Button(action: onSendText) {
             Image(systemName: "arrow.up")
                 #if os(macOS)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.white)
-                .frame(width: 40, height: 40)
+                .frame(width: 32, height: 32)
                 #else
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
@@ -554,7 +603,7 @@ private struct TextInputBar: View {
                 #endif
         }
         #if os(macOS)
-        .frame(width: 40, height: 40)
+        .frame(width: 32, height: 32)
         #else
         .frame(width: 40, height: 40)
         #endif

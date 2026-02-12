@@ -61,7 +61,10 @@ class CertificateModel: ObservableObject {
     }
     
     func isCertificateValid(_ ref: Data) -> Bool {
-        return certificates.contains(where: { $0.id == ref })
+        if certificates.contains(where: { $0.id == ref }) {
+            return true
+        }
+        return MUCertificateController.certificate(withPersistentRef: ref) != nil
     }
     
     func generateNewCertificate(name: String, email: String) {

@@ -84,8 +84,12 @@ struct ChannelView: View {
                         .tabItem { Label("Messages", systemImage: "message.fill") }
                         .tag(AppState.Tab.messages)
                         .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
-                        .background(globalGradient)
                 }
+                .background(globalGradient)
+                #if os(iOS)
+                .toolbarBackground(.clear, for: .tabBar)
+                .toolbarBackground(.hidden, for: .tabBar)
+                #endif
                 .onChange(of: appState.currentTab) {
                     if appState.currentTab == .messages { serverManager.markAsRead() }
                 }
@@ -119,7 +123,9 @@ struct ChannelView: View {
         #if os(iOS)
         let appearance = UITabBarAppearance()
         appearance.configureWithTransparentBackground()
-        appearance.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        appearance.backgroundColor = .clear
+        appearance.backgroundEffect = nil
+        appearance.shadowColor = .clear
         UITabBar.appearance().standardAppearance = appearance
         if #available(iOS 15.0, *) {
             UITabBar.appearance().scrollEdgeAppearance = appearance
@@ -135,36 +141,7 @@ struct ServerChannelView: View {
     @State private var selectedUserForConfig: MKUser? = nil
     
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(alignment: .leading, spacing: kRowSpacing) {
-                Color.clear.frame(height: 10)
-                
-                if let root = MUConnectionController.shared()?.serverModel?.rootChannel() {
-                    ChannelTreeRow(
-                        channel: root,
-                        level: 0,
-                        serverManager: serverManager,
-                        onUserTap: { user in
-                            self.selectedUserForConfig = user
-                        }
-                    )
-                } else {
-                    VStack(spacing: 12) {
-                        ProgressView().tint(.white)
-                        Text("Loading channels...")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 100)
-                }
-                
-                Color.clear.frame(height: 80)
-            }
-            .padding(.horizontal, 16)
-        }
-        .scrollContentBackground(.hidden)
-        .background(
+        ZStack {
             LinearGradient(
                 gradient: Gradient(colors: [
                     Color(red: 0.20, green: 0.20, blue: 0.25),
@@ -174,7 +151,38 @@ struct ServerChannelView: View {
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-        )
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: kRowSpacing) {
+                    Color.clear.frame(height: 10)
+                    
+                    if let root = MUConnectionController.shared()?.serverModel?.rootChannel() {
+                        ChannelTreeRow(
+                            channel: root,
+                            level: 0,
+                            serverManager: serverManager,
+                            onUserTap: { user in
+                                self.selectedUserForConfig = user
+                            }
+                        )
+                    } else {
+                        VStack(spacing: 12) {
+                            ProgressView().tint(.white)
+                            Text("Loading channels...")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 100)
+                    }
+                    
+                    Color.clear.frame(height: 80)
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
         .sheet(item: $selectedUserForConfig) { user in
             UserAudioSettingsView(
                 manager: serverManager,
@@ -601,10 +609,15 @@ struct ResizeHandle: View {
     
     var body: some View {
         ZStack {
-            Rectangle().fill(Color.clear).frame(width: 24).contentShape(Rectangle())
+            Rectangle()
+                .fill(Color.clear)
+                .frame(width: 24)
+                .padding(.bottom, 8)
+                .contentShape(Rectangle())
             Rectangle()
                 .fill(isHovering ? Color.white.opacity(0.5) : Color.white.opacity(0.1))
                 .frame(width: 4)
+                .padding(.bottom, 8)
                 .cornerRadius(2)
         }
         .onHover { hovering in withAnimation { isHovering = hovering } }

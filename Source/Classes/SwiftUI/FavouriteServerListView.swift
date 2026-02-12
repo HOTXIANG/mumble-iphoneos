@@ -135,9 +135,6 @@ struct FavouriteServerRowView: View {
         .onAppear {
             // startPinging 内部已异步化（不会阻塞主线程）
             pingModel.startPinging()
-            if certModel.certificates.isEmpty {
-                certModel.refreshCertificates()
-            }
         }
         .onDisappear {
             pingModel.stopPinging()
@@ -178,6 +175,7 @@ struct FavouriteServerListContentView: View {
     @StateObject private var viewModel = FavouriteServerListViewModel()
     @State private var serverToDelete: MUFavouriteServer?
     @State private var showingDeleteAlert = false
+    @State private var didRefreshCertificates = false
     
     private let successHaptic = PlatformNotificationFeedback()
     
@@ -198,6 +196,12 @@ struct FavouriteServerListContentView: View {
         .onAppear {
             print("📋 FavouriteServers: .onAppear fired")
             viewModel.loadServers()
+            if !didRefreshCertificates {
+                didRefreshCertificates = true
+                DispatchQueue.main.async {
+                    CertificateModel.shared.refreshCertificates()
+                }
+            }
         }
         .onChange(of: refreshTrigger) { _ in
             viewModel.loadServers()

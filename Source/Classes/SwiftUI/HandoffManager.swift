@@ -19,6 +19,9 @@ let MumbleHandoffReceivedNotification = NSNotification.Name("MumbleHandoffReceiv
 /// Handoff 通知：请求 ServerModelManager 重新加载所有用户的音频偏好
 let MumbleHandoffRestoreUserPreferencesNotification = NSNotification.Name("MumbleHandoffRestoreUserPreferencesNotification")
 
+/// 用户设置：接力时是否同步本地对其他用户的音量/本地静音（默认开启）
+let MumbleHandoffSyncLocalAudioSettingsKey = "HandoffSyncLocalAudioSettings"
+
 // MARK: - HandoffServerInfo
 
 /// 每个用户的音频设置（用于 Handoff 传递）
@@ -411,6 +414,8 @@ class HandoffManager: NSObject, ObservableObject {
     /// 在连接成功后恢复闭麦/不听状态和用户音频设置
     private func applyPendingAudioStates() {
         guard let serverModel = MUConnectionController.shared()?.serverModel else { return }
+
+        let shouldSyncLocalAudio = UserDefaults.standard.object(forKey: MumbleHandoffSyncLocalAudioSettingsKey) as? Bool ?? true
         
         // 1. 恢复闭麦/不听状态
         if pendingSelfMuted || pendingSelfDeafened {
@@ -419,7 +424,7 @@ class HandoffManager: NSObject, ObservableObject {
         }
         
         // 2. 恢复每个用户的本地音量和本地静音
-        if !pendingUserAudioSettings.isEmpty {
+        if shouldSyncLocalAudio && !pendingUserAudioSettings.isEmpty {
             guard let hostname = serverModel.hostname(),
                   let rootChannel = serverModel.rootChannel() else { return }
             
@@ -436,6 +441,8 @@ class HandoffManager: NSObject, ObservableObject {
             
             // 通知 ServerModelManager 重新加载所有用户偏好（同步 UI + 音频引擎）
             NotificationCenter.default.post(name: MumbleHandoffRestoreUserPreferencesNotification, object: nil)
+        } else if !shouldSyncLocalAudio {
+            print("ℹ️ Handoff: Local user audio settings sync is disabled by user preference.")
         }
     }
     

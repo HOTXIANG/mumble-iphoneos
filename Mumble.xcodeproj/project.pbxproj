@@ -46,6 +46,8 @@
 		28F79C73147991490003B8BA /* MUAccessTokenViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79C72147991480003B8BA /* MUAccessTokenViewController.m */; };
 		28F79CA9147AB62B0003B8BA /* MUNotificationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79CA8147AB6280003B8BA /* MUNotificationController.m */; };
 		28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */; };
+		3860EEAEB0434D69B4651B14 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0ABD460DB2347D9A25FC176 /* MUMacApplicationDelegate.swift */; };
+		8A6AB2D5876A40B1BA1F9378 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */; };
 		AA000002BBBB000000000001 /* PlatformTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002BBBB000000000002 /* PlatformTypes.swift */; };
 		AA000002BBBB000000000003 /* PlatformHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002BBBB000000000004 /* PlatformHaptics.swift */; };
 		F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */ = {isa = PBXBuildFile; fileRef = F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */; };
@@ -60,8 +62,6 @@
 		F220ECCD2F30E71F0017CCCC /* MUPreferencesViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = F220ECC12F30E71F0017CCCC /* MUPreferencesViewController.m */; };
 		F220ECD12F30FB1A0017CCCC /* SystemMuteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */; };
 		F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34AC2F1729BF00420631 /* MumbleApp.swift */; };
-		3860EEAEB0434D69B4651B14 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0ABD460DB2347D9A25FC176 /* MUMacApplicationDelegate.swift */; };
-		8A6AB2D5876A40B1BA1F9378 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */; };
 		F25F34B22F17353F00420631 /* LocalUserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B02F17353500420631 /* LocalUserPreferences.swift */; };
 		F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */; };
 		F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* Launch Screen.storyboard */; platformFilter = ios; };
@@ -309,6 +309,8 @@
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Source/Info.plist; plistStructureDefinitionIdentifier = "com.apple.xcode.plist.structure-definition.iphone.info-plist"; sourceTree = "<group>"; };
 		AA000002BBBB000000000002 /* PlatformTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformTypes.swift; sourceTree = "<group>"; };
 		AA000002BBBB000000000004 /* PlatformHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformHaptics.swift; sourceTree = "<group>"; };
+		DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
+		E0ABD460DB2347D9A25FC176 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
 		F220ECB12F30E6100017CCCC /* MUCertificateCreationProgressView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUCertificateCreationProgressView.h; sourceTree = "<group>"; };
 		F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUCertificateCreationProgressView.m; sourceTree = "<group>"; };
 		F220ECB32F30E6100017CCCC /* MUCertificateCreationProgressView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MUCertificateCreationProgressView.xib; sourceTree = "<group>"; };
@@ -330,8 +332,6 @@
 		F220ECC52F30E71F0017CCCC /* MUVoiceActivitySetupViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUVoiceActivitySetupViewController.m; sourceTree = "<group>"; };
 		F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMuteManager.swift; sourceTree = "<group>"; };
 		F25F34AC2F1729BF00420631 /* MumbleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleApp.swift; sourceTree = "<group>"; };
-		E0ABD460DB2347D9A25FC176 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
-		DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
 		F25F34B02F17353500420631 /* LocalUserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUserPreferences.swift; sourceTree = "<group>"; };
 		F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAudioSettingsView.swift; sourceTree = "<group>"; };
 		F26689922EE89F20008FC7EB /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
@@ -1121,7 +1121,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mumble.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 200800000;
+				CURRENT_PROJECT_VERSION = 300000000;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_MODULE_VERIFIER = YES;
@@ -1137,7 +1137,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1164,7 +1164,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mumble.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 200800000;
+				CURRENT_PROJECT_VERSION = 300000000;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_MODULE_VERIFIER = YES;
@@ -1180,7 +1180,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1219,7 +1219,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mumble.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 200800000;
+				CURRENT_PROJECT_VERSION = 300000000;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_MODULE_VERIFIER = YES;
@@ -1235,7 +1235,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1274,7 +1274,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mumble.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 200800000;
+				CURRENT_PROJECT_VERSION = 300000000;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_MODULE_VERIFIER = YES;
@@ -1290,7 +1290,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1407,7 +1407,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1493,7 +1493,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1578,7 +1578,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1663,7 +1663,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;

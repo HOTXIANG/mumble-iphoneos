@@ -44,85 +44,55 @@ struct FavouriteServerEditView: View {
             // 1. Server Details Section
             Section(header: Text("Server Details"), footer: detailsFooter) {
                 // Description (始终可改)
-                HStack {
-                    Text("Description")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    TextField("Mumble Server", text: $displayName)
-                        .multilineTextAlignment(.trailing)
-                        .foregroundColor(.secondary)
-                }
+                settingInputRow(
+                    title: "Description",
+                    placeholder: "Mumble Server",
+                    text: $displayName,
+                    isLocked: false
+                )
                 
                 // Address (锁定逻辑)
-                HStack {
-                    Text("Address")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    if isLocked {
-                        lockedField(text: hostName)
-                    } else {
-                        TextField("Hostname or IP", text: $hostName)
-                            .multilineTextAlignment(.trailing)
-                            #if os(iOS)
-                            .keyboardType(.URL)
-                            .autocapitalization(.none)
-                            #endif
-                            .autocorrectionDisabled(true)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                settingInputRow(
+                    title: "Address",
+                    placeholder: "Hostname or IP",
+                    text: $hostName,
+                    isLocked: isLocked,
+                    lockedText: hostName,
+                    isURLField: true
+                )
                 
                 // Port (锁定逻辑)
-                HStack {
-                    Text("Port")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    if isLocked {
-                        lockedField(text: port)
-                    } else {
-                        TextField("64738", text: $port)
-                            .multilineTextAlignment(.trailing)
-                            #if os(iOS)
-                            .keyboardType(.numberPad)
-                            #endif
-                            .foregroundColor(.secondary)
-                    }
-                }
+                settingInputRow(
+                    title: "Port",
+                    placeholder: "64738",
+                    text: $port,
+                    isLocked: isLocked,
+                    lockedText: port,
+                    isNumberField: true
+                )
             }
             
             // 2. Authentication Section
             Section(header: Text("Authentication"), footer: authFooter) {
                 // Username (锁定逻辑)
-                HStack {
-                    Text("Username")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    if isLocked {
-                        lockedField(text: userName)
-                    } else {
-                        TextField(UserDefaults.standard.string(forKey: "DefaultUserName") ?? "User", text: $userName)
-                            .multilineTextAlignment(.trailing)
-                            #if os(iOS)
-                            .autocapitalization(.none)
-                            #endif
-                            .autocorrectionDisabled(true)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                settingInputRow(
+                    title: "Username",
+                    placeholder: UserDefaults.standard.string(forKey: "DefaultUserName") ?? "User",
+                    text: $userName,
+                    isLocked: isLocked,
+                    lockedText: userName,
+                    isUsernameField: true
+                )
                 
                 // Password (锁定逻辑)
-                HStack {
-                    Text("Password")
-                        .foregroundColor(.primary)
-                    Spacer()
-                    if isLocked {
-                        lockedField(text: "••••••")
-                    } else {
-                        SecureField("Optional", text: $password)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                settingInputRow(
+                    title: "Password",
+                    placeholder: "Optional",
+                    text: $password,
+                    isLocked: isLocked,
+                    lockedText: "••••••",
+                    isSecure: true
+                )
             }
             
             // 3. Status Section (显示证书状态)
@@ -163,6 +133,10 @@ struct FavouriteServerEditView: View {
                 }
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        .controlSize(.regular)
+        #endif
         .navigationTitle(isEditMode ? "Edit Favourite" : "New Favourite")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -189,15 +163,77 @@ struct FavouriteServerEditView: View {
     }
     
     // MARK: - Helper Views
+
+    @ViewBuilder
+    private func settingInputRow(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        isLocked: Bool,
+        lockedText: String? = nil,
+        isSecure: Bool = false,
+        isURLField: Bool = false,
+        isNumberField: Bool = false,
+        isUsernameField: Bool = false
+    ) -> some View {
+        #if os(macOS)
+        LabeledContent {
+            if isLocked {
+                lockedField(text: lockedText ?? text.wrappedValue)
+            } else {
+                Group {
+                    if isSecure {
+                        SecureField("", text: text)
+                    } else {
+                        TextField("", text: text)
+                    }
+                }
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.leading)
+            }
+        } label: {
+            Text("\(title)  (\(placeholder))")
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 1)
+        #else
+        HStack {
+            Text(title)
+                .foregroundColor(.primary)
+            Spacer()
+            if isLocked {
+                lockedField(text: lockedText ?? text.wrappedValue)
+            } else {
+                Group {
+                    if isSecure {
+                        SecureField(placeholder, text: text)
+                    } else {
+                        TextField(placeholder, text: text)
+                    }
+                }
+                .multilineTextAlignment(.trailing)
+                #if os(iOS)
+                .keyboardType(isURLField ? .URL : (isNumberField ? .numberPad : .default))
+                .autocapitalization((isURLField || isUsernameField) ? .none : .sentences)
+                #endif
+                .autocorrectionDisabled(isURLField || isUsernameField)
+                .foregroundColor(.secondary)
+            }
+        }
+        #endif
+    }
     
     private func lockedField(text: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "lock.fill")
                 .font(.caption)
-                .foregroundColor(.green.opacity(0.8))
+                .foregroundColor(.secondary)
             Text(text)
                 .foregroundColor(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
     
     @ViewBuilder

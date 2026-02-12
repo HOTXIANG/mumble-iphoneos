@@ -19,6 +19,9 @@ struct NotificationSettingsView: View {
                 Toggle("System Messages", isOn: $notifySystemMessages)
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle("Notifications")
         .onAppear {
             // 进入页面时检查/请求权限
@@ -50,13 +53,22 @@ struct AudioTransmissionSettingsView: View {
     var body: some View {
         Form {
             Section(header: Text("Transmission Method")) {
-                Picker("", selection: $transmitMethod) {
-                    Text("Voice Activated").tag("vad")
-                    Text("Push-to-Talk").tag("ptt")
-                    Text("Continuous").tag("continuous")
+                HStack {
+                    Spacer()
+                    Picker("", selection: $transmitMethod) {
+                        Text("Voice Activated").tag("vad")
+                        Text("Push-to-Talk").tag("ptt")
+                        Text("Continuous").tag("continuous")
+                    }
+                    #if os(macOS)
+                    .pickerStyle(.menu)
+                    #else
+                    .pickerStyle(.inline)
+                    #endif
+                    .labelsHidden()
+                    Spacer()
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
+                .frame(maxWidth: .infinity)
             }
             
             if transmitMethod == "vad" {
@@ -142,6 +154,9 @@ struct AudioTransmissionSettingsView: View {
                 }
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle("Transmission")
         .onChange(of: transmitMethod) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: vadKind) { PreferencesModel.shared.notifySettingsChanged() }
@@ -161,15 +176,27 @@ struct AudioQualitySettingsView: View {
     var body: some View {
         Form {
             Section(header: Text("Quality Preset")) {
-                Picker("", selection: $qualityKind) {
-                    Text("Low (60kbit/s)").tag("low")
-                    Text("Balanced (100kbit/s)").tag("balanced")
-                    Text("High (192kbit/s)").tag("high")
+                HStack {
+                    Spacer()
+                    Picker("", selection: $qualityKind) {
+                        Text("Low (60kbit/s)").tag("low")
+                        Text("Balanced (100kbit/s)").tag("balanced")
+                        Text("High (192kbit/s)").tag("high")
+                    }
+                    #if os(macOS)
+                    .pickerStyle(.menu)
+                    #else
+                    .pickerStyle(.inline)
+                    #endif
+                    .labelsHidden()
+                    Spacer()
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
+                .frame(maxWidth: .infinity)
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle("Audio Quality")
         .onChange(of: qualityKind) { PreferencesModel.shared.notifySettingsChanged() }
     }
@@ -220,6 +247,9 @@ struct AdvancedAudioSettingsView: View {
                     .font(.caption).foregroundColor(.gray)
             }
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        #endif
         .navigationTitle("Advanced")
         .onChange(of: enablePreprocessor) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enableEchoCancel) { PreferencesModel.shared.notifySettingsChanged() }
@@ -232,63 +262,95 @@ struct AdvancedAudioSettingsView: View {
 struct PreferencesView: View {
     @EnvironmentObject var serverManager: ServerModelManager
     @AppStorage("AudioOutputVolume") var outputVolume: Double = 1.0
+    @AppStorage(MumbleHandoffSyncLocalAudioSettingsKey) var handoffSyncLocalAudioSettings: Bool = true
     @Environment(\.dismiss) var dismiss
     
     // 这里我们还需要暂时保留对旧 Objective-C 证书管理器的引用
     // 因为重写证书逻辑比较复杂，我们先用 Wrapper 兼容
+
+    @ViewBuilder
+    private var preferencesContent: some View {
+        // --- 音频部分 ---
+        Section(header: Text("Audio")) {
+            VStack(alignment: .leading) {
+                Label("Master Volume", systemImage: "speaker.wave.3")
+                    .padding(.vertical, 4)
+                HStack {
+                    Image(systemName: "speaker")
+                    Divider()
+                    Slider(value: $outputVolume, in: 0...1) { editing in
+                        if !editing { PreferencesModel.shared.notifySettingsChanged() }
+                    }
+                    .frame(maxWidth: .infinity)
+                    Divider()
+                    Image(systemName: "speaker.wave.3")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            NavigationLink(destination: AudioTransmissionSettingsView()) {
+                Label("Transmission", systemImage: "mic")
+            }
+            
+            NavigationLink(destination: AudioQualitySettingsView()) {
+                Label("Audio Quality", systemImage: "waveform")
+            }
+            
+            NavigationLink(destination: AdvancedAudioSettingsView()) {
+                Label("Advanced & Network", systemImage: "slider.horizontal.3")
+            }
+        }
+        
+        // --- 通知部分 ---
+        Section(header: Text("Notifications")) {
+            NavigationLink(destination: NotificationSettingsView()) {
+                Label("Push Notifications", systemImage: "bell.badge")
+            }
+        }
+
+        // --- 接力部分 ---
+        Section(header: Text("Handoff"), footer: Text("When enabled, handoff will sync your local per-user volume/mute preferences to the target device.")) {
+            Toggle("Sync Local User Volume on Handoff", isOn: $handoffSyncLocalAudioSettings)
+        }
+        
+        // --- 身份与证书 ---
+        NavigationLink(destination: CertificatePreferencesView()) {
+            Label("Certificates", systemImage: "checkmark.shield")
+        }
+        
+        // --- 关于 ---
+        Section {
+            NavigationLink(destination: AboutView()) {
+                Label("About Mumble", systemImage: "info.circle")
+            }
+        } footer: {
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+            #if os(macOS)
+            Text("Mumble macOS v\(version)")
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top)
+            #else
+            Text("Mumble iOS v\(version)")
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top)
+            #endif
+        }
+    }
     
     var body: some View {
-        List {
-            // --- 音频部分 ---
-            Section(header: Text("Audio")) {
-                VStack(alignment: .leading) {
-                    Label("Master Volume", systemImage: "speaker.wave.3")
-                        .padding(.vertical, 4)
-                    HStack {
-                        Image(systemName: "speaker")
-                        Slider(value: $outputVolume, in: 0...1) { editing in
-                            if !editing { PreferencesModel.shared.notifySettingsChanged() }
-                        }
-                        Image(systemName: "speaker.wave.3")
-                    }.padding(.vertical, 8)
-                }
-                
-                NavigationLink(destination: AudioTransmissionSettingsView()) {
-                    Label("Transmission", systemImage: "mic")
-                }
-                
-                NavigationLink(destination: AudioQualitySettingsView()) {
-                    Label("Audio Quality", systemImage: "waveform")
-                }
-                
-                NavigationLink(destination: AdvancedAudioSettingsView()) {
-                    Label("Advanced & Network", systemImage: "slider.horizontal.3")
-                }
+        Group {
+            #if os(macOS)
+            Form {
+                preferencesContent
             }
-            
-            // --- 通知部分 ---
-            Section(header: Text("Notifications")) {
-                NavigationLink(destination: NotificationSettingsView()) {
-                    Label("Push Notifications", systemImage: "bell.badge")
-                }
+            .formStyle(.grouped)
+            #else
+            List {
+                preferencesContent
             }
-            
-            // --- 身份与证书 ---
-            NavigationLink(destination: CertificatePreferencesView()) {
-                Label("Certificates", systemImage: "checkmark.shield")
-            }
-            
-            // --- 关于 ---
-            Section {
-                NavigationLink(destination: AboutView()) {
-                    Label("About Mumble", systemImage: "info.circle")
-                }
-            } footer: {
-                let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-                Text("Mumble iOS v\(version)")
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top)
-            }
+            #endif
         }
         .navigationTitle("Settings")
         #if os(iOS)

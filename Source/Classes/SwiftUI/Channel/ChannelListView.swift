@@ -64,6 +64,7 @@ struct ChannelListView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         #else
         .toolbarTitleDisplayMode(.inline)
+        .toolbarBackground(.clear, for: .windowToolbar)
         .toolbarBackground(.hidden, for: .windowToolbar)
         #endif
         .toolbar {

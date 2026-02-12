@@ -109,12 +109,27 @@ struct WelcomeContentView: View {
                             ) {
                                 connectTo(hostname: server.hostname, port: server.port, username: server.username, displayName: server.displayName)
                             }
+                            #if os(macOS)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    deleteRecentConnection(hostname: server.hostname, port: server.port, username: server.username)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            #endif
                         }
+                        #if os(iOS)
                         .onDelete { indexSet in
                             recentManager.recents.remove(atOffsets: indexSet)
                         }
+                        #endif
                     }
+                    #if os(macOS)
                     .listRowBackground(Color.clear)
+                    #else
+                    .listRowBackground(Rectangle().fill(.regularMaterial.opacity(0.6))).listRowBackground(Rectangle().fill(.regularMaterial.opacity(0.6)))
+                    #endif
                 } else if lanModel.servers.isEmpty {
                     // 如果既没有最近记录，也没有 LAN 服务器，显示一个占位提示
                     Section {
@@ -167,7 +182,6 @@ struct WelcomeContentView: View {
             .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 550)
             #elseif os(iOS)
             .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
             #endif
         }
     }
@@ -195,6 +209,12 @@ struct WelcomeContentView: View {
         
         // 最近连接由 MUConnectionController 内部调用 RecentServerManager.addRecent 自动记录
         // Widget 数据也由 RecentServerManager 自动同步
+    }
+
+    private func deleteRecentConnection(hostname: String, port: Int, username: String) {
+        recentManager.recents.removeAll { item in
+            item.hostname == hostname && item.port == port && item.username == username
+        }
     }
 }
 
@@ -331,6 +351,9 @@ struct AppRootView: View {
     @StateObject private var sidebarNavigationManager = NavigationManager()
  
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
+    @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
+
+    private let narrowWindowThreshold: CGFloat = 1100
     
     var body: some View {
         // 内容区域
@@ -401,50 +424,71 @@ struct AppRootView: View {
     // MARK: - iPad Split View Layout
     
     var iPadLayout: some View {
-        NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
-            // 左侧 Sidebar：使用独立的 sidebarNavigationManager
-            NavigationStack(path: $sidebarNavigationManager.navigationPath) {
-                WelcomeView()
-                    .navigationDestination(for: NavigationDestination.self) { destination in
-                        destinationView(for: destination, navigationManager: sidebarNavigationManager)
-                            .environmentObject(sidebarNavigationManager)
-                    }
-                    .background(Color.clear)
-            }
-            .environmentObject(sidebarNavigationManager)
-            .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
-            .background(Color.clear)
-        } detail: {
-            ZStack {
-                if appState.isConnected {
-                    NavigationStack {
-                        ChannelListView()
-                            .environmentObject(NavigationManager())
-                    }
-                } else {
-                    ContentUnavailableView {
-                        Label("No Server Connected", systemImage: "server.rack")
-                    } description: {
-                        Text("Select a server from the sidebar to start chatting.")
+        GeometryReader { geo in
+            NavigationSplitView(columnVisibility: $splitVisibility, preferredCompactColumn: $preferredCompactColumn) {
+                // 左侧 Sidebar：使用独立的 sidebarNavigationManager
+                NavigationStack(path: $sidebarNavigationManager.navigationPath) {
+                    WelcomeView()
+                        .navigationDestination(for: NavigationDestination.self) { destination in
+                            destinationView(for: destination, navigationManager: sidebarNavigationManager)
+                                .environmentObject(sidebarNavigationManager)
+                        }
+                        .background(Color.clear)
+                }
+                .environmentObject(sidebarNavigationManager)
+                .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
+                .background(Color.clear)
+            } detail: {
+                ZStack {
+                    if appState.isConnected {
+                        NavigationStack {
+                            ChannelListView()
+                                .environmentObject(NavigationManager())
+                        }
+                    } else {
+                        ContentUnavailableView {
+                            Label("No Server Connected", systemImage: "server.rack")
+                        } description: {
+                            Text("Select a server from the sidebar to start chatting.")
+                        }
                     }
                 }
+                .background(Color.clear) // Detail 区域透明
             }
-            .background(Color.clear) // Detail 区域透明
-        }
-        .onChange(of: appState.isConnected) { isConnected in
-            // 如果连接成功，在窄屏模式下优先显示 Detail (频道页)
-            // 如果断开连接，优先显示 Sidebar (欢迎页)
-            preferredCompactColumn = isConnected ? .detail : .sidebar
-        }
-        .onAppear {
-            // 初始化检查：如果启动时已经连接，确保显示 Detail
-            if appState.isConnected {
-                preferredCompactColumn = .detail
+            .onChange(of: appState.isConnected) { isConnected in
+                preferredCompactColumn = isConnected ? .detail : .sidebar
+                updateSplitVisibility(width: geo.size.width)
             }
+            .onChange(of: geo.size.width) { width in
+                updateSplitVisibility(width: width)
+            }
+            .onAppear {
+                if appState.isConnected {
+                    preferredCompactColumn = .detail
+                }
+                updateSplitVisibility(width: geo.size.width)
+            }
+            #if os(iOS)
+            .navigationSplitViewStyle(.balanced)
+            #else
+            .navigationSplitViewStyle(.prominentDetail)
+            #endif
+            .background(Color.clear)
+            .preferredColorScheme(.dark)
         }
-        .navigationSplitViewStyle(.balanced)
-        .background(Color.clear)
-        .preferredColorScheme(.dark)
+    }
+
+    private func updateSplitVisibility(width: CGFloat) {
+        #if os(iOS)
+        // iPad: 保持 sidebar 与 detail 同层，不使用覆盖式 detailOnly
+        splitVisibility = .all
+        #else
+        if appState.isConnected && width < narrowWindowThreshold {
+            splitVisibility = .detailOnly
+        } else {
+            splitVisibility = .all
+        }
+        #endif
     }
     
     // MARK: - iPhone Stack Layout
