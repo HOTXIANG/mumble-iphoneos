@@ -6,6 +6,9 @@ import QuickLook
 #if canImport(UIKit)
 import UIKit
 #endif
+#if os(macOS)
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 // MARK: - 1. QuickLook 预览包装器 (标准 SwiftUI 实现)
@@ -414,16 +417,22 @@ private struct TextInputBar: View {
         PhotosPicker(selection: $selectedPhoto, matching: .images) {
             Image(systemName: "photo.on.rectangle.angled")
                 #if os(macOS)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.indigo)
-                .frame(width: 24, height: 24)
-                .clipShape(Circle())
+                .frame(width: 40, height: 40)
                 #else
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.indigo)
                 .frame(width: 40, height: 40)
                 #endif
         }
+        #if os(macOS)
+        .frame(width: 40, height: 40)
+        #else
+        .frame(width: 40, height: 40)
+        #endif
+        .clipShape(Circle())
+        .contentShape(Circle())
         .onChange(of: selectedPhoto) {
             Task {
                 if let data = try? await selectedPhoto?.loadTransferable(type: Data.self),
@@ -440,9 +449,9 @@ private struct TextInputBar: View {
             .focused($isFocused)
             #if os(macOS)
             .font(.system(size: 12))
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 8)
             .padding(.vertical, 8)
-            .frame(minHeight: 16)
+            .frame(minHeight: 40)
             #else
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -457,23 +466,101 @@ private struct TextInputBar: View {
                 }
                 return .ignored
             }
+            // macOS: 当剪贴板里只有图片（无字符串）时，NSTextField 会把系统 Paste 菜单置灰。
+            // 这里直接拦截 ⌘V，从 NSPasteboard 读图并触发发送图片弹窗。
+            .onKeyPress(KeyEquivalent("v"), phases: .down) { keyPress in
+                guard keyPress.modifiers.contains(.command) else { return .ignored }
+                return handleMacPasteFromPasteboard() ? .handled : .ignored
+            }
             #endif
+            .onPasteCommand(of: [.image]) { providers in
+                handlePastedImages(providers)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    #if os(macOS)
+    private func handleMacPasteFromPasteboard() -> Bool {
+        let pb = NSPasteboard.general
+
+        if let image = NSImage(pasteboard: pb) {
+            Task { @MainActor in
+                isFocused = false
+                await onSendImage(image)
+            }
+            return true
+        }
+
+        // Fallback: data representation (png/tiff/etc.)
+        if let data = pb.data(forType: .png), let image = NSImage(data: data) {
+            Task { @MainActor in
+                isFocused = false
+                await onSendImage(image)
+            }
+            return true
+        }
+        if let data = pb.data(forType: .tiff), let image = NSImage(data: data) {
+            Task { @MainActor in
+                isFocused = false
+                await onSendImage(image)
+            }
+            return true
+        }
+
+        return false
+    }
+    #endif
+
+    private func handlePastedImages(_ providers: [NSItemProvider]) {
+        for provider in providers {
+            if provider.canLoadObject(ofClass: PlatformImage.self) {
+                provider.loadObject(ofClass: PlatformImage.self) { object, _ in
+                    guard let image = object as? PlatformImage else { return }
+                    Task { @MainActor in
+                        // 粘贴图片时通常会弹出确认弹窗；先收起键盘/取消焦点
+                        isFocused = false
+                        await onSendImage(image)
+                    }
+                }
+                return
+            }
+
+            // Fallback: some apps provide image data rather than an object
+            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                    guard let data, let image = PlatformImage(data: data) else { return }
+                    Task { @MainActor in
+                        isFocused = false
+                        await onSendImage(image)
+                    }
+                }
+                return
+            }
+        }
     }
     
     private var sendButton: some View {
         Button(action: onSendText) {
             Image(systemName: "arrow.up")
                 #if os(macOS)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
-                .frame(width: 24, height: 24)
-                .clipShape(Circle())
+                .frame(width: 40, height: 40)
                 #else
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(width: 40, height: 40)
                 #endif
         }
+        #if os(macOS)
+        .frame(width: 40, height: 40)
+        #else
+        .frame(width: 40, height: 40)
+        #endif
+        .clipShape(Circle())
+        .contentShape(Circle())
+        .buttonStyle(.plain)
         .disabled(text.isEmpty)
     }
 }

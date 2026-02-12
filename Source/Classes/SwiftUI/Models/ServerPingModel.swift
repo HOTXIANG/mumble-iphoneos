@@ -17,6 +17,7 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
     @Published var userCountColor: Color = .secondary
     
     private var pinger: MKServerPinger?
+    private var startTask: Task<Void, Never>?
     private let hostname: String
     private let port: UInt
     
@@ -28,16 +29,30 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
     
     func startPinging() {
         guard !hostname.isEmpty else { return }
-        // 停止之前的（如果有）
+        // 取消/停止之前的（如果有）
         stopPinging()
-        
-        // 创建底层 Pinger
-        let pingerInstance = MKServerPinger(hostname: hostname, port: String(port))
-        pingerInstance?.setDelegate(self)
-        self.pinger = pingerInstance
+
+        // 关键：MKServerPinger 的 init 会同步 getaddrinfo，可能阻塞主线程。
+        // 这里把创建挪到后台，创建完成后再回到 MainActor 绑定 delegate。
+        let host = hostname
+        let portString = String(port)
+        startTask = Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+
+            let created = MKServerPinger(hostname: host, port: portString)
+
+            await MainActor.run {
+                // 如果期间已经 stop 了，就不再安装
+                guard !Task.isCancelled else { return }
+                created?.setDelegate(self)
+                self.pinger = created
+            }
+        }
     }
     
     func stopPinging() {
+        startTask?.cancel()
+        startTask = nil
         pinger?.setDelegate(nil)
         pinger = nil
     }

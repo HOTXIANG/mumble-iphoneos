@@ -20,8 +20,12 @@ struct EditableServer: Identifiable {
 // FavouriteServerListNavigationConfig 保持不变
 struct FavouriteServerListNavigationConfig: NavigationConfigurable {
     let onAdd: () -> Void
+    let onClose: (() -> Void)?
     var title: String { NSLocalizedString("Favourite Servers", comment: "") }
-    var leftBarItems: [NavigationBarItem] { [] }
+    var leftBarItems: [NavigationBarItem] {
+        guard let onClose else { return [] }
+        return [NavigationBarItem(systemImage: "xmark", action: onClose)]
+    }
     var rightBarItems: [NavigationBarItem] { [NavigationBarItem(systemImage: "plus", action: onAdd)] }
 }
 
@@ -29,6 +33,30 @@ struct FavouriteServerRowView: View {
     let server: MUFavouriteServer
     @StateObject private var pingModel: ServerPingModel
     @ObservedObject var certModel = CertificateModel.shared
+
+    #if os(macOS)
+    private let rowHStackSpacing: CGFloat = 10
+    private let rowVerticalStackSpacing: CGFloat = 3
+    private let rowHorizontalPadding: CGFloat = 16
+    private let rowVerticalPadding: CGFloat = 10
+    private let rowCornerRadius: CGFloat = 18
+    private let titleFontSize: CGFloat = 14
+    private let hostFontSize: CGFloat = 12
+    private let usernameFontSize: CGFloat = 11
+    private let pingFontSize: CGFloat = 12
+    private let usersFontSize: CGFloat = 11
+    #else
+    private let rowHStackSpacing: CGFloat = 16
+    private let rowVerticalStackSpacing: CGFloat = 4
+    private let rowHorizontalPadding: CGFloat = 20
+    private let rowVerticalPadding: CGFloat = 16
+    private let rowCornerRadius: CGFloat = 27
+    private let titleFontSize: CGFloat = 17
+    private let hostFontSize: CGFloat = 14
+    private let usernameFontSize: CGFloat = 12
+    private let pingFontSize: CGFloat = 14
+    private let usersFontSize: CGFloat = 13
+    #endif
     
     init(server: MUFavouriteServer) {
         self.server = server
@@ -36,13 +64,13 @@ struct FavouriteServerRowView: View {
     }
     
     var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: rowHStackSpacing) {
+            VStack(alignment: .leading, spacing: rowVerticalStackSpacing) {
                 Text(server.displayName ?? "Unknown Server")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: titleFontSize, weight: .semibold))
                 
                 Text("\(server.hostName ?? ""):\(String(server.port))")
-                    .font(.system(size: 14))
+                    .font(.system(size: hostFontSize))
                     .foregroundColor(.secondary)
                 
                 if let userName = server.userName, !userName.isEmpty {
@@ -64,17 +92,17 @@ struct FavouriteServerRowView: View {
                             }
                         }
                     }
-                    .font(.system(size: 12))
+                    .font(.system(size: usernameFontSize))
                     .foregroundColor(.secondary)
                 }
             }
             
             Spacer()
             
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: rowVerticalStackSpacing) {
                 HStack(spacing: 4) {
                     Text(pingModel.pingLabel)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: pingFontSize, weight: .bold))
                         .foregroundColor(pingModel.pingColor)
                     
                     Image(systemName: "network")
@@ -85,7 +113,7 @@ struct FavouriteServerRowView: View {
                 if !pingModel.usersLabel.isEmpty {
                     HStack(spacing: 4) {
                         Text(pingModel.usersLabel)
-                            .font(.system(size: 13))
+                            .font(.system(size: usersFontSize))
                             .foregroundColor(pingModel.userCountColor)
                         Image(systemName: "person.2.fill")
                             .font(.system(size: 10))
@@ -101,16 +129,40 @@ struct FavouriteServerRowView: View {
                 .foregroundColor(.indigo)
         }
         .foregroundColor(.primary)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .modifier(ClearGlassModifier(cornerRadius: 27))
+        .padding(.horizontal, rowHorizontalPadding)
+        .padding(.vertical, rowVerticalPadding)
+        .modifier(ClearGlassModifier(cornerRadius: rowCornerRadius))
         .onAppear {
+            // startPinging 内部已异步化（不会阻塞主线程）
             pingModel.startPinging()
             if certModel.certificates.isEmpty {
                 certModel.refreshCertificates()
             }
         }
-        .onDisappear { pingModel.stopPinging() }
+        .onDisappear {
+            pingModel.stopPinging()
+        }
+    }
+}
+
+// MARK: - ViewModel for stable data lifecycle (fixes macOS sidebar rendering)
+@MainActor
+class FavouriteServerListViewModel: ObservableObject {
+    @Published var servers: [MUFavouriteServer] = []
+    
+    func loadServers() {
+        let result = MUDatabase.fetchAllFavourites()
+        if let nsArray = result as NSArray? {
+            let loaded = nsArray.compactMap { $0 as? MUFavouriteServer }
+            let sorted = loaded.sorted {
+                ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
+            }
+            print("📋 FavouriteServers: loaded \(sorted.count) servers from database")
+            self.servers = sorted
+        } else {
+            print("⚠️ FavouriteServers: fetchAllFavourites returned nil")
+            self.servers = []
+        }
     }
 }
 
@@ -119,8 +171,11 @@ struct FavouriteServerListContentView: View {
     
     @Binding var serverToEdit: EditableServer?
     var refreshTrigger: UUID
+    var dismissOnConnect: Bool
+
+    @Environment(\.dismiss) private var dismiss
     
-    @State private var favouriteServers: [MUFavouriteServer] = []
+    @StateObject private var viewModel = FavouriteServerListViewModel()
     @State private var serverToDelete: MUFavouriteServer?
     @State private var showingDeleteAlert = false
     
@@ -128,100 +183,93 @@ struct FavouriteServerListContentView: View {
     
     var body: some View {
         Group {
-            if favouriteServers.isEmpty {
+            if viewModel.servers.isEmpty {
                 emptyStateView
             } else {
-                #if os(macOS)
-                // macOS: ScrollView + LazyVStack (List 在 NavigationSplitView sidebar 中渲染不可靠)
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(favouriteServers, id: \.primaryKey) { server in
-                            FavouriteServerRowView(server: server)
-                                .frame(maxWidth: .infinity)
-                                .contentShape(Rectangle())
-                                .onTapGesture { connectToServer(server) }
-                                .contextMenu {
-                                    Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
-                                    Button("Edit", systemImage: "pencil") { editServer(server) }
-                                    
-                                    if isServerPinned(server) {
-                                        Button("Remove from Widget", systemImage: "minus.square") {
-                                            unpinFromWidget(server)
-                                        }
-                                    } else {
-                                        Button("Add to Widget", systemImage: "plus.square.on.square") {
-                                            pinToWidget(server)
-                                        }
-                                    }
-                                    
-                                    Button("Delete", systemImage: "trash", role: .destructive) {
-                                        self.serverToDelete = server
-                                        self.showingDeleteAlert = true
-                                    }
-                                }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 20)
-                }
-                #else
-                List {
-                    ForEach(favouriteServers, id: \.primaryKey) { server in
-                        Menu {
-                            Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
-                            Button("Edit", systemImage: "pencil") { editServer(server) }
-                            
-                            if isServerPinned(server) {
-                                Button("Remove from Widget", systemImage: "minus.square") {
-                                    unpinFromWidget(server)
-                                }
-                            } else {
-                                Button("Add to Widget", systemImage: "plus.square.on.square") {
-                                    pinToWidget(server)
-                                }
-                            }
-                            
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                self.serverToDelete = server
-                                self.showingDeleteAlert = true
-                            }
-                        } label: {
-                            FavouriteServerRowView(server: server)
-                        }
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                #endif
+                serverListView
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.20, green: 0.20, blue: 0.25),
-                    Color(red: 0.07, green: 0.07, blue: 0.10)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
+        .background(Color.clear)
+        .task {
+            print("📋 FavouriteServers: .task fired")
+            viewModel.loadServers()
+        }
         .onAppear {
-            loadFavouriteServers()
+            print("📋 FavouriteServers: .onAppear fired")
+            viewModel.loadServers()
         }
         .onChange(of: refreshTrigger) { _ in
-            loadFavouriteServers()
+            viewModel.loadServers()
         }
         .alert("Delete Favourite", isPresented: $showingDeleteAlert, presenting: serverToDelete) { server in
             Button("Delete", role: .destructive) { deleteFavouriteServer(server) }
         } message: { server in
             Text("Are you sure you want to delete '\(server.displayName ?? "this server")'?")
         }
+    }
+    
+    @ViewBuilder
+    private var serverListView: some View {
+        List {
+            ForEach(viewModel.servers, id: \.primaryKey) { server in
+                #if os(macOS)
+                FavouriteServerRowView(server: server)
+                    .contentShape(Rectangle())
+                    .onTapGesture { connectToServer(server) }
+                    .contextMenu {
+                        Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
+                        Button("Edit", systemImage: "pencil") { editServer(server) }
+
+                        if isServerPinned(server) {
+                            Button("Remove from Widget", systemImage: "minus.square") {
+                                unpinFromWidget(server)
+                            }
+                        } else {
+                            Button("Add to Widget", systemImage: "plus.square.on.square") {
+                                pinToWidget(server)
+                            }
+                        }
+
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            self.serverToDelete = server
+                            self.showingDeleteAlert = true
+                        }
+                    }
+                #else
+                Menu {
+                    Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
+                    Button("Edit", systemImage: "pencil") { editServer(server) }
+                    
+                    if isServerPinned(server) {
+                        Button("Remove from Widget", systemImage: "minus.square") {
+                            unpinFromWidget(server)
+                        }
+                    } else {
+                        Button("Add to Widget", systemImage: "plus.square.on.square") {
+                            pinToWidget(server)
+                        }
+                    }
+                    
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        self.serverToDelete = server
+                        self.showingDeleteAlert = true
+                    }
+                } label: {
+                    FavouriteServerRowView(server: server)
+                }
+                #endif
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            #if os(macOS)
+            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+            #else
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            #endif
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
     
     private var emptyStateView: some View {
@@ -239,6 +287,7 @@ struct FavouriteServerListContentView: View {
         }.padding()
     }
     
+    @MainActor
     private func connectToServer(_ server: MUFavouriteServer) {
         AppState.shared.serverDisplayName = server.displayName
         PlatformImpactFeedback(style: .medium).impactOccurred()
@@ -251,35 +300,20 @@ struct FavouriteServerListContentView: View {
             certificateRef: server.certificateRef,
             displayName: server.displayName
         )
-    }
-    
-    private func loadFavouriteServers() {
-        // 调用 OC 数据库接口
-        let result = MUDatabase.fetchAllFavourites()
-        
-        // 安全类型转换
-        if let nsArray = result as NSArray? {
-            // 强制转换为 Swift 数组并过滤无效对象
-            let servers = nsArray.compactMap { $0 as? MUFavouriteServer }
-            
-            print("📋 FavouriteServers: loaded \(servers.count) servers from database")
-            
-            // 排序
-            favouriteServers = servers.sorted {
-                ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
-            }
-        } else {
-            print("⚠️ FavouriteServers: fetchAllFavourites returned nil")
-            favouriteServers = []
+
+        if dismissOnConnect {
+            dismiss()
         }
     }
     
+    @MainActor
     private func deleteServers(offsets: IndexSet) {
         for index in offsets {
-            deleteFavouriteServer(favouriteServers[index])
+            deleteFavouriteServer(viewModel.servers[index])
         }
     }
     
+    @MainActor
     private func deleteFavouriteServer(_ server: MUFavouriteServer) {
         // 如果该服务器已固定到 Widget，同时移除
         let widgetId = WidgetServerItem.makeId(
@@ -290,7 +324,7 @@ struct FavouriteServerListContentView: View {
         WidgetDataManager.shared.unpinServer(id: widgetId)
         
         MUDatabase.deleteFavourite(server)
-        loadFavouriteServers()
+        viewModel.loadServers()
     }
     
     // MARK: - Widget Pin/Unpin
@@ -303,6 +337,7 @@ struct FavouriteServerListContentView: View {
         )
     }
     
+    @MainActor
     private func pinToWidget(_ server: MUFavouriteServer) {
         let item = WidgetServerItem(
             id: WidgetServerItem.makeId(
@@ -325,6 +360,7 @@ struct FavouriteServerListContentView: View {
         }
     }
     
+    @MainActor
     private func unpinFromWidget(_ server: MUFavouriteServer) {
         let id = WidgetServerItem.makeId(
             hostname: server.hostName ?? "",
@@ -338,6 +374,7 @@ struct FavouriteServerListContentView: View {
         }
     }
     
+    @MainActor
     private func editServer(_ server: MUFavouriteServer) {
         // 延迟 0.4s 等待 Menu 动画完全退出，避免 _UIReparentingView 冲突
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -348,6 +385,9 @@ struct FavouriteServerListContentView: View {
 
 struct FavouriteServerListView: MumbleContentView {
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.dismiss) private var dismiss
+
+    var isModalPresentation: Bool = false
     
     @State private var showingNewSheet = false
     @State private var serverToEdit: EditableServer?
@@ -356,13 +396,14 @@ struct FavouriteServerListView: MumbleContentView {
     var navigationConfig: any NavigationConfigurable {
         FavouriteServerListNavigationConfig(onAdd: {
             showingNewSheet = true
-        })
+        }, onClose: isModalPresentation ? { dismiss() } : nil)
     }
     var contentBody: some View {
         FavouriteServerListContentView(
             navigationManager: navigationManager,
             serverToEdit: $serverToEdit,
-            refreshTrigger: refreshTrigger
+            refreshTrigger: refreshTrigger,
+            dismissOnConnect: isModalPresentation
         )
         // 新建收藏
         .sheet(isPresented: $showingNewSheet, onDismiss: {

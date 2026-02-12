@@ -20,6 +20,12 @@ class SystemMuteManager {
     
     /// 激活系统静音集成
     func activate() {
+        #if os(macOS)
+        // macOS 不使用 AVAudioApplication 的 input mute 管道。
+        // 否则调用 setInputMuted 会出现 "input mute handler not set" 日志。
+        return
+        #endif
+
         guard #available(iOS 17.0, *) else { return }
         
         cleanup()
@@ -57,6 +63,11 @@ class SystemMuteManager {
     
     /// App 主动设置系统静音 (当用户点击 App 内按钮时调用)
     func setSystemMute(_ isMuted: Bool) {
+        #if os(macOS)
+        // macOS 下保持 no-op，Mumble 的自闭麦逻辑仍由 serverModel 控制。
+        return
+        #endif
+
         guard #available(iOS 17.0, *) else { return }
         
         #if os(iOS)

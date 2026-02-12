@@ -133,36 +133,44 @@ struct MumbleMenuCommands: Commands {
         
         // "Server" 菜单
         CommandMenu("Server") {
-            Button(serverManager?.connectedUserState?.isSelfMuted == true ? "Unmute" : "Mute") {
+            Button {
                 serverManager?.toggleSelfMute()
+            } label: {
+                Label("Mute/Unmute", systemImage: "mic.slash.fill")
             }
             .keyboardShortcut("m", modifiers: [.command, .shift])
             .disabled(!appState.isConnected)
             
-            Button(serverManager?.connectedUserState?.isSelfDeafened == true ? "Undeafen" : "Deafen") {
+            Button {
                 serverManager?.toggleSelfDeafen()
+            } label: {
+                Label("Deafen/Undeafen", systemImage: "speaker.slash.fill")
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
             .disabled(!appState.isConnected)
             
             Divider()
             
-            if serverManager?.connectedUserState?.isAuthenticated == true {
-                Button("View Certificate") {
-                    NotificationCenter.default.post(name: .mumbleShowCertInfo, object: nil)
-                }
-                .disabled(!appState.isConnected)
-            } else {
-                Button("Register User") {
-                    serverManager?.registerSelf()
-                }
-                .disabled(!appState.isConnected)
+            Button {
+                serverManager?.registerSelf()
+            } label: {
+                Label("Register User", systemImage: "person.badge.plus")
             }
+            .disabled(!appState.isConnected || serverManager?.connectedUserState?.isAuthenticated == true)
+
+            Button {
+                NotificationCenter.default.post(name: .mumbleShowCertInfo, object: nil)
+            } label: {
+                Label("View Certificate", systemImage: "checkmark.shield")
+            }
+            .disabled(!appState.isConnected || serverManager?.connectedUserState?.isAuthenticated != true)
             
             Divider()
             
-            Button("Disconnect") {
+            Button {
                 NotificationCenter.default.post(name: .mumbleInitiateDisconnect, object: nil)
+            } label: {
+                Label("Disconnect", systemImage: "xmark.circle")
             }
             .keyboardShortcut("w", modifiers: [.command])
             .disabled(!appState.isConnected)
@@ -170,8 +178,10 @@ struct MumbleMenuCommands: Commands {
         
         // "Mumble" 菜单 - 添加设置项
         CommandGroup(after: .appSettings) {
-            Button("Settings...") {
+            Button {
                 NotificationCenter.default.post(name: .mumbleShowSettings, object: nil)
+            } label: {
+                Label("Settings...", systemImage: "gearshape")
             }
             .keyboardShortcut(",", modifiers: [.command])
         }

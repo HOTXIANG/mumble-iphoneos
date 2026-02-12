@@ -37,6 +37,7 @@ struct WelcomeContentView: View {
     @ObservedObject private var recentManager = RecentServerManager.shared
     
     @State private var favouriteServers: [MUFavouriteServer] = []
+    @State private var showFavouritesSheet = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -53,7 +54,15 @@ struct WelcomeContentView: View {
             VStack(spacing: 0) {
                 
                 Button(action: {
-                    navigationManager.navigate(to: .swiftUI(.favouriteServerList))
+                    #if os(iOS)
+                    if UIDevice.current.userInterfaceIdiom == .phone {
+                        navigationManager.navigate(to: .swiftUI(.favouriteServerList))
+                    } else {
+                        showFavouritesSheet = true
+                    }
+                    #else
+                    showFavouritesSheet = true
+                    #endif
                 }) {
                     HStack(spacing: 16) {
                         Image(systemName: "star.fill")
@@ -105,7 +114,7 @@ struct WelcomeContentView: View {
                             recentManager.recents.remove(atOffsets: indexSet)
                         }
                     }
-                    .listRowBackground(Rectangle().fill(.regularMaterial.opacity(0.6)))
+                    .listRowBackground(Color.clear)
                 } else if lanModel.servers.isEmpty {
                     // 如果既没有最近记录，也没有 LAN 服务器，显示一个占位提示
                     Section {
@@ -148,6 +157,18 @@ struct WelcomeContentView: View {
         }
         .onDisappear {
             lanModel.stop()
+        }
+        .sheet(isPresented: $showFavouritesSheet) {
+            NavigationStack {
+                FavouriteServerListView(isModalPresentation: true)
+                    .environmentObject(navigationManager)
+            }
+            #if os(macOS)
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 550)
+            #elseif os(iOS)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            #endif
         }
     }
     
@@ -353,9 +374,11 @@ struct AppRootView: View {
                         Button(action: { appState.cancelConnection() }) {
                             Text("Cancel")
                                 .font(.subheadline).fontWeight(.semibold).foregroundColor(.white)
-                                .padding(.horizontal, 32).padding(.vertical, 10)
+                                .padding(.horizontal, 32).padding(.vertical, 4)
                         }
                         .modifier(RedGlassCapsuleModifier())
+                        .clipShape(Capsule())
+                        .contentShape(Capsule())
                     }
                     .padding(.horizontal, 64).padding(.vertical, 24)
                     .modifier(GlassEffectModifier(cornerRadius: 32))
