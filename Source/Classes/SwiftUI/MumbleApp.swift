@@ -35,6 +35,10 @@ struct MumbleApp: App {
                     print("📲 MumbleApp: Received Handoff activity")
                     HandoffManager.shared.handleIncomingActivity(userActivity)
                 }
+                // Widget 深链接：用户从 Widget 点击服务器直接连接
+                .onOpenURL { url in
+                    handleMumbleURL(url)
+                }
         }
         .onChange(of: scenePhase) { newPhase in
             // 你可以在这里处理生命周期，慢慢替代 AppDelegate 里的逻辑
@@ -42,6 +46,53 @@ struct MumbleApp: App {
                 // 例如：触发清理操作
             }
         }
+    }
+    
+    // MARK: - Widget Deep Link 处理
+    
+    /// 处理 mumble:// URL（来自 Widget 或外部链接）
+    private func handleMumbleURL(_ url: URL) {
+        guard url.scheme == "mumble" else { return }
+        
+        let connController = MUConnectionController.shared()
+        guard connController?.isConnected() != true else {
+            print("⚠️ MumbleApp: Already connected, ignoring widget URL")
+            return
+        }
+        
+        let hostname = url.host ?? ""
+        let port = url.port ?? 64738
+        let username = url.user ?? ""
+        let password = url.password ?? ""
+        
+        guard !hostname.isEmpty else { return }
+        
+        print("🔗 MumbleApp: Opening mumble URL → \(hostname):\(port) as \(username)")
+        
+        // 从收藏夹中查找匹配的服务器，以获取证书和其他配置
+        let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
+        let matchingFav = allFavs.first(where: {
+            $0.hostName?.lowercased() == hostname.lowercased()
+            && Int($0.port) == port
+            && $0.userName == username
+        })
+        
+        AppState.shared.serverDisplayName = matchingFav?.displayName ?? hostname
+        #if !targetEnvironment(macCatalyst)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+        
+        connController?.connet(
+            toHostname: hostname,
+            port: UInt(port),
+            withUsername: username.isEmpty ? (matchingFav?.userName ?? "MumbleUser") : username,
+            andPassword: password.isEmpty ? (matchingFav?.password ?? "") : password,
+            certificateRef: matchingFav?.certificateRef,
+            displayName: matchingFav?.displayName
+        )
+        
+        // 最近连接由 MUConnectionController 内部调用 RecentServerManager.addRecent 自动记录
+        // Widget 数据也由 RecentServerManager 自动同步
     }
 }
 

@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-ARCHS = arm64
+ARCHS = $(ARCHS_STANDARD)
 SDKROOT = iphoneos
 
-MACOSX_DEPLOYMENT_TARGET = 10.13
+MACOSX_DEPLOYMENT_TARGET = 14.0
 IPHONEOS_DEPLOYMENT_TARGET = 26.0
 
 CODE_SIGN_IDENTITY[sdk=iphoneos*] = iPhone Developer
+
+SUPPORTS_MACCATALYST = YES
 
 TARGETED_DEVICE_FAMILY = 1,2 // iPhone, iPad
 

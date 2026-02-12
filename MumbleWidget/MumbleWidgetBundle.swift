@@ -7,11 +7,13 @@
 
 import WidgetKit
 import SwiftUI
-import ActivityKit
 
 @main
 struct MumbleWidgetBundle: WidgetBundle {
     var body: some Widget {
+        #if !targetEnvironment(macCatalyst)
         MumbleLiveActivity()
+        #endif
+        MumbleServerWidget()
     }
 }

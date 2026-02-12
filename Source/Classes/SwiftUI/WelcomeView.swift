@@ -156,6 +156,9 @@ struct WelcomeContentView: View {
             certificateRef: certRef,
             displayName: displayName
         )
+        
+        // 最近连接由 MUConnectionController 内部调用 RecentServerManager.addRecent 自动记录
+        // Widget 数据也由 RecentServerManager 自动同步
     }
 }
 

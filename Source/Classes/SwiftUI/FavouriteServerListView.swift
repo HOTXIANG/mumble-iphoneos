@@ -2,6 +2,18 @@
 
 import SwiftUI
 import UIKit
+import WidgetKit
+
+// MARK: - Identifiable wrapper（ObjC 的 MUFavouriteServer 无法直接遵循 Identifiable）
+
+struct EditableServer: Identifiable {
+    let id: NSInteger
+    let server: MUFavouriteServer
+    init(_ server: MUFavouriteServer) {
+        self.id = server.primaryKey
+        self.server = server
+    }
+}
 
 // FavouriteServerListNavigationConfig 保持不变
 struct FavouriteServerListNavigationConfig: NavigationConfigurable {
@@ -103,8 +115,7 @@ struct FavouriteServerRowView: View {
 struct FavouriteServerListContentView: View {
     var navigationManager: NavigationManager
     
-    @Binding var showingSheet: Bool
-    @Binding var editingServer: MUFavouriteServer?
+    @Binding var serverToEdit: EditableServer?
     var refreshTrigger: UUID
     
     @State private var favouriteServers: [MUFavouriteServer] = []
@@ -123,6 +134,18 @@ struct FavouriteServerListContentView: View {
                         Menu {
                             Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
                             Button("Edit", systemImage: "pencil") { editServer(server) }
+                            
+                            // Widget 固定/取消固定
+                            if isServerPinned(server) {
+                                Button("Remove from Widget", systemImage: "minus.square") {
+                                    unpinFromWidget(server)
+                                }
+                            } else {
+                                Button("Add to Widget", systemImage: "plus.square.on.square") {
+                                    pinToWidget(server)
+                                }
+                            }
+                            
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 self.serverToDelete = server
                                 self.showingDeleteAlert = true
@@ -205,44 +228,105 @@ struct FavouriteServerListContentView: View {
     }
     
     private func deleteFavouriteServer(_ server: MUFavouriteServer) {
+        // 如果该服务器已固定到 Widget，同时移除
+        let widgetId = WidgetServerItem.makeId(
+            hostname: server.hostName ?? "",
+            port: Int(server.port),
+            username: server.userName ?? ""
+        )
+        WidgetDataManager.shared.unpinServer(id: widgetId)
+        
         MUDatabase.deleteFavourite(server)
         loadFavouriteServers()
     }
     
+    // MARK: - Widget Pin/Unpin
+    
+    private func isServerPinned(_ server: MUFavouriteServer) -> Bool {
+        WidgetDataManager.shared.isPinned(
+            hostname: server.hostName ?? "",
+            port: Int(server.port),
+            username: server.userName ?? ""
+        )
+    }
+    
+    private func pinToWidget(_ server: MUFavouriteServer) {
+        let item = WidgetServerItem(
+            id: WidgetServerItem.makeId(
+                hostname: server.hostName ?? "",
+                port: Int(server.port),
+                username: server.userName ?? ""
+            ),
+            displayName: server.displayName ?? server.hostName ?? "Unknown",
+            hostname: server.hostName ?? "",
+            port: Int(server.port),
+            username: server.userName ?? "",
+            hasCertificate: server.certificateRef != nil,
+            lastConnected: nil
+        )
+        WidgetDataManager.shared.pinServer(item)
+        
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        withAnimation {
+            AppState.shared.activeToast = AppToast(message: "Added to Widget", type: .success)
+        }
+    }
+    
+    private func unpinFromWidget(_ server: MUFavouriteServer) {
+        let id = WidgetServerItem.makeId(
+            hostname: server.hostName ?? "",
+            port: Int(server.port),
+            username: server.userName ?? ""
+        )
+        WidgetDataManager.shared.unpinServer(id: id)
+        
+        withAnimation {
+            AppState.shared.activeToast = AppToast(message: "Removed from Widget", type: .info)
+        }
+    }
+    
     private func editServer(_ server: MUFavouriteServer) {
-        editingServer = server
-        showingSheet = true
+        // 延迟 0.4s 等待 Menu 动画完全退出，避免 _UIReparentingView 冲突
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            serverToEdit = EditableServer(server)
+        }
     }
 }
 
 struct FavouriteServerListView: MumbleContentView {
     @EnvironmentObject var navigationManager: NavigationManager
     
-    @State private var showingSheet = false
-    @State private var editingServer: MUFavouriteServer?
+    @State private var showingNewSheet = false
+    @State private var serverToEdit: EditableServer?
     @State private var refreshTrigger = UUID()
     
     var navigationConfig: any NavigationConfigurable {
         FavouriteServerListNavigationConfig(onAdd: {
-            editingServer = nil
-            showingSheet = true
+            showingNewSheet = true
         })
     }
     var contentBody: some View {
         FavouriteServerListContentView(
             navigationManager: navigationManager,
-            showingSheet: $showingSheet,
-            editingServer: $editingServer,
+            serverToEdit: $serverToEdit,
             refreshTrigger: refreshTrigger
         )
-
-        .sheet(isPresented: $showingSheet) {
+        // 新建收藏
+        .sheet(isPresented: $showingNewSheet) {
             NavigationStack {
-                FavouriteServerEditView(server: editingServer) { savedServer in
-                    // 保存回调
+                FavouriteServerEditView(server: nil) { savedServer in
                     MUDatabase.storeFavourite(savedServer)
-                    showingSheet = false
-                    // 触发列表刷新
+                    showingNewSheet = false
+                    refreshTrigger = UUID()
+                }
+            }
+        }
+        // 编辑收藏 —— 使用 .sheet(item:) 保证 server 一定非 nil
+        .sheet(item: $serverToEdit) { editable in
+            NavigationStack {
+                FavouriteServerEditView(server: editable.server) { savedServer in
+                    MUDatabase.storeFavourite(savedServer)
+                    serverToEdit = nil
                     refreshTrigger = UUID()
                 }
             }

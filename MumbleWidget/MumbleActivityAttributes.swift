@@ -5,6 +5,7 @@
 //  Created by 王梓田 on 1/3/26.
 //
 
+#if !targetEnvironment(macCatalyst)
 import ActivityKit
 import SwiftUI
 
@@ -23,3 +24,4 @@ struct MumbleActivityAttributes: ActivityAttributes {
     // 静态数据
     var serverName: String
 }
+#endif

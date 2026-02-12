@@ -63,9 +63,5 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
-	<key>NSUserActivityTypes</key>
-	<array>
-		<string>info.mumble.Mumble.serverConnection</string>
-	</array>
 </dict>
 </plist>

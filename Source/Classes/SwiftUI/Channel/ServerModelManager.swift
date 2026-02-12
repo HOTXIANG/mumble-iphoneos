@@ -3,7 +3,9 @@
 import SwiftUI
 import UserNotifications
 import AudioToolbox
+#if !targetEnvironment(macCatalyst)
 import ActivityKit
+#endif
 
 struct UnsafeTransfer<T>: @unchecked Sendable {
     let value: T
@@ -67,7 +69,9 @@ class ServerModelManager: ObservableObject {
     private var userIndexMap: [UInt: Int] = [:]
     private var channelIndexMap: [UInt: Int] = [:]
     private var delegateWrapper: ServerModelDelegateWrapper?
+    #if !targetEnvironment(macCatalyst)
     private var liveActivity: Activity<MumbleActivityAttributes>?
+    #endif
     private var keepAliveTimer: Timer?
     private let systemMuteManager = SystemMuteManager()
     private var isRestoringMuteState = false
@@ -460,6 +464,7 @@ class ServerModelManager: ObservableObject {
     }
     
     private func startLiveActivity() {
+        #if !targetEnvironment(macCatalyst)
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         
         LiveActivityCleanup.forceEndAllActivitiesBlocking()
@@ -500,9 +505,11 @@ class ServerModelManager: ObservableObject {
         } catch {
             print("❌ Failed to start Live Activity: \(error)")
         }
+        #endif
     }
     
     private func updateLiveActivity() {
+        #if !targetEnvironment(macCatalyst)
         guard let activity = liveActivity else { return }
         
         // 1. 获取基础信息
@@ -553,6 +560,7 @@ class ServerModelManager: ObservableObject {
         
         // 7. 同步更新 Handoff Activity 的音频状态
         updateHandoffAudioState()
+        #endif
     }
     
     /// 收集当前用户音频设置并更新 Handoff Activity
@@ -573,6 +581,7 @@ class ServerModelManager: ObservableObject {
     }
     
     private func endLiveActivity() {
+        #if !targetEnvironment(macCatalyst)
         guard let activity = liveActivity else { return }
         
         let finalContentState = MumbleActivityAttributes.ContentState(
@@ -590,6 +599,7 @@ class ServerModelManager: ObservableObject {
             )
             self.liveActivity = nil
         }
+        #endif
     }
     
     private func setupNotifications() {
@@ -1603,6 +1613,7 @@ class ServerModelManager: ObservableObject {
     
     /// 阻塞式强制结束所有活动（专用于 App 终止时）
     @objc public static func forceEndAllActivitiesBlocking() {
+        #if !targetEnvironment(macCatalyst)
         // iOS 16.1 之前不支持
         guard #available(iOS 16.1, *) else { return }
         
@@ -1627,6 +1638,7 @@ class ServerModelManager: ObservableObject {
         } else {
             print("✅ LiveActivity cleanup finished successfully.")
         }
+        #endif
     }
 }
 

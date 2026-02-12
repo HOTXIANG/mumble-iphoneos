@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import WidgetKit
 
 struct RecentServer: Identifiable, Codable, Equatable {
     var id: String { "\(hostname):\(port)" } // 唯一标识
@@ -68,6 +69,23 @@ class RecentServerManager: NSObject, ObservableObject {
         if let data = try? JSONEncoder().encode(recents) {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
+        syncToWidget()
+    }
+    
+    /// 将最近连接同步到 Widget（通过 App Group）
+    private func syncToWidget() {
+        let widgetItems = recents.map { recent in
+            WidgetServerItem(
+                id: WidgetServerItem.makeId(hostname: recent.hostname, port: recent.port, username: recent.username),
+                displayName: recent.displayName,
+                hostname: recent.hostname,
+                port: recent.port,
+                username: recent.username,
+                hasCertificate: false,
+                lastConnected: Date()
+            )
+        }
+        WidgetDataManager.shared.syncRecentServers(widgetItems)
     }
     
     private func loadRecents() {
