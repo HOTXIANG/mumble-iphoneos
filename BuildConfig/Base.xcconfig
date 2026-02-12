@@ -60,6 +60,8 @@ VALIDATE_PRODUCT = YES
 OTHER_LDFLAGS = -all_load -ObjC -lc++
 OTHER_LDFLAGS[sdk=macosx*] = -all_load -ObjC -lc++ "$(BUILT_PRODUCTS_DIR)/OpenSSL.dylib" -F"$(BUILT_PRODUCTS_DIR)" -framework MumbleKit
 
+LD_RUNPATH_SEARCH_PATHS[sdk=macosx*] = @executable_path/../Frameworks
+
 ENABLE_BITCODE = NO
 
 PRODUCT_NAME = Mumble
