@@ -35,6 +35,8 @@
 	<string>300000000</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.social-networking</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Mumble uses your microphone for voice chats</string>
 	<key>NSSupportsLiveActivities</key>
