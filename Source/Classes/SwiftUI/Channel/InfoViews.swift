@@ -337,30 +337,12 @@ struct UserInfoView: View {
     @ViewBuilder
     private var editingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Edit Comment (HTML)")
+            Text("Edit Comment")
                 .font(.headline)
                 .foregroundColor(.secondary)
             
-            TextEditor(text: $editText)
-                .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 150)
-                .scrollContentBackground(.hidden)
-                .padding(8)
-                .background(Color.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor.opacity(0.5), lineWidth: 1))
-            
-            // 实时预览
-            if !editText.isEmpty {
-                Text("Preview")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                HTMLContentView(html: editText, dynamicHeight: $contentHeight)
-                    .frame(height: min(contentHeight, 300))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(4)
-                    .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-            }
+            RichTextEditor(htmlText: $editText)
+                .frame(minHeight: 280)
             
             HStack {
                 Spacer()

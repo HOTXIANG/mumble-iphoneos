@@ -19,6 +19,10 @@ class ServerModelNotificationManager {
     static let privateMessageReceivedNotification = Notification.Name("ServerModelPrivateMessageReceived")
     static let userCommentChangedNotification = Notification.Name("ServerModelUserCommentChanged")
     static let channelDescriptionChangedNotification = Notification.Name("ServerModelChannelDescriptionChanged")
+    static let aclReceivedNotification = Notification.Name("ServerModelACLReceived")
+    static let permissionDeniedNotification = Notification.Name("ServerModelPermissionDenied")
+    static let channelAddedNotification = Notification.Name("ServerModelChannelAdded")
+    static let channelRemovedNotification = Notification.Name("ServerModelChannelRemoved")
     
     // --- 核心修改 2：添加一个发送新通知的方法 ---
     func postUserMoved(user: MKUser, to channel: MKChannel) {
@@ -58,6 +62,34 @@ class ServerModelNotificationManager {
         let userInfo: [String: Any] = ["message": message, "user": user]
         NotificationCenter.default.post(name: Self.privateMessageReceivedNotification, object: nil, userInfo: userInfo)
     }
+    
+    func postACLReceived(_ accessControl: MKAccessControl, for channel: MKChannel) {
+        let userInfo: [String: Any] = ["accessControl": accessControl, "channel": channel]
+        NotificationCenter.default.post(name: Self.aclReceivedNotification, object: nil, userInfo: userInfo)
+    }
+    
+    func postPermissionDenied(permission: MKPermission, user: MKUser?, channel: MKChannel?) {
+        var userInfo: [String: Any] = ["permission": permission.rawValue]
+        if let user = user { userInfo["user"] = user }
+        if let channel = channel { userInfo["channel"] = channel }
+        NotificationCenter.default.post(name: Self.permissionDeniedNotification, object: nil, userInfo: userInfo)
+    }
+    
+    func postPermissionDeniedForReason(_ reason: String?) {
+        var userInfo: [String: Any] = [:]
+        if let reason = reason { userInfo["reason"] = reason }
+        NotificationCenter.default.post(name: Self.permissionDeniedNotification, object: nil, userInfo: userInfo)
+    }
+    
+    func postChannelAdded(_ channel: MKChannel) {
+        let userInfo: [String: Any] = ["channel": channel]
+        NotificationCenter.default.post(name: Self.channelAddedNotification, object: nil, userInfo: userInfo)
+    }
+    
+    func postChannelRemoved(_ channel: MKChannel) {
+        let userInfo: [String: Any] = ["channel": channel]
+        NotificationCenter.default.post(name: Self.channelRemovedNotification, object: nil, userInfo: userInfo)
+    }
 }
 
 @objc class ServerModelDelegateWrapper: NSObject, MKServerModelDelegate {
@@ -92,8 +124,14 @@ class ServerModelNotificationManager {
     // --- 所有其他委托方法保持不变，但为了代码整洁，将它们分门别类 ---
     // 列表重建相关的通知
     func serverModel(_ model: MKServerModel, joinedServerAs user: MKUser) { ServerModelNotificationManager.shared.postRebuildNotification() }
-    func serverModel(_ model: MKServerModel, channelAdded channel: MKChannel) { ServerModelNotificationManager.shared.postRebuildNotification() }
-    func serverModel(_ model: MKServerModel, channelRemoved channel: MKChannel) { ServerModelNotificationManager.shared.postRebuildNotification() }
+    func serverModel(_ model: MKServerModel, channelAdded channel: MKChannel) {
+        ServerModelNotificationManager.shared.postChannelAdded(channel)
+        ServerModelNotificationManager.shared.postRebuildNotification()
+    }
+    func serverModel(_ model: MKServerModel, channelRemoved channel: MKChannel) {
+        ServerModelNotificationManager.shared.postChannelRemoved(channel)
+        ServerModelNotificationManager.shared.postRebuildNotification()
+    }
     func serverModel(_ model: MKServerModel, channelMoved channel: MKChannel) { ServerModelNotificationManager.shared.postRebuildNotification() }
     func serverModel(_ model: MKServerModel, userRenamed user: MKUser) { ServerModelNotificationManager.shared.postRebuildNotification() }
     
@@ -120,5 +158,19 @@ class ServerModelNotificationManager {
     
     func serverModel(_ model: MKServerModel, privateMessageReceived msg: MKTextMessage, from user: MKUser) {
         ServerModelNotificationManager.shared.postPrivateMessageReceived(msg, from: user)
+    }
+    
+    // ACL 相关
+    func serverModel(_ model: MKServerModel, didReceive accessControl: MKAccessControl, for channel: MKChannel) {
+        ServerModelNotificationManager.shared.postACLReceived(accessControl, for: channel)
+    }
+    
+    // 权限拒绝相关
+    func serverModel(_ model: MKServerModel, permissionDenied perm: MKPermission, for user: MKUser, in channel: MKChannel) {
+        ServerModelNotificationManager.shared.postPermissionDenied(permission: perm, user: user, channel: channel)
+    }
+    
+    func serverModel(_ model: MKServerModel, permissionDeniedForReason reason: String?) {
+        ServerModelNotificationManager.shared.postPermissionDeniedForReason(reason)
     }
 }

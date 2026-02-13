@@ -811,6 +811,19 @@ class ServerModelManager: ObservableObject {
             }
         })
         
+        // 权限拒绝通知
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.permissionDeniedNotification, object: nil, queue: nil) { [weak self] notification in
+            let reason = notification.userInfo?["reason"] as? String
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if let reason = reason {
+                    self.addSystemNotification("Permission denied: \(reason)")
+                } else {
+                    self.addSystemNotification("Permission denied")
+                }
+            }
+        })
+        
         center.addObserver(self, selector: #selector(handleConnectionOpened), name: NSNotification.Name("MUConnectionOpenedNotification"), object: nil)
     }
     
@@ -1782,6 +1795,35 @@ class ServerModelManager: ObservableObject {
     func getUserBySession(_ session: UInt) -> MKUser? {
         guard let index = userIndexMap[session], index < modelItems.count else { return nil }
         return modelItems[index].object as? MKUser
+    }
+    
+    // MARK: - Channel Management
+    
+    /// 创建新频道
+    func createChannel(name: String, parent: MKChannel, temporary: Bool) {
+        serverModel?.createChannel(withName: name, parent: parent, temporary: temporary)
+    }
+    
+    /// 删除频道
+    func removeChannel(_ channel: MKChannel) {
+        serverModel?.remove(channel)
+    }
+    
+    /// 编辑频道属性
+    func editChannel(_ channel: MKChannel, name: String?, description: String?, position: NSNumber?, maxUsers: NSNumber? = nil) {
+        serverModel?.edit(channel, name: name, description: description, position: position, maxUsers: maxUsers)
+    }
+    
+    // MARK: - ACL Management
+    
+    /// 请求频道的 ACL 数据
+    func requestACL(for channel: MKChannel) {
+        serverModel?.requestAccessControl(for: channel)
+    }
+    
+    /// 设置频道的 ACL 数据
+    func setACL(_ accessControl: MKAccessControl, for channel: MKChannel) {
+        serverModel?.setAccessControl(accessControl, for: channel)
     }
 }
 

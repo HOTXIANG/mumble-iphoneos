@@ -142,6 +142,8 @@ struct ServerChannelView: View {
     @State private var selectedUserForInfo: MKUser? = nil
     @State private var selectedChannelForInfo: MKChannel? = nil
     @State private var selectedUserForPM: MKUser? = nil
+    @State private var selectedChannelForEdit: MKChannel? = nil
+    @State private var selectedChannelForCreate: MKChannel? = nil
     
     var body: some View {
         ZStack {
@@ -175,6 +177,12 @@ struct ServerChannelView: View {
                             },
                             onUserPMTap: { user in
                                 self.selectedUserForPM = user
+                            },
+                            onChannelEditTap: { channel in
+                                self.selectedChannelForEdit = channel
+                            },
+                            onChannelCreateTap: { channel in
+                                self.selectedChannelForCreate = channel
                             }
                         )
                     } else {
@@ -216,6 +224,18 @@ struct ServerChannelView: View {
                 serverManager: serverManager
             )
         }
+        .sheet(item: $selectedChannelForEdit) { channel in
+            EditChannelView(
+                channel: channel,
+                serverManager: serverManager
+            )
+        }
+        .sheet(item: $selectedChannelForCreate) { channel in
+            CreateChannelView(
+                parentChannel: channel,
+                serverManager: serverManager
+            )
+        }
     }
 }
 
@@ -230,6 +250,8 @@ struct ChannelTreeRow: View {
     let onUserInfoTap: (MKUser) -> Void
     let onChannelInfoTap: (MKChannel) -> Void
     var onUserPMTap: ((MKUser) -> Void)? = nil
+    var onChannelEditTap: ((MKChannel) -> Void)? = nil
+    var onChannelCreateTap: ((MKChannel) -> Void)? = nil
     
     private let haptic = PlatformSelectionFeedback()
     
@@ -277,6 +299,22 @@ struct ChannelTreeRow: View {
                             } label: {
                                 Label("Channel Info", systemImage: "info.circle")
                             }
+                            
+                            if hasChannelEditPermission {
+                                Divider()
+                                
+                                Button {
+                                    onChannelCreateTap?(channel)
+                                } label: {
+                                    Label("Create Sub-Channel", systemImage: "plus.rectangle")
+                                }
+                                
+                                Button {
+                                    onChannelEditTap?(channel)
+                                } label: {
+                                    Label("Edit Channel", systemImage: "pencil.and.outline")
+                                }
+                            }
                         }
                     #else
                     // iOS: 点击弹出菜单
@@ -298,6 +336,22 @@ struct ChannelTreeRow: View {
                             onChannelInfoTap(channel)
                         } label: {
                             Label("Channel Info", systemImage: "info.circle")
+                        }
+                        
+                        if hasChannelEditPermission {
+                            Divider()
+                            
+                            Button {
+                                onChannelCreateTap?(channel)
+                            } label: {
+                                Label("Create Sub-Channel", systemImage: "plus.rectangle")
+                            }
+                            
+                            Button {
+                                onChannelEditTap?(channel)
+                            } label: {
+                                Label("Edit Channel", systemImage: "pencil.and.outline")
+                            }
                         }
                     } label: {
                         Color.clear
@@ -339,7 +393,9 @@ struct ChannelTreeRow: View {
                         onUserTap: onUserTap,
                         onUserInfoTap: onUserInfoTap,
                         onChannelInfoTap: onChannelInfoTap,
-                        onUserPMTap: onUserPMTap
+                        onUserPMTap: onUserPMTap,
+                        onChannelEditTap: onChannelEditTap,
+                        onChannelCreateTap: onChannelCreateTap
                     )
                 }
             }
@@ -368,6 +424,16 @@ struct ChannelTreeRow: View {
             haptic.selectionChanged()
             MUConnectionController.shared()?.serverModel?.join(channel)
         }
+    }
+    
+    /// 检查当前用户是否有权限编辑频道
+    /// 简化判断：authenticated 用户默认认为有权限，服务器会在操作时拒绝无权限的操作
+    private var hasChannelEditPermission: Bool {
+        guard let connectedUser = MUConnectionController.shared()?.serverModel?.connectedUser() else {
+            return false
+        }
+        // 如果用户已认证，显示编辑选项（实际权限由服务器端校验，无权限时会返回 PermissionDenied）
+        return connectedUser.isAuthenticated()
     }
 }
 
@@ -409,9 +475,24 @@ struct ChannelRowView: View {
                     .shadow(radius: 1)
                     .lineLimit(1)
                 
+                // 密码保护标记（通过 maxUsers 等方式推断，这里用简化方式检测）
+                if channel.isTemporary() {
+                    Image(systemName: "clock")
+                        .font(.system(size: 9))
+                        .foregroundColor(.orange)
+                }
+                
                 Spacer()
                 
-                if userCount > 0 {
+                // 最大人数限制标记
+                if channel.maxUsers() > 0 {
+                    Text("\(userCount)/\(channel.maxUsers())")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(UInt(userCount) >= channel.maxUsers() ? .red : .secondary)
+                        .padding(.horizontal, 6)
+                        .frame(minHeight: 20)
+                        .background(Color.black.opacity(0.2), in: Capsule())
+                } else if userCount > 0 {
                     Text("\(userCount)")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.secondary)

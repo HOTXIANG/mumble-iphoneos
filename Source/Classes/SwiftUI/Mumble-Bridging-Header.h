@@ -39,6 +39,10 @@
 #import <MumbleKit/MKVersion.h>
 #import "MKAudioOutput.h"
 #import <MumbleKit/MKServerPinger.h>
+#import <MumbleKit/MKPermission.h>
+#import <MumbleKit/MKAccessControl.h>
+#import <MumbleKit/MKChannelACL.h>
+#import <MumbleKit/MKChannelGroup.h>
 
 @interface MKUser (SwiftExposedPrivateMethods)
 - (void) setLocalMuted:(BOOL)flag;
