@@ -16,6 +16,9 @@ class ServerModelNotificationManager {
     static let channelRenamedNotification = Notification.Name("ServerModelChannelRenamed")
     static let userJoinedNotification = Notification.Name("ServerModelUserJoinedNotification")
     static let userLeftNotification = Notification.Name("ServerModelUserLeftNotification")
+    static let privateMessageReceivedNotification = Notification.Name("ServerModelPrivateMessageReceived")
+    static let userCommentChangedNotification = Notification.Name("ServerModelUserCommentChanged")
+    static let channelDescriptionChangedNotification = Notification.Name("ServerModelChannelDescriptionChanged")
     
     // --- 核心修改 2：添加一个发送新通知的方法 ---
     func postUserMoved(user: MKUser, to channel: MKChannel) {
@@ -42,6 +45,19 @@ class ServerModelNotificationManager {
     func postRebuildNotification() { NotificationCenter.default.post(name: Self.rebuildModelNotification, object: nil) }
     func postUserTalkStateChanged(userSession: UInt, talkState: MKTalkState) { let userInfo: [String: Any] = ["userSession": userSession, "talkState": talkState]; NotificationCenter.default.post(name: Self.userTalkStateChangedNotification, object: nil, userInfo: userInfo) }
     func postChannelRenamed(channelId: UInt, newName: String) { let userInfo: [String: Any] = ["channelId": channelId, "newName": newName]; NotificationCenter.default.post(name: Self.channelRenamedNotification, object: nil, userInfo: userInfo) }
+    
+    func postUserCommentChanged(userSession: UInt) {
+        NotificationCenter.default.post(name: Self.userCommentChangedNotification, object: nil, userInfo: ["userSession": userSession])
+    }
+    
+    func postChannelDescriptionChanged(channelId: UInt) {
+        NotificationCenter.default.post(name: Self.channelDescriptionChangedNotification, object: nil, userInfo: ["channelId": channelId])
+    }
+    
+    func postPrivateMessageReceived(_ message: MKTextMessage, from user: MKUser) {
+        let userInfo: [String: Any] = ["message": message, "user": user]
+        NotificationCenter.default.post(name: Self.privateMessageReceivedNotification, object: nil, userInfo: userInfo)
+    }
 }
 
 @objc class ServerModelDelegateWrapper: NSObject, MKServerModelDelegate {
@@ -92,4 +108,17 @@ class ServerModelNotificationManager {
     
     // 频道重命名相关的通知
     func serverModel(_ model: MKServerModel, channelRenamed channel: MKChannel) { ServerModelNotificationManager.shared.postChannelRenamed(channelId: channel.channelId(), newName: channel.channelName() ?? "") }
+    
+    // 用户评论 / 频道简介变化通知
+    func serverModel(_ model: MKServerModel, userCommentChanged user: MKUser) {
+        ServerModelNotificationManager.shared.postUserCommentChanged(userSession: user.session())
+    }
+    
+    func serverModel(_ model: MKServerModel, channelDescriptionChanged channel: MKChannel) {
+        ServerModelNotificationManager.shared.postChannelDescriptionChanged(channelId: channel.channelId())
+    }
+    
+    func serverModel(_ model: MKServerModel, privateMessageReceived msg: MKTextMessage, from user: MKUser) {
+        ServerModelNotificationManager.shared.postPrivateMessageReceived(msg, from: user)
+    }
 }

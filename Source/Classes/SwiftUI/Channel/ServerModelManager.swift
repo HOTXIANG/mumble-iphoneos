@@ -659,7 +659,7 @@ class ServerModelManager: ObservableObject {
                 let destChannelId = safeChannel.channelId()
                 if let connectedUser = self.serverModel?.connectedUser() {
                     if movingUserSession == connectedUser.session() {
-                        self.addSystemNotification("You moved to channel \(destChannelName)", category: .userMoved)
+                        self.addSystemNotification("You moved to channel \(destChannelName)", category: .userMoved, suppressPush: true)
                         // 更新 Handoff Activity 的频道信息
                         HandoffManager.shared.updateActivityChannel(
                             channelId: Int(destChannelId),
@@ -755,6 +755,62 @@ class ServerModelManager: ObservableObject {
             }
         })
         
+        // 私聊消息接收
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.privateMessageReceivedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let message = userInfo["message"] as? MKTextMessage,
+                  let user = userInfo["user"] as? MKUser else { return }
+            
+            let senderName = user.userName() ?? "Unknown"
+            let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
+            let senderSession = user.session()
+            
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let connectedUserSession = self.serverModel?.connectedUser()?.session()
+                
+                // 忽略自己发给自己的回显
+                if senderSession == connectedUserSession {
+                    return
+                }
+                
+                let images = imageData.compactMap { PlatformImage(data: $0) }
+                
+                let pmMessage = ChatMessage(
+                    type: .privateMessage,
+                    senderName: senderName,
+                    attributedMessage: self.attributedString(from: plainText),
+                    images: images,
+                    timestamp: Date(),
+                    isSentBySelf: false,
+                    privatePeerName: senderName
+                )
+                self.messages.append(pmMessage)
+                
+                // 发送通知
+                let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+                if notifyEnabled {
+                    let bodyText = plainText.isEmpty ? "[Image]" : plainText
+                    self.sendLocalNotification(title: "PM from \(senderName)", body: bodyText)
+                }
+                
+                #if os(macOS)
+                if !NSApplication.shared.isActive {
+                    AppState.shared.unreadMessageCount += 1
+                } else {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                    }
+                }
+                #else
+                if AppState.shared.currentTab != .messages {
+                    AppState.shared.unreadMessageCount += 1
+                }
+                #endif
+            }
+        })
+        
         center.addObserver(self, selector: #selector(handleConnectionOpened), name: NSNotification.Name("MUConnectionOpenedNotification"), object: nil)
     }
     
@@ -804,10 +860,14 @@ class ServerModelManager: ObservableObject {
     }
     
     /// 添加系统消息到聊天区域，并根据分类开关决定是否发送系统推送通知
-    private func addSystemNotification(_ text: String, category: SystemNotifyCategory? = nil) {
+    /// - Parameters:
+    ///   - text: 消息文本
+    ///   - category: 通知分类（nil 则不推送）
+    ///   - suppressPush: 为 true 时只在聊天区域显示，不发送系统推送（用于自己的操作）
+    private func addSystemNotification(_ text: String, category: SystemNotifyCategory? = nil, suppressPush: Bool = false) {
         let didAppend = appendNotificationMessage(text: text, senderName: "System")
         
-        guard didAppend else { return }
+        guard didAppend, !suppressPush else { return }
         
         // 如果指定了分类，检查该分类的独立开关（默认开启）
         // 如果未指定分类（如 "Connected to server"），不发送推送
@@ -960,6 +1020,32 @@ class ServerModelManager: ObservableObject {
             images: [],
             timestamp: Date(),
             isSentBySelf: true
+        )
+        messages.append(selfMessage)
+    }
+    
+    // MARK: - 私聊发送
+    
+    func sendPrivateMessage(_ text: String, to user: MKUser) {
+        guard let serverModel = serverModel, !text.isEmpty else { return }
+        
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+        
+        let htmlMessage = MUTextMessageProcessor.processedHTML(fromPlainTextMessage: trimmedText)
+        let message = MKTextMessage(string: htmlMessage)
+        
+        serverModel.send(message, to: user)
+        
+        // 立即在 UI 上显示自己发送的私聊
+        let targetName = user.userName() ?? "Unknown"
+        let selfMessage = ChatMessage(
+            type: .privateMessage,
+            senderName: serverModel.connectedUser()?.userName() ?? "Me",
+            attributedMessage: attributedString(from: trimmedText),
+            timestamp: Date(),
+            isSentBySelf: true,
+            privatePeerName: targetName
         )
         messages.append(selfMessage)
     }
@@ -1128,16 +1214,16 @@ class ServerModelManager: ObservableObject {
             }()
             
             if isSelf || isInSameChannel {
-                let userName = user.userName() ?? "Unknown"
+                let displayName = isSelf ? "You" : (user.userName() ?? "Unknown")
                 
                 if prev.isSelfDeafened != currentDeafened {
                     // 不听状态变化（优先级高于闭麦，因为 deafen 隐含 mute）
                     let action = currentDeafened ? "deafened" : "undeafened"
-                    addSystemNotification("\(userName) \(action)", category: .muteDeafen)
+                    addSystemNotification("\(displayName) \(action)", category: .muteDeafen, suppressPush: isSelf)
                 } else if prev.isSelfMuted != currentMuted {
                     // 闭麦状态变化
                     let action = currentMuted ? "muted" : "unmuted"
-                    addSystemNotification("\(userName) \(action)", category: .muteDeafen)
+                    addSystemNotification("\(displayName) \(action)", category: .muteDeafen, suppressPush: isSelf)
                 }
             }
         }

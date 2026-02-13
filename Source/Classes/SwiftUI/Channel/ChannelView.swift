@@ -139,6 +139,9 @@ struct ChannelView: View {
 struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
     @State private var selectedUserForConfig: MKUser? = nil
+    @State private var selectedUserForInfo: MKUser? = nil
+    @State private var selectedChannelForInfo: MKChannel? = nil
+    @State private var selectedUserForPM: MKUser? = nil
     
     var body: some View {
         ZStack {
@@ -163,6 +166,15 @@ struct ServerChannelView: View {
                             serverManager: serverManager,
                             onUserTap: { user in
                                 self.selectedUserForConfig = user
+                            },
+                            onUserInfoTap: { user in
+                                self.selectedUserForInfo = user
+                            },
+                            onChannelInfoTap: { channel in
+                                self.selectedChannelForInfo = channel
+                            },
+                            onUserPMTap: { user in
+                                self.selectedUserForPM = user
                             }
                         )
                     } else {
@@ -191,6 +203,19 @@ struct ServerChannelView: View {
             )
             .presentationDetents([.medium])
         }
+        .sheet(item: $selectedUserForInfo) { user in
+            let isSelf = user.session() == MUConnectionController.shared()?.serverModel?.connectedUser()?.session()
+            UserInfoView(user: user, isSelf: isSelf)
+        }
+        .sheet(item: $selectedChannelForInfo) { channel in
+            ChannelInfoView(channel: channel)
+        }
+        .sheet(item: $selectedUserForPM) { user in
+            PrivateMessageInputView(
+                targetUser: user,
+                serverManager: serverManager
+            )
+        }
     }
 }
 
@@ -202,6 +227,9 @@ struct ChannelTreeRow: View {
     @ObservedObject var serverManager: ServerModelManager
     
     let onUserTap: (MKUser) -> Void
+    let onUserInfoTap: (MKUser) -> Void
+    let onChannelInfoTap: (MKChannel) -> Void
+    var onUserPMTap: ((MKUser) -> Void)? = nil
     
     private let haptic = PlatformSelectionFeedback()
     
@@ -245,7 +273,7 @@ struct ChannelTreeRow: View {
                                 Label("Join Channel", systemImage: "arrow.right.to.line")
                             }
                             Button {
-                                // TODO: Show Info
+                                onChannelInfoTap(channel)
                             } label: {
                                 Label("Channel Info", systemImage: "info.circle")
                             }
@@ -267,7 +295,7 @@ struct ChannelTreeRow: View {
                         }
                         
                         Button {
-                            // TODO: Show Info
+                            onChannelInfoTap(channel)
                         } label: {
                             Label("Channel Info", systemImage: "info.circle")
                         }
@@ -292,7 +320,9 @@ struct ChannelTreeRow: View {
                     UserRowView(
                         user: user,
                         serverManager: serverManager,
-                        onTap: { onUserTap(user) }
+                        onTap: { onUserTap(user) },
+                        onInfoTap: { u in onUserInfoTap(u) },
+                        onPMTap: onUserPMTap
                     )
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
@@ -306,7 +336,10 @@ struct ChannelTreeRow: View {
                         channel: subChannel,
                         level: level + 1,
                         serverManager: serverManager,
-                        onUserTap: onUserTap
+                        onUserTap: onUserTap,
+                        onUserInfoTap: onUserInfoTap,
+                        onChannelInfoTap: onChannelInfoTap,
+                        onUserPMTap: onUserPMTap
                     )
                 }
             }
@@ -420,6 +453,8 @@ struct UserRowView: View {
     @ObservedObject var serverManager: ServerModelManager
     
     let onTap: () -> Void
+    var onInfoTap: ((MKUser) -> Void)? = nil
+    var onPMTap: ((MKUser) -> Void)? = nil
     
     private var currentVolume: Float {
         if let vol = serverManager.userVolumes[user.session()] {
@@ -525,24 +560,27 @@ struct UserRowView: View {
                         }
                         Divider()
                     }
-                    Button(action: {}) { Label("User Info", systemImage: "person.circle") }
+                    Button { onInfoTap?(user) } label: { Label("User Info", systemImage: "person.circle") }
+                    if !isMyself {
+                        Button { onPMTap?(user) } label: { Label("Private Message", systemImage: "envelope.fill") }
+                    }
                 }
             
             #if os(iOS)
-            if !isMyself {
-                HStack(spacing: 0) {
-                    let level = dynamicLevel
-                    // 避开前面的缩进区域，确保点击的是内容部分
-                    Spacer().frame(width: CGFloat(level) * kIndentUnit)
+            HStack(spacing: 0) {
+                let level = dynamicLevel
+                // 避开前面的缩进区域，确保点击的是内容部分
+                Spacer().frame(width: CGFloat(level) * kIndentUnit)
+                
+                Menu {
+                    // Menu Header
+                    Text(user.userName() ?? "User")
+                        .font(.caption)
+                        .foregroundColor(.gray)
                     
-                    Menu {
-                        // Menu Header
-                        Text(user.userName() ?? "User")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        
-                        Divider()
-                        
+                    Divider()
+                    
+                    if !isMyself {
                         // Action 1: 本地静音/取消静音
                         Button {
                             serverManager.toggleLocalUserMute(session: user.session())
@@ -562,19 +600,28 @@ struct UserRowView: View {
                         }
                         
                         Divider()
-                        
-                        // Action 3: 用户信息 (占位)
-                        Button {
-                            // Show User Info Logic
-                        } label: {
-                            Label("User Info", systemImage: "person.circle")
-                        }
-                        
-                    } label: {
-                        Color.clear
                     }
-                    .contentShape(Rectangle()) // 确保透明区域可点击
+                    
+                    // Action 3: 用户信息
+                    Button {
+                        onInfoTap?(user)
+                    } label: {
+                        Label("User Info", systemImage: "person.circle")
+                    }
+                    
+                    // Action 4: 私聊
+                    if !isMyself {
+                        Button {
+                            onPMTap?(user)
+                        } label: {
+                            Label("Private Message", systemImage: "envelope.fill")
+                        }
+                    }
+                    
+                } label: {
+                    Color.clear
                 }
+                .contentShape(Rectangle()) // 确保透明区域可点击
             }
             #endif
         }
@@ -627,5 +674,82 @@ struct ResizeHandle: View {
 extension MKUser: Identifiable {
     public var id: UInt {
         return session()
+    }
+}
+
+extension MKChannel: Identifiable {
+    public var id: UInt {
+        return channelId()
+    }
+}
+
+// MARK: - 7. Private Message Input Dialog
+
+struct PrivateMessageInputView: View {
+    let targetUser: MKUser
+    @ObservedObject var serverManager: ServerModelManager
+    
+    @State private var messageText: String = ""
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                // 目标用户
+                HStack(spacing: 10) {
+                    Image(systemName: "envelope.fill")
+                        .font(.title2)
+                        .foregroundColor(.accentColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Private Message")
+                            .font(.headline)
+                        Text("To: \(targetUser.userName() ?? "Unknown")")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                
+                // 输入区域
+                TextEditor(text: $messageText)
+                    .font(.body)
+                    .frame(minHeight: 100)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+                
+                Spacer()
+            }
+            .navigationTitle("Private Message")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Send") {
+                        sendMessage()
+                    }
+                    .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 400, minHeight: 250)
+        #endif
+    }
+    
+    private func sendMessage() {
+        serverManager.sendPrivateMessage(messageText, to: targetUser)
+        dismiss()
     }
 }

@@ -6,7 +6,7 @@ import SwiftUI
 enum TalkingState {
     case passive
     case talking
-    // MumbleKit 中还有 a, 但为了简化UI，我们只区分“在讲话”和“没讲话”
+    // MumbleKit 中还有 a, 但为了简化UI，我们只区分"在讲话"和"没讲话"
 }
 
 // 2. UserState 结构体保持不变
@@ -77,8 +77,9 @@ struct ChannelNavigationConfig: NavigationConfigurable {
 
 // 1. 定义一个新的枚举来表示消息的类型
 enum ChatMessageType {
-    case userMessage // 普通的用户聊天消息
-    case notification // 系统通知，例如“加入频道”
+    case userMessage      // 普通的用户聊天消息
+    case notification     // 系统通知，例如"加入频道"
+    case privateMessage   // 私聊消息
 }
 
 // 2. 为 ChatMessage 结构体添加一个新的 type 属性
@@ -88,17 +89,28 @@ struct ChatMessage: Identifiable, Equatable {
     }
     
     let id: UUID
-    let type: ChatMessageType // 新增的类型属性
+    let type: ChatMessageType
     let senderName: String
     let attributedMessage: AttributedString
     let images: [PlatformImage]
     let timestamp: Date
     let isSentBySelf: Bool
+    /// 私聊对方的名称（收到时为发送者名，发出时为接收者名）
+    let privatePeerName: String?
+    
+    init(id: UUID = UUID(), type: ChatMessageType, senderName: String, attributedMessage: AttributedString, images: [PlatformImage] = [], timestamp: Date = Date(), isSentBySelf: Bool, privatePeerName: String? = nil) {
+        self.id = id
+        self.type = type
+        self.senderName = senderName
+        self.attributedMessage = attributedMessage
+        self.images = images
+        self.timestamp = timestamp
+        self.isSentBySelf = isSentBySelf
+        self.privatePeerName = privatePeerName
+    }
     
     // 为了方便，我们保留一个纯文本的计算属性
     var plainTextMessage: String {
         return attributedMessage.description
     }
 }
-
-

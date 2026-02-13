@@ -68,6 +68,7 @@
 		F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34AC2F1729BF00420631 /* MumbleApp.swift */; };
 		F25F34B22F17353F00420631 /* LocalUserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B02F17353500420631 /* LocalUserPreferences.swift */; };
 		F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */; };
+		F2A1B0012F5F4A0000AABB01 /* InfoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1B0002F5F4A0000AABB01 /* InfoViews.swift */; };
 		F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* Launch Screen.storyboard */; platformFilter = ios; };
 		F266899C2EE8A46A008FC7EB /* iTunesArtwork.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689942EE8A46A008FC7EB /* iTunesArtwork.png */; };
 		F266899D2EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689972EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png */; };
@@ -369,6 +370,7 @@
 		F25F34AC2F1729BF00420631 /* MumbleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleApp.swift; sourceTree = "<group>"; };
 		F25F34B02F17353500420631 /* LocalUserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUserPreferences.swift; sourceTree = "<group>"; };
 		F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAudioSettingsView.swift; sourceTree = "<group>"; };
+		F2A1B0002F5F4A0000AABB01 /* InfoViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoViews.swift; sourceTree = "<group>"; };
 		F26689922EE89F20008FC7EB /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
 		F26689942EE8A46A008FC7EB /* iTunesArtwork.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = iTunesArtwork.png; path = Resources/iTunesArtwork.png; sourceTree = "<group>"; };
 		F26689952EE8A46A008FC7EB /* LOGO.psd */ = {isa = PBXFileReference; lastKnownFileType = file; name = LOGO.psd; path = Resources/LOGO.psd; sourceTree = "<group>"; };
@@ -794,6 +796,7 @@
 			isa = PBXGroup;
 			children = (
 				F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */,
+				F2A1B0002F5F4A0000AABB01 /* InfoViews.swift */,
 				F2E9CC062F07A3EF00464F79 /* ServerCertificateDetailView.swift */,
 				F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */,
 				F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */,
@@ -1069,6 +1072,7 @@
 				F2FF567C2E0F711A00D76B49 /* ChannelView.swift in Sources */,
 				F28C6B2B2EE871F000DE9CD2 /* ServerPingModel.swift in Sources */,
 				F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */,
+				F2A1B0012F5F4A0000AABB01 /* InfoViews.swift in Sources */,
 				F2FF567E2E0F711A00D76B49 /* ChannelDataModels.swift in Sources */,
 				F2FF567F2E0F711A00D76B49 /* ServerModelManager.swift in Sources */,
 				F28C6AF02EE6E55300DE9CD2 /* PreferencesView.swift in Sources */,

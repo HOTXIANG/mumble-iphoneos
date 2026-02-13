@@ -69,6 +69,14 @@ struct AudioTransmissionSettingsView: View {
     
     var body: some View {
         Form {
+            #if os(macOS)
+            Picker("Transmission Method", selection: $transmitMethod) {
+                Text("Voice Activated").tag("vad")
+                Text("Push-to-Talk").tag("ptt")
+                Text("Continuous").tag("continuous")
+            }
+            .pickerStyle(.menu)
+            #else
             Section(header: Text("Transmission Method")) {
                 HStack {
                     Spacer()
@@ -77,16 +85,13 @@ struct AudioTransmissionSettingsView: View {
                         Text("Push-to-Talk").tag("ptt")
                         Text("Continuous").tag("continuous")
                     }
-                    #if os(macOS)
-                    .pickerStyle(.menu)
-                    #else
                     .pickerStyle(.inline)
-                    #endif
                     .labelsHidden()
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
             }
+            #endif
             
             if transmitMethod == "vad" {
                 Section(header: Text("Voice Activation Settings")) {
@@ -192,6 +197,14 @@ struct AudioQualitySettingsView: View {
     
     var body: some View {
         Form {
+            #if os(macOS)
+            Picker("Quality Preset", selection: $qualityKind) {
+                Text("Low (60kbit/s)").tag("low")
+                Text("Balanced (100kbit/s)").tag("balanced")
+                Text("High (192kbit/s)").tag("high")
+            }
+            .pickerStyle(.menu)
+            #else
             Section(header: Text("Quality Preset")) {
                 HStack {
                     Spacer()
@@ -200,16 +213,13 @@ struct AudioQualitySettingsView: View {
                         Text("Balanced (100kbit/s)").tag("balanced")
                         Text("High (192kbit/s)").tag("high")
                     }
-                    #if os(macOS)
-                    .pickerStyle(.menu)
-                    #else
                     .pickerStyle(.inline)
-                    #endif
                     .labelsHidden()
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
             }
+            #endif
         }
         #if os(macOS)
         .formStyle(.grouped)
@@ -289,23 +299,32 @@ struct PreferencesView: View {
     private var preferencesContent: some View {
         // --- 音频部分 ---
         Section(header: Text("Audio")) {
-            VStack(alignment: .leading) {
-                Label("Master Volume", systemImage: "speaker.wave.3")
+            #if os(macOS)
+            HStack(spacing: 8) {
+                Label("Master Volume", systemImage: "speaker.wave.1")
+                    .frame(width: 140, alignment: .leading)
+                Slider(value: $outputVolume, in: 0...1) { editing in
+                    if !editing { PreferencesModel.shared.notifySettingsChanged() }
+                }
+            }
+            #else
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Master Volume", systemImage: "speaker.wave.2")
                     .padding(.vertical, 4)
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "speaker")
-                    Divider()
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
                     Slider(value: $outputVolume, in: 0...1) { editing in
                         if !editing { PreferencesModel.shared.notifySettingsChanged() }
                     }
-                    .frame(maxWidth: .infinity)
-                    Divider()
                     Image(systemName: "speaker.wave.3")
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            #endif
             
             NavigationLink(destination: AudioTransmissionSettingsView()) {
                 Label("Transmission", systemImage: "mic")

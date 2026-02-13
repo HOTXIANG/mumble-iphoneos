@@ -252,6 +252,11 @@ struct MessagesList: View {
                                 )
                             case .notification:
                                 NotificationMessageView(message: message)
+                            case .privateMessage:
+                                PrivateMessageBubbleView(
+                                    message: message,
+                                    onImageTap: onPreviewRequest
+                                )
                             }
                         }
                         Spacer().frame(height: 10).id(bottomID)
@@ -386,6 +391,73 @@ private struct MessageBubbleView: View {
             .background(
                 message.isSentBySelf ? Color.accentColor : Color.systemGray4,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .foregroundColor(message.isSentBySelf ? .white : .primary)
+            
+            Text(message.timestamp, style: .time)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: message.isSentBySelf ? .trailing : .leading)
+    }
+}
+
+// MARK: - Private Message Bubble
+
+private struct PrivateMessageBubbleView: View {
+    let message: ChatMessage
+    let onImageTap: (PlatformImage) -> Void
+    
+    var body: some View {
+        VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
+            // 私聊标签
+            HStack(spacing: 4) {
+                Image(systemName: "envelope.fill")
+                    .font(.system(size: 10))
+                if message.isSentBySelf {
+                    Text("PM to \(message.privatePeerName ?? "?")")
+                        .font(.system(size: 12, weight: .semibold))
+                } else {
+                    Text("PM from \(message.privatePeerName ?? message.senderName)")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .foregroundColor(.purple)
+            .padding(.horizontal, 4)
+            
+            // 消息内容
+            VStack(alignment: .leading, spacing: 6) {
+                if !message.plainTextMessage.isEmpty {
+                    Text(message.attributedMessage)
+                        .tint(.pink)
+                        .textSelection(.enabled)
+                }
+                if !message.images.isEmpty {
+                    ForEach(0..<message.images.count, id: \.self) { index in
+                        Button(action: { onImageTap(message.images[index]) }) {
+                            Image(platformImage: message.images[index])
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: 200)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        .cornerRadius(8)
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .background(
+                message.isSentBySelf
+                    ? Color.purple.opacity(0.7)
+                    : Color.purple.opacity(0.25),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.purple.opacity(0.5), lineWidth: 1)
             )
             .foregroundColor(message.isSentBySelf ? .white : .primary)
             

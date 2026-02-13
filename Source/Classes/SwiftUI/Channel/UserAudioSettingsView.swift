@@ -17,7 +17,7 @@ struct UserAudioSettingsView: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Audio Settings for \(userName)")) {
                     // 1. 自定义音量滑块
@@ -70,6 +70,9 @@ struct UserAudioSettingsView: View {
                     }
                 }
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle(userName)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
