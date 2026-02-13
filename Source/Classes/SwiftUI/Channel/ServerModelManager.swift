@@ -75,6 +75,8 @@ class ServerModelManager: ObservableObject {
     private var keepAliveTimer: Timer?
     private let systemMuteManager = SystemMuteManager()
     private var isRestoringMuteState = false
+    /// 追踪每个用户的 mute/deafen 状态，用于检测变化并生成系统消息
+    private var previousMuteStates: [UInt: (isSelfMuted: Bool, isSelfDeafened: Bool)] = [:]
     
     enum ViewMode {
         case server,
@@ -147,23 +149,15 @@ class ServerModelManager: ObservableObject {
     }
     
     private func sendLocalNotification(title: String, body: String) {
-        // 1. 如果应用在前台，直接播放音效
         #if os(iOS)
+        // iOS: 前台直接播放音效（不弹系统通知），后台发系统通知
         if UIApplication.shared.applicationState == .active {
-            // 1007 是 iOS 标准的三全音 (Tri-tone) 提示音
-            // 使用 AlertSound 可以在静音模式下触发震动
-            AudioServicesPlayAlertSound(1000)
-            return
-        }
-        #else
-        // macOS: 检查应用是否活跃
-        if NSApplication.shared.isActive {
             AudioServicesPlayAlertSound(1000)
             return
         }
         #endif
-        
-        // 2. 如果应用在后台，发送带有默认音效的系统通知
+        // macOS: 始终发送系统通知（前台也发，由 willPresent delegate 控制展示方式和音效）
+        // iOS 后台: 也发送系统通知
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -277,6 +271,7 @@ class ServerModelManager: ObservableObject {
         keepAliveTimer = nil
         
         userVolumes.removeAll()
+        previousMuteStates.removeAll()
         
         self.delegateToken = nil
         self.serverModel = nil
@@ -664,7 +659,7 @@ class ServerModelManager: ObservableObject {
                 let destChannelId = safeChannel.channelId()
                 if let connectedUser = self.serverModel?.connectedUser() {
                     if movingUserSession == connectedUser.session() {
-                        self.addSystemNotification("You moved to channel \(destChannelName)")
+                        self.addSystemNotification("You moved to channel \(destChannelName)", category: .userMoved)
                         // 更新 Handoff Activity 的频道信息
                         HandoffManager.shared.updateActivityChannel(
                             channelId: Int(destChannelId),
@@ -685,7 +680,7 @@ class ServerModelManager: ObservableObject {
                             let isLeavingMyChannel = (originChannelId == myCurrentChannelId)
                             let isEnteringMyChannel = (destChannelId == myCurrentChannelId)
                             if isLeavingMyChannel || isEnteringMyChannel {
-                                self.addSystemNotification("\(movingUserName) moved to \(destChannelName)")
+                                self.addSystemNotification("\(movingUserName) moved to \(destChannelName)", category: .userMoved)
                             }
                         }
                     }
@@ -703,7 +698,7 @@ class ServerModelManager: ObservableObject {
                 let safeUser = userTransfer.value
                 self.applySavedUserPreferences(user: safeUser)
                 let userName = safeUser.userName() ?? "Unknown User"
-                self.addSystemNotification("\(userName) connected")
+                self.addSystemNotification("\(userName) connected", category: .userJoined)
                 self.rebuildModelArray()
             }
         })
@@ -711,7 +706,7 @@ class ServerModelManager: ObservableObject {
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userLeftNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser else { return }
             let userName = user.userName() ?? "Unknown User"
-            Task { @MainActor [weak self] in self?.addSystemNotification("\(userName) disconnected") }
+            Task { @MainActor [weak self] in self?.addSystemNotification("\(userName) disconnected", category: .userLeft) }
         })
         
         // 核心修复：消息去重 + 监听器管理
@@ -742,9 +737,21 @@ class ServerModelManager: ObservableObject {
                     connectedUserSession: connectedUserSession
                 )
                 
+                #if os(macOS)
+                // macOS 分栏模式：前台即已读，只在非活跃窗口时累计未读
+                if !NSApplication.shared.isActive {
+                    AppState.shared.unreadMessageCount += 1
+                } else {
+                    // 前台活跃时不累计未读数；延迟清理通知中心，让横幅有时间显示
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                    }
+                }
+                #else
                 if AppState.shared.currentTab != .messages {
                     AppState.shared.unreadMessageCount += 1
                 }
+                #endif
             }
         })
         
@@ -788,12 +795,27 @@ class ServerModelManager: ObservableObject {
         }
     }
     
-    private func addSystemNotification(_ text: String) {
+    /// 系统通知分类，每类对应一个独立的 UserDefaults 开关
+    enum SystemNotifyCategory: String {
+        case userJoined    = "NotifyUserJoined"
+        case userLeft      = "NotifyUserLeft"
+        case userMoved     = "NotifyUserMoved"
+        case muteDeafen    = "NotifyMuteDeafen"
+    }
+    
+    /// 添加系统消息到聊天区域，并根据分类开关决定是否发送系统推送通知
+    private func addSystemNotification(_ text: String, category: SystemNotifyCategory? = nil) {
         let didAppend = appendNotificationMessage(text: text, senderName: "System")
         
-        // 只有真的添加了系统消息，才发通知
-        if didAppend && UserDefaults.standard.bool(forKey: "NotificationNotifySystemMessages") {
-            sendLocalNotification(title: currentNotificationTitle, body: text)
+        guard didAppend else { return }
+        
+        // 如果指定了分类，检查该分类的独立开关（默认开启）
+        // 如果未指定分类（如 "Connected to server"），不发送推送
+        if let category = category {
+            let shouldNotify = UserDefaults.standard.object(forKey: category.rawValue) as? Bool ?? true
+            if shouldNotify {
+                sendLocalNotification(title: currentNotificationTitle, body: text)
+            }
         }
     }
     
@@ -1092,6 +1114,35 @@ class ServerModelManager: ObservableObject {
             return
         }
         
+        // 检测 mute/deafen 状态变化，生成系统消息
+        let currentMuted = user.isSelfMuted()
+        let currentDeafened = user.isSelfDeafened()
+        
+        if let prev = previousMuteStates[session] {
+            // 判断是否需要通知：自己的变化始终通知，他人的变化只在同频道时通知
+            let isSelf = serverModel?.connectedUser()?.session() == session
+            let isInSameChannel: Bool = {
+                guard let myChannelId = serverModel?.connectedUser()?.channel()?.channelId(),
+                      let theirChannelId = user.channel()?.channelId() else { return false }
+                return myChannelId == theirChannelId
+            }()
+            
+            if isSelf || isInSameChannel {
+                let userName = user.userName() ?? "Unknown"
+                
+                if prev.isSelfDeafened != currentDeafened {
+                    // 不听状态变化（优先级高于闭麦，因为 deafen 隐含 mute）
+                    let action = currentDeafened ? "deafened" : "undeafened"
+                    addSystemNotification("\(userName) \(action)", category: .muteDeafen)
+                } else if prev.isSelfMuted != currentMuted {
+                    // 闭麦状态变化
+                    let action = currentMuted ? "muted" : "unmuted"
+                    addSystemNotification("\(userName) \(action)", category: .muteDeafen)
+                }
+            }
+        }
+        previousMuteStates[session] = (isSelfMuted: currentMuted, isSelfDeafened: currentDeafened)
+        
         // 更新 item 的状态
         updateUserItemState(
             item: modelItems[index],
@@ -1154,7 +1205,12 @@ class ServerModelManager: ObservableObject {
                 .isSuppressed(),
             isPrioritySpeaker: user
                 .isPrioritySpeaker()
-        ); item.state = state; updateUserTalkingState(
+        ); item.state = state
+        // 初始化 mute/deafen 状态追踪（首次见到用户时记录，不触发通知）
+        if previousMuteStates[user.session()] == nil {
+            previousMuteStates[user.session()] = (isSelfMuted: user.isSelfMuted(), isSelfDeafened: user.isSelfDeafened())
+        }
+        updateUserTalkingState(
             userSession: user
                 .session(),
             talkState: user

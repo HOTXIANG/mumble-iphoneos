@@ -79,9 +79,6 @@ final class MUStatusBarController: NSObject {
         m.addItem(withTitle: "Deafen / Undeafen", action: #selector(toggleDeafen), keyEquivalent: "")
             .target = self
         m.addItem(NSMenuItem.separator())
-        m.addItem(withTitle: "Show Mumble", action: #selector(showMainWindow), keyEquivalent: "")
-            .target = self
-        m.addItem(NSMenuItem.separator())
         m.addItem(withTitle: "Disconnect", action: #selector(disconnect), keyEquivalent: "")
             .target = self
 
@@ -138,13 +135,6 @@ final class MUStatusBarController: NSObject {
             serverModel.setSelfMuted(true, andSelfDeafened: true)
         } else {
             serverModel.setSelfMuted(false, andSelfDeafened: false)
-        }
-    }
-
-    @objc private func showMainWindow() {
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.canBecomeMain }) {
-            window.makeKeyAndOrderFront(nil)
         }
     }
 

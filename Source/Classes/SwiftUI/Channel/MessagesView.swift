@@ -52,23 +52,13 @@ struct PreviewItem: Identifiable {
     let url: URL
 }
 
-#if os(macOS)
-struct MacImagePreviewItem: Identifiable {
-    let id = UUID()
-    let image: PlatformImage
-}
-#endif
-
 // MARK: - 3. 主容器 (Stable Container)
 struct MessagesView: View {
     let serverManager: ServerModelManager
     
     // 状态管理中心
     @State private var previewItem: PreviewItem?
-    #if os(macOS)
-    @State private var macPreviewItem: MacImagePreviewItem?
-    #endif
-    @State private var selectedImageForSend: PlatformImage? // ✅ 状态提升到这里
+    @State private var selectedImageForSend: PlatformImage?
     
     var body: some View {
         ZStack {
@@ -76,24 +66,20 @@ struct MessagesView: View {
             MessagesList(
                 serverManager: serverManager,
                 onPreviewRequest: { image in handleImageTap(image: image) },
-                onImageSelected: { image in selectedImageForSend = image } // ✅ 接收子视图传来的图片
+                onImageSelected: { image in selectedImageForSend = image }
             )
             
             // 2. 静态锚点层 (所有弹窗都挂在这里)
             Color.clear
                 .allowsHitTesting(false)
-                // 挂载查看大图 (QuickLook)
+                // 挂载查看大图 (QuickLook) — iOS only
                 #if os(iOS)
                 .fullScreenCover(item: $previewItem) { item in
                     QuickLookPreview(url: item.url)
                         .ignoresSafeArea()
                 }
-                #else
-                .sheet(item: $macPreviewItem) { item in
-                    MacImagePreviewView(image: item.image)
-                }
                 #endif
-                // ✅ 挂载发送确认框 (Sheet) - 现在它也稳定了！
+                // 挂载发送确认框 (Sheet)
                 .sheet(item: $selectedImageForSend) { image in
                     ImageConfirmationView(
                         image: image,
@@ -105,12 +91,13 @@ struct MessagesView: View {
                     )
                     .presentationDetents([.medium , .large])
                 }
+            
         }
     }
     
     private func handleImageTap(image: PlatformImage) {
         #if os(macOS)
-        macPreviewItem = MacImagePreviewItem(image: image)
+        AppState.shared.previewImage = image
         #else
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "mumble_preview_\(UUID().uuidString).jpg"
@@ -129,28 +116,92 @@ struct MessagesView: View {
 }
 
 #if os(macOS)
-private struct MacImagePreviewView: View {
+/// macOS 图片预览 overlay：全窗口覆盖，支持触控板/鼠标缩放，双击还原，Esc 关闭
+struct MacImagePreviewOverlay: View {
     let image: PlatformImage
-    @Environment(\.dismiss) private var dismiss
-
+    let onDismiss: () -> Void
+    
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.9)
-                .ignoresSafeArea()
-
-            ScrollView([.horizontal, .vertical]) {
+        GeometryReader { geo in
+            ZStack {
+                // 半透明背景，点击空白区域关闭
+                Color.black.opacity(0.88)
+                    .ignoresSafeArea()
+                    .onTapGesture { onDismiss() }
+                
+                // 可缩放、可拖拽的图片
                 Image(platformImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 1400, maxHeight: 1000)
-                    .padding(24)
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .frame(maxWidth: geo.size.width * 0.92, maxHeight: geo.size.height * 0.92)
+                    // 触控板双指缩放
+                    .gesture(
+                        MagnifyGesture()
+                            .onChanged { value in
+                                scale = max(0.5, lastScale * value.magnification)
+                            }
+                            .onEnded { _ in
+                                lastScale = scale
+                                if scale < 1.0 {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        scale = 1.0
+                                        lastScale = 1.0
+                                        offset = .zero
+                                        lastOffset = .zero
+                                    }
+                                }
+                            }
+                    )
+                    // 拖拽平移（放大后移动图片）
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                offset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
+                            .onEnded { _ in
+                                lastOffset = offset
+                            }
+                    )
+                    // 双击：放大 2.5x ↔ 还原 1x
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring(response: 0.35)) {
+                            if scale > 1.05 {
+                                scale = 1.0; lastScale = 1.0
+                                offset = .zero; lastOffset = .zero
+                            } else {
+                                scale = 2.5; lastScale = 2.5
+                            }
+                        }
+                    }
+                
+                // 右上角关闭按钮
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: onDismiss) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 28))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(16)
+                    }
+                    Spacer()
+                }
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Close") { dismiss() }
-            }
-        }
+        .onExitCommand { onDismiss() } // Esc 键关闭
     }
 }
 #endif

@@ -413,6 +413,19 @@ struct AppRootView: View {
                 .transition(.opacity.animation(.easeInOut(duration: 0.3)))
             }
         }
+        // macOS 全窗口图片预览 overlay（覆盖整个 App 界面，包括分栏）
+        #if os(macOS)
+        .overlay {
+            if let image = appState.previewImage {
+                MacImagePreviewOverlay(image: image) {
+                    appState.previewImage = nil
+                }
+                .transition(.opacity)
+                .zIndex(10000)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: appState.previewImage != nil)
+        #endif
         .alert(item: $appState.activeError) { error in
             Alert(title: Text(error.title), message: Text(error.message), dismissButton: .default(Text("OK")))
         }

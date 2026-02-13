@@ -213,12 +213,18 @@ class NotificationDelegate: NSObject, ObservableObject, UNUserNotificationCenter
         completionHandler()
     }
     
-    /// App 在前台收到通知时不弹 banner（前台已有音效提示）
+    /// App 在前台收到通知时的展示策略
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        #if os(macOS)
+        // macOS: 前台也显示系统通知横幅并播放音效
+        completionHandler([.banner, .sound])
+        #else
+        // iOS: 前台不弹系统通知（已在 sendLocalNotification 中用 AudioServicesPlayAlertSound 播放了音效）
         completionHandler([])
+        #endif
     }
 }

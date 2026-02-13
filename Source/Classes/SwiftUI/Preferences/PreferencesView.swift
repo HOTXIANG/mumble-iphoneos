@@ -10,13 +10,30 @@ import UserNotifications
 
 struct NotificationSettingsView: View {
     @AppStorage("NotificationNotifyUserMessages") var notifyUserMessages: Bool = true
-    @AppStorage("NotificationNotifySystemMessages") var notifySystemMessages: Bool = true
+    
+    // 系统通知分类开关
+    @AppStorage("NotifyUserJoined") var notifyUserJoined: Bool = true
+    @AppStorage("NotifyUserLeft") var notifyUserLeft: Bool = true
+    @AppStorage("NotifyUserMoved") var notifyUserMoved: Bool = true
+    @AppStorage("NotifyMuteDeafen") var notifyMuteDeafen: Bool = false
     
     var body: some View {
         Form {
-            Section(header: Text("Push Notifications"), footer: Text("Notifications will be sent when the app is in the background.")) {
+            #if os(macOS)
+            Section(header: Text("User Messages")) {
                 Toggle("User Messages", isOn: $notifyUserMessages)
-                Toggle("System Messages", isOn: $notifySystemMessages)
+            }
+            #else
+            Section(header: Text("User Messages"), footer: Text("Notifications will be sent when the app is in the background.")) {
+                Toggle("User Messages", isOn: $notifyUserMessages)
+            }
+            #endif
+            
+            Section(header: Text("System Events")) {
+                Toggle("User Joined", isOn: $notifyUserJoined)
+                Toggle("User Left", isOn: $notifyUserLeft)
+                Toggle("User Moved Channel", isOn: $notifyUserMoved)
+                Toggle("Mute / Deafen", isOn: $notifyMuteDeafen)
             }
         }
         #if os(macOS)

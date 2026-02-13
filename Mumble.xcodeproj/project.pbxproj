@@ -46,7 +46,6 @@
 		28F79C73147991490003B8BA /* MUAccessTokenViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79C72147991480003B8BA /* MUAccessTokenViewController.m */; };
 		28F79CA9147AB62B0003B8BA /* MUNotificationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79CA8147AB6280003B8BA /* MUNotificationController.m */; };
 		28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */; };
-		3860EEAEB0434D69B4651B14 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0ABD460DB2347D9A25FC176 /* MUMacApplicationDelegate.swift */; };
 		8A6AB2D5876A40B1BA1F9378 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */; };
 		AA000002BBBB000000000001 /* PlatformTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002BBBB000000000002 /* PlatformTypes.swift */; };
 		AA000002BBBB000000000003 /* PlatformHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002BBBB000000000004 /* PlatformHaptics.swift */; };
@@ -241,6 +240,23 @@
 		};
 /* End PBXCopyFilesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		F24EB7E12F3E3AB500904644 /* Re-sign Nested Dylibs */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Re-sign Nested Dylibs";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Re-sign nested dylibs inside MumbleKit.framework so Team IDs match the app\nMK_FRAMEWORKS=\"${CODESIGNING_FOLDER_PATH}/Contents/Frameworks/MumbleKit.framework\"\necho \"Looking for nested dylibs in: $MK_FRAMEWORKS\"\nif [ -d \"$MK_FRAMEWORKS\" ]; then\n  for dylib in \"$MK_FRAMEWORKS\"/Versions/A/Frameworks/*.dylib; do\n    if [ -f \"$dylib\" ]; then\n      echo \"Re-signing $dylib\"\n      /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$dylib\"\n    fi\n  done\n  # Re-sign the framework itself to update the seal\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$MK_FRAMEWORKS\"\nelse\n  echo \"MumbleKit.framework not found at $MK_FRAMEWORKS\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXFileReference section */
 		0EA3B0742DC3A75E00A69F03 /* fmdb.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = fmdb.xcodeproj; path = Dependencies/fmdb/fmdb.xcodeproj; sourceTree = "<group>"; };
 		1D30AB110D05D00D00671497 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -327,7 +343,6 @@
 		AA000002BBBB000000000002 /* PlatformTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformTypes.swift; sourceTree = "<group>"; };
 		AA000002BBBB000000000004 /* PlatformHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformHaptics.swift; sourceTree = "<group>"; };
 		DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
-		E0ABD460DB2347D9A25FC176 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
 		F220ECB12F30E6100017CCCC /* MUCertificateCreationProgressView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUCertificateCreationProgressView.h; sourceTree = "<group>"; };
 		F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUCertificateCreationProgressView.m; sourceTree = "<group>"; };
 		F220ECB32F30E6100017CCCC /* MUCertificateCreationProgressView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MUCertificateCreationProgressView.xib; sourceTree = "<group>"; };
@@ -468,7 +483,6 @@
 				2838EA0C1293165700035C5D /* Preferences */,
 				F26689922EE89F20008FC7EB /* Launch Screen.storyboard */,
 				2861C25D116BE905002B8514 /* MUApplicationDelegate.h */,
-				E0ABD460DB2347D9A25FC176 /* MUMacApplicationDelegate.swift */,
 				DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */,
 				2861C25E116BE905002B8514 /* MUApplicationDelegate.m */,
 				F2E9CC022F06FB7800464F79 /* MUFavouriteServer.h */,
@@ -803,6 +817,7 @@
 				1D60588F0D05DD3D006BFB54 /* Frameworks */,
 				F2CBB0672F090CE300D88E21 /* Embed Foundation Extensions */,
 				F24EB79E2F3E3AB500904644 /* Embed Libraries */,
+				F24EB7E12F3E3AB500904644 /* Re-sign Nested Dylibs */,
 			);
 			buildRules = (
 			);
@@ -1034,7 +1049,6 @@
 				F2E9CC072F07A40300464F79 /* ServerCertificateDetailView.swift in Sources */,
 				28F019911364585C00E402F6 /* MUServerCell.m in Sources */,
 				F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */,
-				3860EEAEB0434D69B4651B14 /* MUMacApplicationDelegate.swift in Sources */,
 				8A6AB2D5876A40B1BA1F9378 /* MUMacApplicationDelegate.swift in Sources */,
 				AA000002BBBB000000000001 /* PlatformTypes.swift in Sources */,
 				AA000002BBBB000000000003 /* PlatformHaptics.swift in Sources */,
@@ -1162,6 +1176,7 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
@@ -1219,6 +1234,7 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
@@ -1288,6 +1304,7 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
@@ -1357,6 +1374,7 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",

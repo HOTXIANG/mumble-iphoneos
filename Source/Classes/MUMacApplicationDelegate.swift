@@ -68,7 +68,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         // Setup macOS menu bar status item
         statusBarController.setup()
         
-        applyMinimumWindowSizeToAllWindows()
+        // 设置窗口最小尺寸约束（仅设置 minSize，不强制修改当前 frame）
+        applyMinSizeToAllWindows()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleWindowDidBecomeMain(_:)),
@@ -77,10 +78,47 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         )
     }
     
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return true
+    }
+    
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // macOS 分栏模式下，窗口重新激活时自动清除堆积的系统通知和未读徽章
+        AppState.shared.unreadMessageCount = 0
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    }
+    
     func applicationWillTerminate(_ notification: Notification) {
         statusBarController.teardown()
         MUDatabase.teardown()
         NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - Handoff (接力)
+    
+    /// 当系统准备接收 Handoff 活动时调用，返回 true 表示本应用可以处理该活动类型
+    func application(_ application: NSApplication, willContinueUserActivityWithType userActivityType: String) -> Bool {
+        print("📲 MUMacApplicationDelegate: willContinueUserActivityWithType → \(userActivityType)")
+        return userActivityType == MumbleHandoffActivityType
+    }
+    
+    /// 当系统成功接收到 Handoff 活动后调用，这是 macOS 上处理 Handoff 的核心入口
+    /// 在 SwiftUI 的 .onContinueUserActivity 不可靠的场景下（冷启动、后台唤醒），
+    /// 由 NSApplicationDelegate 保底处理
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        guard userActivity.activityType == MumbleHandoffActivityType else {
+            print("⚠️ MUMacApplicationDelegate: Unknown activity type: \(userActivity.activityType)")
+            return false
+        }
+        
+        print("📲 MUMacApplicationDelegate: Received Handoff activity via NSApplicationDelegate")
+        HandoffManager.shared.handleIncomingActivity(userActivity)
+        return true
+    }
+    
+    /// Handoff 活动接收失败时调用
+    func application(_ application: NSApplication, didFailToContinueUserActivityWithType userActivityType: String, error: any Error) {
+        print("⚠️ MUMacApplicationDelegate: Failed to continue activity type \(userActivityType): \(error.localizedDescription)")
     }
     
     @objc private func reloadPreferences() {
@@ -162,24 +200,21 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func applyMinimumWindowSizeToAllWindows() {
+    // MARK: - 窗口最小尺寸约束
+    
+    /// 对所有已存在的窗口设置 minSize
+    private func applyMinSizeToAllWindows() {
         for window in NSApp.windows {
-            applyMinimumWindowSize(to: window)
+            window.minSize = minimumWindowSize
         }
     }
 
+    /// 当新窗口成为 main window 时，确保它也有 minSize 约束
+    /// 注意：只设置 minSize，不强制修改当前 frame，避免窗口获焦时尺寸被重置
     @objc private func handleWindowDidBecomeMain(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        applyMinimumWindowSize(to: window)
-    }
-
-    private func applyMinimumWindowSize(to window: NSWindow) {
-        window.minSize = minimumWindowSize
-        if window.frame.width < minimumWindowSize.width || window.frame.height < minimumWindowSize.height {
-            var frame = window.frame
-            frame.size.width = max(frame.size.width, minimumWindowSize.width)
-            frame.size.height = max(frame.size.height, minimumWindowSize.height)
-            window.setFrame(frame, display: true, animate: false)
+        if window.minSize.width < minimumWindowSize.width || window.minSize.height < minimumWindowSize.height {
+            window.minSize = minimumWindowSize
         }
     }
 }

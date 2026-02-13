@@ -48,6 +48,11 @@ class AppState: ObservableObject {
     // --- 核心修改 2：添加一个属性来跟踪当前显示的 Tab ---
     @Published var currentTab: Tab = .channels // 默认是频道列表
     
+    /// macOS 图片预览：设置此属性会在 AppRootView 层级弹出全窗口预览 overlay
+    #if os(macOS)
+    @Published var previewImage: PlatformImage? = nil
+    #endif
+    
     private var cancellables = Set<AnyCancellable>()
     
     static let shared = AppState()
