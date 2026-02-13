@@ -191,18 +191,20 @@ struct WelcomeContentView: View {
         AppState.shared.serverDisplayName = hostname
         PlatformImpactFeedback(style: .medium).impactOccurred()
         
-        // 尝试从收藏夹查找匹配的证书
+        // 尝试从收藏夹查找匹配的证书和密码
         var certRef: Data? = nil
+        var password: String = ""
         let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
         if let match = allFavs.first(where: { $0.hostName == hostname && $0.port == UInt(port) && $0.userName == username }) {
             certRef = match.certificateRef
+            password = match.password ?? ""
         }
         
         MUConnectionController.shared()?.connet(
             toHostname: hostname,
             port: UInt(port),
             withUsername: username,
-            andPassword: "",
+            andPassword: password,
             certificateRef: certRef,
             displayName: displayName
         )

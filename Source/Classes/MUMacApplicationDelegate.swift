@@ -13,6 +13,7 @@ import UserNotifications
 class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     private let minimumWindowSize = NSSize(width: 980, height: 680)
     private var connectionActive = false
+    private let statusBarController = MUStatusBarController()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Disable automatic window tabbing (removes "Show Tab Bar" / "Show All Tabs" from View menu)
@@ -63,6 +64,10 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         MUDatabase.initializeDatabase()
         
         print("🖥️ MUMacApplicationDelegate: Initialization complete (Opus enabled, database initialized)")
+        
+        // Setup macOS menu bar status item
+        statusBarController.setup()
+        
         applyMinimumWindowSizeToAllWindows()
         NotificationCenter.default.addObserver(
             self,
@@ -73,6 +78,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        statusBarController.teardown()
         MUDatabase.teardown()
         NotificationCenter.default.removeObserver(self)
     }
