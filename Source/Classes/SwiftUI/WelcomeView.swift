@@ -64,31 +64,57 @@ struct WelcomeContentView: View {
                     showFavouritesSheet = true
                     #endif
                 }) {
-                    HStack(spacing: 16) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.yellow)
-                            .frame(width: 30)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Favourite Servers")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            Text("Manage your saved servers")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
+                    ViewThatFits(in: .horizontal) {
+                        // 宽度足够时：完整显示星星 + 文字 + 箭头
+                        HStack(spacing: 16) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.yellow)
+                                .frame(width: 30)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Favourite Servers")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Your saved servers")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.indigo)
                         }
                         
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.indigo)
+                        // 宽度不够时
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.yellow)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Favourite")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Servers")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.indigo)
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 16)
-                    .contentShape(Rectangle()) // 修复点击热区问题
+                    .contentShape(Rectangle())
                     .modifier(GlassEffectModifier(cornerRadius: 27))
                 }
                 .padding(.horizontal, 20)
@@ -191,11 +217,15 @@ struct WelcomeContentView: View {
         AppState.shared.serverDisplayName = hostname
         PlatformImpactFeedback(style: .medium).impactOccurred()
         
-        // 尝试从收藏夹查找匹配的证书和密码
+        // 尝试从收藏夹查找匹配的证书和密码（大小写不敏感匹配 hostname）
         var certRef: Data? = nil
         var password: String = ""
         let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
-        if let match = allFavs.first(where: { $0.hostName == hostname && $0.port == UInt(port) && $0.userName == username }) {
+        if let match = allFavs.first(where: {
+            $0.hostName?.caseInsensitiveCompare(hostname) == .orderedSame
+            && $0.port == UInt(port)
+            && $0.userName == username
+        }) {
             certRef = match.certificateRef
             password = match.password ?? ""
         }
@@ -355,7 +385,11 @@ struct AppRootView: View {
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
 
+    #if os(iOS)
+    private let narrowWindowThreshold: CGFloat = 700
+    #else
     private let narrowWindowThreshold: CGFloat = 1100
+    #endif
     
     var body: some View {
         // 内容区域
@@ -451,7 +485,7 @@ struct AppRootView: View {
                         .background(Color.clear)
                 }
                 .environmentObject(sidebarNavigationManager)
-                .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 480)
+                .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 360)
                 .background(Color.clear)
             } detail: {
                 ZStack {
@@ -472,16 +506,16 @@ struct AppRootView: View {
             }
             .onChange(of: appState.isConnected) { isConnected in
                 preferredCompactColumn = isConnected ? .detail : .sidebar
-                updateSplitVisibility(width: geo.size.width)
+                updateSplitVisibility(width: geo.size.width, connectionChanged: true)
             }
             .onChange(of: geo.size.width) { width in
-                updateSplitVisibility(width: width)
+                updateSplitVisibility(width: width, connectionChanged: false)
             }
             .onAppear {
                 if appState.isConnected {
                     preferredCompactColumn = .detail
                 }
-                updateSplitVisibility(width: geo.size.width)
+                updateSplitVisibility(width: geo.size.width, connectionChanged: false)
             }
             #if os(iOS)
             .navigationSplitViewStyle(.balanced)
@@ -493,11 +527,19 @@ struct AppRootView: View {
         }
     }
 
-    private func updateSplitVisibility(width: CGFloat) {
+    private func updateSplitVisibility(width: CGFloat, connectionChanged: Bool) {
         #if os(iOS)
-        // iPad: 保持 sidebar 与 detail 同层，不使用覆盖式 detailOnly
-        splitVisibility = .all
+        // iPad：连接服务器后主动关闭侧边栏，调整窗口大小时不自动弹出
+        if connectionChanged {
+            if appState.isConnected {
+                splitVisibility = .detailOnly
+            } else {
+                splitVisibility = .all
+            }
+        }
+        // 宽度变化时不主动改变侧边栏状态，用户可通过按钮手动打开
         #else
+        // macOS：根据窗口宽度自动切换
         if appState.isConnected && width < narrowWindowThreshold {
             splitVisibility = .detailOnly
         } else {

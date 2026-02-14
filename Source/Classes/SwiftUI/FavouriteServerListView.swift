@@ -148,16 +148,16 @@ class FavouriteServerListViewModel: ObservableObject {
     @Published var servers: [MUFavouriteServer] = []
     
     func loadServers() {
-        let result = MUDatabase.fetchAllFavourites()
+        let result = MUDatabase.fetchVisibleFavourites()
         if let nsArray = result as NSArray? {
             let loaded = nsArray.compactMap { $0 as? MUFavouriteServer }
             let sorted = loaded.sorted {
                 ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
             }
-            print("📋 FavouriteServers: loaded \(sorted.count) servers from database")
+            print("📋 FavouriteServers: loaded \(sorted.count) visible servers from database")
             self.servers = sorted
         } else {
-            print("⚠️ FavouriteServers: fetchAllFavourites returned nil")
+            print("⚠️ FavouriteServers: fetchVisibleFavourites returned nil")
             self.servers = []
         }
     }
@@ -327,7 +327,16 @@ struct FavouriteServerListContentView: View {
         )
         WidgetDataManager.shared.unpinServer(id: widgetId)
         
-        MUDatabase.deleteFavourite(server)
+        // 如果有绑定证书且证书仍然有效，则软删除（标记为 hidden）
+        // 这样证书仍可用于自动匹配连接，不会因误删 profile 导致注册失效
+        if let certRef = server.certificateRef, CertificateModel.shared.isCertificateValid(certRef) {
+            server.isHidden = true
+            MUDatabase.storeFavourite(server)
+            print("🔒 Soft-deleted favourite '\(server.displayName ?? "")' (hidden, cert preserved)")
+        } else {
+            MUDatabase.deleteFavourite(server)
+            print("🗑️ Hard-deleted favourite '\(server.displayName ?? "")' (no valid cert)")
+        }
         viewModel.loadServers()
     }
     

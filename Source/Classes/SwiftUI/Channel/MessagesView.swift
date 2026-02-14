@@ -499,7 +499,7 @@ private struct ImageConfirmationView: View {
                         Text("High Quality Mode")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                        Text("Less Compressed (May fail on PC)")
+                        Text("Less Compressed")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

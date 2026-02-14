@@ -422,11 +422,20 @@
 
 // --- 新增：导入 P12 ---
 + (NSData *) importPKCS12Data:(NSData *)data password:(NSString *)password error:(NSError **)error {
+    CFArrayRef items = NULL;
+    OSStatus status;
+    
+    // 首先用提供的密码尝试导入
     NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
     [options setObject:(password ? password : @"") forKey:(__bridge id)kSecImportExportPassphrase];
+    status = SecPKCS12Import((__bridge CFDataRef)data, (__bridge CFDictionaryRef)options, &items);
     
-    CFArrayRef items = NULL;
-    OSStatus status = SecPKCS12Import((__bridge CFDataRef)data, (__bridge CFDictionaryRef)options, &items);
+    // 如果密码为空且导入失败，尝试无密码导入（某些 P12 文件没有密码保护）
+    if (status != errSecSuccess && (password == nil || password.length == 0)) {
+        // 尝试完全不提供 passphrase 键
+        NSDictionary *emptyOptions = @{};
+        status = SecPKCS12Import((__bridge CFDataRef)data, (__bridge CFDictionaryRef)emptyOptions, &items);
+    }
     
     // 1. 处理 P12 解析/密码错误
     if (status != errSecSuccess) {

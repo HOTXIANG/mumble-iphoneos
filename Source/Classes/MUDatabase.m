@@ -105,6 +105,25 @@ static FMDatabase *db = nil;
             NSLog(@"MUDatabase: Failed to add column certificate_ref: %@", [db lastErrorMessage]);
         }
     }
+    
+    // 检查并添加 hidden 列（用于软删除有证书的 profile）
+    BOOL hiddenColumnExists = NO;
+    FMResultSet *rs2 = [db executeQuery:@"PRAGMA table_info(favourites)"];
+    while ([rs2 next]) {
+        NSString *columnName = [rs2 stringForColumn:@"name"];
+        if ([@"hidden" isEqualToString:columnName]) {
+            hiddenColumnExists = YES;
+            break;
+        }
+    }
+    [rs2 close];
+    
+    if (!hiddenColumnExists) {
+        NSLog(@"MUDatabase: Upgrading table 'favourites' adding column 'hidden'...");
+        if (![db executeUpdate:@"ALTER TABLE `favourites` ADD COLUMN `hidden` INTEGER DEFAULT 0"]) {
+            NSLog(@"MUDatabase: Failed to add column hidden: %@", [db lastErrorMessage]);
+        }
+    }
 
     [db executeUpdate:@"CREATE TABLE IF NOT EXISTS `cert` "
                       @"(`id` INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -145,22 +164,24 @@ static FMDatabase *db = nil;
     if (!db) return;
 
     if ([favServ hasPrimaryKey]) {
-        [db executeUpdate:@"UPDATE `favourites` SET `name`=?, `hostname`=?, `port`=?, `username`=?, `password`=?, `certificate_ref`=? WHERE `id`=?",
+        [db executeUpdate:@"UPDATE `favourites` SET `name`=?, `hostname`=?, `port`=?, `username`=?, `password`=?, `certificate_ref`=?, `hidden`=? WHERE `id`=?",
             [self nilToNull:[favServ displayName]],
             [self nilToNull:[favServ hostName]],
             [NSNumber numberWithUnsignedInteger:[favServ port]],
             [self nilToNull:[favServ userName]],
             [self nilToNull:[favServ password]],
-            [self nilToNull:[favServ certificateRef]], // 新增
+            [self nilToNull:[favServ certificateRef]],
+            [NSNumber numberWithBool:[favServ isHidden]],
             [NSNumber numberWithInteger:[favServ primaryKey]]];
     } else {
-        [db executeUpdate:@"INSERT INTO `favourites` (`name`, `hostname`, `port`, `username`, `password`, `certificate_ref`) VALUES (?, ?, ?, ?, ?, ?)",
+        [db executeUpdate:@"INSERT INTO `favourites` (`name`, `hostname`, `port`, `username`, `password`, `certificate_ref`, `hidden`) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [self nilToNull:[favServ displayName]],
             [self nilToNull:[favServ hostName]],
             [NSNumber numberWithUnsignedInteger:[favServ port]],
             [self nilToNull:[favServ userName]],
             [self nilToNull:[favServ password]],
-            [self nilToNull:[favServ certificateRef]]]; // 新增
+            [self nilToNull:[favServ certificateRef]],
+            [NSNumber numberWithBool:[favServ isHidden]]];
 
         FMResultSet *res = [db executeQuery:@"SELECT last_insert_rowid()"];
         if ([res next]) {
@@ -185,13 +206,12 @@ static FMDatabase *db = nil;
     [db commit];
 }
 
-// Fetch all favourites
+// Fetch all favourites (包括 hidden，用于连接时匹配证书)
 + (NSMutableArray *) fetchAllFavourites {
     NSMutableArray *favs = [[NSMutableArray alloc] init];
     if (!db) return favs;
     
-    // 记得查询 certificate_ref
-    FMResultSet *res = [db executeQuery:@"SELECT `id`, `name`, `hostname`, `port`, `username`, `password`, `certificate_ref` FROM `favourites`"];
+    FMResultSet *res = [db executeQuery:@"SELECT `id`, `name`, `hostname`, `port`, `username`, `password`, `certificate_ref`, `hidden` FROM `favourites`"];
     while ([res next]) {
         MUFavouriteServer *fs = [[MUFavouriteServer alloc] init];
         [fs setPrimaryKey:[res intForColumnIndex:0]];
@@ -200,11 +220,40 @@ static FMDatabase *db = nil;
         [fs setPort:[res intForColumnIndex:3]];
         [fs setUserName:[res stringForColumnIndex:4]];
         [fs setPassword:[res stringForColumnIndex:5]];
-        [fs setCertificateRef:[res dataForColumnIndex:6]]; // 读取证书引用
+        [fs setCertificateRef:[res dataForColumnIndex:6]];
+        [fs setIsHidden:[res boolForColumnIndex:7]];
         [favs addObject:fs];
     }
     [res close];
     return favs;
+}
+
+// Fetch only visible favourites (不包括 hidden，用于 UI 显示)
++ (NSMutableArray *) fetchVisibleFavourites {
+    NSMutableArray *favs = [[NSMutableArray alloc] init];
+    if (!db) return favs;
+    
+    FMResultSet *res = [db executeQuery:@"SELECT `id`, `name`, `hostname`, `port`, `username`, `password`, `certificate_ref`, `hidden` FROM `favourites` WHERE `hidden` = 0 OR `hidden` IS NULL"];
+    while ([res next]) {
+        MUFavouriteServer *fs = [[MUFavouriteServer alloc] init];
+        [fs setPrimaryKey:[res intForColumnIndex:0]];
+        [fs setDisplayName:[res stringForColumnIndex:1]];
+        [fs setHostName:[res stringForColumnIndex:2]];
+        [fs setPort:[res intForColumnIndex:3]];
+        [fs setUserName:[res stringForColumnIndex:4]];
+        [fs setPassword:[res stringForColumnIndex:5]];
+        [fs setCertificateRef:[res dataForColumnIndex:6]];
+        [fs setIsHidden:NO];
+        [favs addObject:fs];
+    }
+    [res close];
+    return favs;
+}
+
+// 删除所有引用了指定证书 persistent ref 的 hidden profiles
++ (void) deleteHiddenFavouritesWithCertificateRef:(NSData *)certRef {
+    if (!db || !certRef) return;
+    [db executeUpdate:@"DELETE FROM `favourites` WHERE `hidden` = 1 AND `certificate_ref` = ?", certRef];
 }
 
 #pragma mark -

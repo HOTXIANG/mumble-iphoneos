@@ -55,7 +55,7 @@ struct CertificatePreferencesView: View {
                     performImport()
                 }
             }, message: {
-                Text("Enter the password for the .p12 file.")
+                Text("Enter the password for the .p12 file. Leave empty if none.")
             })
             .alert("Import Failed", isPresented: $showingImportErrorAlert, actions: {
                 Button("OK", role: .cancel) { }

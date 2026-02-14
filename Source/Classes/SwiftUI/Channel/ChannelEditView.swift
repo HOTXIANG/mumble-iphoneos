@@ -607,13 +607,13 @@ struct ChannelACLContentView: View {
             }
         }
         .sheet(item: $selectedACLEntry) { entry in
-            ACLEntryEditView(entry: entry) { }
+            ACLEntryEditView(entry: entry, serverManager: serverManager) { }
         }
         .sheet(item: $selectedGroupEntry) { entry in
             GroupEntryEditView(entry: entry, serverManager: serverManager) { }
         }
         .sheet(item: $newACLEntry) { entry in
-            ACLEntryEditView(entry: entry) { }
+            ACLEntryEditView(entry: entry, serverManager: serverManager) { }
         }
         .sheet(item: $newGroupEntry) { entry in
             GroupEntryEditView(entry: entry, serverManager: serverManager) { }

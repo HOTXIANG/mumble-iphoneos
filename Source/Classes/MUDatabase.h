@@ -17,6 +17,8 @@
 + (void) deleteFavourite:(MUFavouriteServer *)favServ;
 + (void) storeFavourites:(NSArray *)favourites;
 + (NSMutableArray *) fetchAllFavourites;
++ (NSMutableArray *) fetchVisibleFavourites;
++ (void) deleteHiddenFavouritesWithCertificateRef:(NSData *)certRef;
 
 // Cert verification
 + (void) storeDigest:(NSString *)hash forServerWithHostname:(NSString *)hostname port:(NSInteger)port;

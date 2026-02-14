@@ -383,23 +383,23 @@ struct ChannelTreeRow: View {
                                 }
                             }
                             
-                            // 监听频道
-                            if canListenToChannel {
-                                Divider()
-                                if serverManager.listeningChannels.contains(channel.channelId()) {
-                                    Button {
-                                        serverManager.stopListening(to: channel)
-                                    } label: {
-                                        Label("Stop Listening", systemImage: "ear")
-                                    }
-                                } else {
-                                    Button {
-                                        serverManager.startListening(to: channel)
-                                    } label: {
-                                        Label("Listen to Channel", systemImage: "ear")
-                                    }
-                                }
-                            }
+                            // 监听频道（功能暂时搁置）
+                            // if canListenToChannel {
+                            //     Divider()
+                            //     if serverManager.listeningChannels.contains(channel.channelId()) {
+                            //         Button {
+                            //             serverManager.stopListening(to: channel)
+                            //         } label: {
+                            //             Label("Stop Listening", systemImage: "ear")
+                            //         }
+                            //     } else {
+                            //         Button {
+                            //             serverManager.startListening(to: channel)
+                            //         } label: {
+                            //             Label("Listen to Channel", systemImage: "ear")
+                            //         }
+                            //     }
+                            // }
                         }
                     #else
                     // iOS: 点击弹出菜单
@@ -439,23 +439,23 @@ struct ChannelTreeRow: View {
                             }
                         }
                         
-                        // 监听频道
-                        if canListenToChannel {
-                            Divider()
-                            if serverManager.listeningChannels.contains(channel.channelId()) {
-                                Button {
-                                    serverManager.stopListening(to: channel)
-                                } label: {
-                                    Label("Stop Listening", systemImage: "ear")
-                                }
-                            } else {
-                                Button {
-                                    serverManager.startListening(to: channel)
-                                } label: {
-                                    Label("Listen to Channel", systemImage: "ear")
-                                }
-                            }
-                        }
+                        // 监听频道（功能暂时搁置）
+                        // if canListenToChannel {
+                        //     Divider()
+                        //     if serverManager.listeningChannels.contains(channel.channelId()) {
+                        //         Button {
+                        //             serverManager.stopListening(to: channel)
+                        //         } label: {
+                        //             Label("Stop Listening", systemImage: "ear")
+                        //         }
+                        //     } else {
+                        //         Button {
+                        //             serverManager.startListening(to: channel)
+                        //         } label: {
+                        //             Label("Listen to Channel", systemImage: "ear")
+                        //         }
+                        //     }
+                        // }
                     } label: {
                         Color.clear
                     }
@@ -576,12 +576,11 @@ struct ChannelTreeRow: View {
         }
     }
     
-    /// 检查当前用户是否有权限编辑频道
+    /// 检查当前用户是否有权限编辑频道（需要 Write 权限）或创建子频道（需要 MakeChannel 权限）
     private var hasChannelEditPermission: Bool {
-        guard let connectedUser = MUConnectionController.shared()?.serverModel?.connectedUser() else {
-            return false
-        }
-        return connectedUser.isAuthenticated()
+        let chId = channel.channelId()
+        return serverManager.hasPermission(MKPermissionWrite, forChannelId: chId) ||
+               serverManager.hasPermission(MKPermissionMakeChannel, forChannelId: chId)
     }
     
     /// 是否可以监听此频道（不是自己当前所在的频道 + 有 Whisper 权限）
@@ -755,20 +754,18 @@ struct UserRowView: View {
         return depth
     }
     
-    /// 检查当前用户是否有权限移动其他用户（需要已认证）
+    /// 检查当前用户是否有权限移动其他用户（需要目标用户所在频道的 Move 权限）
     private var hasMovePermission: Bool {
-        guard let connectedUser = MUConnectionController.shared()?.serverModel?.connectedUser() else {
-            return false
-        }
-        return connectedUser.isAuthenticated()
+        let userChannelId = user.channel()?.channelId() ?? 0
+        return serverManager.hasPermission(MKPermissionMove, forChannelId: userChannelId) ||
+               serverManager.hasRootPermission(MKPermissionMove)
     }
     
-    /// 是否有管理员权限（MuteDeafen 权限 = 服务器端静音）
+    /// 是否有管理员权限（MuteDeafen 权限 = 服务器端静音/耳聋）
     private var hasAdminPermission: Bool {
-        guard let connectedUser = MUConnectionController.shared()?.serverModel?.connectedUser() else {
-            return false
-        }
-        return connectedUser.isAuthenticated()
+        let userChannelId = user.channel()?.channelId() ?? 0
+        return serverManager.hasPermission(MKPermissionMuteDeafen, forChannelId: userChannelId) ||
+               serverManager.hasRootPermission(MKPermissionMuteDeafen)
     }
     
     var body: some View {

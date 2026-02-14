@@ -68,6 +68,9 @@ class ServerModelManager: ObservableObject {
     /// 跟踪当前用户有权进入的频道（通过 PermissionQuery 检测到有 Enter 权限）
     @Published var channelsUserCanEnter: Set<UInt> = []
     
+    /// 存储每个频道的权限位（通过 PermissionQuery 获得），用于精确的权限检查
+    @Published var channelPermissions: [UInt: UInt32] = [:]
+    
     /// 跟踪正在被监听的频道 ID 集合（本用户）
     @Published var listeningChannels: Set<UInt> = []
     
@@ -99,6 +102,9 @@ class ServerModelManager: ObservableObject {
     private var keepAliveTimer: Timer?
     private let systemMuteManager = SystemMuteManager()
     private var isRestoringMuteState = false
+    /// 音频重启前保存的闭麦/不听状态（防止系统回调覆盖）
+    private var savedMuteBeforeRestart: Bool?
+    private var savedDeafenBeforeRestart: Bool?
     /// 追踪每个用户的 mute/deafen 状态，用于检测变化并生成系统消息
     private var previousMuteStates: [UInt: (isSelfMuted: Bool, isSelfDeafened: Bool)] = [:]
     
@@ -298,6 +304,7 @@ class ServerModelManager: ObservableObject {
         previousMuteStates.removeAll()
         channelsWithPassword.removeAll()
         channelsUserCanEnter.removeAll()
+        channelPermissions.removeAll()
         // 保存当前监听频道以便重连后恢复
         if !listeningChannels.isEmpty {
             savedListeningChannelIds = listeningChannels
@@ -938,7 +945,7 @@ class ServerModelManager: ObservableObject {
             }
         })
         
-        // PermissionQuery 结果 - 更新频道限制状态后刷新 UI
+        // PermissionQuery 结果 - 更新频道权限和限制状态后刷新 UI
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.permissionQueryResultNotification, object: nil, queue: nil) { [weak self] notification in
             guard let channel = notification.userInfo?["channel"] as? MKChannel,
                   let permissions = notification.userInfo?["permissions"] as? UInt32 else { return }
@@ -947,6 +954,8 @@ class ServerModelManager: ObservableObject {
             let hasEnter = (permissions & MKPermissionEnter.rawValue) != 0
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                // 存储此频道的完整权限位
+                self.channelPermissions[channelId] = permissions
                 // 记录用户有权进入的频道
                 if hasEnter {
                     self.channelsUserCanEnter.insert(channelId)
@@ -1030,6 +1039,17 @@ class ServerModelManager: ObservableObject {
                     }
                 }
                 self.rebuildModelArray()
+            }
+        })
+        
+        // 音频设置即将变更 → 保存当前闭麦状态，防止系统回调在 restart 期间覆盖
+        center.addObserver(self, selector: #selector(handlePreferencesAboutToChange), name: NSNotification.Name("MumblePreferencesChanged"), object: nil)
+        
+        // 音频引擎重启后恢复闭麦/不听状态（修改音频设置时 MKAudio.restart() 会重置音频输入）
+        tokenHolder.add(center.addObserver(forName: NSNotification.Name.MKAudioDidRestart, object: nil, queue: nil) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.restoreMuteDeafenStateAfterAudioRestart()
             }
         })
         
@@ -1365,69 +1385,130 @@ class ServerModelManager: ObservableObject {
         }
     }
     
-    // MARK: - 智能压缩算法 (二分法 + Resize)
+    // MARK: - 智能压缩算法（先降分辨率再降质量，优先保画质）
     private func smartCompress(image: PlatformImage, to maxBytes: Int) async -> Data? {
         // 1. 预检查：如果原图已经很小，直接返回
         if let data = image.jpegData(compressionQuality: 1.0), data.count <= maxBytes {
             return data
         }
         
-        // 2. 二分法查找最佳压缩比 (只调整质量，不调整分辨率)
-        var minQuality: CGFloat = 0.0
-        var maxQuality: CGFloat = 1.0
-        var bestData: Data? = nil
+        // 2. 获取实际像素尺寸
+        #if os(iOS)
+        let pixelWidth = image.size.width * image.scale
+        let pixelHeight = image.size.height * image.scale
+        #else
+        let pixelWidth = image.size.width
+        let pixelHeight = image.size.height
+        #endif
+        let maxDim = max(pixelWidth, pixelHeight)
         
-        // 最多尝试 6 次二分查找 (精度足以达到 0.015)
-        for _ in 0..<6 {
-            let midQuality = (minQuality + maxQuality) / 2
-            if let data = image.jpegData(compressionQuality: midQuality) {
-                if data.count <= maxBytes {
-                    bestData = data // 暂存这个可用的结果
-                    minQuality = midQuality // 尝试更好的质量
-                } else {
-                    maxQuality = midQuality // 质量太高了，降低
-                }
+        // 3. 渐进式策略：先尝试当前分辨率，质量降到阈值后改为降分辨率
+        // 分辨率梯度：从原始尺寸开始，逐级缩小
+        var resolutionTiers: [CGFloat] = []
+        // 第一级：如果原图超过 2048，先降到 2048
+        if maxDim > 2048 {
+            resolutionTiers.append(2048)
+        } else {
+            resolutionTiers.append(maxDim) // 保持原始分辨率
+        }
+        // 后续梯度
+        for dim in [1536, 1024, 768, 512] as [CGFloat] {
+            if dim < resolutionTiers.last! {
+                resolutionTiers.append(dim)
             }
         }
         
-        // 3. 如果二分法找到了符合大小的数据，直接返回
-        if let data = bestData {
-            return data
+        for tier in resolutionTiers {
+            // 获取当前梯度的工作图片
+            let workingImage: PlatformImage
+            if tier < maxDim {
+                workingImage = resizeImage(image: image, maxDimension: tier)
+            } else {
+                workingImage = image
+            }
+            
+            // 二分法查找最佳质量（8 次迭代，精度 ~0.004）
+            var lo: CGFloat = 0.05
+            var hi: CGFloat = 1.0
+            var bestData: Data? = nil
+            var bestQuality: CGFloat = 0
+            
+            for _ in 0..<8 {
+                let mid = (lo + hi) / 2
+                if let data = workingImage.jpegData(compressionQuality: mid) {
+                    if data.count <= maxBytes {
+                        bestData = data
+                        bestQuality = mid
+                        lo = mid // 尝试更好的质量
+                    } else {
+                        hi = mid // 降低质量
+                    }
+                }
+            }
+            
+            if let data = bestData {
+                // 如果质量 >= 0.3 或者已经是最小分辨率了，接受此结果
+                if bestQuality >= 0.3 || tier <= 512 {
+                    let tierStr = tier < maxDim ? "resized to \(Int(tier))px" : "original"
+                    print("📸 Compressed: \(tierStr), quality=\(String(format: "%.2f", bestQuality)), size=\(data.count/1024)KB")
+                    return data
+                }
+                // 质量太低，尝试下一级更小的分辨率以获得更好的画质
+                print("📸 Quality \(String(format: "%.2f", bestQuality)) too low at \(Int(tier))px, trying smaller resolution...")
+                continue
+            }
+            // 在此分辨率下即使质量最低也不行，继续降分辨率
         }
         
-        // 4. 兜底方案：如果质量降到 0 还是太大，说明分辨率太高，必须 Resize
-        // 强制缩放到较小的尺寸 (比如长边 1024)
-        print("⚠️ Quality compression failed. Resizing image...")
-        let resizedImage = resizeImage(image: image, targetSize: CGSize(width: 1024, height: 1024))
-        
-        // 对缩放后的图片再次尝试低质量压缩
-        return resizedImage.jpegData(compressionQuality: 0.5)
+        // 4. 兜底：最小分辨率 + 最低质量
+        print("⚠️ Fallback: minimum resolution + minimum quality")
+        let smallest = resizeImage(image: image, maxDimension: 512)
+        return smallest.jpegData(compressionQuality: 0.2)
     }
- 
-    // 辅助：保持比例缩放图片
-    private func resizeImage(image: PlatformImage, targetSize: CGSize) -> PlatformImage {
-        let size = image.size
+    
+    /// 保持比例缩放图片（指定长边最大像素数），修复白色边线问题
+    private func resizeImage(image: PlatformImage, maxDimension: CGFloat) -> PlatformImage {
+        #if os(iOS)
+        // 使用实际像素尺寸而非 point 尺寸
+        let pixelW = image.size.width * image.scale
+        let pixelH = image.size.height * image.scale
+        #else
+        let pixelW = image.size.width
+        let pixelH = image.size.height
+        #endif
         
-        let widthRatio  = targetSize.width  / size.width
-        let heightRatio = targetSize.height / size.height
+        let currentMax = max(pixelW, pixelH)
+        guard currentMax > maxDimension else { return image }
         
-        // 取较小的比例，确保长宽都在 targetSize 内
-        let ratio = min(widthRatio, heightRatio)
-        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        let ratio = maxDimension / currentMax
+        // 关键：向下取整到整数像素，防止浮点精度导致右侧/底部出现白色像素列
+        let newW = floor(pixelW * ratio)
+        let newH = floor(pixelH * ratio)
+        let newSize = CGSize(width: newW, height: newH)
         
         #if os(iOS)
-        let rect = CGRect(origin: .zero, size: newSize)
-        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
-        image.draw(in: rect)
-        let newImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        return newImage ?? image
+        // opaque: true（JPEG 不需要透明通道，避免边缘透明→白线）
+        // scale: 1.0（直接按像素操作，不受屏幕 scale 影响）
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { context in
+            // 先填充白色背景确保无透明区域
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: newSize))
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
         #else
         let newImage = NSImage(size: newSize)
         newImage.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        // 填充白色背景
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: newSize).fill()
         image.draw(in: NSRect(origin: .zero, size: newSize),
-                   from: NSRect(origin: .zero, size: size),
-                   operation: .copy, fraction: 1.0)
+                   from: NSRect(origin: .zero, size: image.size),
+                   operation: .sourceOver, fraction: 1.0)
         newImage.unlockFocus()
         return newImage
         #endif
@@ -1547,6 +1628,8 @@ class ServerModelManager: ObservableObject {
             .session() == user
             .session() {
             item.isConnectedUser = true
+            // 同步认证状态到 AppState，供 macOS 菜单栏等全局 UI 使用
+            AppState.shared.isUserAuthenticated = user.isAuthenticated()
         } else {
             item.isConnectedUser = false
         }
@@ -1675,6 +1758,55 @@ class ServerModelManager: ObservableObject {
                 channel
             )
     }
+    /// 音频设置即将变更（MumblePreferencesChanged），在 restart 之前或之后同步保存当前状态
+    /// 注意：使用 selector-based observer 确保在同一次 NotificationCenter.post 中同步执行
+    @objc private func handlePreferencesAboutToChange() {
+        guard let user = serverModel?.connectedUser() else { return }
+        // 保存当前的闭麦/不听状态（此时系统回调尚未被处理，状态仍为真实值）
+        savedMuteBeforeRestart = user.isSelfMuted()
+        savedDeafenBeforeRestart = user.isSelfDeafened()
+        isRestoringMuteState = true
+        print("🔒 Preferences changing - saved mute state: muted=\(savedMuteBeforeRestart ?? false), deafened=\(savedDeafenBeforeRestart ?? false)")
+    }
+    
+    /// 音频引擎重启后恢复闭麦/不听状态
+    /// 使用 handlePreferencesAboutToChange 中保存的状态（而非 user 当前状态，因为系统回调可能已覆盖）
+    private func restoreMuteDeafenStateAfterAudioRestart() {
+        guard let user = serverModel?.connectedUser() else {
+            isRestoringMuteState = false
+            savedMuteBeforeRestart = nil
+            savedDeafenBeforeRestart = nil
+            return
+        }
+        
+        // 优先使用 restart 前保存的状态，若无则使用当前 user 状态
+        let targetMuted = savedMuteBeforeRestart ?? user.isSelfMuted()
+        let targetDeafened = savedDeafenBeforeRestart ?? user.isSelfDeafened()
+        
+        print("🔄 Audio restarted - restoring mute state: muted=\(targetMuted), deafened=\(targetDeafened)")
+        
+        // 如果系统回调已经把状态改错了，强制恢复到正确状态
+        if user.isSelfMuted() != targetMuted || user.isSelfDeafened() != targetDeafened {
+            print("⚠️ State drifted during restart! Forcing correct state back to server.")
+            serverModel?.setSelfMuted(targetMuted, andSelfDeafened: targetDeafened)
+            updateUserBySession(user.session())
+        }
+        
+        // 在 iOS 上同步系统层面的闭麦状态（macOS 上 SystemMuteManager 是 no-op）
+        systemMuteManager.setSystemMute(targetMuted || targetDeafened)
+        
+        // 清理保存的状态
+        savedMuteBeforeRestart = nil
+        savedDeafenBeforeRestart = nil
+        
+        // 延迟释放锁，确保后续的系统回调也被忽略
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            self.isRestoringMuteState = false
+            print("🔓 Audio restart state lock released.")
+        }
+    }
+    
     func toggleSelfMute() {
         guard let user = serverModel?.connectedUser() else { return }
         
@@ -1977,6 +2109,19 @@ class ServerModelManager: ObservableObject {
         }
     }
     
+    // MARK: - Permission Helpers
+    
+    /// 检查当前用户在指定频道是否拥有某权限
+    func hasPermission(_ permission: MKPermission, forChannelId channelId: UInt) -> Bool {
+        guard let perms = channelPermissions[channelId] else { return false }
+        return (perms & UInt32(permission.rawValue)) != 0
+    }
+    
+    /// 检查当前用户在根频道（全局）是否拥有某权限
+    func hasRootPermission(_ permission: MKPermission) -> Bool {
+        return hasPermission(permission, forChannelId: 0)
+    }
+    
     /// 连接后扫描所有频道的权限，检测哪些频道限制进入
     /// 使用 PermissionQuery（所有用户可用），而非 ACL 查询（仅管理员可用）
     func scanAllChannelPermissions() {
@@ -1988,11 +2133,18 @@ class ServerModelManager: ObservableObject {
         recursiveRequestPermission(channel: root, count: &count)
         print("🔐 scanAllChannelPermissions: Requested permissions for \(count) channels")
         
-        // 管理员用户还可以额外请求 ACL 来区分密码频道和纯权限限制频道
-        if let connectedUser = serverModel?.connectedUser(), connectedUser.isAuthenticated() {
-            var aclCount = 0
-            recursiveRequestACL(channel: root, count: &aclCount)
-            print("🔐 scanAllChannelPermissions: Also requested ACL for \(aclCount) channels (admin)")
+        // 只有拥有 Write 权限的用户（管理员）才额外请求 ACL 来区分密码频道和纯权限限制频道
+        // 普通注册用户不应请求 ACL，否则会收到大量 permission denied
+        // 注意：此时 channelPermissions 可能还没收到服务器回复，延迟执行 ACL 扫描
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self else { return }
+            if self.hasRootPermission(MKPermissionWrite) {
+                var aclCount = 0
+                self.recursiveRequestACL(channel: root, count: &aclCount)
+                print("🔐 scanAllChannelPermissions: Also requested ACL for \(aclCount) channels (admin)")
+            } else {
+                print("🔐 scanAllChannelPermissions: Skipping ACL requests (no Write permission)")
+            }
         }
         
         // 延迟后关闭扫描标记（给服务器足够时间响应）

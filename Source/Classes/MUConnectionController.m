@@ -276,11 +276,23 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
     if (_certificateRef != nil) {
         // 如果这个服务器有专属证书，就用它
         NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:_certificateRef];
-        [_connection setCertificateChain:certChain];
-        NSLog(@"🔐 Using server-specific certificate for connection.");
+        if (certChain && certChain.count > 0) {
+            [_connection setCertificateChain:certChain];
+            NSLog(@"🔐 Using server-specific certificate for connection. (chain length: %lu)", (unsigned long)certChain.count);
+        } else {
+            // 专属证书构建失败，尝试回退到全局默认
+            NSLog(@"⚠️ Failed to build cert chain from server-specific ref (%lu bytes). Falling back...", (unsigned long)_certificateRef.length);
+            NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
+            if (globalCert) {
+                NSArray *fallbackChain = [MUCertificateChainBuilder buildChainFromPersistentRef:globalCert];
+                [_connection setCertificateChain:fallbackChain];
+                NSLog(@"🔐 Fell back to global default certificate.");
+            } else {
+                NSLog(@"👤 No fallback certificate available. Connecting anonymously.");
+            }
+        }
     } else {
         // 如果没有专属证书，再回退到全局默认 (可选，或者直接匿名)
-        // 建议：如果你想要彻底隔离，这里可以删掉 fallback，让其直接匿名
         NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
         if (globalCert) {
             NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:globalCert];

@@ -16,6 +16,7 @@
 @property (copy)    NSString    *userName;
 @property (copy)    NSString    *password;
 @property (nonatomic, retain) NSData *certificateRef;
+@property (assign) BOOL isHidden;
 
 - (BOOL) hasPrimaryKey;
 - (NSComparisonResult) compare:(MUFavouriteServer *)favServ;

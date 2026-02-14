@@ -13,6 +13,9 @@ struct ChannelListView: View {
     private let showSettingsPublisher = NotificationCenter.default.publisher(for: .mumbleShowSettings)
     private let showCertInfoPublisher = NotificationCenter.default.publisher(for: .mumbleShowCertInfo)
     private let disconnectPublisher = NotificationCenter.default.publisher(for: .mumbleInitiateDisconnect)
+    private let registerUserPublisher = NotificationCenter.default.publisher(for: .mumbleRegisterUser)
+    private let toggleMutePublisher = NotificationCenter.default.publisher(for: .mumbleToggleMute)
+    private let toggleDeafenPublisher = NotificationCenter.default.publisher(for: .mumbleToggleDeafen)
     #endif
     
     // --- 核心修改 1：注入 NavigationManager ---
@@ -90,6 +93,18 @@ struct ChannelListView: View {
         }
         .onReceive(showCertInfoPublisher) { _ in showingCertInfo = true }
         .onReceive(disconnectPublisher) { _ in initiateDisconnect() }
+        .onReceive(registerUserPublisher) { _ in
+            guard appState.isConnected else { return }
+            serverManager.registerSelf()
+        }
+        .onReceive(toggleMutePublisher) { _ in
+            guard appState.isConnected else { return }
+            serverManager.toggleSelfMute()
+        }
+        .onReceive(toggleDeafenPublisher) { _ in
+            guard appState.isConnected else { return }
+            serverManager.toggleSelfDeafen()
+        }
         #endif
     }
     

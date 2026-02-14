@@ -255,13 +255,13 @@ struct ChannelACLView: View {
                 }
             }
             .sheet(item: $selectedACLEntry) { entry in
-                ACLEntryEditView(entry: entry) { }
+                ACLEntryEditView(entry: entry, serverManager: serverManager) { }
             }
             .sheet(item: $selectedGroupEntry) { entry in
                 GroupEntryEditView(entry: entry, serverManager: serverManager) { }
             }
             .sheet(isPresented: $showAddACL) {
-                ACLEntryEditView(entry: createNewACLEntry()) { }
+                ACLEntryEditView(entry: createNewACLEntry(), serverManager: serverManager) { }
             }
             .sheet(isPresented: $showAddGroup) {
                 GroupEntryEditView(entry: createNewGroupEntry(), serverManager: serverManager) { }
@@ -566,11 +566,86 @@ struct GroupEntryRow: View {
 
 struct ACLEntryEditView: View {
     @ObservedObject var entry: ACLEntryModel
+    @ObservedObject var serverManager: ServerModelManager
     var onSave: () -> Void
     @Environment(\.dismiss) var dismiss
     
     /// 预定义的 Mumble 内置组
     static let builtInGroups = ["all", "auth", "in", "out", "admin", "sub", "~sub"]
+    
+    @State private var userSearchText: String = ""
+    @State private var userSearchError: String? = nil
+    
+    /// 在线已注册用户列表
+    private var registeredOnlineUsers: [(name: String, userId: Int)] {
+        var users: [(name: String, userId: Int)] = []
+        for item in serverManager.modelItems {
+            if item.type == .user, let user = item.object as? MKUser {
+                let regId = Int(user.userId())
+                if regId >= 0, let name = user.userName() {
+                    users.append((name: name, userId: regId))
+                }
+            }
+        }
+        return users.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+    
+    /// 根据用户名或 User ID 字符串解析出注册 User ID
+    private func resolveUserId(from input: String) -> Int? {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+        if let numericId = Int(trimmed) { return numericId }
+        for item in serverManager.modelItems {
+            if item.type == .user, let user = item.object as? MKUser {
+                if let name = user.userName(),
+                   name.caseInsensitiveCompare(trimmed) == .orderedSame {
+                    let regId = Int(user.userId())
+                    return regId >= 0 ? regId : nil
+                }
+            }
+        }
+        return nil
+    }
+    
+    /// 判断用户名是否匹配到了未注册用户
+    private func isUnregisteredUser(_ input: String) -> Bool {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+        for item in serverManager.modelItems {
+            if item.type == .user, let user = item.object as? MKUser {
+                if let name = user.userName(),
+                   name.caseInsensitiveCompare(trimmed) == .orderedSame {
+                    return Int(user.userId()) < 0
+                }
+            }
+        }
+        return false
+    }
+    
+    private func applyUserSearch() {
+        userSearchError = nil
+        let trimmed = userSearchText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        
+        if let userId = resolveUserId(from: trimmed) {
+            entry.userID = userId
+            userSearchText = ""
+        } else if isUnregisteredUser(trimmed) {
+            userSearchError = "'\(trimmed)' is not a registered user."
+        } else {
+            userSearchError = "User '\(trimmed)' not found online. Enter a numeric User ID for offline users."
+        }
+    }
+    
+    /// 根据 User ID 查找显示名称
+    private func userDisplayName(for userId: Int) -> String {
+        for item in serverManager.modelItems {
+            if item.type == .user, let user = item.object as? MKUser {
+                if user.userId() == Int(userId) {
+                    return user.userName() ?? "User #\(userId)"
+                }
+            }
+        }
+        return "User #\(userId)"
+    }
     
     var body: some View {
         NavigationStack {
@@ -620,15 +695,64 @@ struct ACLEntryEditView: View {
                             .textFieldStyle(.roundedBorder)
                             #endif
                     } else {
+                        // 当前选中的用户
+                        if entry.userID >= 0 {
+                            HStack {
+                                Image(systemName: "person.fill")
+                                    .foregroundColor(.accentColor)
+                                Text(userDisplayName(for: entry.userID))
+                                Spacer()
+                                Text("ID: \(entry.userID)")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                        
+                        // 搜索框
                         HStack {
-                            Text("User ID")
-                            Spacer()
-                            TextField("ID", value: $entry.userID, format: .number)
-                                .frame(width: 100)
+                            TextField("Username or User ID", text: $userSearchText)
+                                .onSubmit { applyUserSearch() }
                                 #if os(macOS)
                                 .textFieldStyle(.roundedBorder)
                                 #endif
-                                .multilineTextAlignment(.trailing)
+                            Button {
+                                applyUserSearch()
+                            } label: {
+                                Image(systemName: "magnifyingglass.circle.fill")
+                            }
+                            .disabled(userSearchText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                        
+                        if let error = userSearchError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        
+                        // 在线已注册用户快捷选择
+                        if !registeredOnlineUsers.isEmpty {
+                            DisclosureGroup("Online Registered Users") {
+                                ForEach(registeredOnlineUsers, id: \.userId) { info in
+                                    Button {
+                                        entry.userID = info.userId
+                                    } label: {
+                                        HStack {
+                                            Image(systemName: "person.fill")
+                                                .foregroundColor(.accentColor)
+                                            Text(info.name)
+                                            Spacer()
+                                            Text("ID: \(info.userId)")
+                                                .foregroundColor(.secondary)
+                                                .font(.caption)
+                                            if entry.userID == info.userId {
+                                                Image(systemName: "checkmark")
+                                                    .foregroundColor(.green)
+                                            }
+                                        }
+                                    }
+                                    .foregroundColor(.primary)
+                                }
+                            }
                         }
                     }
                 }
@@ -666,6 +790,10 @@ struct ACLEntryEditView: View {
                 if !entry.isInherited {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
+                            // 提交未完成的搜索
+                            if !userSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                applyUserSearch()
+                            }
                             onSave()
                             dismiss()
                         }
@@ -721,6 +849,94 @@ struct GroupEntryEditView: View {
     
     @State private var newMemberID: String = ""
     @State private var newExcludedID: String = ""
+    @State private var memberAddError: String? = nil
+    @State private var excludedAddError: String? = nil
+    
+    /// 在线已注册用户列表（用于快捷选择）
+    private var registeredOnlineUsers: [(name: String, userId: Int)] {
+        var users: [(name: String, userId: Int)] = []
+        for item in serverManager.modelItems {
+            if item.type == .user, let user = item.object as? MKUser {
+                let regId = Int(user.userId())
+                if regId >= 0, let name = user.userName() {
+                    users.append((name: name, userId: regId))
+                }
+            }
+        }
+        return users.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+    
+    /// 根据用户名或 User ID 字符串解析出注册 User ID
+    private func resolveUserId(from input: String) -> Int? {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+        // 首先尝试作为数字解析
+        if let numericId = Int(trimmed) {
+            return numericId
+        }
+        // 按用户名查找在线用户
+        for item in serverManager.modelItems {
+            if item.type == .user, let user = item.object as? MKUser {
+                if let name = user.userName(),
+                   name.caseInsensitiveCompare(trimmed) == .orderedSame {
+                    let regId = Int(user.userId())
+                    if regId >= 0 {
+                        return regId
+                    } else {
+                        return nil  // 找到了但未注册
+                    }
+                }
+            }
+        }
+        return nil
+    }
+    
+    /// 判断用户名是否匹配到了未注册用户
+    private func isUnregisteredUser(_ input: String) -> Bool {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+        for item in serverManager.modelItems {
+            if item.type == .user, let user = item.object as? MKUser {
+                if let name = user.userName(),
+                   name.caseInsensitiveCompare(trimmed) == .orderedSame {
+                    return Int(user.userId()) < 0
+                }
+            }
+        }
+        return false
+    }
+    
+    private func addMember() {
+        memberAddError = nil
+        let trimmed = newMemberID.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        
+        if let userId = resolveUserId(from: trimmed) {
+            if !entry.members.contains(userId) {
+                entry.members.append(userId)
+            }
+            newMemberID = ""
+        } else if isUnregisteredUser(trimmed) {
+            memberAddError = "'\(trimmed)' is not a registered user."
+        } else {
+            memberAddError = "User '\(trimmed)' not found online. Enter a numeric User ID for offline users."
+        }
+    }
+    
+    private func addExcludedMember() {
+        excludedAddError = nil
+        let trimmed = newExcludedID.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        
+        if let userId = resolveUserId(from: trimmed) {
+            if !entry.excludedMembers.contains(userId) {
+                entry.excludedMembers.append(userId)
+            }
+            newExcludedID = ""
+        } else if isUnregisteredUser(trimmed) {
+            excludedAddError = "'\(trimmed)' is not a registered user."
+        } else {
+            excludedAddError = "User '\(trimmed)' not found online. Enter a numeric User ID for offline users."
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -755,19 +971,51 @@ struct GroupEntryEditView: View {
                     }
                     
                     HStack {
-                        TextField("User ID", text: $newMemberID)
+                        TextField("Username or User ID", text: $newMemberID)
+                            .onSubmit { addMember() }
                             #if os(macOS)
                             .textFieldStyle(.roundedBorder)
                             #endif
                         Button {
-                            if let id = Int(newMemberID) {
-                                entry.members.append(id)
-                                newMemberID = ""
-                            }
+                            addMember()
                         } label: {
                             Image(systemName: "plus.circle.fill")
                         }
-                        .disabled(Int(newMemberID) == nil)
+                        .disabled(newMemberID.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    
+                    if let error = memberAddError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    
+                    // 在线已注册用户快捷选择
+                    if !registeredOnlineUsers.isEmpty {
+                        DisclosureGroup("Online Registered Users") {
+                            ForEach(registeredOnlineUsers, id: \.userId) { info in
+                                Button {
+                                    if !entry.members.contains(info.userId) {
+                                        entry.members.append(info.userId)
+                                    }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "person.fill")
+                                            .foregroundColor(.accentColor)
+                                        Text(info.name)
+                                        Spacer()
+                                        Text("ID: \(info.userId)")
+                                            .foregroundColor(.secondary)
+                                            .font(.caption)
+                                        if entry.members.contains(info.userId) {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(.green)
+                                        }
+                                    }
+                                }
+                                .foregroundColor(.primary)
+                            }
+                        }
                     }
                 }
                 
@@ -789,19 +1037,23 @@ struct GroupEntryEditView: View {
                     }
                     
                     HStack {
-                        TextField("User ID", text: $newExcludedID)
+                        TextField("Username or User ID", text: $newExcludedID)
+                            .onSubmit { addExcludedMember() }
                             #if os(macOS)
                             .textFieldStyle(.roundedBorder)
                             #endif
                         Button {
-                            if let id = Int(newExcludedID) {
-                                entry.excludedMembers.append(id)
-                                newExcludedID = ""
-                            }
+                            addExcludedMember()
                         } label: {
                             Image(systemName: "plus.circle.fill")
                         }
-                        .disabled(Int(newExcludedID) == nil)
+                        .disabled(newExcludedID.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    
+                    if let error = excludedAddError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
                     }
                 }
                 
@@ -837,6 +1089,13 @@ struct GroupEntryEditView: View {
                 if !entry.isInherited {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
+                            // 提交未完成的输入
+                            if !newMemberID.trimmingCharacters(in: .whitespaces).isEmpty {
+                                addMember()
+                            }
+                            if !newExcludedID.trimmingCharacters(in: .whitespaces).isEmpty {
+                                addExcludedMember()
+                            }
                             onSave()
                             dismiss()
                         }

@@ -54,7 +54,8 @@ class CertificateModel: ObservableObject {
     func findCertificateReference(name: String) -> Data? {
         // 遍历缓存的证书列表寻找匹配项
         // 注意：证书的 Common Name (CN) 通常就是我们生成的 "User@Host"
-        if let match = certificates.first(where: { $0.name == name }) {
+        // 使用大小写不敏感匹配，因为用户重新输入 hostname 时大小写可能不同
+        if let match = certificates.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
             return match.id
         }
         return nil
@@ -81,6 +82,9 @@ class CertificateModel: ObservableObject {
     }
     
     func deleteCertificate(_ item: CertificateItem) {
+        // 先清理引用了该证书的 hidden profiles（证书删除后 profile 就真正没用了）
+        MUDatabase.deleteHiddenFavourites(withCertificateRef: item.id)
+        
         MUCertificateController.deleteCertificate(withPersistentRef: item.id)
         refreshCertificates()
     }

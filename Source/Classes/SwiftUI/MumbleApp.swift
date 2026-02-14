@@ -43,6 +43,10 @@ struct MumbleApp: App {
             // 这里直接使用你之前的 Wrapper，或者直接换成 MainView
             AppRootView()
                 .environmentObject(AppState.shared) // 建议注入 AppState，防止子视图崩溃
+                #if os(macOS)
+                .frame(minWidth: 600, minHeight: 400)
+                .background(WindowMinSizeSetter(minSize: NSSize(width: 600, height: 400)))
+                #endif
                 .onAppear {
                     print("🚀 MumbleApp: SwiftUI Lifecycle Started")
                     UNUserNotificationCenter.current().delegate = notificationDelegate
@@ -137,7 +141,7 @@ struct MumbleMenuCommands: Commands {
         // "Server" 菜单
         CommandMenu("Server") {
             Button {
-                serverManager?.toggleSelfMute()
+                NotificationCenter.default.post(name: .mumbleToggleMute, object: nil)
             } label: {
                 Label("Mute/Unmute", systemImage: "mic.slash.fill")
             }
@@ -145,7 +149,7 @@ struct MumbleMenuCommands: Commands {
             .disabled(!appState.isConnected)
             
             Button {
-                serverManager?.toggleSelfDeafen()
+                NotificationCenter.default.post(name: .mumbleToggleDeafen, object: nil)
             } label: {
                 Label("Deafen/Undeafen", systemImage: "speaker.slash.fill")
             }
@@ -155,18 +159,18 @@ struct MumbleMenuCommands: Commands {
             Divider()
             
             Button {
-                serverManager?.registerSelf()
+                NotificationCenter.default.post(name: .mumbleRegisterUser, object: nil)
             } label: {
                 Label("Register User", systemImage: "person.badge.plus")
             }
-            .disabled(!appState.isConnected || serverManager?.connectedUserState?.isAuthenticated == true)
+            .disabled(!appState.isConnected || appState.isUserAuthenticated)
 
             Button {
                 NotificationCenter.default.post(name: .mumbleShowCertInfo, object: nil)
             } label: {
                 Label("View Certificate", systemImage: "checkmark.shield")
             }
-            .disabled(!appState.isConnected || serverManager?.connectedUserState?.isAuthenticated != true)
+            .disabled(!appState.isConnected || !appState.isUserAuthenticated)
             
             Divider()
             
@@ -196,6 +200,32 @@ extension Notification.Name {
     static let mumbleShowSettings = Notification.Name("MumbleShowSettingsNotification")
     static let mumbleShowCertInfo = Notification.Name("MumbleShowCertInfoNotification")
     static let mumbleInitiateDisconnect = Notification.Name("MumbleInitiateDisconnectFromMenuNotification")
+    static let mumbleRegisterUser = Notification.Name("MumbleRegisterUserNotification")
+    static let mumbleToggleMute = Notification.Name("MumbleToggleMuteNotification")
+    static let mumbleToggleDeafen = Notification.Name("MumbleToggleDeafenNotification")
+}
+
+/// 通过 NSViewRepresentable 直接设置 NSWindow.minSize，确保窗口无法缩小到指定尺寸以下
+struct WindowMinSizeSetter: NSViewRepresentable {
+    let minSize: NSSize
+    
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        // 延迟到下一个 run loop，此时 view 已经被加入到 window 中
+        DispatchQueue.main.async {
+            if let window = view.window {
+                window.minSize = minSize
+            }
+        }
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // 每次更新时也确保 minSize 保持设置
+        if let window = nsView.window {
+            window.minSize = minSize
+        }
+    }
 }
 #endif
 

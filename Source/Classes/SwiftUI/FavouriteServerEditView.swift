@@ -258,6 +258,31 @@ struct FavouriteServerEditView: View {
     // MARK: - Save Logic
     
     private func saveServer() {
+        let finalPort = UInt(port) ?? 64738
+        let finalUserName: String? = userName.isEmpty ? nil : userName
+        let finalPassword: String? = password.isEmpty ? nil : password
+        let finalDisplayName = displayName.isEmpty ? (hostName.isEmpty ? "Mumble Server" : hostName) : displayName
+        
+        // 如果是新建模式，检查是否有匹配的 hidden profile 可以恢复
+        if !isEditMode {
+            let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
+            if let hiddenMatch = allFavs.first(where: {
+                $0.isHidden
+                && $0.hostName?.caseInsensitiveCompare(hostName) == .orderedSame
+                && $0.port == finalPort
+                && $0.userName == finalUserName
+                && $0.certificateRef != nil
+            }) {
+                // 恢复 hidden profile：更新显示名/密码，取消 hidden
+                hiddenMatch.displayName = finalDisplayName
+                hiddenMatch.password = finalPassword
+                hiddenMatch.isHidden = false
+                print("♻️ Restored hidden profile for \(hiddenMatch.userName ?? "")@\(hiddenMatch.hostName ?? "")")
+                onSave(hiddenMatch)
+                return
+            }
+        }
+        
         let serverToSave: MUFavouriteServer
         if let existingServer = server {
             serverToSave = existingServer.copy() as! MUFavouriteServer
@@ -265,18 +290,20 @@ struct FavouriteServerEditView: View {
             serverToSave = MUFavouriteServer()
         }
         
-        // 逻辑保持不变：如果显示名称为空，则使用主机名或默认值
-        serverToSave.displayName = displayName.isEmpty ? (hostName.isEmpty ? "Mumble Server" : hostName) : displayName
+        serverToSave.displayName = finalDisplayName
         serverToSave.hostName = hostName
-        serverToSave.port = UInt(port) ?? 64738
-        serverToSave.userName = userName.isEmpty ? nil : userName
-        serverToSave.password = password.isEmpty ? nil : password
+        serverToSave.port = finalPort
+        serverToSave.userName = finalUserName
+        serverToSave.password = finalPassword
         
         if serverToSave.certificateRef == nil, let user = serverToSave.userName, let host = serverToSave.hostName {
-            let potentialCertName = "\(user)@\(host)" // e.g. "UserA@mumble.com" (这是之前生成证书时的命名规则)
+            // 确保证书列表是最新的
+            certModel.refreshCertificates()
             
-            // 尝试在证书库里找找有没有同名的
-            if let matchRef = CertificateModel.shared.findCertificateReference(name: potentialCertName) {
+            let potentialCertName = "\(user)@\(host)"
+            
+            // 尝试在证书库里找找有没有同名的（大小写不敏感）
+            if let matchRef = certModel.findCertificateReference(name: potentialCertName) {
                 print("♻️ Auto-matched existing certificate for \(potentialCertName)")
                 serverToSave.certificateRef = matchRef
             }

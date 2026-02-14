@@ -33,6 +33,7 @@ class AppState: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var isConnecting: Bool = false
     @Published var isReconnecting: Bool = false
+    @Published var isUserAuthenticated: Bool = false
     @Published var activeError: AppError?
     @Published var activeToast: AppToast?
     @Published var isRegistering: Bool = false
@@ -138,6 +139,7 @@ class AppState: ObservableObject {
                 self.isConnecting = false
                 self.isReconnecting = false
                 self.isConnected = false
+                self.isUserAuthenticated = false
                 self.serverDisplayName = nil
                 self.unreadMessageCount = 0
             }
@@ -170,6 +172,7 @@ class AppState: ObservableObject {
                 self.isConnecting = false
                 self.isReconnecting = false
                 self.isConnected = false
+                self.isUserAuthenticated = false
                 self.pendingRegistration = false
                 // 解析 ObjC 传来的 userInfo
                 if let userInfo = notification.userInfo,

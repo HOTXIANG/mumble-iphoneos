@@ -12,6 +12,7 @@
     NSUInteger _port;
     NSString   *_userName;
     NSString   *_password;
+    BOOL       _isHidden;
 }
 @end
 
@@ -24,6 +25,7 @@
 @synthesize userName           = _userName;
 @synthesize password           = _password;
 @synthesize certificateRef     = _certificateRef;
+@synthesize isHidden           = _isHidden;
 
 - (id) initWithDisplayName:(NSString *)displayName hostName:(NSString *)hostName port:(NSUInteger)port userName:(NSString *)userName password:(NSString *)passWord {
     self = [super init];
@@ -52,6 +54,7 @@
     [copy setUserName:[self userName]];
     [copy setPassword:[self password]];
     [copy setCertificateRef:[self certificateRef]]; // Copy ref
+    [copy setIsHidden:[self isHidden]];
     if ([self hasPrimaryKey])
         [copy setPrimaryKey:[self primaryKey]];
     return copy;
