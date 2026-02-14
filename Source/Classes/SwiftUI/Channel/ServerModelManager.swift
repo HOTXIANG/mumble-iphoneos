@@ -62,9 +62,33 @@ class ServerModelManager: ObservableObject {
     
     @Published public var userVolumes: [UInt: Float] = [:]
     
+    /// 跟踪哪些频道有密码保护（通过 ACL 检测到 deny Enter for @all + grant Enter for #token）
+    @Published var channelsWithPassword: Set<UInt> = []
+    
+    /// 跟踪当前用户有权进入的频道（通过 PermissionQuery 检测到有 Enter 权限）
+    @Published var channelsUserCanEnter: Set<UInt> = []
+    
+    /// 跟踪正在被监听的频道 ID 集合（本用户）
+    @Published var listeningChannels: Set<UInt> = []
+    
+    /// 跟踪所有用户的监听状态：channelId -> [userSession]
+    @Published var channelListeners: [UInt: Set<UInt>] = [:]
+    
+    /// 用于密码输入弹窗的状态
+    @Published var passwordPromptChannel: MKChannel? = nil
+    @Published var pendingPasswordInput: String = ""
+    
+    /// "Move to..." 模式：当前正在被移动的用户（非 nil 时进入频道选择模式）
+    @Published var movingUser: MKUser? = nil
+    
+    /// ACL 扫描期间抑制 permission denied 通知
+    private var isScanningACLs: Bool = false
+    
     private let tokenHolder = ObserverTokenHolder()
     private var delegateToken: DelegateToken?
     private var muteStateBeforeDeafen: Bool = false
+    /// 保存重连前的监听频道 ID，重连后自动重新注册
+    private var savedListeningChannelIds: Set<UInt> = []
     private var serverModel: MKServerModel?
     private var userIndexMap: [UInt: Int] = [:]
     private var channelIndexMap: [UInt: Int] = [:]
@@ -272,6 +296,18 @@ class ServerModelManager: ObservableObject {
         
         userVolumes.removeAll()
         previousMuteStates.removeAll()
+        channelsWithPassword.removeAll()
+        channelsUserCanEnter.removeAll()
+        // 保存当前监听频道以便重连后恢复
+        if !listeningChannels.isEmpty {
+            savedListeningChannelIds = listeningChannels
+            print("💾 Saved \(savedListeningChannelIds.count) listening channels for reconnect")
+        }
+        listeningChannels.removeAll()
+        channelListeners.removeAll()
+        movingUser = nil
+        passwordPromptChannel = nil
+        pendingPasswordInput = ""
         
         self.delegateToken = nil
         self.serverModel = nil
@@ -647,19 +683,36 @@ class ServerModelManager: ObservableObject {
         
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userMovedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser, let channel = userInfo["channel"] as? MKChannel else { return }
+            let mover = userInfo["mover"] as? MKUser
             let userTransfer = UnsafeTransfer(value: user)
             let channelTransfer = UnsafeTransfer(value: channel)
+            let moverTransfer = mover.map { UnsafeTransfer(value: $0) }
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 let safeUser = userTransfer.value
                 let safeChannel = channelTransfer.value
+                let safeMover = moverTransfer?.value
                 let movingUserSession = safeUser.session()
                 let movingUserName = safeUser.userName() ?? "Unknown"
                 let destChannelName = safeChannel.channelName() ?? "Unknown Channel"
                 let destChannelId = safeChannel.channelId()
                 if let connectedUser = self.serverModel?.connectedUser() {
                     if movingUserSession == connectedUser.session() {
-                        self.addSystemNotification("You moved to channel \(destChannelName)", category: .userMoved, suppressPush: true)
+                        // 如果是通过密码进入的频道，标记为密码频道（橙色锁）
+                        if let pendingId = self.pendingPasswordChannelId, pendingId == destChannelId {
+                            self.channelsWithPassword.insert(destChannelId)
+                            self.pendingPasswordChannelId = nil
+                        }
+                        
+                        // 区分自己移动和被管理员移动
+                        let movedBySelf = (safeMover == nil || safeMover?.session() == connectedUser.session())
+                        if movedBySelf {
+                            self.addSystemNotification("You moved to channel \(destChannelName)", category: .userMoved, suppressPush: true)
+                        } else {
+                            let moverName = safeMover?.userName() ?? "admin"
+                            self.addSystemNotification("You were moved to channel \(destChannelName) by \(moverName)", category: .movedByAdmin)
+                        }
+                        
                         // 更新 Handoff Activity 的频道信息
                         HandoffManager.shared.updateActivityChannel(
                             channelId: Int(destChannelId),
@@ -706,7 +759,20 @@ class ServerModelManager: ObservableObject {
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userLeftNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser else { return }
             let userName = user.userName() ?? "Unknown User"
-            Task { @MainActor [weak self] in self?.addSystemNotification("\(userName) disconnected", category: .userLeft) }
+            let session = user.session()
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.addSystemNotification("\(userName) disconnected", category: .userLeft)
+                // 清除离开用户的监听状态
+                for (channelId, var listeners) in self.channelListeners {
+                    listeners.remove(session)
+                    if listeners.isEmpty {
+                        self.channelListeners.removeValue(forKey: channelId)
+                    } else {
+                        self.channelListeners[channelId] = listeners
+                    }
+                }
+            }
         })
         
         // 核心修复：消息去重 + 监听器管理
@@ -814,13 +880,156 @@ class ServerModelManager: ObservableObject {
         // 权限拒绝通知
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.permissionDeniedNotification, object: nil, queue: nil) { [weak self] notification in
             let reason = notification.userInfo?["reason"] as? String
+            let permRaw = notification.userInfo?["permission"] as? UInt32
+            let channel = notification.userInfo?["channel"] as? MKChannel
+            let channelTransfer = channel.map { UnsafeTransfer(value: $0) }
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                if let reason = reason {
+                
+                // 检测是否为 Enter 权限被拒绝
+                let isEnterDenied = permRaw.map { ($0 & MKPermissionEnter.rawValue) != 0 } ?? false
+                let deniedChannelId = channelTransfer?.value.channelId()
+                let isUserInitiated = deniedChannelId != nil && deniedChannelId == self.userInitiatedJoinChannelId
+                
+                // ACL 扫描期间抑制后台扫描的 permission denied（但不抑制用户主动加入的）
+                if self.isScanningACLs && !isUserInitiated { return }
+                
+                if isEnterDenied, let ct = channelTransfer {
+                    let ch = ct.value
+                    // 清除主动加入标记
+                    if isUserInitiated { self.userInitiatedJoinChannelId = nil }
+                    // 弹出密码提示框
+                    self.passwordPromptChannel = ch
+                    self.pendingPasswordInput = ""
+                    self.addSystemNotification("Access denied. You may try entering a password.")
+                } else if let reason = reason {
                     self.addSystemNotification("Permission denied: \(reason)")
                 } else {
                     self.addSystemNotification("Permission denied")
                 }
+            }
+        })
+        
+        // ACL 接收通知 - 检测频道是否有密码保护
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.aclReceivedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let accessControl = userInfo["accessControl"] as? MKAccessControl,
+                  let channel = userInfo["channel"] as? MKChannel else { return }
+            let channelTransfer = UnsafeTransfer(value: channel)
+            let aclTransfer = UnsafeTransfer(value: accessControl)
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.updatePasswordStatus(for: channelTransfer.value, from: aclTransfer.value)
+            }
+        })
+        
+        // 新频道添加时自动扫描其权限
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.channelAddedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let channel = notification.userInfo?["channel"] as? MKChannel else { return }
+            let channelTransfer = UnsafeTransfer(value: channel)
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                // 请求权限查询（所有用户可用）
+                self.serverModel?.requestPermission(for: channelTransfer.value)
+                // 管理员还请求 ACL（用于区分密码和权限限制）
+                if let connectedUser = self.serverModel?.connectedUser(), connectedUser.isAuthenticated() {
+                    self.serverModel?.requestAccessControl(for: channelTransfer.value)
+                }
+            }
+        })
+        
+        // PermissionQuery 结果 - 更新频道限制状态后刷新 UI
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.permissionQueryResultNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let channel = notification.userInfo?["channel"] as? MKChannel,
+                  let permissions = notification.userInfo?["permissions"] as? UInt32 else { return }
+            let channelTransfer = UnsafeTransfer(value: channel)
+            let channelId = channel.channelId()
+            let hasEnter = (permissions & MKPermissionEnter.rawValue) != 0
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                // 记录用户有权进入的频道
+                if hasEnter {
+                    self.channelsUserCanEnter.insert(channelId)
+                } else {
+                    self.channelsUserCanEnter.remove(channelId)
+                }
+                self.rebuildModelArray()
+            }
+        })
+        
+        // 监听频道变更通知（来自服务器回传的 UserState）
+        tokenHolder.add(center.addObserver(forName: NSNotification.Name("MKListeningChannelAddNotification"), object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let user = userInfo["user"] as? MKUser,
+                  let addChannels = userInfo["addChannels"] as? [NSNumber] else { return }
+            let userTransfer = UnsafeTransfer(value: user)
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let u = userTransfer.value
+                let session = u.session()
+                let isMyself = (session == MUConnectionController.shared()?.serverModel?.connectedUser()?.session())
+                
+                for channelIdNum in addChannels {
+                    let channelId = channelIdNum.uintValue
+                    
+                    // 如果是自己，且 listeningChannels 中没有此频道（说明我们已经 stopListening 了），
+                    // 跳过服务器的延迟回传，防止竞态条件导致监听行重新出现
+                    if isMyself && !self.listeningChannels.contains(channelId) {
+                        // 服务器确认添加监听 → 同步到 listeningChannels
+                        self.listeningChannels.insert(channelId)
+                    }
+                    
+                    var listeners = self.channelListeners[channelId] ?? Set()
+                    listeners.insert(session)
+                    self.channelListeners[channelId] = listeners
+                }
+                // 检查是否有人开始监听我所在的频道 → 通知
+                if let myChannel = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel(),
+                   !isMyself {
+                    for channelIdNum in addChannels {
+                        if channelIdNum.uintValue == myChannel.channelId() {
+                            let userName = u.userName() ?? "Someone"
+                            self.addSystemNotification("\(userName) started listening to your channel", category: .channelListening)
+                        }
+                    }
+                }
+                self.rebuildModelArray()
+            }
+        })
+        
+        tokenHolder.add(center.addObserver(forName: NSNotification.Name("MKListeningChannelRemoveNotification"), object: nil, queue: nil) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let user = userInfo["user"] as? MKUser,
+                  let removeChannels = userInfo["removeChannels"] as? [NSNumber] else { return }
+            let userTransfer = UnsafeTransfer(value: user)
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let u = userTransfer.value
+                let session = u.session()
+                let isMyself = (session == MUConnectionController.shared()?.serverModel?.connectedUser()?.session())
+                
+                for channelIdNum in removeChannels {
+                    let channelId = channelIdNum.uintValue
+                    self.channelListeners[channelId]?.remove(session)
+                    if self.channelListeners[channelId]?.isEmpty == true {
+                        self.channelListeners.removeValue(forKey: channelId)
+                    }
+                    // 如果是自己被服务器移除监听（管理员操作或频道删除），同步更新 listeningChannels
+                    if isMyself {
+                        self.listeningChannels.remove(channelId)
+                    }
+                }
+                // 检查是否有人停止监听我所在的频道 → 通知
+                if let myChannel = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel(),
+                   !isMyself {
+                    for channelIdNum in removeChannels {
+                        if channelIdNum.uintValue == myChannel.channelId() {
+                            let userName = u.userName() ?? "Someone"
+                            self.addSystemNotification("\(userName) stopped listening to your channel", category: .channelListening)
+                        }
+                    }
+                }
+                self.rebuildModelArray()
             }
         })
         
@@ -845,6 +1054,10 @@ class ServerModelManager: ObservableObject {
             
             self.setupServerModel()
             
+            // 连接初期立即开始抑制 permission denied
+            // （ACL 扫描和初始权限同步期间，服务器会发送大量 PermissionDenied）
+            self.isScanningACLs = true
+            
             Task.detached(priority: .userInitiated) {
                 // 稍微等待 UI 动画完成 (例如进入频道的 Push 动画)
                 try? await Task.sleep(nanoseconds: 600_000_000) // 0.6s
@@ -860,16 +1073,31 @@ class ServerModelManager: ObservableObject {
                         self.systemMuteManager.setSystemMute(true)
                     }
                 }
+                
+                // 延迟 2s 后扫描频道权限（确保频道树已完全构建）
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
+                await MainActor.run {
+                    print("🔐 [Async] Scanning channel permissions...")
+                    self.scanAllChannelPermissions()
+                }
+                
+                // 延迟 1s 后恢复之前的监听（确保频道树和权限扫描已完成）
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s
+                await MainActor.run {
+                    self.reRegisterListeningChannels()
+                }
             }
         }
     }
     
     /// 系统通知分类，每类对应一个独立的 UserDefaults 开关
     enum SystemNotifyCategory: String {
-        case userJoined    = "NotifyUserJoined"
-        case userLeft      = "NotifyUserLeft"
-        case userMoved     = "NotifyUserMoved"
-        case muteDeafen    = "NotifyMuteDeafen"
+        case userJoined       = "NotifyUserJoined"
+        case userLeft         = "NotifyUserLeft"
+        case userMoved        = "NotifyUserMoved"
+        case muteDeafen       = "NotifyMuteDeafen"
+        case movedByAdmin     = "NotifyMovedByAdmin"
+        case channelListening = "NotifyChannelListening"
     }
     
     /// 添加系统消息到聊天区域，并根据分类开关决定是否发送系统推送通知
@@ -1749,6 +1977,54 @@ class ServerModelManager: ObservableObject {
         }
     }
     
+    /// 连接后扫描所有频道的权限，检测哪些频道限制进入
+    /// 使用 PermissionQuery（所有用户可用），而非 ACL 查询（仅管理员可用）
+    func scanAllChannelPermissions() {
+        guard let root = serverModel?.rootChannel() else {
+            print("🔐 scanAllChannelPermissions: No root channel available")
+            return
+        }
+        var count = 0
+        recursiveRequestPermission(channel: root, count: &count)
+        print("🔐 scanAllChannelPermissions: Requested permissions for \(count) channels")
+        
+        // 管理员用户还可以额外请求 ACL 来区分密码频道和纯权限限制频道
+        if let connectedUser = serverModel?.connectedUser(), connectedUser.isAuthenticated() {
+            var aclCount = 0
+            recursiveRequestACL(channel: root, count: &aclCount)
+            print("🔐 scanAllChannelPermissions: Also requested ACL for \(aclCount) channels (admin)")
+        }
+        
+        // 延迟后关闭扫描标记（给服务器足够时间响应）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            self?.isScanningACLs = false
+        }
+    }
+    
+    private func recursiveRequestPermission(channel: MKChannel, count: inout Int) {
+        // 对所有频道请求权限查询（轻量级，所有用户可用）
+        serverModel?.requestPermission(for: channel)
+        count += 1
+        // 递归子频道
+        if let subs = channel.channels() as? [MKChannel] {
+            for sub in subs {
+                recursiveRequestPermission(channel: sub, count: &count)
+            }
+        }
+    }
+    
+    private func recursiveRequestACL(channel: MKChannel, count: inout Int) {
+        // 请求所有频道的 ACL（仅管理员能成功）
+        serverModel?.requestAccessControl(for: channel)
+        count += 1
+        // 递归子频道
+        if let subs = channel.channels() as? [MKChannel] {
+            for sub in subs {
+                recursiveRequestACL(channel: sub, count: &count)
+            }
+        }
+    }
+    
     private func recursiveRestore(channel: MKChannel) async {
         // 1. 恢复当前频道的用户
         if let users = channel.users() as? [MKUser] {
@@ -1797,6 +2073,20 @@ class ServerModelManager: ObservableObject {
         return modelItems[index].object as? MKUser
     }
     
+    // MARK: - User Movement
+    
+    /// 移动用户到指定频道
+    func moveUser(_ user: MKUser, toChannel channel: MKChannel) {
+        serverModel?.move(user, to: channel)
+    }
+    
+    /// 通过 session ID 移动用户到指定频道 ID
+    func moveUser(session: UInt, toChannelId channelId: UInt) {
+        guard let user = getUserBySession(session),
+              let channel = serverModel?.channel(withId: channelId) else { return }
+        serverModel?.move(user, to: channel)
+    }
+    
     // MARK: - Channel Management
     
     /// 创建新频道
@@ -1824,6 +2114,178 @@ class ServerModelManager: ObservableObject {
     /// 设置频道的 ACL 数据
     func setACL(_ accessControl: MKAccessControl, for channel: MKChannel) {
         serverModel?.setAccessControl(accessControl, for: channel)
+    }
+    
+    // MARK: - Password Channel Management
+    
+    /// 检测 ACL 中是否包含密码模式（deny Enter @all + grant Enter #token）
+    func updatePasswordStatus(for channel: MKChannel, from accessControl: MKAccessControl) {
+        let channelId = channel.channelId()
+        guard let acls = accessControl.acls else {
+            channelsWithPassword.remove(channelId)
+            return
+        }
+        
+        var hasDenyEnterAll = false
+        var hasGrantEnterToken = false
+        
+        for item in acls {
+            guard let aclItem = item as? MKChannelACL, !aclItem.inherited else { continue }
+            if aclItem.group == "all" && (aclItem.deny.rawValue & MKPermissionEnter.rawValue) != 0 {
+                hasDenyEnterAll = true
+            }
+            if let group = aclItem.group, group.hasPrefix("#") && !group.hasPrefix("#!") &&
+               (aclItem.grant.rawValue & MKPermissionEnter.rawValue) != 0 {
+                hasGrantEnterToken = true
+            }
+        }
+        
+        if hasDenyEnterAll && hasGrantEnterToken {
+            channelsWithPassword.insert(channelId)
+        } else {
+            channelsWithPassword.remove(channelId)
+        }
+    }
+    
+    /// 标记频道为有密码
+    func markChannelHasPassword(_ channelId: UInt) {
+        channelsWithPassword.insert(channelId)
+    }
+    
+    /// 设置 access token 并尝试加入频道
+    func submitPasswordAndJoin(channel: MKChannel, password: String) {
+        // 获取当前已有的 tokens，添加新 token
+        var tokens = currentAccessTokens
+        if !tokens.contains(password) {
+            tokens.append(password)
+        }
+        currentAccessTokens = tokens
+        serverModel?.setAccessTokens(tokens)
+        
+        // 记录正在尝试用密码进入的频道
+        pendingPasswordChannelId = channel.channelId()
+        markUserInitiatedJoin(channelId: channel.channelId())
+        
+        // 稍微延迟后尝试加入频道（让服务器处理 token 更新）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.serverModel?.join(channel)
+            
+            // 3 秒后清除等待标记（无论是否成功）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.pendingPasswordChannelId = nil
+            }
+        }
+    }
+    
+    /// 当前的 access tokens 列表
+    private var currentAccessTokens: [String] = []
+    
+    /// 正在尝试用密码进入的频道 ID（用于成功后标记为密码频道）
+    private var pendingPasswordChannelId: UInt? = nil
+    
+    /// 记录用户在被 server deafen 之前是否已被 server mute（用于 undeafen 时决定是否保留 mute）
+    private var wasMutedBeforeServerDeafen: [UInt: Bool] = [:]
+    
+    /// 用户主动尝试加入的频道 ID（用于在扫描期间仍弹出密码框）
+    private var userInitiatedJoinChannelId: UInt? = nil
+    
+    /// 标记用户主动加入某频道（外部调用）
+    func markUserInitiatedJoin(channelId: UInt) {
+        userInitiatedJoinChannelId = channelId
+        // 3 秒后自动清除
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            if self?.userInitiatedJoinChannelId == channelId {
+                self?.userInitiatedJoinChannelId = nil
+            }
+        }
+    }
+    
+    // MARK: - Channel Listening
+    
+    /// 重连后恢复之前保存的监听频道
+    private func reRegisterListeningChannels() {
+        guard !savedListeningChannelIds.isEmpty else { return }
+        print("🔄 Re-registering \(savedListeningChannelIds.count) listening channels after reconnect")
+        for channelId in savedListeningChannelIds {
+            if let channel = serverModel?.channel(withId: channelId) {
+                startListening(to: channel)
+                print("  👂 Re-registered listening on channel: \(channel.channelName() ?? "?")")
+            } else {
+                print("  ⚠️ Channel \(channelId) no longer exists, skipping")
+            }
+        }
+        savedListeningChannelIds.removeAll()
+    }
+    
+    /// 开始监听某频道（接收其音频，不加入）
+    func startListening(to channel: MKChannel) {
+        let channelId = channel.channelId()
+        serverModel?.addListening(channel)
+        listeningChannels.insert(channelId)
+        // 同时记录自己为该频道的监听者
+        if let mySession = serverModel?.connectedUser()?.session() {
+            var listeners = channelListeners[channelId] ?? Set()
+            listeners.insert(mySession)
+            channelListeners[channelId] = listeners
+        }
+        // 自动展开被监听的频道（确保监听行可见）
+        if isChannelCollapsed(Int(channelId)) {
+            toggleChannelCollapse(Int(channelId))
+        }
+        rebuildModelArray()
+    }
+    
+    /// 停止监听某频道
+    func stopListening(to channel: MKChannel) {
+        let channelId = channel.channelId()
+        serverModel?.removeListening(channel)
+        listeningChannels.remove(channelId)
+        // 移除自己的监听记录
+        if let mySession = serverModel?.connectedUser()?.session() {
+            channelListeners[channelId]?.remove(mySession)
+            if channelListeners[channelId]?.isEmpty == true {
+                channelListeners.removeValue(forKey: channelId)
+            }
+        }
+        rebuildModelArray()
+    }
+    
+    /// 获取某频道的所有监听者用户对象
+    func getListeners(for channel: MKChannel) -> [MKUser] {
+        guard let sessions = channelListeners[channel.channelId()] else { return [] }
+        return sessions.compactMap { session in
+            serverModel?.user(withSession: session)
+        }
+    }
+    
+    // MARK: - Server-side Mute
+    
+    /// 服务器端静音某用户（管理员操作）
+    func setServerMuted(_ muted: Bool, for user: MKUser) {
+        serverModel?.setServerMuted(muted, for: user)
+    }
+    
+    /// 服务器端耳聋某用户（管理员操作）
+    /// - deafen 时同时 mute
+    /// - undeafen 时如果用户在 deafen 之前没有被单独 mute，也同时 unmute
+    func setServerDeafened(_ deafened: Bool, for user: MKUser) {
+        let session = user.session()
+        if deafened {
+            // 记录 deafen 之前的 mute 状态
+            wasMutedBeforeServerDeafen[session] = user.isMuted()
+            // deafen = 同时 mute + deafen
+            serverModel?.setServerMuted(true, for: user)
+            serverModel?.setServerDeafened(true, for: user)
+        } else {
+            // undeafen
+            serverModel?.setServerDeafened(false, for: user)
+            // 如果 deafen 之前没有被单独 mute，则也 unmute
+            let wasMuted = wasMutedBeforeServerDeafen[session] ?? false
+            if !wasMuted {
+                serverModel?.setServerMuted(false, for: user)
+            }
+            wasMutedBeforeServerDeafen.removeValue(forKey: session)
+        }
     }
 }
 

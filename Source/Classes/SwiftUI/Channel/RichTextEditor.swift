@@ -18,18 +18,15 @@ struct RichTextEditor: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 模式切换
-            HStack {
-                Picker("", selection: $isSourceMode) {
-                    Text("Visual").tag(false)
-                    Text("Source").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 180)
-                
-                Spacer()
+            // 模式切换（居中）
+            Picker("Mode", selection: $isSourceMode) {
+                Text("Visual").tag(false)
+                Text("Source").tag(true)
             }
-            .padding(.horizontal, 8)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 180)
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             .background(Color.secondary.opacity(0.08))
             
@@ -68,7 +65,8 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
     }
     
     func updateNSView(_ webView: WKWebView, context: Context) {
-        context.coordinator.updateContentIfNeeded(htmlText)
+        // 每次 SwiftUI 驱动的更新都把最新值传入 coordinator
+        context.coordinator.externalHTMLUpdate(htmlText)
     }
     #else
     typealias UIViewType = WKWebView
@@ -78,12 +76,12 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
     }
     
     func updateUIView(_ webView: WKWebView, context: Context) {
-        context.coordinator.updateContentIfNeeded(htmlText)
+        context.coordinator.externalHTMLUpdate(htmlText)
     }
     #endif
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+        Coordinator(htmlBinding: $htmlText, heightBinding: $editorHeight)
     }
     
     private func createWebView(context: Context) -> WKWebView {
@@ -106,13 +104,10 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
         #endif
         
         context.coordinator.webView = webView
-        // 记录初始内容，在 editorReady 回调中设置
-        context.coordinator.pendingInitialHTML = htmlText
         loadEditorShell(in: webView)
         return webView
     }
     
-    /// 只加载编辑器骨架（不含内容），内容通过 JS 设置
     private func loadEditorShell(in webView: WKWebView) {
         let isDark: Bool
         #if os(macOS)
@@ -142,55 +137,77 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
                 padding: 0;
             }
             .toolbar {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 2px;
+                display: flex; flex-wrap: wrap; gap: 2px;
                 padding: 4px 6px;
                 background: \(toolbarBg);
                 border-bottom: 1px solid \(borderColor);
-                position: sticky;
-                top: 0;
-                z-index: 100;
+                position: sticky; top: 0; z-index: 100;
             }
             .toolbar button {
-                background: none;
-                border: 1px solid transparent;
-                border-radius: 4px;
-                padding: 4px 8px;
-                cursor: pointer;
-                font-size: 13px;
-                color: \(textColor);
-                min-width: 28px;
-                text-align: center;
+                background: none; border: 1px solid transparent; border-radius: 4px;
+                padding: 4px 8px; cursor: pointer; font-size: 13px;
+                color: \(textColor); min-width: 28px; text-align: center;
             }
             .toolbar button:hover {
                 background: \(isDark ? "#3a3a3a" : "#e0e0e0");
                 border-color: \(borderColor);
             }
-            .toolbar .sep {
-                width: 1px;
-                background: \(borderColor);
-                margin: 2px 4px;
+            .toolbar .sep { width: 1px; background: \(borderColor); margin: 2px 4px; }
+            .toolbar .dropdown {
+                position: relative; display: inline-block;
+            }
+            .toolbar .dropdown-btn {
+                background: none; border: 1px solid transparent; border-radius: 4px;
+                padding: 4px 8px; cursor: pointer; font-size: 13px;
+                color: \(textColor); text-align: center;
+            }
+            .toolbar .dropdown-btn:hover {
+                background: \(isDark ? "#3a3a3a" : "#e0e0e0");
+                border-color: \(borderColor);
+            }
+            .toolbar .dropdown-panel {
+                display: none; position: absolute; top: 100%; left: 0;
+                background: \(isDark ? "#2d2d2d" : "#fff");
+                border: 1px solid \(borderColor);
+                border-radius: 6px; padding: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 200; min-width: 160px;
+            }
+            .toolbar .dropdown-panel.show { display: block; }
+            .color-grid {
+                display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px;
+                margin-bottom: 6px;
+            }
+            .color-swatch {
+                width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+                border: 2px solid transparent;
+            }
+            .color-swatch:hover { border-color: \(textColor); }
+            .color-input-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+            .color-input-row input[type=color] {
+                width: 28px; height: 28px; border: none; padding: 0;
+                cursor: pointer; border-radius: 4px; background: none;
+            }
+            .color-input-row span { font-size: 11px; color: \(isDark ? "#999" : "#666"); }
+            .size-list button, .font-list button {
+                display: block; width: 100%; text-align: left;
+                background: none; border: none; padding: 5px 10px;
+                color: \(textColor); cursor: pointer; font-size: 13px;
+                border-radius: 4px;
+            }
+            .size-list button:hover, .font-list button:hover {
+                background: \(isDark ? "#3a3a3a" : "#e8e8e8");
             }
             #editor {
-                padding: 10px;
-                min-height: 120px;
-                outline: none;
-                line-height: 1.5;
-                word-wrap: break-word;
-                overflow-wrap: break-word;
+                padding: 10px; min-height: 120px; outline: none;
+                line-height: 1.5; word-wrap: break-word; overflow-wrap: break-word;
             }
             #editor:empty:before {
                 content: 'Enter description...';
                 color: \(isDark ? "#666" : "#999");
                 pointer-events: none;
             }
-            #editor img {
-                max-width: 100%;
-                height: auto;
-                border-radius: 4px;
-                margin: 4px 0;
-            }
+            #editor img { max-width: 100%; height: auto; border-radius: 4px; margin: 4px 0; }
             #editor a { color: #4a9eff; }
             #editor h1, #editor h2, #editor h3 { margin: 8px 0 4px 0; }
             #editor ul, #editor ol { padding-left: 20px; margin: 4px 0; }
@@ -198,83 +215,166 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
         </head>
         <body>
         <div class="toolbar">
-            <button onmousedown="event.preventDefault()" onclick="fmt('bold')"><b>B</b></button>
-            <button onmousedown="event.preventDefault()" onclick="fmt('italic')"><i>I</i></button>
-            <button onmousedown="event.preventDefault()" onclick="fmt('underline')"><u>U</u></button>
-            <button onmousedown="event.preventDefault()" onclick="fmt('strikeThrough')"><s>S</s></button>
+            <button onmousedown="event.preventDefault()" onclick="fmt('bold')" title="Bold"><b>B</b></button>
+            <button onmousedown="event.preventDefault()" onclick="fmt('italic')" title="Italic"><i>I</i></button>
+            <button onmousedown="event.preventDefault()" onclick="fmt('underline')" title="Underline"><u>U</u></button>
+            <button onmousedown="event.preventDefault()" onclick="fmt('strikeThrough')" title="Strikethrough"><s>S</s></button>
             <div class="sep"></div>
-            <button onmousedown="event.preventDefault()" onclick="setColor('red')" style="color:red">A</button>
-            <button onmousedown="event.preventDefault()" onclick="setColor('blue')" style="color:blue">A</button>
-            <button onmousedown="event.preventDefault()" onclick="setColor('green')" style="color:green">A</button>
-            <button onmousedown="event.preventDefault()" onclick="setColor('orange')" style="color:orange">A</button>
+
+            <!-- 颜色选择器 -->
+            <div class="dropdown" id="colorDropdown">
+                <button class="dropdown-btn" onmousedown="event.preventDefault()" onclick="togglePanel('colorPanel')" title="Text Color">
+                    <span style="border-bottom:3px solid currentColor; padding-bottom:1px">A</span> ▾
+                </button>
+                <div class="dropdown-panel" id="colorPanel" onmousedown="event.preventDefault()">
+                    <div class="color-grid">
+                        <div class="color-swatch" style="background:#000" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#000')"></div>
+                        <div class="color-swatch" style="background:#e03c31" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#e03c31')"></div>
+                        <div class="color-swatch" style="background:#ff8c00" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#ff8c00')"></div>
+                        <div class="color-swatch" style="background:#ffd700" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#ffd700')"></div>
+                        <div class="color-swatch" style="background:#2ecc40" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#2ecc40')"></div>
+                        <div class="color-swatch" style="background:#0074d9" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#0074d9')"></div>
+                        <div class="color-swatch" style="background:#b10dc9" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#b10dc9')"></div>
+                        <div class="color-swatch" style="background:#ff69b4" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#ff69b4')"></div>
+                        <div class="color-swatch" style="background:#aaa" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#aaa')"></div>
+                        <div class="color-swatch" style="background:#fff; border:1px solid #ccc" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#fff')"></div>
+                        <div class="color-swatch" style="background:#795548" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#795548')"></div>
+                        <div class="color-swatch" style="background:#01ff70" onmousedown="event.preventDefault();event.stopPropagation()" onclick="pickColor('#01ff70')"></div>
+                    </div>
+                    <div class="color-input-row">
+                        <input type="color" id="customColor" value="#ff0000" onchange="pickColor(this.value)"/>
+                        <span>Custom</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 文字大小 -->
+            <div class="dropdown" id="sizeDropdown">
+                <button class="dropdown-btn" onmousedown="event.preventDefault()" onclick="togglePanel('sizePanel')" title="Text Size">
+                    T<small>T</small> ▾
+                </button>
+                <div class="dropdown-panel" id="sizePanel" onmousedown="event.preventDefault()">
+                    <div class="size-list">
+                        <button onmousedown="event.preventDefault()" onclick="setSize(1)">Tiny</button>
+                        <button onmousedown="event.preventDefault()" onclick="setSize(2)">Small</button>
+                        <button onmousedown="event.preventDefault()" onclick="setSize(3)">Normal</button>
+                        <button onmousedown="event.preventDefault()" onclick="setSize(4)">Large</button>
+                        <button onmousedown="event.preventDefault()" onclick="setSize(5)">Huge</button>
+                        <button onmousedown="event.preventDefault()" onclick="setSize(7)">Massive</button>
+                        <hr style="margin:4px 0; border:none; border-top:1px solid \(borderColor)">
+                        <button onmousedown="event.preventDefault()" onclick="setBlock('h1')"><b style="font-size:20px">Heading 1</b></button>
+                        <button onmousedown="event.preventDefault()" onclick="setBlock('h2')"><b style="font-size:17px">Heading 2</b></button>
+                        <button onmousedown="event.preventDefault()" onclick="setBlock('h3')"><b style="font-size:15px">Heading 3</b></button>
+                        <button onmousedown="event.preventDefault()" onclick="setBlock('p')">Paragraph</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 字体选择 -->
+            <div class="dropdown" id="fontDropdown">
+                <button class="dropdown-btn" onmousedown="event.preventDefault()" onclick="togglePanel('fontPanel')" title="Font">
+                    F ▾
+                </button>
+                <div class="dropdown-panel" id="fontPanel" style="min-width:180px" onmousedown="event.preventDefault()">
+                    <div class="font-list">
+                        <button onmousedown="event.preventDefault()" onclick="setFont('sans-serif')" style="font-family:sans-serif">Sans Serif</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('serif')" style="font-family:serif">Serif</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('monospace')" style="font-family:monospace">Monospace</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('Arial')" style="font-family:Arial">Arial</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('Georgia')" style="font-family:Georgia">Georgia</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('Courier New')" style="font-family:'Courier New'">Courier New</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('Helvetica')" style="font-family:Helvetica">Helvetica</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('Times New Roman')" style="font-family:'Times New Roman'">Times New Roman</button>
+                        <button onmousedown="event.preventDefault()" onclick="setFont('Verdana')" style="font-family:Verdana">Verdana</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="sep"></div>
-            <button onmousedown="event.preventDefault()" onclick="fmt('formatBlock','<h1>')">H1</button>
-            <button onmousedown="event.preventDefault()" onclick="fmt('formatBlock','<h2>')">H2</button>
-            <button onmousedown="event.preventDefault()" onclick="fmt('formatBlock','<h3>')">H3</button>
-            <button onmousedown="event.preventDefault()" onclick="fmt('formatBlock','<p>')">P</button>
-            <div class="sep"></div>
-            <button onmousedown="event.preventDefault()" onclick="fmt('insertUnorderedList')">&#8226;</button>
-            <button onmousedown="event.preventDefault()" onclick="fmt('insertOrderedList')">1.</button>
-            <button onmousedown="event.preventDefault()" onclick="insertLink()">&#128279;</button>
+            <button onmousedown="event.preventDefault()" onclick="fmt('insertUnorderedList')" title="Bullet List">&#8226;</button>
+            <button onmousedown="event.preventDefault()" onclick="fmt('insertOrderedList')" title="Numbered List">1.</button>
+            <button onmousedown="event.preventDefault()" onclick="insertLink()" title="Insert Link">&#128279;</button>
         </div>
         <div id="editor" contenteditable="true"></div>
         <script>
             var editor = document.getElementById('editor');
-            var _ignoreNextInput = false;
+            var _suppress = false;
             
             function fmt(cmd, val) {
                 document.execCommand(cmd, false, val || null);
                 editor.focus();
                 notifyChange();
             }
-            
-            function setColor(c) {
-                document.execCommand('foreColor', false, c);
+            // --- 弹出面板管理 ---
+            function togglePanel(id) {
+                var panel = document.getElementById(id);
+                var wasOpen = panel.classList.contains('show');
+                closeAllPanels();
+                if (!wasOpen) panel.classList.add('show');
+            }
+            function closeAllPanels() {
+                var panels = document.querySelectorAll('.dropdown-panel');
+                for (var i = 0; i < panels.length; i++) panels[i].classList.remove('show');
+            }
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.dropdown')) closeAllPanels();
+            });
+
+            // --- 颜色 ---
+            function pickColor(c) {
+                // 先恢复焦点和执行命令（选区保持），再关闭面板
                 editor.focus();
+                document.execCommand('foreColor', false, c);
+                closeAllPanels();
                 notifyChange();
             }
-            
+
+            // --- 字号（1-7 使用 fontSize 命令）---
+            function setSize(s) {
+                editor.focus();
+                document.execCommand('fontSize', false, s);
+                closeAllPanels();
+                notifyChange();
+            }
+
+            // --- 块级标签 ---
+            function setBlock(tag) {
+                editor.focus();
+                document.execCommand('formatBlock', false, '<' + tag + '>');
+                closeAllPanels();
+                notifyChange();
+            }
+
+            // --- 字体 ---
+            function setFont(f) {
+                editor.focus();
+                document.execCommand('fontName', false, f);
+                closeAllPanels();
+                notifyChange();
+            }
+
             function insertLink() {
                 var url = prompt('Enter URL:', 'https://');
-                if (url) {
-                    document.execCommand('createLink', false, url);
-                    notifyChange();
-                }
+                if (url) { document.execCommand('createLink', false, url); notifyChange(); }
             }
-            
             function notifyChange() {
-                if (_ignoreNextInput) return;
+                if (_suppress) return;
                 var html = editor.innerHTML;
-                // 清除 WKWebView 自动添加的尾部空行
-                html = html.replace(/<br\\s*\\/?>\\s*$/i, '');
-                html = html.replace(/<div><br\\s*\\/?><\\/div>\\s*$/i, '');
                 window.webkit.messageHandlers.htmlChanged.postMessage(html);
                 reportHeight();
             }
-            
             function reportHeight() {
-                var h = document.documentElement.scrollHeight;
-                window.webkit.messageHandlers.heightChanged.postMessage(h);
+                window.webkit.messageHandlers.heightChanged.postMessage(
+                    document.documentElement.scrollHeight
+                );
             }
-            
-            // 从 Swift 端设置内容（不触发 notifyChange）
             function setContent(html) {
-                _ignoreNextInput = true;
+                _suppress = true;
                 editor.innerHTML = html;
-                _ignoreNextInput = false;
+                _suppress = false;
                 reportHeight();
             }
-            
-            // 获取当前内容
-            function getContent() {
-                return editor.innerHTML;
-            }
-            
-            editor.addEventListener('input', function() {
-                notifyChange();
-            });
-            
-            // 粘贴处理：支持粘贴图片
+            editor.addEventListener('input', notifyChange);
             editor.addEventListener('paste', function(e) {
                 var items = (e.clipboardData || e.originalEvent.clipboardData).items;
                 for (var i = 0; i < items.length; i++) {
@@ -282,9 +382,9 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
                         e.preventDefault();
                         var blob = items[i].getAsFile();
                         var reader = new FileReader();
-                        reader.onload = function(event) {
+                        reader.onload = function(ev) {
                             document.execCommand('insertHTML', false,
-                                '<img src="' + event.target.result + '" style="max-width:100%"/>');
+                                '<img src="' + ev.target.result + '" style="max-width:100%"/>');
                             notifyChange();
                         };
                         reader.readAsDataURL(blob);
@@ -293,79 +393,94 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
                 }
                 setTimeout(notifyChange, 50);
             });
-            
-            // 通知 Swift 编辑器已就绪
             window.webkit.messageHandlers.editorReady.postMessage('ready');
         </script>
         </body>
         </html>
         """
-        
         webView.loadHTMLString(fullHTML, baseURL: nil)
     }
     
     // MARK: - Coordinator
     
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        var parent: WYSIWYGEditorView
+        private var htmlBinding: Binding<String>
+        private var heightBinding: Binding<CGFloat>
         var webView: WKWebView?
-        var isReady: Bool = false
-        var pendingInitialHTML: String = ""
-        /// 上次从 JS 端收到的 HTML，用于避免循环更新
-        private var lastReceivedHTML: String = ""
-        /// 是否正在从 Swift 端推送内容到 JS
-        private var isPushingToJS: Bool = false
         
-        init(_ parent: WYSIWYGEditorView) {
-            self.parent = parent
+        /// 编辑器是否已就绪（JS 脚本已加载完成）
+        private var isReady = false
+        /// 最新的从 SwiftUI 外部传入的 HTML（通过 updateView）
+        private var latestExternalHTML: String = ""
+        /// 上次从 JS 端接收到的 HTML（用户编辑产生的）
+        private var lastHTMLFromJS: String = ""
+        /// 是否正在向 JS 推送内容（防止回环）
+        private var isPushing = false
+        
+        init(htmlBinding: Binding<String>, heightBinding: Binding<CGFloat>) {
+            self.htmlBinding = htmlBinding
+            self.heightBinding = heightBinding
         }
         
-        /// 当 SwiftUI 绑定改变时（如切换 Source → Visual），仅在内容确实不同时更新 WKWebView
-        func updateContentIfNeeded(_ newHTML: String) {
-            guard isReady, !isPushingToJS else { return }
-            // 只有当外部改变（如源码模式编辑后切回）导致内容不同时才更新
-            if newHTML != lastReceivedHTML {
-                pushContentToJS(newHTML)
+        /// 从 SwiftUI 的 updateView 调用 — 传入最新的绑定值
+        func externalHTMLUpdate(_ html: String) {
+            latestExternalHTML = html
+            pushToJSIfNeeded()
+        }
+        
+        /// 当编辑器就绪或外部内容变化时，尝试推送到 JS
+        private func pushToJSIfNeeded() {
+            guard isReady, !isPushing else { return }
+            // 只在外部值与 JS 端最新值不同时才推送（避免用户编辑被覆盖）
+            if latestExternalHTML != lastHTMLFromJS {
+                pushToJS(latestExternalHTML)
             }
         }
         
-        private func pushContentToJS(_ html: String) {
-            guard let webView = webView, isReady else { return }
-            isPushingToJS = true
-            lastReceivedHTML = html
+        private func pushToJS(_ html: String) {
+            guard let webView = webView else { return }
+            isPushing = true
+            lastHTMLFromJS = html  // 预设，防止回环
             let escaped = html
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "'", with: "\\'")
                 .replacingOccurrences(of: "\n", with: "\\n")
                 .replacingOccurrences(of: "\r", with: "")
             webView.evaluateJavaScript("setContent('\(escaped)')") { [weak self] _, _ in
-                self?.isPushingToJS = false
+                self?.isPushing = false
             }
         }
         
+        // MARK: - WKScriptMessageHandler
+        
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            if message.name == "editorReady" {
+            switch message.name {
+            case "editorReady":
                 isReady = true
-                // 编辑器就绪，设置初始内容
-                if !pendingInitialHTML.isEmpty {
-                    pushContentToJS(pendingInitialHTML)
-                    pendingInitialHTML = ""
-                } else {
-                    // 绑定值可能在 editorReady 之前就被设置了
-                    pushContentToJS(parent.htmlText)
-                }
-            } else if message.name == "htmlChanged", let html = message.body as? String {
-                guard !isPushingToJS else { return }
-                lastReceivedHTML = html
+                // 编辑器就绪 — 推送 SwiftUI 侧最新的内容
+                pushToJSIfNeeded()
+                
+            case "htmlChanged":
+                guard !isPushing, let html = message.body as? String else { return }
+                lastHTMLFromJS = html
+                latestExternalHTML = html  // 同步，防止 updateView 触发无谓推送
                 DispatchQueue.main.async {
-                    self.parent.htmlText = html
+                    self.htmlBinding.wrappedValue = html
                 }
-            } else if message.name == "heightChanged", let height = message.body as? CGFloat {
-                DispatchQueue.main.async {
-                    self.parent.editorHeight = max(height, 200)
+                
+            case "heightChanged":
+                if let h = message.body as? CGFloat {
+                    DispatchQueue.main.async {
+                        self.heightBinding.wrappedValue = max(h, 200)
+                    }
                 }
+                
+            default:
+                break
             }
         }
+        
+        // MARK: - WKNavigationDelegate
         
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {

@@ -58,6 +58,22 @@ class AppState: ObservableObject {
     static let shared = AppState()
     private init() {
         setupObservers()
+        setupDockBadge()
+    }
+    
+    private func setupDockBadge() {
+        #if os(macOS)
+        $unreadMessageCount
+            .receive(on: RunLoop.main)
+            .sink { count in
+                if count > 0 {
+                    NSApp.dockTile.badgeLabel = "\(count)"
+                } else {
+                    NSApp.dockTile.badgeLabel = nil
+                }
+            }
+            .store(in: &cancellables)
+        #endif
     }
     
     private func setupObservers() {

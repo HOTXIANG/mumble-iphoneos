@@ -41,9 +41,12 @@ struct CreateChannelView: View {
                     
                     HStack {
                         Label("Position", systemImage: "number")
+                        Text("(sort order)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         Spacer()
-                        TextField("0", value: $position, format: .number)
-                            .frame(width: 80)
+                        TextField("", value: $position, format: .number)
+                            .frame(width: 150)
                             #if os(macOS)
                             .textFieldStyle(.roundedBorder)
                             #endif
@@ -52,9 +55,12 @@ struct CreateChannelView: View {
                     
                     HStack {
                         Label("Max Users", systemImage: "person.2")
+                        Text("(0 = unlimited)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         Spacer()
-                        TextField("0 = Unlimited", value: $maxUsers, format: .number)
-                            .frame(width: 120)
+                        TextField("", value: $maxUsers, format: .number)
+                            .frame(width: 150)
                             #if os(macOS)
                             .textFieldStyle(.roundedBorder)
                             #endif
@@ -63,8 +69,11 @@ struct CreateChannelView: View {
                     
                     HStack {
                         Label("Password", systemImage: "lock")
+                        Text("(optional)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         Spacer()
-                        SecureField("No password", text: $channelPassword)
+                        SecureField("", text: $channelPassword)
                             .frame(width: 150)
                             #if os(macOS)
                             .textFieldStyle(.roundedBorder)
@@ -100,11 +109,126 @@ struct CreateChannelView: View {
     private func createChannel() {
         let trimmedName = channelName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
+        
+        let hasExtraSettings = !channelDescription.isEmpty || position != 0 || maxUsers != 0 || !channelPassword.isEmpty
+        
+        if hasExtraSettings {
+            // 频道创建后，服务器会返回带有 channelId 的 ChannelState
+            // 监听 channelAddedNotification，在新频道出现后再设置额外属性
+            let parentId = parentChannel.channelId()
+            let desc = channelDescription
+            let pos = position
+            let maxU = maxUsers
+            let pwd = channelPassword
+            let mgr = serverManager
+            
+            var observer: NSObjectProtocol?
+            observer = NotificationCenter.default.addObserver(
+                forName: ServerModelNotificationManager.channelAddedNotification,
+                object: nil,
+                queue: .main
+            ) { notification in
+                guard let userInfo = notification.userInfo,
+                      let newChannel = userInfo["channel"] as? MKChannel,
+                      newChannel.channelName() == trimmedName,
+                      newChannel.parent()?.channelId() == parentId else { return }
+                
+                // 移除一次性监听
+                if let obs = observer {
+                    NotificationCenter.default.removeObserver(obs)
+                }
+                
+                let channelRef = UnsafeTransfer(value: newChannel)
+                
+                Task { @MainActor in
+                    let ch = channelRef.value
+                    
+                    // 设置描述、位置、最大人数
+                    let newDesc: String? = desc.isEmpty ? nil : desc
+                    let newPos: NSNumber? = pos != 0 ? NSNumber(value: pos) : nil
+                    let newMaxUsers: NSNumber? = maxU != 0 ? NSNumber(value: maxU) : nil
+                    
+                    if newDesc != nil || newPos != nil || newMaxUsers != nil {
+                        mgr.editChannel(ch, name: nil, description: newDesc, position: newPos, maxUsers: newMaxUsers)
+                    }
+                    
+                    // 设置密码（通过 ACL）
+                    if !pwd.isEmpty {
+                        Self.setupPasswordACLForChannel(ch, password: pwd, serverManager: mgr)
+                    }
+                }
+            }
+        }
+        
         serverManager.createChannel(name: trimmedName, parent: parentChannel, temporary: isTemporary)
-        // 频道创建后，服务器会返回带有 channelId 的 ChannelState
-        // 后续需要通过 editChannel 设置 description/position/maxUsers/password
-        // 由于新频道的 ID 在创建后才知道，这些属性需要在频道出现后通过编辑设置
         dismiss()
+    }
+    
+    /// 通过 ACL 为频道设置密码（静态方法，不依赖 View 生命周期）
+    static func setupPasswordACLForChannel(_ channel: MKChannel, password: String, serverManager: ServerModelManager) {
+        serverManager.requestACL(for: channel)
+        
+        let channelId = channel.channelId()
+        let channelRef = UnsafeTransfer(value: channel)
+        var observer: NSObjectProtocol?
+        observer = NotificationCenter.default.addObserver(
+            forName: ServerModelNotificationManager.aclReceivedNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let userInfo = notification.userInfo,
+                  let accessControl = userInfo["accessControl"] as? MKAccessControl,
+                  let chan = userInfo["channel"] as? MKChannel,
+                  chan.channelId() == channelId else { return }
+            
+            if let obs = observer {
+                NotificationCenter.default.removeObserver(obs)
+            }
+            
+            let aclTransfer = UnsafeTransfer(value: accessControl)
+            
+            Task { @MainActor in
+                let acl = aclTransfer.value
+                let ch = channelRef.value
+                
+                let existingACLs = acl.acls ?? NSMutableArray()
+                let filteredACLs = NSMutableArray()
+                for item in existingACLs {
+                    if let aclItem = item as? MKChannelACL {
+                        let isPasswordGroup = (aclItem.group?.hasPrefix("#") ?? false) && !aclItem.inherited
+                        let isDenyAllEnter = (aclItem.group == "all") && !aclItem.inherited &&
+                            (aclItem.deny.rawValue & MKPermissionEnter.rawValue) != 0
+                        if !isPasswordGroup && !isDenyAllEnter {
+                            filteredACLs.add(aclItem)
+                        }
+                    }
+                }
+                
+                let denyACL = MKChannelACL()
+                denyACL.applyHere = true
+                denyACL.applySubs = false
+                denyACL.inherited = false
+                denyACL.userID = -1
+                denyACL.group = "all"
+                denyACL.grant = MKPermission(rawValue: 0)
+                denyACL.deny = MKPermissionEnter
+                filteredACLs.add(denyACL)
+                
+                let grantACL = MKChannelACL()
+                grantACL.applyHere = true
+                grantACL.applySubs = false
+                grantACL.inherited = false
+                grantACL.userID = -1
+                grantACL.group = "#\(password)"
+                grantACL.grant = MKPermissionEnter
+                grantACL.deny = MKPermission(rawValue: 0)
+                filteredACLs.add(grantACL)
+                
+                acl.acls = filteredACLs
+                serverManager.setACL(acl, for: ch)
+                serverManager.markChannelHasPassword(ch.channelId())
+            }
+        }
     }
 }
 
@@ -177,6 +301,8 @@ struct ChannelPropertiesView: View {
     @State private var position: Int = 0
     @State private var maxUsers: Int = 0
     @State private var channelPassword: String = ""
+    @State private var hasExistingPassword: Bool = false
+    @State private var passwordModified: Bool = false
     @State private var showDeleteConfirmation: Bool = false
     @State private var isLoading: Bool = true
     @State private var contentHeight: CGFloat = 60
@@ -207,9 +333,12 @@ struct ChannelPropertiesView: View {
             Section(header: Text("Settings")) {
                 HStack {
                     Label("Position", systemImage: "number")
+                    Text("(sort order)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     Spacer()
-                    TextField("0", value: $position, format: .number)
-                        .frame(width: 80)
+                    TextField("", value: $position, format: .number)
+                        .frame(width: 150)
                         #if os(macOS)
                         .textFieldStyle(.roundedBorder)
                         #endif
@@ -218,9 +347,12 @@ struct ChannelPropertiesView: View {
                 
                 HStack {
                     Label("Max Users", systemImage: "person.2")
+                    Text("(0 = unlimited)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     Spacer()
-                    TextField("0 = Unlimited", value: $maxUsers, format: .number)
-                        .frame(width: 120)
+                    TextField("", value: $maxUsers, format: .number)
+                        .frame(width: 150)
                         #if os(macOS)
                         .textFieldStyle(.roundedBorder)
                         #endif
@@ -229,13 +361,37 @@ struct ChannelPropertiesView: View {
                 
                 HStack {
                     Label("Password", systemImage: "lock")
+                    if hasExistingPassword && !passwordModified {
+                        Text("(has password)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("(optional)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     Spacer()
-                    SecureField("No password", text: $channelPassword)
+                    SecureField(hasExistingPassword ? "••••••" : "", text: $channelPassword)
                         .frame(width: 150)
                         #if os(macOS)
                         .textFieldStyle(.roundedBorder)
                         #endif
                         .multilineTextAlignment(.trailing)
+                        .onChange(of: channelPassword) {
+                            passwordModified = true
+                        }
+                    if hasExistingPassword && passwordModified {
+                        Button {
+                            channelPassword = ""
+                            passwordModified = false
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Reset to keep existing password")
+                    }
                 }
             }
             
@@ -300,12 +456,40 @@ struct ChannelPropertiesView: View {
             Text("Are you sure you want to delete \"\(channel.channelName() ?? "this channel")\"? This action cannot be undone.")
         }
         .onAppear { loadChannelInfo() }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.channelDescriptionChangedNotification)) { notification in
+            if let chanId = notification.userInfo?["channelId"] as? UInt,
+               chanId == channel.channelId(),
+               let desc = channel.channelDescription(), !desc.isEmpty {
+                channelDescription = desc
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.aclReceivedNotification)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let chan = userInfo["channel"] as? MKChannel,
+                  chan.channelId() == channel.channelId(),
+                  let accessControl = userInfo["accessControl"] as? MKAccessControl else { return }
+            // 直接从 ACL 数据检测密码状态（不依赖 ServerModelManager 的更新顺序）
+            if !passwordModified {
+                let detected = detectPasswordInACL(accessControl)
+                hasExistingPassword = detected
+            }
+        }
     }
     
     private func loadChannelInfo() {
         channelName = channel.channelName() ?? ""
         position = Int(channel.position())
         maxUsers = Int(channel.maxUsers())
+        
+        // 检测密码状态
+        hasExistingPassword = serverManager.channelsWithPassword.contains(channel.channelId())
+        passwordModified = false
+        channelPassword = ""
+        
+        // 如果还不知道密码状态，请求 ACL 来检测
+        if !hasExistingPassword {
+            serverManager.requestACL(for: channel)
+        }
         
         if let desc = channel.channelDescription(), !desc.isEmpty {
             channelDescription = desc
@@ -317,6 +501,24 @@ struct ChannelPropertiesView: View {
             channelDescription = ""
             isLoading = false
         }
+    }
+    
+    /// 直接从 ACL 数据检测是否含有密码模式
+    private func detectPasswordInACL(_ accessControl: MKAccessControl) -> Bool {
+        guard let acls = accessControl.acls else { return false }
+        var hasDenyEnterAll = false
+        var hasGrantEnterToken = false
+        for item in acls {
+            guard let aclItem = item as? MKChannelACL, !aclItem.inherited else { continue }
+            if aclItem.group == "all" && (aclItem.deny.rawValue & MKPermissionEnter.rawValue) != 0 {
+                hasDenyEnterAll = true
+            }
+            if let group = aclItem.group, group.hasPrefix("#") && !group.hasPrefix("#!") &&
+               (aclItem.grant.rawValue & MKPermissionEnter.rawValue) != 0 {
+                hasGrantEnterToken = true
+            }
+        }
+        return hasDenyEnterAll && hasGrantEnterToken
     }
     
     private func saveChanges() {
@@ -335,90 +537,12 @@ struct ChannelPropertiesView: View {
             serverManager.editChannel(channel, name: newName, description: newDesc, position: newPosition, maxUsers: newMaxUsers)
         }
         
-        // 处理密码设置：通过 ACL 实现
-        if !channelPassword.isEmpty {
-            setupPasswordACL(password: channelPassword)
+        // 处理密码设置：仅在用户明确修改了密码时才更新
+        if passwordModified && !channelPassword.isEmpty {
+            CreateChannelView.setupPasswordACLForChannel(channel, password: channelPassword, serverManager: serverManager)
         }
         
         dismiss()
-    }
-    
-    /// 通过 ACL 设置频道密码
-    /// Mumble 的频道密码是通过 access token 组实现的：
-    /// 1. 先请求频道的现有 ACL
-    /// 2. 在现有 ACL 基础上追加密码相关的条目
-    /// 3. 发送更新后的完整 ACL
-    private func setupPasswordACL(password: String) {
-        // 先请求现有 ACL
-        serverManager.requestACL(for: channel)
-        
-        // 监听 ACL 返回，追加密码条目
-        let channelId = channel.channelId()
-        let channelRef = UnsafeTransfer(value: channel)
-        var observer: NSObjectProtocol?
-        observer = NotificationCenter.default.addObserver(
-            forName: ServerModelNotificationManager.aclReceivedNotification,
-            object: nil,
-            queue: .main
-        ) { [serverManager] notification in
-            guard let userInfo = notification.userInfo,
-                  let accessControl = userInfo["accessControl"] as? MKAccessControl,
-                  let chan = userInfo["channel"] as? MKChannel,
-                  chan.channelId() == channelId else { return }
-            
-            // 移除一次性监听
-            if let obs = observer {
-                NotificationCenter.default.removeObserver(obs)
-            }
-            
-            let aclTransfer = UnsafeTransfer(value: accessControl)
-            
-            Task { @MainActor in
-                let acl = aclTransfer.value
-                let ch = channelRef.value
-                
-                // 在现有 ACL 基础上追加密码条目
-                let existingACLs = acl.acls ?? NSMutableArray()
-                
-                // 先移除之前可能存在的旧密码 ACL
-                let filteredACLs = NSMutableArray()
-                for item in existingACLs {
-                    if let aclItem = item as? MKChannelACL {
-                        let isPasswordGroup = (aclItem.group?.hasPrefix("#") ?? false) && !aclItem.inherited
-                        let isDenyAllEnter = (aclItem.group == "all") && !aclItem.inherited &&
-                            (aclItem.deny.rawValue & MKPermissionEnter.rawValue) != 0
-                        if !isPasswordGroup && !isDenyAllEnter {
-                            filteredACLs.add(aclItem)
-                        }
-                    }
-                }
-                
-                // 1. Deny Enter to @all
-                let denyACL = MKChannelACL()
-                denyACL.applyHere = true
-                denyACL.applySubs = false
-                denyACL.inherited = false
-                denyACL.userID = -1
-                denyACL.group = "all"
-                denyACL.grant = MKPermission(rawValue: 0)
-                denyACL.deny = MKPermissionEnter
-                filteredACLs.add(denyACL)
-                
-                // 2. Grant Enter to @#<password> (access token group)
-                let grantACL = MKChannelACL()
-                grantACL.applyHere = true
-                grantACL.applySubs = false
-                grantACL.inherited = false
-                grantACL.userID = -1
-                grantACL.group = "#\(password)"
-                grantACL.grant = MKPermissionEnter
-                grantACL.deny = MKPermission(rawValue: 0)
-                filteredACLs.add(grantACL)
-                
-                acl.acls = filteredACLs
-                serverManager.setACL(acl, for: ch)
-            }
-        }
     }
 }
 

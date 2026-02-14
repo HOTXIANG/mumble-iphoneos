@@ -23,10 +23,12 @@ class ServerModelNotificationManager {
     static let permissionDeniedNotification = Notification.Name("ServerModelPermissionDenied")
     static let channelAddedNotification = Notification.Name("ServerModelChannelAdded")
     static let channelRemovedNotification = Notification.Name("ServerModelChannelRemoved")
+    static let permissionQueryResultNotification = Notification.Name("ServerModelPermissionQueryResult")
     
     // --- 核心修改 2：添加一个发送新通知的方法 ---
-    func postUserMoved(user: MKUser, to channel: MKChannel) {
-        let userInfo: [String: Any] = ["user": user, "channel": channel]
+    func postUserMoved(user: MKUser, to channel: MKChannel, by mover: MKUser? = nil) {
+        var userInfo: [String: Any] = ["user": user, "channel": channel]
+        if let mover = mover { userInfo["mover"] = mover }
         NotificationCenter.default.post(name: Self.userMovedNotification, object: nil, userInfo: userInfo)
     }
     
@@ -68,6 +70,11 @@ class ServerModelNotificationManager {
         NotificationCenter.default.post(name: Self.aclReceivedNotification, object: nil, userInfo: userInfo)
     }
     
+    func postPermissionQueryResult(permissions: UInt32, for channel: MKChannel) {
+        let userInfo: [String: Any] = ["permissions": permissions, "channel": channel]
+        NotificationCenter.default.post(name: Self.permissionQueryResultNotification, object: nil, userInfo: userInfo)
+    }
+    
     func postPermissionDenied(permission: MKPermission, user: MKUser?, channel: MKChannel?) {
         var userInfo: [String: Any] = ["permission": permission.rawValue]
         if let user = user { userInfo["user"] = user }
@@ -96,8 +103,8 @@ class ServerModelNotificationManager {
     
     // --- 核心修改 3：让 userMoved 委托方法发送新的、专用的通知 ---
     func serverModel(_ model: MKServerModel, userMoved user: MKUser, to channel: MKChannel, by mover: MKUser?) {
-        // 先发送移动通知，用于在聊天框显示提示
-        ServerModelNotificationManager.shared.postUserMoved(user: user, to: channel)
+        // 先发送移动通知，用于在聊天框显示提示（包含 mover 信息）
+        ServerModelNotificationManager.shared.postUserMoved(user: user, to: channel, by: mover)
         // 再发送重建通知，用于更新频道列表UI
         ServerModelNotificationManager.shared.postRebuildNotification()
     }
@@ -172,5 +179,10 @@ class ServerModelNotificationManager {
     
     func serverModel(_ model: MKServerModel, permissionDeniedForReason reason: String?) {
         ServerModelNotificationManager.shared.postPermissionDeniedForReason(reason)
+    }
+    
+    // Permission Query 结果
+    func serverModel(_ model: MKServerModel, permissionQueryResult permissions: UInt32, for channel: MKChannel) {
+        ServerModelNotificationManager.shared.postPermissionQueryResult(permissions: permissions, for: channel)
     }
 }

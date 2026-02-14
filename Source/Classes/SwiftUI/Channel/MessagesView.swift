@@ -588,7 +588,7 @@ private struct TextInputBar: View {
         PhotosPicker(selection: $selectedPhoto, matching: .images) {
             Image(systemName: "photo.on.rectangle.angled")
                 #if os(macOS)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.indigo)
                 .frame(width: 32, height: 32)
                 #else

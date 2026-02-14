@@ -16,6 +16,8 @@ struct NotificationSettingsView: View {
     @AppStorage("NotifyUserLeft") var notifyUserLeft: Bool = true
     @AppStorage("NotifyUserMoved") var notifyUserMoved: Bool = true
     @AppStorage("NotifyMuteDeafen") var notifyMuteDeafen: Bool = false
+    @AppStorage("NotifyMovedByAdmin") var notifyMovedByAdmin: Bool = true
+    @AppStorage("NotifyChannelListening") var notifyChannelListening: Bool = true
     
     var body: some View {
         Form {
@@ -34,6 +36,8 @@ struct NotificationSettingsView: View {
                 Toggle("User Left", isOn: $notifyUserLeft)
                 Toggle("User Moved Channel", isOn: $notifyUserMoved)
                 Toggle("Mute / Deafen", isOn: $notifyMuteDeafen)
+                Toggle("Moved by Admin", isOn: $notifyMovedByAdmin)
+                Toggle("Channel Listening", isOn: $notifyChannelListening)
             }
         }
         #if os(macOS)
@@ -69,29 +73,12 @@ struct AudioTransmissionSettingsView: View {
     
     var body: some View {
         Form {
-            #if os(macOS)
             Picker("Transmission Method", selection: $transmitMethod) {
                 Text("Voice Activated").tag("vad")
                 Text("Push-to-Talk").tag("ptt")
                 Text("Continuous").tag("continuous")
             }
             .pickerStyle(.menu)
-            #else
-            Section(header: Text("Transmission Method")) {
-                HStack {
-                    Spacer()
-                    Picker("", selection: $transmitMethod) {
-                        Text("Voice Activated").tag("vad")
-                        Text("Push-to-Talk").tag("ptt")
-                        Text("Continuous").tag("continuous")
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            }
-            #endif
             
             if transmitMethod == "vad" {
                 Section(header: Text("Voice Activation Settings")) {
@@ -197,29 +184,12 @@ struct AudioQualitySettingsView: View {
     
     var body: some View {
         Form {
-            #if os(macOS)
             Picker("Quality Preset", selection: $qualityKind) {
                 Text("Low (60kbit/s)").tag("low")
                 Text("Balanced (100kbit/s)").tag("balanced")
                 Text("High (192kbit/s)").tag("high")
             }
             .pickerStyle(.menu)
-            #else
-            Section(header: Text("Quality Preset")) {
-                HStack {
-                    Spacer()
-                    Picker("", selection: $qualityKind) {
-                        Text("Low (60kbit/s)").tag("low")
-                        Text("Balanced (100kbit/s)").tag("balanced")
-                        Text("High (192kbit/s)").tag("high")
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-            }
-            #endif
         }
         #if os(macOS)
         .formStyle(.grouped)
