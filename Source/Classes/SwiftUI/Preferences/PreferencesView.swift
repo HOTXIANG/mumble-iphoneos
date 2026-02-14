@@ -260,6 +260,7 @@ struct PreferencesView: View {
     @EnvironmentObject var serverManager: ServerModelManager
     @AppStorage("AudioOutputVolume") var outputVolume: Double = 1.0
     @AppStorage(MumbleHandoffSyncLocalAudioSettingsKey) var handoffSyncLocalAudioSettings: Bool = true
+    @AppStorage("HandoffPreferredProfileKey") var handoffPreferredProfileKey: Int = -1
     @Environment(\.dismiss) var dismiss
     
     // 这里我们还需要暂时保留对旧 Objective-C 证书管理器的引用
@@ -317,7 +318,9 @@ struct PreferencesView: View {
         }
 
         // --- 接力部分 ---
-        Section(header: Text("Handoff"), footer: Text("When enabled, handoff will sync your local per-user volume/mute preferences to the target device.")) {
+        Section(header: Text("Handoff"), footer: Text("Choose which profile to use when continuing a session from another device. 'Automatic' will match by server address.")) {
+            HandoffProfilePicker(selectedKey: $handoffPreferredProfileKey)
+            
             Toggle("Sync Local User Volume on Handoff", isOn: $handoffSyncLocalAudioSettings)
         }
         
@@ -371,6 +374,74 @@ struct PreferencesView: View {
         }
         .onAppear {
             serverManager.startAudioTest()
+        }
+    }
+}
+
+/// Handoff profile 选项模型
+struct HandoffProfileOption: Identifiable {
+    let primaryKey: Int
+    let displayLabel: String
+    let hasCertificate: Bool
+    var id: Int { primaryKey }
+}
+
+/// 独立的 Handoff Profile 选择器，在 init 时即加载 profiles，避免 @State + onAppear 时序问题
+struct HandoffProfilePicker: View {
+    @Binding var selectedKey: Int
+    @State private var profiles: [HandoffProfileOption] = []
+    
+    var body: some View {
+        Picker("Handoff Profile", selection: $selectedKey) {
+            Text("Automatic").tag(-1)
+            ForEach(profiles) { profile in
+                Label {
+                    Text(profile.displayLabel)
+                } icon: {
+                    if profile.hasCertificate {
+                        Image(systemName: "checkmark.shield.fill")
+                    }
+                }
+                .tag(profile.primaryKey)
+            }
+        }
+        .onAppear {
+            loadProfiles()
+        }
+        .onChange(of: selectedKey) { _ in
+            // 确保 selection 有效：如果选中的 key 不在 profiles 中也不是 -1，重置为 Automatic
+            if selectedKey != -1 && !profiles.contains(where: { $0.primaryKey == selectedKey }) {
+                selectedKey = -1
+            }
+        }
+    }
+    
+    private func loadProfiles() {
+        guard let servers = MUDatabase.fetchVisibleFavourites() as? [MUFavouriteServer] else {
+            profiles = []
+            validateSelection()
+            return
+        }
+        profiles = servers.compactMap { server in
+            guard server.hasPrimaryKey() else { return nil }
+            let name = server.displayName ?? server.hostName ?? "Unknown"
+            let user = server.userName ?? ""
+            let host = server.hostName ?? ""
+            let port = server.port
+            let label = user.isEmpty ? "\(name) (\(host):\(port))" : "\(name) — \(user)@\(host):\(port)"
+            return HandoffProfileOption(
+                primaryKey: Int(server.primaryKey),
+                displayLabel: label,
+                hasCertificate: server.certificateRef != nil
+            )
+        }
+        validateSelection()
+    }
+    
+    /// 确保当前 selection 对应一个有效的 tag，否则重置为 Automatic
+    private func validateSelection() {
+        if selectedKey != -1 && !profiles.contains(where: { $0.primaryKey == selectedKey }) {
+            selectedKey = -1
         }
     }
 }

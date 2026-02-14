@@ -298,42 +298,59 @@ class HandoffManager: NSObject, ObservableObject {
     // MARK: - 核心连接逻辑
     
     /// 根据 Handoff 信息决定用哪个身份连接
-    /// 优先级：1. 有证书的注册用户 → 2. 无证书但有用户名的收藏 → 3. 源设备用户名+设备后缀
+    /// 优先级：0. 用户手动指定的 profile → 1. 有证书的注册用户 → 2. 无证书但有用户名的收藏 → 3. 源设备用户名+设备后缀
     private func connectForHandoff(serverInfo: HandoffServerInfo) {
-        // 1. 查找 Favourite Servers 中所有匹配的服务器
-        let matchedServers = findMatchingFavouriteServers(
-            hostname: serverInfo.hostname,
-            port: serverInfo.port
-        )
-        
         let connectUsername: String
         let connectPassword: String?
         let connectCertRef: NSData?
         let connectDisplayName: String?
         
-        // 2a. 优先匹配有证书的注册用户
-        if let registered = matchedServers.first(where: { $0.certificateRef != nil && $0.userName != nil && !$0.userName!.isEmpty }) {
-            connectUsername = registered.userName!
-            connectPassword = registered.password
-            connectCertRef = registered.certificateRef as NSData?
-            connectDisplayName = registered.displayName
-            print("📲 Handoff: Found registered favourite (with cert). Using: \(connectUsername)")
+        // 0. 检查用户是否手动指定了 Handoff Profile
+        // @AppStorage 存储为 Int，使用 object(forKey:) 确保兼容性
+        let preferredKey: Int
+        if let stored = UserDefaults.standard.object(forKey: "HandoffPreferredProfileKey") {
+            preferredKey = (stored as? Int) ?? (stored as? NSNumber)?.intValue ?? -1
+        } else {
+            preferredKey = -1
         }
-        // 2b. 其次匹配无证书但有用户名的收藏
-        else if let unregistered = matchedServers.first(where: { $0.userName != nil && !$0.userName!.isEmpty }) {
-            connectUsername = unregistered.userName!
-            connectPassword = unregistered.password
-            connectCertRef = nil
-            connectDisplayName = unregistered.displayName
-            print("📲 Handoff: Found favourite (no cert). Using: \(connectUsername)")
-        }
-        // 2c. 没有收藏 → 使用源设备的用户名 + 设备类型后缀
-        else {
-            connectUsername = "\(serverInfo.username)-\(HandoffManager.deviceTypeSuffix)"
-            connectPassword = serverInfo.password
-            connectCertRef = nil
-            connectDisplayName = serverInfo.displayName
-            print("📲 Handoff: No favourite found. Using suffixed username: \(connectUsername)")
+        print("📲 Handoff: Preferred profile key = \(preferredKey)")
+        if preferredKey > 0, let preferredProfile = findFavouriteByPrimaryKey(preferredKey) {
+            connectUsername = preferredProfile.userName ?? "\(serverInfo.username)-\(HandoffManager.deviceTypeSuffix)"
+            connectPassword = preferredProfile.password
+            connectCertRef = preferredProfile.certificateRef as NSData?
+            connectDisplayName = preferredProfile.displayName
+            print("📲 Handoff: Using user-preferred profile (key=\(preferredKey)). Username: \(connectUsername)")
+        } else {
+            // 自动匹配：查找 Favourite Servers 中所有匹配的服务器
+            let matchedServers = findMatchingFavouriteServers(
+                hostname: serverInfo.hostname,
+                port: serverInfo.port
+            )
+            
+            // 1. 优先匹配有证书的注册用户
+            if let registered = matchedServers.first(where: { $0.certificateRef != nil && $0.userName != nil && !$0.userName!.isEmpty }) {
+                connectUsername = registered.userName!
+                connectPassword = registered.password
+                connectCertRef = registered.certificateRef as NSData?
+                connectDisplayName = registered.displayName
+                print("📲 Handoff: Found registered favourite (with cert). Using: \(connectUsername)")
+            }
+            // 2. 其次匹配无证书但有用户名的收藏
+            else if let unregistered = matchedServers.first(where: { $0.userName != nil && !$0.userName!.isEmpty }) {
+                connectUsername = unregistered.userName!
+                connectPassword = unregistered.password
+                connectCertRef = nil
+                connectDisplayName = unregistered.displayName
+                print("📲 Handoff: Found favourite (no cert). Using: \(connectUsername)")
+            }
+            // 3. 没有收藏 → 使用源设备的用户名 + 设备类型后缀
+            else {
+                connectUsername = "\(serverInfo.username)-\(HandoffManager.deviceTypeSuffix)"
+                connectPassword = serverInfo.password
+                connectCertRef = nil
+                connectDisplayName = serverInfo.displayName
+                print("📲 Handoff: No favourite found. Using suffixed username: \(connectUsername)")
+            }
         }
         
         // 3. 设置 AppState 的显示名称
@@ -350,6 +367,14 @@ class HandoffManager: NSObject, ObservableObject {
         )
         
         print("📲 Handoff: Connecting to \(serverInfo.hostname):\(serverInfo.port) as \(connectUsername)")
+    }
+    
+    /// 根据 primaryKey 查找收藏服务器
+    private func findFavouriteByPrimaryKey(_ key: Int) -> MUFavouriteServer? {
+        guard let favourites = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] else {
+            return nil
+        }
+        return favourites.first { $0.hasPrimaryKey() && Int($0.primaryKey) == key }
     }
     
     /// 在收藏列表中查找所有匹配该服务器的条目
