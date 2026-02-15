@@ -77,6 +77,30 @@ class ACLEntryModel: ObservableObject, Identifiable {
         self.grant = 0
         self.deny = 0
     }
+
+    /// 创建一个可编辑副本（用于弹窗草稿）
+    func clone() -> ACLEntryModel {
+        let copy = ACLEntryModel()
+        copy.applyHere = applyHere
+        copy.applySubs = applySubs
+        copy.isInherited = isInherited
+        copy.userID = userID
+        copy.group = group
+        copy.grant = grant
+        copy.deny = deny
+        return copy
+    }
+
+    /// 将草稿内容回写到当前对象（保留原对象 identity）
+    func apply(from draft: ACLEntryModel) {
+        applyHere = draft.applyHere
+        applySubs = draft.applySubs
+        isInherited = draft.isInherited
+        userID = draft.userID
+        group = draft.group
+        grant = draft.grant
+        deny = draft.deny
+    }
     
     func toMKChannelACL() -> MKChannelACL {
         let acl = MKChannelACL()
@@ -177,6 +201,30 @@ class GroupEntryModel: ObservableObject, Identifiable {
         self.excludedMembers = []
         self.inheritedMembers = []
     }
+
+    /// 创建一个可编辑副本（用于弹窗草稿）
+    func clone() -> GroupEntryModel {
+        let copy = GroupEntryModel()
+        copy.name = name
+        copy.isInherited = isInherited
+        copy.inherit = inherit
+        copy.inheritable = inheritable
+        copy.members = members
+        copy.excludedMembers = excludedMembers
+        copy.inheritedMembers = inheritedMembers
+        return copy
+    }
+
+    /// 将草稿内容回写到当前对象（保留原对象 identity）
+    func apply(from draft: GroupEntryModel) {
+        name = draft.name
+        isInherited = draft.isInherited
+        inherit = draft.inherit
+        inheritable = draft.inheritable
+        members = draft.members
+        excludedMembers = draft.excludedMembers
+        inheritedMembers = draft.inheritedMembers
+    }
     
     func toMKChannelGroup() -> MKChannelGroup {
         let group = MKChannelGroup()
@@ -202,10 +250,10 @@ struct ChannelACLView: View {
     @State private var groupEntries: [GroupEntryModel] = []
     @State private var isLoading: Bool = true
     @State private var selectedTab: ACLTab = .acls
-    @State private var selectedACLEntry: ACLEntryModel? = nil
-    @State private var selectedGroupEntry: GroupEntryModel? = nil
-    @State private var showAddACL: Bool = false
-    @State private var showAddGroup: Bool = false
+    @State private var aclDraftEntry: ACLEntryModel? = nil
+    @State private var groupDraftEntry: GroupEntryModel? = nil
+    @State private var editingACLIndex: Int? = nil
+    @State private var editingGroupIndex: Int? = nil
     @Environment(\.dismiss) var dismiss
     
     enum ACLTab: String, CaseIterable {
@@ -254,17 +302,15 @@ struct ChannelACLView: View {
                     Button("Save") { saveACL() }
                 }
             }
-            .sheet(item: $selectedACLEntry) { entry in
-                ACLEntryEditView(entry: entry, serverManager: serverManager) { }
+            .sheet(item: $aclDraftEntry) { draft in
+                ACLEntryEditView(entry: draft, serverManager: serverManager) {
+                    commitACLEntryDraft()
+                }
             }
-            .sheet(item: $selectedGroupEntry) { entry in
-                GroupEntryEditView(entry: entry, serverManager: serverManager) { }
-            }
-            .sheet(isPresented: $showAddACL) {
-                ACLEntryEditView(entry: createNewACLEntry(), serverManager: serverManager) { }
-            }
-            .sheet(isPresented: $showAddGroup) {
-                GroupEntryEditView(entry: createNewGroupEntry(), serverManager: serverManager) { }
+            .sheet(item: $groupDraftEntry) { draft in
+                GroupEntryEditView(entry: draft, serverManager: serverManager) {
+                    commitGroupEntryDraft()
+                }
             }
         }
         .onAppear { loadACL() }
@@ -303,11 +349,14 @@ struct ChannelACLView: View {
                     .padding()
             } else {
                 ForEach(aclEntries) { entry in
-                    ACLEntryRow(entry: entry)
+                    ACLEntryRow(
+                        entry: entry,
+                        resolvedUserName: entry.isGroupBased ? nil : serverManager.aclUserDisplayName(for: entry.userID)
+                    )
                         .contentShape(Rectangle())
                         .onTapGesture {
                             if !entry.isInherited {
-                                selectedACLEntry = entry
+                                beginEditACLEntry(entry)
                             }
                         }
                         .opacity(entry.isInherited ? 0.6 : 1.0)
@@ -321,7 +370,7 @@ struct ChannelACLView: View {
             
             Section {
                 Button {
-                    showAddACL = true
+                    beginAddACLEntry()
                 } label: {
                     Label("Add ACL Entry", systemImage: "plus.circle")
                 }
@@ -349,7 +398,7 @@ struct ChannelACLView: View {
                         .contentShape(Rectangle())
                         .onTapGesture {
                             if !entry.isInherited {
-                                selectedGroupEntry = entry
+                                beginEditGroupEntry(entry)
                             }
                         }
                         .opacity(entry.isInherited ? 0.6 : 1.0)
@@ -362,7 +411,7 @@ struct ChannelACLView: View {
             
             Section {
                 Button {
-                    showAddGroup = true
+                    beginAddGroupEntry()
                 } label: {
                     Label("Add Group", systemImage: "plus.circle")
                 }
@@ -385,8 +434,22 @@ struct ChannelACLView: View {
         
         aclEntries = (accessControl.acls as? [MKChannelACL])?.map { ACLEntryModel(from: $0) } ?? []
         groupEntries = (accessControl.groups as? [MKChannelGroup])?.map { GroupEntryModel(from: $0) } ?? []
+        requestUserNamesForCurrentACL()
         
         isLoading = false
+    }
+
+    private func requestUserNamesForCurrentACL() {
+        var ids: Set<Int> = []
+        for acl in aclEntries where !acl.isGroupBased && acl.userID >= 0 {
+            ids.insert(acl.userID)
+        }
+        for group in groupEntries {
+            ids.formUnion(group.members.filter { $0 >= 0 })
+            ids.formUnion(group.excludedMembers.filter { $0 >= 0 })
+            ids.formUnion(group.inheritedMembers.filter { $0 >= 0 })
+        }
+        serverManager.requestACLUserNames(for: Array(ids))
     }
     
     private func saveACL() {
@@ -409,16 +472,44 @@ struct ChannelACLView: View {
         dismiss()
     }
     
-    private func createNewACLEntry() -> ACLEntryModel {
-        let entry = ACLEntryModel()
-        aclEntries.append(entry)
-        return entry
+    private func beginAddACLEntry() {
+        editingACLIndex = nil
+        aclDraftEntry = ACLEntryModel()
     }
-    
-    private func createNewGroupEntry() -> GroupEntryModel {
-        let entry = GroupEntryModel()
-        groupEntries.append(entry)
-        return entry
+
+    private func beginEditACLEntry(_ entry: ACLEntryModel) {
+        editingACLIndex = aclEntries.firstIndex(where: { $0.id == entry.id })
+        aclDraftEntry = entry.clone()
+    }
+
+    private func commitACLEntryDraft() {
+        guard let draft = aclDraftEntry else { return }
+        if let index = editingACLIndex, aclEntries.indices.contains(index) {
+            aclEntries[index].apply(from: draft)
+        } else {
+            aclEntries.append(draft)
+        }
+        editingACLIndex = nil
+    }
+
+    private func beginAddGroupEntry() {
+        editingGroupIndex = nil
+        groupDraftEntry = GroupEntryModel()
+    }
+
+    private func beginEditGroupEntry(_ entry: GroupEntryModel) {
+        editingGroupIndex = groupEntries.firstIndex(where: { $0.id == entry.id })
+        groupDraftEntry = entry.clone()
+    }
+
+    private func commitGroupEntryDraft() {
+        guard let draft = groupDraftEntry else { return }
+        if let index = editingGroupIndex, groupEntries.indices.contains(index) {
+            groupEntries[index].apply(from: draft)
+        } else {
+            groupEntries.append(draft)
+        }
+        editingGroupIndex = nil
     }
 }
 
@@ -426,6 +517,17 @@ struct ChannelACLView: View {
 
 struct ACLEntryRow: View {
     @ObservedObject var entry: ACLEntryModel
+    var resolvedUserName: String? = nil
+
+    private var titleText: String {
+        if entry.isGroupBased {
+            return "@\(entry.group)"
+        }
+        if let name = resolvedUserName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return name
+        }
+        return "User #\(entry.userID)"
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -434,7 +536,7 @@ struct ACLEntryRow: View {
                     .foregroundColor(entry.isInherited ? .secondary : .accentColor)
                     .frame(width: 20)
                 
-                Text(entry.displayName)
+                Text(titleText)
                     .font(.headline)
                 
                 Spacer()
@@ -575,6 +677,8 @@ struct ACLEntryEditView: View {
     
     @State private var userSearchText: String = ""
     @State private var userSearchError: String? = nil
+    @State private var lastSelectedUserID: Int = 0
+    @State private var lastSelectedGroup: String = "all"
     
     /// 在线已注册用户列表
     private var registeredOnlineUsers: [(name: String, userId: Int)] {
@@ -627,6 +731,7 @@ struct ACLEntryEditView: View {
         
         if let userId = resolveUserId(from: trimmed) {
             entry.userID = userId
+            lastSelectedUserID = userId
             userSearchText = ""
         } else if isUnregisteredUser(trimmed) {
             userSearchError = "'\(trimmed)' is not a registered user."
@@ -634,17 +739,31 @@ struct ACLEntryEditView: View {
             userSearchError = "User '\(trimmed)' not found online. Enter a numeric User ID for offline users."
         }
     }
+
+    private func switchTargetMode(toGroup: Bool) {
+        if toGroup {
+            if entry.userID >= 0 {
+                lastSelectedUserID = entry.userID
+            }
+            let trimmedGroup = entry.group.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedGroup.isEmpty {
+                lastSelectedGroup = trimmedGroup
+            }
+            entry.userID = -1
+            entry.group = lastSelectedGroup.isEmpty ? "all" : lastSelectedGroup
+        } else {
+            let trimmedGroup = entry.group.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedGroup.isEmpty {
+                lastSelectedGroup = trimmedGroup
+            }
+            entry.userID = max(lastSelectedUserID, 0)
+            // 切到 User ID 时不清空 group，保证切回时内容仍在
+        }
+    }
     
     /// 根据 User ID 查找显示名称
     private func userDisplayName(for userId: Int) -> String {
-        for item in serverManager.modelItems {
-            if item.type == .user, let user = item.object as? MKUser {
-                if user.userId() == Int(userId) {
-                    return user.userName() ?? "User #\(userId)"
-                }
-            }
-        }
-        return "User #\(userId)"
+        return serverManager.aclUserDisplayName(for: userId)
     }
     
     var body: some View {
@@ -655,12 +774,9 @@ struct ACLEntryEditView: View {
                     Picker("Type", selection: Binding(
                         get: { entry.isGroupBased },
                         set: { isGroup in
-                            if isGroup {
-                                entry.userID = -1
-                                if entry.group.isEmpty { entry.group = "all" }
-                            } else {
-                                entry.userID = 0
-                                entry.group = ""
+                            // 避免在 View 更新周期内直接发布 ObservableObject 变更
+                            DispatchQueue.main.async {
+                                self.switchTargetMode(toGroup: isGroup)
                             }
                         }
                     )) {
@@ -735,6 +851,7 @@ struct ACLEntryEditView: View {
                                 ForEach(registeredOnlineUsers, id: \.userId) { info in
                                     Button {
                                         entry.userID = info.userId
+                                        lastSelectedUserID = info.userId
                                     } label: {
                                         HStack {
                                             Image(systemName: "person.fill")
@@ -802,6 +919,24 @@ struct ACLEntryEditView: View {
             }
         }
         .disabled(entry.isInherited)
+        .onAppear {
+            if entry.userID >= 0 {
+                serverManager.requestACLUserNames(for: [entry.userID])
+            }
+            let trimmedGroup = entry.group.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedGroup.isEmpty {
+                lastSelectedGroup = trimmedGroup
+            }
+            if entry.userID >= 0 {
+                lastSelectedUserID = entry.userID
+            }
+        }
+        .onChange(of: entry.group) { newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                lastSelectedGroup = trimmed
+            }
+        }
     }
 }
 
@@ -912,6 +1047,7 @@ struct GroupEntryEditView: View {
         if let userId = resolveUserId(from: trimmed) {
             if !entry.members.contains(userId) {
                 entry.members.append(userId)
+                serverManager.requestACLUserNames(for: [userId])
             }
             newMemberID = ""
         } else if isUnregisteredUser(trimmed) {
@@ -929,6 +1065,7 @@ struct GroupEntryEditView: View {
         if let userId = resolveUserId(from: trimmed) {
             if !entry.excludedMembers.contains(userId) {
                 entry.excludedMembers.append(userId)
+                serverManager.requestACLUserNames(for: [userId])
             }
             newExcludedID = ""
         } else if isUnregisteredUser(trimmed) {
@@ -965,6 +1102,16 @@ struct GroupEntryEditView: View {
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
+                        #if os(macOS)
+                        .contentShape(Rectangle())
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                entry.members.removeAll { $0 == memberID }
+                            } label: {
+                                Label("Remove Member", systemImage: "trash")
+                            }
+                        }
+                        #endif
                     }
                     .onDelete { offsets in
                         entry.members.remove(atOffsets: offsets)
@@ -997,6 +1144,7 @@ struct GroupEntryEditView: View {
                                 Button {
                                     if !entry.members.contains(info.userId) {
                                         entry.members.append(info.userId)
+                                        serverManager.requestACLUserNames(for: [info.userId])
                                     }
                                 } label: {
                                     HStack {
@@ -1104,18 +1252,14 @@ struct GroupEntryEditView: View {
             }
         }
         .disabled(entry.isInherited)
+        .onAppear {
+            let ids = Set(entry.members + entry.excludedMembers + entry.inheritedMembers).filter { $0 >= 0 }
+            serverManager.requestACLUserNames(for: Array(ids))
+        }
     }
     
     /// 尝试从 ServerModelManager 的用户列表中查找用户名
     private func userDisplayName(for userID: Int) -> String {
-        // 遍历 modelItems 查找匹配 userId 的用户
-        for item in serverManager.modelItems {
-            if item.type == .user, let user = item.object as? MKUser {
-                if user.userId() == UInt32(userID) {
-                    return user.userName() ?? "User #\(userID)"
-                }
-            }
-        }
-        return "User #\(userID)"
+        return serverManager.aclUserDisplayName(for: userID)
     }
 }

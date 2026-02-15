@@ -338,7 +338,7 @@ struct ChannelPropertiesView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     TextField("", value: $position, format: .number)
-                        .frame(width: 150)
+                        .frame(width: 100)
                         #if os(macOS)
                         .textFieldStyle(.roundedBorder)
                         #endif
@@ -352,7 +352,7 @@ struct ChannelPropertiesView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                     TextField("", value: $maxUsers, format: .number)
-                        .frame(width: 150)
+                        .frame(width: 100)
                         #if os(macOS)
                         .textFieldStyle(.roundedBorder)
                         #endif
@@ -372,7 +372,7 @@ struct ChannelPropertiesView: View {
                     }
                     Spacer()
                     SecureField(hasExistingPassword ? "••••••" : "", text: $channelPassword)
-                        .frame(width: 150)
+                        .frame(width: 100)
                         #if os(macOS)
                         .textFieldStyle(.roundedBorder)
                         #endif
@@ -558,10 +558,10 @@ struct ChannelACLContentView: View {
     @State private var groupEntries: [GroupEntryModel] = []
     @State private var isLoading: Bool = true
     @State private var selectedSubTab: ACLSubTab = .acls
-    @State private var selectedACLEntry: ACLEntryModel? = nil
-    @State private var selectedGroupEntry: GroupEntryModel? = nil
-    @State private var newACLEntry: ACLEntryModel? = nil
-    @State private var newGroupEntry: GroupEntryModel? = nil
+    @State private var aclDraftEntry: ACLEntryModel? = nil
+    @State private var groupDraftEntry: GroupEntryModel? = nil
+    @State private var editingACLIndex: Int? = nil
+    @State private var editingGroupIndex: Int? = nil
     
     enum ACLSubTab: String, CaseIterable {
         case acls = "ACLs"
@@ -606,17 +606,15 @@ struct ChannelACLContentView: View {
                     .padding()
             }
         }
-        .sheet(item: $selectedACLEntry) { entry in
-            ACLEntryEditView(entry: entry, serverManager: serverManager) { }
+        .sheet(item: $aclDraftEntry) { draft in
+            ACLEntryEditView(entry: draft, serverManager: serverManager) {
+                commitACLEntryDraft()
+            }
         }
-        .sheet(item: $selectedGroupEntry) { entry in
-            GroupEntryEditView(entry: entry, serverManager: serverManager) { }
-        }
-        .sheet(item: $newACLEntry) { entry in
-            ACLEntryEditView(entry: entry, serverManager: serverManager) { }
-        }
-        .sheet(item: $newGroupEntry) { entry in
-            GroupEntryEditView(entry: entry, serverManager: serverManager) { }
+        .sheet(item: $groupDraftEntry) { draft in
+            GroupEntryEditView(entry: draft, serverManager: serverManager) {
+                commitGroupEntryDraft()
+            }
         }
         .onAppear { loadACL() }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.aclReceivedNotification)) { notification in
@@ -641,10 +639,13 @@ struct ChannelACLContentView: View {
                     .padding()
             } else {
                 ForEach(aclEntries) { entry in
-                    ACLEntryRow(entry: entry)
+                    ACLEntryRow(
+                        entry: entry,
+                        resolvedUserName: entry.isGroupBased ? nil : serverManager.aclUserDisplayName(for: entry.userID)
+                    )
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if !entry.isInherited { selectedACLEntry = entry }
+                            if !entry.isInherited { beginEditACLEntry(entry) }
                         }
                         .opacity(entry.isInherited ? 0.6 : 1.0)
                 }
@@ -656,9 +657,7 @@ struct ChannelACLContentView: View {
             
             Section {
                 Button {
-                    let entry = ACLEntryModel()
-                    aclEntries.append(entry)
-                    newACLEntry = entry
+                    beginAddACLEntry()
                 } label: {
                     Label("Add ACL Entry", systemImage: "plus.circle")
                 }
@@ -682,7 +681,7 @@ struct ChannelACLContentView: View {
                     GroupEntryRow(entry: entry)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if !entry.isInherited { selectedGroupEntry = entry }
+                            if !entry.isInherited { beginEditGroupEntry(entry) }
                         }
                         .opacity(entry.isInherited ? 0.6 : 1.0)
                 }
@@ -694,9 +693,7 @@ struct ChannelACLContentView: View {
             
             Section {
                 Button {
-                    let entry = GroupEntryModel()
-                    groupEntries.append(entry)
-                    newGroupEntry = entry
+                    beginAddGroupEntry()
                 } label: {
                     Label("Add Group", systemImage: "plus.circle")
                 }
@@ -713,7 +710,21 @@ struct ChannelACLContentView: View {
         inheritACLs = accessControl.inheritACLs
         aclEntries = (accessControl.acls as? [MKChannelACL])?.map { ACLEntryModel(from: $0) } ?? []
         groupEntries = (accessControl.groups as? [MKChannelGroup])?.map { GroupEntryModel(from: $0) } ?? []
+        requestUserNamesForCurrentACL()
         isLoading = false
+    }
+
+    private func requestUserNamesForCurrentACL() {
+        var ids: Set<Int> = []
+        for acl in aclEntries where !acl.isGroupBased && acl.userID >= 0 {
+            ids.insert(acl.userID)
+        }
+        for group in groupEntries {
+            ids.formUnion(group.members.filter { $0 >= 0 })
+            ids.formUnion(group.excludedMembers.filter { $0 >= 0 })
+            ids.formUnion(group.inheritedMembers.filter { $0 >= 0 })
+        }
+        serverManager.requestACLUserNames(for: Array(ids))
     }
     
     private func saveACL() {
@@ -729,5 +740,45 @@ struct ChannelACLContentView: View {
         accessControl.groups = groupArray
         
         serverManager.setACL(accessControl, for: channel)
+    }
+
+    private func beginAddACLEntry() {
+        editingACLIndex = nil
+        aclDraftEntry = ACLEntryModel()
+    }
+
+    private func beginEditACLEntry(_ entry: ACLEntryModel) {
+        editingACLIndex = aclEntries.firstIndex(where: { $0.id == entry.id })
+        aclDraftEntry = entry.clone()
+    }
+
+    private func commitACLEntryDraft() {
+        guard let draft = aclDraftEntry else { return }
+        if let index = editingACLIndex, aclEntries.indices.contains(index) {
+            aclEntries[index].apply(from: draft)
+        } else {
+            aclEntries.append(draft)
+        }
+        editingACLIndex = nil
+    }
+
+    private func beginAddGroupEntry() {
+        editingGroupIndex = nil
+        groupDraftEntry = GroupEntryModel()
+    }
+
+    private func beginEditGroupEntry(_ entry: GroupEntryModel) {
+        editingGroupIndex = groupEntries.firstIndex(where: { $0.id == entry.id })
+        groupDraftEntry = entry.clone()
+    }
+
+    private func commitGroupEntryDraft() {
+        guard let draft = groupDraftEntry else { return }
+        if let index = editingGroupIndex, groupEntries.indices.contains(index) {
+            groupEntries[index].apply(from: draft)
+        } else {
+            groupEntries.append(draft)
+        }
+        editingGroupIndex = nil
     }
 }

@@ -150,7 +150,38 @@ class FavouriteServerListViewModel: ObservableObject {
     func loadServers() {
         let result = MUDatabase.fetchVisibleFavourites()
         if let nsArray = result as NSArray? {
-            let loaded = nsArray.compactMap { $0 as? MUFavouriteServer }
+            var loaded = nsArray.compactMap { $0 as? MUFavouriteServer }
+
+            // 修复历史/异常证书引用：归一化为 identity ref；若失效则按 user@host 自动重匹配
+            var repaired = false
+            for server in loaded {
+                guard let certRef = server.certificateRef else { continue }
+
+                let normalized = MUCertificateController.normalizedIdentityPersistentRef(forPersistentRef: certRef)
+                if let normalized, normalized != certRef {
+                    server.certificateRef = normalized
+                    MUDatabase.storeFavourite(server)
+                    repaired = true
+                    continue
+                }
+
+                if normalized == nil,
+                   let user = server.userName, !user.isEmpty,
+                   let host = server.hostName {
+                    let certName = "\(user)@\(host)"
+                    if let rematched = CertificateModel.shared.findCertificateReference(name: certName) {
+                        server.certificateRef = rematched
+                        MUDatabase.storeFavourite(server)
+                        repaired = true
+                    }
+                }
+            }
+
+            // 重新读取，确保 UI 与数据库持久化一致
+            if repaired, let refreshed = MUDatabase.fetchVisibleFavourites() as? [MUFavouriteServer] {
+                loaded = refreshed
+            }
+
             let sorted = loaded.sorted {
                 ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
             }
@@ -326,17 +357,10 @@ struct FavouriteServerListContentView: View {
             username: server.userName ?? ""
         )
         WidgetDataManager.shared.unpinServer(id: widgetId)
-        
-        // 如果有绑定证书且证书仍然有效，则软删除（标记为 hidden）
-        // 这样证书仍可用于自动匹配连接，不会因误删 profile 导致注册失效
-        if let certRef = server.certificateRef, CertificateModel.shared.isCertificateValid(certRef) {
-            server.isHidden = true
-            MUDatabase.storeFavourite(server)
-            print("🔒 Soft-deleted favourite '\(server.displayName ?? "")' (hidden, cert preserved)")
-        } else {
-            MUDatabase.deleteFavourite(server)
-            print("🗑️ Hard-deleted favourite '\(server.displayName ?? "")' (no valid cert)")
-        }
+
+        // 现在统一使用真实删除，不再保留 hidden profile
+        MUDatabase.deleteFavourite(server)
+        print("🗑️ Deleted favourite '\(server.displayName ?? "")'")
         viewModel.loadServers()
     }
     

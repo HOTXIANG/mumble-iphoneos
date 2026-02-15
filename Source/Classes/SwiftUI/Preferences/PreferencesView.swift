@@ -7,13 +7,24 @@
 
 import SwiftUI
 import UserNotifications
+#if os(iOS)
+import UIKit
+#endif
+#if os(macOS)
+import AppKit
+import CoreAudio
+private let macAudioInputDevicesChangedNotification = Notification.Name("MUMacAudioInputDevicesChanged")
+#endif
 
 struct NotificationSettingsView: View {
-    @AppStorage("NotificationNotifyUserMessages") var notifyUserMessages: Bool = true
+    @AppStorage("NotificationNotifyNormalUserMessages") var notifyNormalUserMessages: Bool = true
+    @AppStorage("NotificationNotifyPrivateMessages") var notifyPrivateMessages: Bool = true
     
     // 系统通知分类开关
-    @AppStorage("NotifyUserJoined") var notifyUserJoined: Bool = true
-    @AppStorage("NotifyUserLeft") var notifyUserLeft: Bool = true
+    @AppStorage("NotifyUserJoinedSameChannel") var notifyUserJoinedSameChannel: Bool = true
+    @AppStorage("NotifyUserLeftSameChannel") var notifyUserLeftSameChannel: Bool = true
+    @AppStorage("NotifyUserJoinedOtherChannels") var notifyUserJoinedOtherChannels: Bool = false
+    @AppStorage("NotifyUserLeftOtherChannels") var notifyUserLeftOtherChannels: Bool = false
     @AppStorage("NotifyUserMoved") var notifyUserMoved: Bool = true
     @AppStorage("NotifyMuteDeafen") var notifyMuteDeafen: Bool = false
     @AppStorage("NotifyMovedByAdmin") var notifyMovedByAdmin: Bool = true
@@ -23,17 +34,21 @@ struct NotificationSettingsView: View {
         Form {
             #if os(macOS)
             Section(header: Text("User Messages")) {
-                Toggle("User Messages", isOn: $notifyUserMessages)
+                Toggle("User Messages", isOn: $notifyNormalUserMessages)
+                Toggle("Private Messages", isOn: $notifyPrivateMessages)
             }
             #else
             Section(header: Text("User Messages"), footer: Text("Notifications will be sent when the app is in the background.")) {
-                Toggle("User Messages", isOn: $notifyUserMessages)
+                Toggle("User Messages", isOn: $notifyNormalUserMessages)
+                Toggle("Private Messages", isOn: $notifyPrivateMessages)
             }
             #endif
             
             Section(header: Text("System Events")) {
-                Toggle("User Joined", isOn: $notifyUserJoined)
-                Toggle("User Left", isOn: $notifyUserLeft)
+                Toggle("User Joined (Same Channel)", isOn: $notifyUserJoinedSameChannel)
+                Toggle("User Left (Same Channel)", isOn: $notifyUserLeftSameChannel)
+                Toggle("User Joined (Other Channels)", isOn: $notifyUserJoinedOtherChannels)
+                Toggle("User Left (Other Channels)", isOn: $notifyUserLeftOtherChannels)
                 Toggle("User Moved Channel", isOn: $notifyUserMoved)
                 Toggle("Mute / Deafen", isOn: $notifyMuteDeafen)
                 Toggle("Moved by Admin", isOn: $notifyMovedByAdmin)
@@ -45,6 +60,28 @@ struct NotificationSettingsView: View {
         #endif
         .navigationTitle("Notifications")
         .onAppear {
+            // 兼容旧版本的单一开关：如果新开关尚未写入，则沿用旧值
+            let defaults = UserDefaults.standard
+            let legacy = defaults.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+            if defaults.object(forKey: "NotificationNotifyNormalUserMessages") == nil {
+                notifyNormalUserMessages = legacy
+            }
+            if defaults.object(forKey: "NotificationNotifyPrivateMessages") == nil {
+                notifyPrivateMessages = legacy
+            }
+            
+            // 兼容旧版本的加入/离开总开关，迁移到同频道/异频道四个开关
+            if defaults.object(forKey: "NotifyUserJoinedSameChannel") == nil {
+                let legacyJoined = defaults.object(forKey: "NotifyUserJoined") as? Bool ?? true
+                notifyUserJoinedSameChannel = legacyJoined
+                notifyUserJoinedOtherChannels = legacyJoined
+            }
+            if defaults.object(forKey: "NotifyUserLeftSameChannel") == nil {
+                let legacyLeft = defaults.object(forKey: "NotifyUserLeft") as? Bool ?? true
+                notifyUserLeftSameChannel = legacyLeft
+                notifyUserLeftOtherChannels = legacyLeft
+            }
+            
             // 进入页面时检查/请求权限
             #if os(iOS)
             let options: UNAuthorizationOptions = [.alert, .badge, .sound]
@@ -68,11 +105,62 @@ struct AudioTransmissionSettingsView: View {
     @AppStorage("AudioVADAbove") var vadAbove: Double = 0.6
     
     @AppStorage("AudioPreprocessor") var enablePreprocessor: Bool = true
+    @AppStorage("AudioEchoCancel") var enableEchoCancel: Bool = true
+    @AppStorage("AudioMicBoost") var micBoost: Double = 1.0
+    #if os(macOS)
+    @AppStorage("AudioFollowSystemInputDevice") private var followSystemInputDevice: Bool = true
+    @AppStorage("AudioPreferredInputDeviceUID") private var preferredInputDeviceUID: String = ""
+    @State private var devices: [MacInputDeviceOption] = []
+    @State private var systemDefaultUID: String = ""
+    private let followSystemToken = "__follow_system__"
+    #endif
     
     @StateObject private var audioMeter = AudioMeterModel()
     
     var body: some View {
         Form {
+            #if os(macOS)
+            Section(header: Text("Input Device")) {
+                Picker("Microphone", selection: selectedInputDeviceTag) {
+                    Text("Follow System Default (\(systemDefaultName))").tag(followSystemToken)
+                    if devices.isEmpty {
+                        Text("No Input Device").tag("")
+                    } else {
+                        ForEach(devices) { device in
+                            Text(device.name).tag(device.uid)
+                        }
+                    }
+                }
+                .pickerStyle(.menu)
+                
+                if !followSystemInputDevice && selectedDeviceMissing {
+                    Text("Selected microphone is unavailable, please choose another one.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Button("Refresh Device List") {
+                    refreshDevices()
+                    normalizeSelectionIfNeeded()
+                }
+                .font(.caption)
+            }
+            #endif
+            
+            Section(header: Text("Processing")) {
+                Toggle("Preprocessing", isOn: $enablePreprocessor)
+                if enablePreprocessor {
+                    Toggle("Echo Cancellation", isOn: $enableEchoCancel)
+                } else {
+                    VStack(alignment: .leading) {
+                        Text("Mic Volume: \(Int(micBoost * 100))%")
+                        Slider(value: $micBoost, in: 0...3.0, step: 0.1) { editing in
+                            if !editing { PreferencesModel.shared.notifySettingsChanged() }
+                        }
+                    }
+                }
+            }
+
             Picker("Transmission Method", selection: $transmitMethod) {
                 Text("Voice Activated").tag("vad")
                 Text("Push-to-Talk").tag("ptt")
@@ -166,16 +254,97 @@ struct AudioTransmissionSettingsView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
-        .navigationTitle("Transmission")
+        .navigationTitle("Input Setting")
         .onChange(of: transmitMethod) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: vadKind) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: enablePreprocessor) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: enableEchoCancel) { PreferencesModel.shared.notifySettingsChanged() }
         .onAppear {
+            #if os(macOS)
+            refreshDevices()
+            normalizeSelectionIfNeeded()
+            #endif
             audioMeter.startMonitoring()
         }
         .onDisappear {
             audioMeter.stopMonitoring()
         }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshDevices()
+            normalizeSelectionIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: macAudioInputDevicesChangedNotification)) { _ in
+            refreshDevices()
+            normalizeSelectionIfNeeded()
+        }
+        #endif
     }
+    
+    #if os(macOS)
+    private var selectedInputDeviceTag: Binding<String> {
+        Binding<String>(
+            get: {
+                followSystemInputDevice ? followSystemToken : preferredInputDeviceUID
+            },
+            set: { newValue in
+                if newValue == followSystemToken {
+                    followSystemInputDevice = true
+                } else {
+                    followSystemInputDevice = false
+                    preferredInputDeviceUID = newValue
+                    normalizeSelectionIfNeeded()
+                }
+                PreferencesModel.shared.notifySettingsChanged()
+            }
+        )
+    }
+    
+    private var selectedDeviceMissing: Bool {
+        !preferredInputDeviceUID.isEmpty && !devices.contains(where: { $0.uid == preferredInputDeviceUID })
+    }
+    
+    private var systemDefaultName: String {
+        if let current = devices.first(where: { $0.uid == systemDefaultUID }) {
+            return current.name
+        }
+        return "Unknown"
+    }
+    
+    private func refreshDevices() {
+        devices = MacInputDeviceCatalog.inputDevices()
+        systemDefaultUID = MacInputDeviceCatalog.defaultInputUID() ?? ""
+    }
+    
+    private func normalizeSelectionIfNeeded() {
+        var changed = false
+        guard !devices.isEmpty else {
+            if !followSystemInputDevice {
+                followSystemInputDevice = true
+                changed = true
+            }
+            if !preferredInputDeviceUID.isEmpty {
+                preferredInputDeviceUID = ""
+                changed = true
+            }
+            if changed {
+                PreferencesModel.shared.notifySettingsChanged()
+            }
+            return
+        }
+        
+        if !followSystemInputDevice,
+           (preferredInputDeviceUID.isEmpty || !devices.contains(where: { $0.uid == preferredInputDeviceUID })) {
+            followSystemInputDevice = true
+            preferredInputDeviceUID = ""
+            changed = true
+        }
+        
+        if changed {
+            PreferencesModel.shared.notifySettingsChanged()
+        }
+    }
+    #endif
 }
 
 // 2. 音频质量设置视图
@@ -201,9 +370,7 @@ struct AudioQualitySettingsView: View {
 
 // 3. 高级音频设置视图
 struct AdvancedAudioSettingsView: View {
-    @AppStorage("AudioPreprocessor") var enablePreprocessor: Bool = true
-    @AppStorage("AudioEchoCancel") var enableEchoCancel: Bool = true
-    @AppStorage("AudioMicBoost") var micBoost: Double = 1.0
+    @AppStorage("AudioQualityKind") var qualityKind: String = "balanced"
     @AppStorage("AudioSidetone") var enableSidetone: Bool = false
     @AppStorage("AudioSidetoneVolume") var sidetoneVolume: Double = 0.2
     @AppStorage("AudioSpeakerPhoneMode") var speakerPhoneMode: Bool = true
@@ -211,22 +378,12 @@ struct AdvancedAudioSettingsView: View {
     
     var body: some View {
         Form {
-            Section(header: Text("Processing")) {
-                Toggle("Preprocessing", isOn: $enablePreprocessor)
-                if enablePreprocessor {
-                    Toggle("Echo Cancellation", isOn: $enableEchoCancel)
-                } else {
-                    VStack(alignment: .leading) {
-                        Text("Mic Boost: \(String(format: "%.1f", micBoost))x")
-                        Slider(value: $micBoost, in: 0...2.0, step: 0.1) { editing in
-                            if !editing { PreferencesModel.shared.notifySettingsChanged() }
-                        }
-                    }
-                }
-            }
-            
             Section(header: Text("Output")) {
+                #if os(iOS)
+                if UIDevice.current.userInterfaceIdiom == .phone {
                 Toggle("Speakerphone Mode", isOn: $speakerPhoneMode)
+                }
+                #endif
                 Toggle("Sidetone (Hear yourself)", isOn: $enableSidetone)
                 if enableSidetone {
                     VStack(alignment: .leading) {
@@ -236,6 +393,15 @@ struct AdvancedAudioSettingsView: View {
                         }
                     }
                 }
+            }
+            
+            Section(header: Text("Quality")) {
+                Picker("Audio Quality", selection: $qualityKind) {
+                    Text("Low (60kbit/s)").tag("low")
+                    Text("Balanced (100kbit/s)").tag("balanced")
+                    Text("High (192kbit/s)").tag("high")
+                }
+                .pickerStyle(.menu)
             }
             
             Section(header: Text("Network")) {
@@ -248,12 +414,111 @@ struct AdvancedAudioSettingsView: View {
         .formStyle(.grouped)
         #endif
         .navigationTitle("Advanced")
-        .onChange(of: enablePreprocessor) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: enableEchoCancel) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enableSidetone) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: speakerPhoneMode) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: qualityKind) { PreferencesModel.shared.notifySettingsChanged() }
     }
 }
+
+#if os(macOS)
+private struct MacInputDeviceOption: Identifiable, Hashable {
+    let uid: String
+    let name: String
+    var id: String { uid }
+}
+
+private enum MacInputDeviceCatalog {
+    static func inputDevices() -> [MacInputDeviceOption] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        
+        var dataSize: UInt32 = 0
+        let systemObject = AudioObjectID(kAudioObjectSystemObject)
+        guard AudioObjectGetPropertyDataSize(systemObject, &address, 0, nil, &dataSize) == noErr,
+              dataSize >= UInt32(MemoryLayout<AudioDeviceID>.size) else {
+            return []
+        }
+        
+        let count = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(systemObject, &address, 0, nil, &dataSize, &deviceIDs) == noErr else {
+            return []
+        }
+        
+        var options: [MacInputDeviceOption] = []
+        for deviceID in deviceIDs {
+            guard hasInputStream(deviceID),
+                  let uid = deviceUID(for: deviceID),
+                  let name = deviceName(for: deviceID) else { continue }
+            options.append(MacInputDeviceOption(uid: uid, name: name))
+        }
+        
+        return options.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+    
+    static func defaultInputUID() -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let err = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &size,
+            &deviceID
+        )
+        guard err == noErr else { return nil }
+        return deviceUID(for: deviceID)
+    }
+    
+    private static func hasInputStream(_ deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreams,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        var size: UInt32 = 0
+        let err = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
+        return err == noErr && size > 0
+    }
+    
+    private static func deviceUID(for deviceID: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        var value: CFString?
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        let err = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+        guard err == noErr, let uid = value else { return nil }
+        return uid as String
+    }
+    
+    private static func deviceName(for deviceID: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        var value: CFString?
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        let err = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+        guard err == noErr, let name = value else { return nil }
+        return name as String
+    }
+}
+
+#endif
 
 // 4. 主设置入口视图
 struct PreferencesView: View {
@@ -272,21 +537,30 @@ struct PreferencesView: View {
         Section(header: Text("Audio")) {
             #if os(macOS)
             HStack(spacing: 8) {
-                Label("Master Volume", systemImage: "speaker.wave.1")
+                Label("Output Volume", systemImage: "speaker.wave.1")
                     .frame(width: 140, alignment: .leading)
-                Slider(value: $outputVolume, in: 0...1) { editing in
+                Slider(value: $outputVolume, in: 0...3, step: 0.1) { editing in
                     if !editing { PreferencesModel.shared.notifySettingsChanged() }
                 }
+                Text("\(Int(outputVolume * 100))%")
+                    .font(.system(.body, design: .monospaced))
+                    .frame(width: 56, alignment: .trailing)
             }
             #else
             VStack(alignment: .leading, spacing: 6) {
-                Label("Master Volume", systemImage: "speaker.wave.2")
-                    .padding(.vertical, 4)
+                HStack {
+                    Label("Output Volume", systemImage: "speaker.wave.2")
+                    Spacer()
+                    Text("\(Int(outputVolume * 100))%")
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
                 HStack(spacing: 8) {
                     Image(systemName: "speaker")
                         .foregroundColor(.secondary)
                         .frame(width: 16)
-                    Slider(value: $outputVolume, in: 0...1) { editing in
+                    Slider(value: $outputVolume, in: 0...3, step: 0.1) { editing in
                         if !editing { PreferencesModel.shared.notifySettingsChanged() }
                     }
                     Image(systemName: "speaker.wave.3")
@@ -298,11 +572,7 @@ struct PreferencesView: View {
             #endif
             
             NavigationLink(destination: AudioTransmissionSettingsView()) {
-                Label("Transmission", systemImage: "mic")
-            }
-            
-            NavigationLink(destination: AudioQualitySettingsView()) {
-                Label("Audio Quality", systemImage: "waveform")
+                Label("Input Setting", systemImage: "mic")
             }
             
             NavigationLink(destination: AdvancedAudioSettingsView()) {
@@ -381,7 +651,8 @@ struct PreferencesView: View {
 /// Handoff profile 选项模型
 struct HandoffProfileOption: Identifiable {
     let primaryKey: Int
-    let displayLabel: String
+    let shortLabel: String
+    let menuLabel: String
     let hasCertificate: Bool
     var id: Int { primaryKey }
 }
@@ -392,17 +663,50 @@ struct HandoffProfilePicker: View {
     @State private var profiles: [HandoffProfileOption] = []
     
     var body: some View {
-        Picker("Handoff Profile", selection: $selectedKey) {
-            Text("Automatic").tag(-1)
-            ForEach(profiles) { profile in
-                Label {
-                    Text(profile.displayLabel)
-                } icon: {
-                    if profile.hasCertificate {
-                        Image(systemName: "checkmark.shield.fill")
+        LabeledContent("Handoff Profile") {
+            Menu {
+                Button {
+                    selectedKey = -1
+                } label: {
+                    HStack(spacing: 8) {
+                        selectionMarker(selectedKey == -1)
+                        Text("Automatic")
                     }
                 }
-                .tag(profile.primaryKey)
+
+                if !profiles.isEmpty {
+                    Divider()
+                }
+
+                ForEach(profiles) { profile in
+                    Button {
+                        selectedKey = profile.primaryKey
+                    } label: {
+                        HStack(spacing: 8) {
+                            selectionMarker(selectedKey == profile.primaryKey)
+                            Text(profile.menuLabel)
+                            if profile.hasCertificate {
+                                Image(systemName: "checkmark.shield.fill")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                #if os(iOS)
+                HStack(spacing: 6) {
+                    Text(selectedLabel)
+                        .font(.system(.body, design: .monospaced))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(.secondary)
+                #else
+                Text(selectedLabel)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                #endif
             }
         }
         .onAppear {
@@ -425,13 +729,17 @@ struct HandoffProfilePicker: View {
         profiles = servers.compactMap { server in
             guard server.hasPrimaryKey() else { return nil }
             let name = server.displayName ?? server.hostName ?? "Unknown"
-            let user = server.userName ?? ""
+            let user = (server.userName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let host = server.hostName ?? ""
             let port = server.port
-            let label = user.isEmpty ? "\(name) (\(host):\(port))" : "\(name) — \(user)@\(host):\(port)"
+            let shortLabel = name
+            let menuLabel = user.isEmpty
+                ? "\(name) — \(host):\(port)"
+                : "\(name) — \(user) @ \(host):\(port)"
             return HandoffProfileOption(
                 primaryKey: Int(server.primaryKey),
-                displayLabel: label,
+                shortLabel: shortLabel,
+                menuLabel: menuLabel,
                 hasCertificate: server.certificateRef != nil
             )
         }
@@ -442,6 +750,27 @@ struct HandoffProfilePicker: View {
     private func validateSelection() {
         if selectedKey != -1 && !profiles.contains(where: { $0.primaryKey == selectedKey }) {
             selectedKey = -1
+        }
+    }
+
+    private var selectedLabel: String {
+        if selectedKey == -1 {
+            return "Automatic"
+        }
+        if let selected = profiles.first(where: { $0.primaryKey == selectedKey }) {
+            return selected.shortLabel
+        }
+        return "Automatic"
+    }
+
+    @ViewBuilder
+    private func selectionMarker(_ isSelected: Bool) -> some View {
+        if isSelected {
+            Image(systemName: "checkmark")
+                .font(.system(size: 12, weight: .semibold))
+        } else {
+            Color.clear
+                .frame(width: 12, height: 12)
         }
     }
 }

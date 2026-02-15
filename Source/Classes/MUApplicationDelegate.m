@@ -21,6 +21,7 @@
     UIWindow                  *_window;
     UINavigationController    *_navigationController;
     BOOL                      _connectionActive;
+    NSString                  *_lastAudioRestartSignature;
 
 }
 - (void) setupAudio;
@@ -30,6 +31,23 @@
 @implementation MUApplicationDelegate
 
     NSTimeInterval _lastAudioRestartTime;
+
+static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
+    return [NSString stringWithFormat:@"%@|%@|%f|%f|%@|%f|%d|%d|%d|%f|%d|%d|%d",
+            [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
+            [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
+            [defaults doubleForKey:@"AudioVADBelow"],
+            [defaults doubleForKey:@"AudioVADAbove"],
+            [defaults stringForKey:@"AudioQualityKind"] ?: @"balanced",
+            [defaults doubleForKey:@"AudioMicBoost"],
+            [defaults boolForKey:@"AudioPreprocessor"],
+            [defaults boolForKey:@"AudioEchoCancel"],
+            [defaults boolForKey:@"AudioSidetone"],
+            [defaults doubleForKey:@"AudioSidetoneVolume"],
+            [defaults boolForKey:@"AudioSpeakerPhoneMode"],
+            [defaults boolForKey:@"AudioOpusCodecForceCELTMode"],
+            [defaults boolForKey:@"AudioMixerDebug"]];
+}
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     
@@ -73,6 +91,11 @@
                                                                 // Network
                                                                 [NSNumber numberWithBool:NO],      @"NetworkForceTCP",
                                                                 @"MumbleUser",                     @"DefaultUserName",
+                                                                // Notifications
+                                                                [NSNumber numberWithBool:YES],     @"NotifyUserJoinedSameChannel",
+                                                                [NSNumber numberWithBool:YES],     @"NotifyUserLeftSameChannel",
+                                                                [NSNumber numberWithBool:NO],      @"NotifyUserJoinedOtherChannels",
+                                                                [NSNumber numberWithBool:NO],      @"NotifyUserLeftOtherChannels",
                                                         nil]];
 
     // Disable mixer debugging for all builds.
@@ -169,6 +192,7 @@
     NSLog(@"[DEBUG] 🔧 setupAudio CALLED! Time: %f", [[NSDate date] timeIntervalSince1970]); // <--- 添加这行
     // Set up a good set of default audio settings.
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *restartSignature = MURestartSignatureFromDefaults(defaults);
     MKAudioSettings settings;
     memset(&settings, 0, sizeof(settings));
 
@@ -257,13 +281,18 @@
     settings.audioMixerDebug = [defaults boolForKey:@"AudioMixerDebug"];
     
     MKAudio *audio = [MKAudio sharedAudio];
+    BOOL audioActive = _connectionActive || [audio isRunning];
+    BOOL shouldRestart = audioActive
+        && _lastAudioRestartSignature != nil
+        && ![_lastAudioRestartSignature isEqualToString:restartSignature];
     [audio updateAudioSettings:&settings];
-    if (_connectionActive || [audio isRunning]) {
+    if (shouldRestart) {
         NSLog(@"[DEBUG] 🔧 Settings changed while active. Restarting audio engine...");
         [audio restart];
     } else {
-        NSLog(@"[DEBUG] 💤 Settings updated, but audio engine is idle. Skipping start.");
+        NSLog(@"[DEBUG] 💤 Settings updated without restart.");
     }
+    _lastAudioRestartSignature = [restartSignature copy];
     
     NSLog(@"[DEBUG] ✅ setupAudio FINISHED. Engine should be running.");
 }

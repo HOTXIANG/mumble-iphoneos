@@ -13,6 +13,9 @@ struct FavouriteServerEditView: View {
     @State private var port: String
     @State private var userName: String
     @State private var password: String
+    @State private var selectedCertificateTag: String
+    @State private var didEditCertificateSelection: Bool
+    @State private var suppressCertificateSelectionTracking: Bool
     
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject private var navigationManager: NavigationManager
@@ -37,6 +40,13 @@ struct FavouriteServerEditView: View {
         _port = State(initialValue: portValue == 0 ? "" : "\(portValue)")
         _userName = State(initialValue: server?.userName ?? "")
         _password = State(initialValue: server?.password ?? "")
+        let normalizedRef: Data? = {
+            guard let ref = server?.certificateRef else { return nil }
+            return MUCertificateController.normalizedIdentityPersistentRef(forPersistentRef: ref) ?? ref
+        }()
+        _selectedCertificateTag = State(initialValue: normalizedRef?.base64EncodedString() ?? "")
+        _didEditCertificateSelection = State(initialValue: false)
+        _suppressCertificateSelectionTracking = State(initialValue: false)
     }
     
     var body: some View {
@@ -93,6 +103,73 @@ struct FavouriteServerEditView: View {
                     lockedText: "••••••",
                     isSecure: true
                 )
+            }
+
+            Section(header: Text("Certificate"), footer: certificateFooter) {
+                LabeledContent("Bound Certificate") {
+                    Menu {
+                        Button {
+                            selectedCertificateTag = ""
+                        } label: {
+                            HStack {
+                                Text("None")
+                                if selectedCertificateTag.isEmpty {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        if !sortedCertificates.isEmpty || (!selectedCertificateTag.isEmpty && !selectedCertificateExists) {
+                            Divider()
+                        }
+
+                        if !selectedCertificateTag.isEmpty, !selectedCertificateExists {
+                            Button {
+                                // 当前绑定存在但无法在列表中解析时，允许保留该值
+                            } label: {
+                                HStack {
+                                    Text("Missing bound certificate")
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+
+                        ForEach(sortedCertificates, id: \.id) { cert in
+                            let tag = cert.id.base64EncodedString()
+                            Button {
+                                selectedCertificateTag = tag
+                            } label: {
+                                HStack {
+                                    Text(fullCertificateLabel(for: cert))
+                                    if selectedCertificateTag == tag {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        #if os(iOS)
+                        HStack(spacing: 6) {
+                            Text(boundCertificateCompactLabel)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundColor(.secondary)
+                        #else
+                        Text(boundCertificateCompactLabel)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                        #endif
+                    }
+                }
+                .onChange(of: selectedCertificateTag) { _ in
+                    if suppressCertificateSelectionTracking {
+                        suppressCertificateSelectionTracking = false
+                        return
+                    }
+                    didEditCertificateSelection = true
+                }
             }
             
             // 3. Status Section (显示证书状态)
@@ -159,6 +236,10 @@ struct FavouriteServerEditView: View {
         .onAppear {
             // 确保证书状态是最新的
             certModel.refreshCertificates()
+            reconcileSelectedCertificateTagIfNeeded()
+        }
+        .onChange(of: certModel.certificates) { _ in
+            reconcileSelectedCertificateTagIfNeeded()
         }
     }
     
@@ -254,6 +335,139 @@ struct FavouriteServerEditView: View {
             Text("You can update your username/password since the original certificate is lost.")
         }
     }
+
+    @ViewBuilder
+    private var certificateFooter: some View {
+        Text("You can manually bind a certificate for this profile. The selected certificate will be used when connecting from Favourite Servers.")
+    }
+
+    private var sortedCertificates: [CertificateItem] {
+        certModel.certificates.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    private var selectedCertificateRef: Data? {
+        guard !selectedCertificateTag.isEmpty else { return nil }
+        return Data(base64Encoded: selectedCertificateTag)
+    }
+
+    private var canonicalSelectedCertificateRef: Data? {
+        guard let selected = selectedCertificateRef else { return nil }
+        return MUCertificateController.normalizedIdentityPersistentRef(forPersistentRef: selected) ?? selected
+    }
+
+    private var selectedCertificateExists: Bool {
+        guard let selected = selectedCertificateRef else { return true }
+        if certModel.certificates.contains(where: { $0.id == selected }) {
+            return true
+        }
+        guard let selectedHash = certificateHash(forPersistentRef: selected) else {
+            return false
+        }
+        return certModel.certificates.contains(where: { normalizedHash($0.hash) == selectedHash })
+    }
+
+    private func fullCertificateLabel(for cert: CertificateItem) -> String {
+        let parsed = parseCertificateCommonName(cert.name)
+        let user = parsed.user
+        let host = parsed.host ?? currentServerHostForDisplay
+        return "\(user) @ \(host):\(currentServerPortForDisplay)"
+    }
+
+    private var boundCertificateCompactLabel: String {
+        guard let selected = selectedCertificateRef else { return "None" }
+
+        if let exact = certModel.certificates.first(where: { $0.id == selected }) {
+            return compactUserName(fromCertificateName: exact.name)
+        }
+
+        if let normalized = MUCertificateController.normalizedIdentityPersistentRef(forPersistentRef: selected),
+           let exact = certModel.certificates.first(where: { $0.id == normalized }) {
+            return compactUserName(fromCertificateName: exact.name)
+        }
+
+        if let cert = MUCertificateController.certificate(withPersistentRef: selected),
+           let name = cert.commonName(), !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return compactUserName(fromCertificateName: name)
+        }
+
+        return "Missing"
+    }
+
+    private func compactUserName(fromCertificateName raw: String) -> String {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return "Unknown" }
+        if let at = name.firstIndex(of: "@"), at > name.startIndex {
+            return String(name[..<at])
+        }
+        return name
+    }
+
+    private func parseCertificateCommonName(_ raw: String) -> (user: String, host: String?) {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            return ("Unknown", nil)
+        }
+        if let at = name.firstIndex(of: "@"), at > name.startIndex {
+            let user = String(name[..<at]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let hostPart = String(name[name.index(after: at)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let host = hostPart.isEmpty ? nil : hostPart
+            return (user.isEmpty ? "Unknown" : user, host)
+        }
+        return (name, nil)
+    }
+
+    private var currentServerHostForDisplay: String {
+        let host = hostName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !host.isEmpty { return host }
+        let fallback = server?.hostName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return fallback.isEmpty ? "Unknown" : fallback
+    }
+
+    private var currentServerPortForDisplay: UInt {
+        if let p = UInt(port.trimmingCharacters(in: .whitespacesAndNewlines)), p > 0 {
+            return p
+        }
+        if let fallback = server?.port, fallback > 0 {
+            return fallback
+        }
+        return 64738
+    }
+
+    private func normalizedHash(_ digest: String) -> String {
+        digest.replacingOccurrences(of: ":", with: "").uppercased()
+    }
+
+    private func certificateHash(forPersistentRef ref: Data) -> String? {
+        guard let cert = MUCertificateController.certificate(withPersistentRef: ref),
+              let digest = cert.hexDigest() else {
+            return nil
+        }
+        return normalizedHash(digest)
+    }
+
+    private func reconcileSelectedCertificateTagIfNeeded() {
+        guard let selected = selectedCertificateRef else { return }
+
+        if certModel.certificates.contains(where: { $0.id == selected }) {
+            return
+        }
+
+        if let normalized = MUCertificateController.normalizedIdentityPersistentRef(forPersistentRef: selected),
+           let exact = certModel.certificates.first(where: { $0.id == normalized }) {
+            suppressCertificateSelectionTracking = true
+            selectedCertificateTag = exact.id.base64EncodedString()
+            return
+        }
+
+        guard let selectedHash = certificateHash(forPersistentRef: selected),
+              let matchedByHash = certModel.certificates.first(where: { normalizedHash($0.hash) == selectedHash }) else {
+            return
+        }
+        suppressCertificateSelectionTracking = true
+        selectedCertificateTag = matchedByHash.id.base64EncodedString()
+    }
     
     // MARK: - Save Logic
     
@@ -262,26 +476,6 @@ struct FavouriteServerEditView: View {
         let finalUserName: String? = userName.isEmpty ? nil : userName
         let finalPassword: String? = password.isEmpty ? nil : password
         let finalDisplayName = displayName.isEmpty ? (hostName.isEmpty ? "Mumble Server" : hostName) : displayName
-        
-        // 如果是新建模式，检查是否有匹配的 hidden profile 可以恢复
-        if !isEditMode {
-            let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
-            if let hiddenMatch = allFavs.first(where: {
-                $0.isHidden
-                && $0.hostName?.caseInsensitiveCompare(hostName) == .orderedSame
-                && $0.port == finalPort
-                && $0.userName == finalUserName
-                && $0.certificateRef != nil
-            }) {
-                // 恢复 hidden profile：更新显示名/密码，取消 hidden
-                hiddenMatch.displayName = finalDisplayName
-                hiddenMatch.password = finalPassword
-                hiddenMatch.isHidden = false
-                print("♻️ Restored hidden profile for \(hiddenMatch.userName ?? "")@\(hiddenMatch.hostName ?? "")")
-                onSave(hiddenMatch)
-                return
-            }
-        }
         
         let serverToSave: MUFavouriteServer
         if let existingServer = server {
@@ -295,8 +489,20 @@ struct FavouriteServerEditView: View {
         serverToSave.port = finalPort
         serverToSave.userName = finalUserName
         serverToSave.password = finalPassword
-        
-        if serverToSave.certificateRef == nil, let user = serverToSave.userName, let host = serverToSave.hostName {
+
+        if didEditCertificateSelection {
+            serverToSave.certificateRef = canonicalSelectedCertificateRef
+        } else if !selectedCertificateTag.isEmpty {
+            // 保留原有绑定（包含暂时找不到的证书 ref）
+            serverToSave.certificateRef = canonicalSelectedCertificateRef
+        } else {
+            serverToSave.certificateRef = nil
+        }
+
+        if !didEditCertificateSelection,
+           serverToSave.certificateRef == nil,
+           let user = serverToSave.userName,
+           let host = serverToSave.hostName {
             // 确保证书列表是最新的
             certModel.refreshCertificates()
             

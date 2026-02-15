@@ -192,6 +192,19 @@
     return (__bridge_transfer NSArray *)result;
 }
 
++ (NSData *) normalizedIdentityPersistentRefForPersistentRef:(NSData *)persistentRef {
+    if (!persistentRef) return nil;
+
+    SecIdentityRef identity = [self copyIdentityForPersistentRef:persistentRef];
+    if (!identity) {
+        return nil;
+    }
+
+    NSData *normalized = [self persistentRefForIdentity:identity];
+    CFRelease(identity);
+    return normalized;
+}
+
 + (NSString *) fingerprintFromHexString:(NSString *)hexDigest {
     if ([hexDigest length] != 40)
         return hexDigest;

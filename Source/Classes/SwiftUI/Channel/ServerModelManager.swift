@@ -76,6 +76,9 @@ class ServerModelManager: ObservableObject {
     
     /// 跟踪所有用户的监听状态：channelId -> [userSession]
     @Published var channelListeners: [UInt: Set<UInt>] = [:]
+
+    /// ACL 页面用的 UserID -> 用户名缓存（包含离线已注册用户）
+    @Published var aclUserNamesById: [Int: String] = [:]
     
     /// 用于密码输入弹窗的状态
     @Published var passwordPromptChannel: MKChannel? = nil
@@ -86,6 +89,7 @@ class ServerModelManager: ObservableObject {
     
     /// ACL 扫描期间抑制 permission denied 通知
     private var isScanningACLs: Bool = false
+    private var pendingACLUserNameQueries: Set<Int> = []
     
     private let tokenHolder = ObserverTokenHolder()
     private var delegateToken: DelegateToken?
@@ -305,6 +309,8 @@ class ServerModelManager: ObservableObject {
         channelsWithPassword.removeAll()
         channelsUserCanEnter.removeAll()
         channelPermissions.removeAll()
+        aclUserNamesById.removeAll()
+        pendingACLUserNameQueries.removeAll()
         // 保存当前监听频道以便重连后恢复
         if !listeningChannels.isEmpty {
             savedListeningChannelIds = listeningChannels
@@ -758,18 +764,22 @@ class ServerModelManager: ObservableObject {
                 let safeUser = userTransfer.value
                 self.applySavedUserPreferences(user: safeUser)
                 let userName = safeUser.userName() ?? "Unknown User"
-                self.addSystemNotification("\(userName) connected", category: .userJoined)
+                let category: SystemNotifyCategory = self.isUserInSameChannelAsMe(safeUser) ? .userJoinedSameChannel : .userJoinedOtherChannels
+                self.addSystemNotification("\(userName) connected", category: category)
                 self.rebuildModelArray()
             }
         })
         
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userLeftNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let user = userInfo["user"] as? MKUser else { return }
-            let userName = user.userName() ?? "Unknown User"
-            let session = user.session()
+            let userTransfer = UnsafeTransfer(value: user)
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                self.addSystemNotification("\(userName) disconnected", category: .userLeft)
+                let safeUser = userTransfer.value
+                let userName = safeUser.userName() ?? "Unknown User"
+                let category: SystemNotifyCategory = self.isUserInSameChannelAsMe(safeUser) ? .userLeftSameChannel : .userLeftOtherChannels
+                self.addSystemNotification("\(userName) disconnected", category: category)
+                let session = safeUser.session()
                 // 清除离开用户的监听状态
                 for (channelId, var listeners) in self.channelListeners {
                     listeners.remove(session)
@@ -862,7 +872,11 @@ class ServerModelManager: ObservableObject {
                 self.messages.append(pmMessage)
                 
                 // 发送通知
-                let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+                let defaults = UserDefaults.standard
+                let notifyEnabled: Bool = {
+                    if let v = defaults.object(forKey: "NotificationNotifyPrivateMessages") as? Bool { return v }
+                    return defaults.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+                }()
                 if notifyEnabled {
                     let bodyText = plainText.isEmpty ? "[Image]" : plainText
                     self.sendLocalNotification(title: "PM from \(senderName)", body: bodyText)
@@ -963,6 +977,31 @@ class ServerModelManager: ObservableObject {
                     self.channelsUserCanEnter.remove(channelId)
                 }
                 self.rebuildModelArray()
+            }
+        })
+
+        // QueryUsers 结果：离线注册用户名解析（UserID -> Name）
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.aclUserNamesResolvedNotification, object: nil, queue: nil) { [weak self] notification in
+            let raw = notification.userInfo?["userNamesById"]
+            var resolved: [Int: String] = [:]
+            if let typed = raw as? [NSNumber: String] {
+                for (key, value) in typed {
+                    resolved[key.intValue] = value
+                }
+            } else if let dict = raw as? NSDictionary {
+                for (key, value) in dict {
+                    if let idNum = key as? NSNumber, let name = value as? String {
+                        resolved[idNum.intValue] = name
+                    }
+                }
+            }
+            guard !resolved.isEmpty else { return }
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                for (id, name) in resolved {
+                    self.aclUserNamesById[id] = name
+                    self.pendingACLUserNameQueries.remove(id)
+                }
             }
         })
         
@@ -1112,12 +1151,23 @@ class ServerModelManager: ObservableObject {
     
     /// 系统通知分类，每类对应一个独立的 UserDefaults 开关
     enum SystemNotifyCategory: String {
-        case userJoined       = "NotifyUserJoined"
-        case userLeft         = "NotifyUserLeft"
+        case userJoinedSameChannel    = "NotifyUserJoinedSameChannel"
+        case userLeftSameChannel      = "NotifyUserLeftSameChannel"
+        case userJoinedOtherChannels  = "NotifyUserJoinedOtherChannels"
+        case userLeftOtherChannels    = "NotifyUserLeftOtherChannels"
         case userMoved        = "NotifyUserMoved"
         case muteDeafen       = "NotifyMuteDeafen"
         case movedByAdmin     = "NotifyMovedByAdmin"
         case channelListening = "NotifyChannelListening"
+        
+        var defaultEnabled: Bool {
+            switch self {
+            case .userJoinedSameChannel, .userLeftSameChannel, .userMoved, .movedByAdmin, .channelListening:
+                return true
+            case .userJoinedOtherChannels, .userLeftOtherChannels, .muteDeafen:
+                return false
+            }
+        }
     }
     
     /// 添加系统消息到聊天区域，并根据分类开关决定是否发送系统推送通知
@@ -1133,11 +1183,40 @@ class ServerModelManager: ObservableObject {
         // 如果指定了分类，检查该分类的独立开关（默认开启）
         // 如果未指定分类（如 "Connected to server"），不发送推送
         if let category = category {
-            let shouldNotify = UserDefaults.standard.object(forKey: category.rawValue) as? Bool ?? true
+            let shouldNotify = UserDefaults.standard.object(forKey: category.rawValue) as? Bool ?? category.defaultEnabled
             if shouldNotify {
                 sendLocalNotification(title: currentNotificationTitle, body: text)
             }
         }
+    }
+
+    private func isUserInSameChannelAsMe(_ user: MKUser) -> Bool {
+        guard let myChannelId = serverModel?.connectedUser()?.channel()?.channelId() else {
+            return false
+        }
+        if let directUserChannelId = user.channel()?.channelId() {
+            return directUserChannelId == myChannelId
+        }
+        guard let inferredUserChannelId = inferredChannelId(forUserSession: user.session()) else {
+            return false
+        }
+        return inferredUserChannelId == myChannelId
+    }
+
+    private func inferredChannelId(forUserSession session: UInt) -> UInt? {
+        guard let userIndex = userIndexMap[session],
+              userIndex > 0,
+              userIndex < modelItems.count else {
+            return nil
+        }
+        let userItem = modelItems[userIndex]
+        for i in stride(from: userIndex - 1, through: 0, by: -1) {
+            let item = modelItems[i]
+            if item.type == .channel && item.indentLevel < userItem.indentLevel {
+                return (item.object as? MKChannel)?.channelId()
+            }
+        }
+        return nil
     }
     
     // 新增：一个用于将纯文本转换为 AttributedString 的辅助函数
@@ -1240,7 +1319,11 @@ class ServerModelManager: ObservableObject {
         // 只有当消息真的被添加了 (didAppend == true)，才处理后续通知
         if didAppend {
             let isSentBySelf = (senderSession == connectedUserSession)
-            let notifyEnabled = UserDefaults.standard.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+            let defaults = UserDefaults.standard
+            let notifyEnabled: Bool = {
+                if let v = defaults.object(forKey: "NotificationNotifyNormalUserMessages") as? Bool { return v }
+                return defaults.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
+            }()
             
             // 只有不是自己发的、且开启了通知，才发通知
             // sendLocalNotification 内部会根据 applicationState 判断：前台播放音效，后台发系统推送
@@ -2266,6 +2349,30 @@ class ServerModelManager: ObservableObject {
     /// 设置频道的 ACL 数据
     func setACL(_ accessControl: MKAccessControl, for channel: MKChannel) {
         serverModel?.setAccessControl(accessControl, for: channel)
+    }
+
+    /// 请求离线已注册用户的用户名（用于 ACL 显示）
+    func requestACLUserNames(for userIds: [Int]) {
+        let uniqueIds = Set(userIds.filter { $0 >= 0 })
+        let idsToQuery = uniqueIds.filter { aclUserNamesById[$0] == nil && !pendingACLUserNameQueries.contains($0) }
+        guard !idsToQuery.isEmpty else { return }
+
+        pendingACLUserNameQueries.formUnion(idsToQuery)
+        let payload = idsToQuery.sorted().map { NSNumber(value: $0) }
+        serverModel?.queryUserNames(forIds: payload)
+    }
+
+    /// ACL 专用：优先返回在线用户名，其次返回离线缓存，最后回退 User #id
+    func aclUserDisplayName(for userId: Int) -> String {
+        for item in modelItems {
+            if item.type == .user, let user = item.object as? MKUser, Int(user.userId()) == userId {
+                return user.userName() ?? "User #\(userId)"
+            }
+        }
+        if let cached = aclUserNamesById[userId], !cached.isEmpty {
+            return cached
+        }
+        return "User #\(userId)"
     }
     
     // MARK: - Password Channel Management

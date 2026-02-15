@@ -18,6 +18,7 @@
 #import <MumbleKit/MKCertificate.h>
 #import <AVFoundation/AVFoundation.h>
 #import <Network/Network.h>
+@import Security;
 
 NSString *MUConnectionOpenedNotification = @"MUConnectionOpenedNotification";
 NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
@@ -25,6 +26,42 @@ NSString *MUConnectionConnectingNotification = @"MUConnectionConnectingNotificat
 NSString *MUConnectionErrorNotification = @"MUConnectionErrorNotification";
 
 NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
+
+static BOOL MUCertChainHasIdentity(NSArray *chain) {
+    if (!chain || [chain count] == 0) return NO;
+    id first = [chain objectAtIndex:0];
+    return CFGetTypeID((__bridge CFTypeRef)first) == SecIdentityGetTypeID();
+}
+
+static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *label) {
+    if (!ref) return nil;
+
+    NSData *normalizedRef = [MUCertificateController normalizedIdentityPersistentRefForPersistentRef:ref];
+    if (normalizedRef && ![normalizedRef isEqualToData:ref]) {
+        NSLog(@"🔧 Normalized %@ certificate ref (%lu -> %lu bytes).",
+              label ?: @"",
+              (unsigned long)[ref length],
+              (unsigned long)[normalizedRef length]);
+    }
+
+    if (normalizedRef) {
+        NSArray *normalizedChain = [MUCertificateChainBuilder buildChainFromPersistentRef:normalizedRef];
+        if (MUCertChainHasIdentity(normalizedChain)) {
+            return normalizedChain;
+        }
+    }
+
+    NSArray *rawChain = [MUCertificateChainBuilder buildChainFromPersistentRef:ref];
+    if (MUCertChainHasIdentity(rawChain)) {
+        return rawChain;
+    }
+
+    if (rawChain && [rawChain count] > 0) {
+        NSLog(@"⚠️ %@ certificate ref resolved to cert-only chain (no private key identity). Ignoring it.",
+              label ?: @"");
+    }
+    return nil;
+}
 
 @interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate
 #if TARGET_OS_IOS
@@ -274,19 +311,23 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 #endif
 
     if (_certificateRef != nil) {
-        // 如果这个服务器有专属证书，就用它
-        NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:_certificateRef];
+        // 如果这个服务器有专属证书，就优先使用可认证（含 identity）的证书链
+        NSArray *certChain = MUIdentityBackedChainForPersistentRef(_certificateRef, @"server-specific");
         if (certChain && certChain.count > 0) {
             [_connection setCertificateChain:certChain];
             NSLog(@"🔐 Using server-specific certificate for connection. (chain length: %lu)", (unsigned long)certChain.count);
         } else {
-            // 专属证书构建失败，尝试回退到全局默认
-            NSLog(@"⚠️ Failed to build cert chain from server-specific ref (%lu bytes). Falling back...", (unsigned long)_certificateRef.length);
+            // 专属证书不可用，回退到全局默认
+            NSLog(@"⚠️ Failed to resolve server-specific cert identity (%lu bytes). Falling back...", (unsigned long)_certificateRef.length);
             NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
             if (globalCert) {
-                NSArray *fallbackChain = [MUCertificateChainBuilder buildChainFromPersistentRef:globalCert];
-                [_connection setCertificateChain:fallbackChain];
-                NSLog(@"🔐 Fell back to global default certificate.");
+                NSArray *fallbackChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
+                if (fallbackChain && fallbackChain.count > 0) {
+                    [_connection setCertificateChain:fallbackChain];
+                    NSLog(@"🔐 Fell back to global default certificate.");
+                } else {
+                    NSLog(@"👤 Global default certificate is unusable for client auth. Connecting anonymously.");
+                }
             } else {
                 NSLog(@"👤 No fallback certificate available. Connecting anonymously.");
             }
@@ -295,9 +336,13 @@ NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
         // 如果没有专属证书，再回退到全局默认 (可选，或者直接匿名)
         NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
         if (globalCert) {
-            NSArray *certChain = [MUCertificateChainBuilder buildChainFromPersistentRef:globalCert];
-            [_connection setCertificateChain:certChain];
-            NSLog(@"🔐 Using global default certificate.");
+            NSArray *certChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
+            if (certChain && certChain.count > 0) {
+                [_connection setCertificateChain:certChain];
+                NSLog(@"🔐 Using global default certificate.");
+            } else {
+                NSLog(@"👤 Global default certificate is unusable for client auth. Connecting anonymously.");
+            }
         } else {
             NSLog(@"👤 Connecting anonymously (No certificate).");
         }

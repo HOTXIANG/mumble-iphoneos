@@ -53,7 +53,7 @@ struct ChannelView: View {
             if geo.size.width > 700 {
                 // [宽屏模式]
                 HStack(spacing: 0) {
-                    ServerChannelView(serverManager: serverManager)
+                    ServerChannelView(serverManager: serverManager, isSplitLayout: true)
                         .frame(maxWidth: .infinity)
                     
                     ResizeHandle()
@@ -68,7 +68,7 @@ struct ChannelView: View {
                         )
                         .zIndex(10)
                     
-                    MessagesView(serverManager: serverManager)
+                    MessagesView(serverManager: serverManager, isSplitLayout: true)
                         .frame(width: calculateEffectiveChatWidth(totalWidth: geo.size.width))
                         .background(Color.black.opacity(0.15))
                         .onAppear { appState.unreadMessageCount = 0 }
@@ -77,11 +77,11 @@ struct ChannelView: View {
             } else {
                 // [窄屏模式]
                 TabView(selection: $appState.currentTab) {
-                    ServerChannelView(serverManager: serverManager)
+                    ServerChannelView(serverManager: serverManager, isSplitLayout: false)
                         .tabItem { Label("Channels", systemImage: "person.3.fill") }
                         .tag(AppState.Tab.channels)
                     
-                    MessagesView(serverManager: serverManager)
+                    MessagesView(serverManager: serverManager, isSplitLayout: false)
                         .tabItem { Label("Messages", systemImage: "message.fill") }
                         .tag(AppState.Tab.messages)
                         .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
@@ -139,6 +139,7 @@ struct ChannelView: View {
 
 struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
+    let isSplitLayout: Bool
     @State private var selectedUserForConfig: MKUser? = nil
     @State private var selectedUserForInfo: MKUser? = nil
     @State private var selectedChannelForInfo: MKChannel? = nil
@@ -199,7 +200,8 @@ struct ServerChannelView: View {
                     
                     Color.clear.frame(height: 80)
                 }
-                .padding(.horizontal, 16)
+                .padding(.leading, 16)
+                .padding(.trailing, isSplitLayout ? 4 : 16)
             }
         }
         .overlay(alignment: .bottom) {

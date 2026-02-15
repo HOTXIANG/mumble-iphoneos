@@ -55,6 +55,7 @@ struct PreviewItem: Identifiable {
 // MARK: - 3. 主容器 (Stable Container)
 struct MessagesView: View {
     let serverManager: ServerModelManager
+    let isSplitLayout: Bool
     
     // 状态管理中心
     @State private var previewItem: PreviewItem?
@@ -65,6 +66,7 @@ struct MessagesView: View {
             // 1. 动态内容层
             MessagesList(
                 serverManager: serverManager,
+                isSplitLayout: isSplitLayout,
                 onPreviewRequest: { image in handleImageTap(image: image) },
                 onImageSelected: { image in selectedImageForSend = image }
             )
@@ -210,6 +212,7 @@ struct MacImagePreviewOverlay: View {
 // 这个视图负责监听数据变化和 UI 刷新
 struct MessagesList: View {
     @ObservedObject var serverManager: ServerModelManager
+    let isSplitLayout: Bool
     
     // 回调函数
     let onPreviewRequest: (PlatformImage) -> Void
@@ -261,7 +264,10 @@ struct MessagesList: View {
                         }
                         Spacer().frame(height: 10).id(bottomID)
                     }
-                    .padding()
+                    .padding(.top, 16)
+                    .padding(.bottom, 16)
+                    .padding(.leading, isSplitLayout ? 4 : 16)
+                    .padding(.trailing, 16)
                 }
                 .safeAreaInset(edge: .bottom) {
                     TextInputBar(

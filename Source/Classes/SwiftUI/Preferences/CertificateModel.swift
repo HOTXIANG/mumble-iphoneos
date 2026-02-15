@@ -62,10 +62,13 @@ class CertificateModel: ObservableObject {
     }
     
     func isCertificateValid(_ ref: Data) -> Bool {
-        if certificates.contains(where: { $0.id == ref }) {
+        guard let normalized = MUCertificateController.normalizedIdentityPersistentRef(forPersistentRef: ref) else {
+            return false
+        }
+        if certificates.contains(where: { $0.id == normalized }) {
             return true
         }
-        return MUCertificateController.certificate(withPersistentRef: ref) != nil
+        return MUCertificateController.certificate(withPersistentRef: normalized) != nil
     }
     
     func generateNewCertificate(name: String, email: String) {

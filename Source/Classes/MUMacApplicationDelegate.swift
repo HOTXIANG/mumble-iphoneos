@@ -14,6 +14,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     private let minimumWindowSize = NSSize(width: 980, height: 680)
     private var connectionActive = false
     private let statusBarController = MUStatusBarController()
+    private var lastAudioRestartSignature: String?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Disable automatic window tabbing (removes "Show Tab Bar" / "Show All Tabs" from View menu)
@@ -45,10 +46,17 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioSidetone": false,
             "AudioSidetoneVolume": 0.2,
             "AudioSpeakerPhoneMode": true,
+            "AudioFollowSystemInputDevice": true,
+            "AudioPreferredInputDeviceUID": "",
             "AudioOpusCodecForceCELTMode": true,
             // Network
             "NetworkForceTCP": false,
             "DefaultUserName": "MumbleUser",
+            // Notifications
+            "NotifyUserJoinedSameChannel": true,
+            "NotifyUserLeftSameChannel": true,
+            "NotifyUserJoinedOtherChannels": false,
+            "NotifyUserLeftOtherChannels": false,
         ])
         
         // Disable mixer debugging
@@ -135,6 +143,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     
     private func setupAudio() {
         let defaults = UserDefaults.standard
+        let restartSignature = audioRestartSignature(defaults: defaults)
         
         var settings = MKAudioSettings()
         
@@ -194,10 +203,34 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         settings.audioMixerDebug = ObjCBool(defaults.bool(forKey: "AudioMixerDebug"))
         
         let audio = MKAudio.shared()
+        let shouldRestart = (connectionActive || (audio?.isRunning() ?? false))
+            && (lastAudioRestartSignature != nil)
+            && (lastAudioRestartSignature != restartSignature)
         audio?.update(&settings)
-        if connectionActive || (audio?.isRunning() ?? false) {
+        if shouldRestart {
             audio?.restart()
         }
+        lastAudioRestartSignature = restartSignature
+    }
+
+    private func audioRestartSignature(defaults: UserDefaults) -> String {
+        [
+            defaults.string(forKey: "AudioTransmitMethod") ?? "vad",
+            defaults.string(forKey: "AudioVADKind") ?? "amplitude",
+            String(defaults.double(forKey: "AudioVADBelow")),
+            String(defaults.double(forKey: "AudioVADAbove")),
+            defaults.string(forKey: "AudioQualityKind") ?? "balanced",
+            String(defaults.double(forKey: "AudioMicBoost")),
+            String(defaults.bool(forKey: "AudioPreprocessor")),
+            String(defaults.bool(forKey: "AudioEchoCancel")),
+            String(defaults.bool(forKey: "AudioSidetone")),
+            String(defaults.double(forKey: "AudioSidetoneVolume")),
+            String(defaults.bool(forKey: "AudioSpeakerPhoneMode")),
+            String(defaults.bool(forKey: "AudioOpusCodecForceCELTMode")),
+            String(defaults.bool(forKey: "AudioMixerDebug")),
+            String(defaults.bool(forKey: "AudioFollowSystemInputDevice")),
+            defaults.string(forKey: "AudioPreferredInputDeviceUID") ?? ""
+        ].joined(separator: "|")
     }
 
     // MARK: - 窗口最小尺寸约束

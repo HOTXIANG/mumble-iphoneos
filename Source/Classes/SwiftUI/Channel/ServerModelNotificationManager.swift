@@ -24,6 +24,7 @@ class ServerModelNotificationManager {
     static let channelAddedNotification = Notification.Name("ServerModelChannelAdded")
     static let channelRemovedNotification = Notification.Name("ServerModelChannelRemoved")
     static let permissionQueryResultNotification = Notification.Name("ServerModelPermissionQueryResult")
+    static let aclUserNamesResolvedNotification = Notification.Name("ServerModelACLUserNamesResolved")
     
     // --- 核心修改 2：添加一个发送新通知的方法 ---
     func postUserMoved(user: MKUser, to channel: MKChannel, by mover: MKUser? = nil) {
@@ -73,6 +74,11 @@ class ServerModelNotificationManager {
     func postPermissionQueryResult(permissions: UInt32, for channel: MKChannel) {
         let userInfo: [String: Any] = ["permissions": permissions, "channel": channel]
         NotificationCenter.default.post(name: Self.permissionQueryResultNotification, object: nil, userInfo: userInfo)
+    }
+
+    func postACLUserNamesResolved(_ userNamesById: [NSNumber: String]) {
+        let userInfo: [String: Any] = ["userNamesById": userNamesById]
+        NotificationCenter.default.post(name: Self.aclUserNamesResolvedNotification, object: nil, userInfo: userInfo)
     }
     
     func postPermissionDenied(permission: MKPermission, user: MKUser?, channel: MKChannel?) {
@@ -184,5 +190,18 @@ class ServerModelNotificationManager {
     // Permission Query 结果
     func serverModel(_ model: MKServerModel, permissionQueryResult permissions: UInt32, for channel: MKChannel) {
         ServerModelNotificationManager.shared.postPermissionQueryResult(permissions: permissions, for: channel)
+    }
+
+    // QueryUsers 结果（UserID -> 用户名）
+    func serverModel(_ model: MKServerModel, didResolveUserNames userNamesById: [AnyHashable : Any]) {
+        var resolved: [NSNumber: String] = [:]
+        for (key, value) in userNamesById {
+            if let idNum = key as? NSNumber, let name = value as? String {
+                resolved[idNum] = name
+            }
+        }
+        if !resolved.isEmpty {
+            ServerModelNotificationManager.shared.postACLUserNamesResolved(resolved)
+        }
     }
 }

@@ -16,6 +16,10 @@
 
 + (NSArray *) persistentRefsForIdentities;
 
+// 将任意证书引用（identity/certificate）归一化为可认证的 identity persistent ref。
+// 返回 nil 表示该引用无法解析为可用于客户端认证的身份。
++ (NSData *) normalizedIdentityPersistentRefForPersistentRef:(NSData *)persistentRef;
+
 + (NSData *) generateSelfSignedCertificateWithName:(NSString *)name email:(NSString *)email;
 
 // 导出指定身份为 P12 数据
