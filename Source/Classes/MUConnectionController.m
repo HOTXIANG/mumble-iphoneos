@@ -3,10 +3,6 @@
 // license that can be found in the LICENSE file.
 
 #import "MUConnectionController.h"
-#if TARGET_OS_IOS
-#import "MUServerRootViewController.h"
-#import "MUServerCertificateTrustViewController.h"
-#endif
 #import "MUCertificateController.h"
 #import "MUCertificateChainBuilder.h"
 #import "MUDatabase.h"
@@ -63,15 +59,10 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     return nil;
 }
 
-@interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate
-#if TARGET_OS_IOS
-    , MUServerCertificateTrustViewControllerProtocol
-#endif
-> {
+@interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate> {
     MKConnection               *_connection;
     MKServerModel              *_serverModel;
 #if TARGET_OS_IOS
-    MUServerRootViewController *_serverRoot;
     UIViewController           *_parentViewController;
     UIAlertController          *_alertCtrl;
 #endif
@@ -185,9 +176,6 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         [_connection disconnect];
     }
     
-#if TARGET_OS_IOS
-    [_serverRoot dismissViewControllerAnimated:YES completion:nil];
-#endif
     [self teardownConnection];
 }
 
@@ -306,10 +294,6 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     _serverModel = [[MKServerModel alloc] initWithConnection:_connection];
     [_serverModel addDelegate:self];
     
-#if TARGET_OS_IOS
-    _serverRoot = [[MUServerRootViewController alloc] initWithConnection:_connection andServerModel:_serverModel];
-#endif
-
     if (_certificateRef != nil) {
         // 如果这个服务器有专属证书，就优先使用可认证（含 identity）的证书链
         NSArray *certChain = MUIdentityBackedChainForPersistentRef(_certificateRef, @"server-specific");
@@ -365,10 +349,6 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         _connection = nil;
     }
     [_timer invalidate];
-#if TARGET_OS_IOS
-    _serverRoot = nil;
-#endif
-    
 #if TARGET_OS_IOS
     [[UIApplication sharedApplication] setApplicationIconBadgeNumber:0];
 #endif
@@ -634,12 +614,6 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         [self postErrorWithTitle:NSLocalizedString(@"You were banned", nil) message:msg];
     }
 }
-#if TARGET_OS_IOS
-- (void) serverCertificateTrustViewControllerDidDismiss:(MUServerCertificateTrustViewController *)trustView {
-    [self showConnectingView];
-    [_connection reconnect];
-}
-#endif
 - (void) serverModel:(MKServerModel *)model userJoined:(MKUser *)user {}
 - (void) serverModel:(MKServerModel *)model userDisconnected:(MKUser *)user {}
 - (void) serverModel:(MKServerModel *)model userLeft:(MKUser *)user {}

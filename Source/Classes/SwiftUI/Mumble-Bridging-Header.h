@@ -12,11 +12,6 @@
 
 #if TARGET_OS_IOS
 // 导入 Mumble UIKit 控制器 (iOS only)
-#import "MUFavouriteServerListController.h"
-#import "MUPreferencesViewController.h"
-#import "MULegalViewController.h"
-#import "MUServerViewController.h"
-#import "MUCertificatePreferencesViewController.h"
 #import "MUApplicationDelegate.h"
 #import "MUImage.h"
 #endif

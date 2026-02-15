@@ -48,8 +48,9 @@ static NSArray *FindValidParentsForCert(SecCertificateRef cert) {
     CFDataRef issuerData = SecCertificateCopyNormalizedIssuerSequence(cert);
     if (!issuerData) return nil;
     
-    // CFDataRef -> NSData* 需要 __bridge_transfer
-    NSData *issuer = (__bridge_transfer NSData *)issuerData;
+    // MUCertificateChainBuilder.m 使用 MRC（-fno-objc-arc），
+    // 这里通过 autorelease 接管 CoreFoundation 返回对象。
+    NSData *issuer = [(NSData *)issuerData autorelease];
 
     // 在 Keychain 中搜索 Subject 等于该 Issuer 的证书
     NSDictionary *query = @{
@@ -66,7 +67,7 @@ static NSArray *FindValidParentsForCert(SecCertificateRef cert) {
         return nil;
     }
 
-    NSArray *matches = (__bridge_transfer NSArray *)result;
+    NSArray *matches = [(NSArray *)result autorelease];
     NSMutableArray *parents = [NSMutableArray arrayWithCapacity:[matches count]];
 
     for (id match in matches) {

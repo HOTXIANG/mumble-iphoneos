@@ -576,12 +576,6 @@ struct AppRootView: View {
     @ViewBuilder
     private func destinationView(for destination: NavigationDestination, navigationManager: NavigationManager) -> some View {
         switch destination {
-        case .objectiveC(let type):
-            #if os(iOS)
-            ObjectiveCViewWrapper(controllerType: type)
-            #else
-            Text("Not available on macOS")
-            #endif
         case .swiftUI(let type):
             switch type {
             case .favouriteServerList:
