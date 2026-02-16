@@ -653,7 +653,7 @@ private struct VADOnboardingSplashView: View {
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    Slider(value: belowBinding, in: minThreshold...(maxThreshold - minGap), step: 0.01)
+                    Slider(value: belowBinding, in: minThreshold...(maxThreshold - minGap))
                         .tint(.indigo)
                     
                     HStack {
@@ -664,7 +664,7 @@ private struct VADOnboardingSplashView: View {
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    Slider(value: aboveBinding, in: (minThreshold + minGap)...maxThreshold, step: 0.01)
+                    Slider(value: aboveBinding, in: (minThreshold + minGap)...maxThreshold)
                         .tint(.indigo)
                     
                     HStack {
