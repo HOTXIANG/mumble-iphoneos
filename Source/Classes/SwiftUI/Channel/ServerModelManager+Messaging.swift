@@ -5,6 +5,23 @@
 
 import SwiftUI
 
+private final class MessageSendFailureBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var failed = false
+
+    func markFailed() {
+        lock.lock()
+        failed = true
+        lock.unlock()
+    }
+
+    var didFail: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return failed
+    }
+}
+
 extension ServerModelManager {
     func sendTextMessage(_ text: String) {
         guard let serverModel = serverModel, !text.isEmpty else { return }
@@ -93,14 +110,14 @@ extension ServerModelManager {
             try? await Task.sleep(nanoseconds: 800 * 1_000_000)
         }
 
-        var didFail = false
+        let failureBox = MessageSendFailureBox()
         let observer = NotificationCenter.default.addObserver(forName: failName, object: nil, queue: .main) { _ in
-            didFail = true
+            failureBox.markFailed()
         }
         _ = await task.result
         NotificationCenter.default.removeObserver(observer)
 
-        if didFail {
+        if failureBox.didFail {
             print("⚠️ Send failed. Reducing size by 10%...")
             let newTarget = Int(Double(targetSize) * decayRate)
             await attemptSendImage(image: image, targetSize: newTarget, decayRate: decayRate)

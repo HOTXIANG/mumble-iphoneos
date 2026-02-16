@@ -17,6 +17,25 @@
 
 @implementation MUNotificationController
 
+static UIWindow *MUNotificationKeyWindow(void) {
+    UIApplication *application = [UIApplication sharedApplication];
+    for (UIScene *scene in application.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        if (windowScene.activationState != UISceneActivationStateForegroundActive) {
+            continue;
+        }
+        for (UIWindow *window in windowScene.windows) {
+            if (window.isKeyWindow) {
+                return window;
+            }
+        }
+    }
+    return nil;
+}
+
 + (MUNotificationController *) sharedController {
     static MUNotificationController *nc;
     static dispatch_once_t token;
@@ -87,7 +106,12 @@
     lbl.textAlignment = NSTextAlignmentCenter;
     [container addSubview:lbl];
     
-    [[[UIApplication sharedApplication] keyWindow] addSubview:container];
+    UIWindow *keyWindow = MUNotificationKeyWindow();
+    if (!keyWindow) {
+        _running = NO;
+        return;
+    }
+    [keyWindow addSubview:container];
 
     self->_notificationView = container;
     [UIView animateWithDuration:0.1f animations:^{

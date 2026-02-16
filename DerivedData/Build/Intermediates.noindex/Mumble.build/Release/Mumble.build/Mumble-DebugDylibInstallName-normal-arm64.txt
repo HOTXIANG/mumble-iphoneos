@@ -1,0 +1,1 @@
+@rpath/Mumble.debug.dylib

@@ -163,7 +163,7 @@ struct FavouriteServerEditView: View {
                         #endif
                     }
                 }
-                .onChange(of: selectedCertificateTag) { _ in
+                .onChange(of: selectedCertificateTag) { _, _ in
                     if suppressCertificateSelectionTracking {
                         suppressCertificateSelectionTracking = false
                         return
@@ -238,7 +238,7 @@ struct FavouriteServerEditView: View {
             certModel.refreshCertificates()
             reconcileSelectedCertificateTagIfNeeded()
         }
-        .onChange(of: certModel.certificates) { _ in
+        .onChange(of: certModel.certificates) { _, _ in
             reconcileSelectedCertificateTagIfNeeded()
         }
     }

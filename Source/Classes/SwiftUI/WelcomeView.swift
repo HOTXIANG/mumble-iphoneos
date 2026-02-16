@@ -9,6 +9,11 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
+#if os(macOS)
+import AppKit
+import CoreAudio
+private let onboardingMacAudioInputDevicesChangedNotification = Notification.Name("MUMacAudioInputDevicesChanged")
+#endif
 
 // MARK: - Navigation Configurations
 
@@ -371,10 +376,420 @@ struct MumbleNavigationModifier: ViewModifier {
 
 // MARK: - App Root View (Split View & Stack Logic)
 
+#if os(macOS)
+private struct OnboardingMacInputDeviceOption: Identifiable, Hashable {
+    let uid: String
+    let name: String
+    var id: String { uid }
+}
+
+private enum OnboardingMacInputDeviceCatalog {
+    static func inputDevices() -> [OnboardingMacInputDeviceOption] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        
+        var dataSize: UInt32 = 0
+        let systemObject = AudioObjectID(kAudioObjectSystemObject)
+        guard AudioObjectGetPropertyDataSize(systemObject, &address, 0, nil, &dataSize) == noErr,
+              dataSize >= UInt32(MemoryLayout<AudioDeviceID>.size) else {
+            return []
+        }
+        
+        let count = Int(dataSize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(systemObject, &address, 0, nil, &dataSize, &deviceIDs) == noErr else {
+            return []
+        }
+        
+        var options: [OnboardingMacInputDeviceOption] = []
+        for deviceID in deviceIDs {
+            guard hasInputStream(deviceID),
+                  let uid = deviceUID(for: deviceID),
+                  let name = deviceName(for: deviceID) else { continue }
+            options.append(OnboardingMacInputDeviceOption(uid: uid, name: name))
+        }
+        
+        return options.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+    
+    static func defaultInputUID() -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let err = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &size,
+            &deviceID
+        )
+        guard err == noErr else { return nil }
+        return deviceUID(for: deviceID)
+    }
+    
+    private static func hasInputStream(_ deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreams,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        let err = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
+        return err == noErr && size > 0
+    }
+    
+    private static func deviceUID(for deviceID: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let err = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+        guard err == noErr, let value else { return nil }
+        return value.takeUnretainedValue() as String
+    }
+    
+    private static func deviceName(for deviceID: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let err = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+        guard err == noErr, let value else { return nil }
+        return value.takeUnretainedValue() as String
+    }
+}
+#endif
+
+private struct VADOnboardingSplashView: View {
+    let onFinish: () -> Void
+    let onStartAudioTest: () -> Void
+    let onStopAudioTest: () -> Void
+    @StateObject private var audioMeter = AudioMeterModel()
+    
+    @AppStorage("AudioVADKind") private var vadKind: String = "amplitude"
+    @AppStorage("AudioPreprocessor") private var enablePreprocessor: Bool = true
+    @AppStorage("AudioVADBelow") private var vadBelow: Double = 0.3
+    @AppStorage("AudioVADAbove") private var vadAbove: Double = 0.6
+    @AppStorage("AudioVADHoldSeconds") private var vadHoldSeconds: Double = 0.1
+    
+    private let minThreshold: Double = 0.0
+    private let maxThreshold: Double = 1.0
+    private let minGap: Double = 0.05
+    #if os(macOS)
+    @AppStorage("AudioFollowSystemInputDevice") private var followSystemInputDevice: Bool = true
+    @AppStorage("AudioPreferredInputDeviceUID") private var preferredInputDeviceUID: String = ""
+    @State private var devices: [OnboardingMacInputDeviceOption] = []
+    @State private var systemDefaultUID: String = ""
+    private let followSystemToken = "__follow_system__"
+    #endif
+    
+    private var belowBinding: Binding<Double> {
+        Binding(
+            get: { vadBelow },
+            set: { newValue in
+                let clamped = max(minThreshold, min(maxThreshold, newValue))
+                vadBelow = min(clamped, vadAbove - minGap)
+            }
+        )
+    }
+    
+    private var aboveBinding: Binding<Double> {
+        Binding(
+            get: { vadAbove },
+            set: { newValue in
+                let clamped = max(minThreshold, min(maxThreshold, newValue))
+                vadAbove = max(clamped, vadBelow + minGap)
+            }
+        )
+    }
+    
+    private var belowPercentLabel: String { "\(Int((vadBelow * 100).rounded()))%" }
+    private var abovePercentLabel: String { "\(Int((vadAbove * 100).rounded()))%" }
+    private var holdMillisLabel: String { "\(Int((vadHoldSeconds * 1000).rounded())) ms" }
+    private var inputPercentLabel: String {
+        "\(Int((Double(audioMeter.currentLevel) * 100).rounded()))%"
+    }
+    private var holdBinding: Binding<Double> {
+        Binding(
+            get: { min(max(vadHoldSeconds, 0.0), 0.3) },
+            set: { vadHoldSeconds = min(max($0, 0.0), 0.3) }
+        )
+    }
+    private var modeDescription: String {
+        if vadKind == "snr" {
+            return "Signal to Noise (SNR): detects speech by comparing voice against background noise. Better in noisy environments."
+        }
+        return "Amplitude: detects speech by raw input loudness. Simpler and usually more responsive in quiet environments."
+    }
+    private var systemSheetBackground: Color {
+        #if os(macOS)
+        return Color(nsColor: .windowBackgroundColor)
+        #else
+        return Color(uiColor: .systemBackground)
+        #endif
+    }
+    
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 8) {
+                Image(systemName: "waveform.badge.mic")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundColor(.indigo)
+                
+                VStack(spacing: 8) {
+                    Text("Welcome to Mumble")
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                    Text("Let's quickly tune your voice activity threshold for better automatic mic detection.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                VStack(spacing: 12) {
+                    #if os(macOS)
+                    VStack(alignment: .center, spacing: 8) {
+                        Text("Input Device")
+                            .font(.headline)
+                        Picker("", selection: selectedInputDeviceTag) {
+                            Text("Follow System Default (\(systemDefaultName))").tag(followSystemToken)
+                            if devices.isEmpty {
+                                Text("No Input Device").tag("")
+                            } else {
+                                ForEach(devices) { device in
+                                    Text(device.name).tag(device.uid)
+                                }
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        
+                        if !followSystemInputDevice && selectedDeviceMissing {
+                            Text("Selected microphone is unavailable, automatically switched to Follow System.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    #endif
+                    
+                    VStack(alignment: .center, spacing: 8) {
+                        Text("Detection Mode")
+                            .font(.headline)
+                        Picker("", selection: $vadKind) {
+                            Text("Amplitude").tag("amplitude")
+                            Text("Signal to Noise").tag("snr")
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Text(modeDescription)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .layoutPriority(1)
+                        
+                        if vadKind == "snr" && !enablePreprocessor {
+                            Text("SNR requires preprocessing. It will be enabled automatically.")
+                                .font(.caption)
+                                .foregroundColor(.yellow)
+                        }
+                    }
+                    
+                    HStack {
+                        Text("Live Input Level")
+                            .font(.headline)
+                        Spacer()
+                        Text(inputPercentLabel)
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    AudioBarView(
+                        level: audioMeter.currentLevel,
+                        lower: Float(vadBelow),
+                        upper: Float(vadAbove)
+                    )
+                    
+                    HStack {
+                        Text("VAD Below")
+                            .font(.headline)
+                        Spacer()
+                        Text(belowPercentLabel)
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: belowBinding, in: minThreshold...(maxThreshold - minGap), step: 0.01)
+                        .tint(.indigo)
+                    
+                    HStack {
+                        Text("VAD Above")
+                            .font(.headline)
+                        Spacer()
+                        Text(abovePercentLabel)
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: aboveBinding, in: (minThreshold + minGap)...maxThreshold, step: 0.01)
+                        .tint(.indigo)
+                    
+                    HStack {
+                        Text("Silence Hold")
+                            .font(.headline)
+                        Spacer()
+                        Text(holdMillisLabel)
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: holdBinding, in: 0...0.3)
+                        .tint(.indigo)
+                }
+                
+                Text("Below: input under this level is treated as silence.\nAbove: input over this level is treated as speech.\nSilence Hold: when input stays below Below for this duration, it finally switches to silent.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Button("Continue") {
+                    onFinish()
+                }
+                .font(.headline.weight(.semibold))
+                .controlSize(.large)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(24)
+            .frame(maxWidth: 620)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .background(systemSheetBackground.ignoresSafeArea())
+        .onAppear {
+            #if os(macOS)
+            refreshDevices()
+            normalizeSelectionIfNeeded()
+            #endif
+            if vadKind == "snr" && !enablePreprocessor {
+                enablePreprocessor = true
+                PreferencesModel.shared.notifySettingsChanged()
+            }
+            onStartAudioTest()
+            // Defensive delayed start to survive any late stop from settings dismissal.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                onStartAudioTest()
+            }
+            audioMeter.startMonitoring()
+        }
+        .onDisappear {
+            audioMeter.stopMonitoring()
+            onStopAudioTest()
+        }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshDevices()
+            normalizeSelectionIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: onboardingMacAudioInputDevicesChangedNotification)) { _ in
+            refreshDevices()
+            normalizeSelectionIfNeeded()
+        }
+        #endif
+        .onChange(of: vadKind) { _, newValue in
+            if newValue == "snr" && !enablePreprocessor {
+                enablePreprocessor = true
+            }
+            // Keep splash behavior aligned with Input Setting.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                PreferencesModel.shared.notifySettingsChanged()
+            }
+        }
+    }
+    
+    #if os(macOS)
+    private var selectedInputDeviceTag: Binding<String> {
+        Binding<String>(
+            get: {
+                followSystemInputDevice ? followSystemToken : preferredInputDeviceUID
+            },
+            set: { newValue in
+                if newValue == followSystemToken {
+                    followSystemInputDevice = true
+                } else {
+                    followSystemInputDevice = false
+                    preferredInputDeviceUID = newValue
+                    normalizeSelectionIfNeeded()
+                }
+                PreferencesModel.shared.notifySettingsChanged()
+            }
+        )
+    }
+    
+    private var selectedDeviceMissing: Bool {
+        !preferredInputDeviceUID.isEmpty && !devices.contains(where: { $0.uid == preferredInputDeviceUID })
+    }
+    
+    private var systemDefaultName: String {
+        if let current = devices.first(where: { $0.uid == systemDefaultUID }) {
+            return current.name
+        }
+        return "Unknown"
+    }
+    
+    private func refreshDevices() {
+        devices = OnboardingMacInputDeviceCatalog.inputDevices()
+        systemDefaultUID = OnboardingMacInputDeviceCatalog.defaultInputUID() ?? ""
+    }
+    
+    private func normalizeSelectionIfNeeded() {
+        var changed = false
+        guard !devices.isEmpty else {
+            if !followSystemInputDevice {
+                followSystemInputDevice = true
+                changed = true
+            }
+            if !preferredInputDeviceUID.isEmpty {
+                preferredInputDeviceUID = ""
+                changed = true
+            }
+            if changed {
+                PreferencesModel.shared.notifySettingsChanged()
+            }
+            return
+        }
+        
+        if !followSystemInputDevice,
+           (preferredInputDeviceUID.isEmpty || !devices.contains(where: { $0.uid == preferredInputDeviceUID })) {
+            followSystemInputDevice = true
+            preferredInputDeviceUID = ""
+            changed = true
+        }
+        
+        if changed {
+            PreferencesModel.shared.notifySettingsChanged()
+        }
+    }
+    #endif
+}
+
 struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
     
     @StateObject private var serverManager = ServerModelManager()
+    @AppStorage("HasCompletedVADOnboarding") private var hasCompletedVADOnboarding: Bool = false
+    @State private var showVADOnboarding = false
     
     // iPhone 使用的单一导航管理器
     @StateObject private var navigationManager = NavigationManager()
@@ -418,8 +833,13 @@ struct AppRootView: View {
         .overlay(alignment: .bottom) {
             // 连接成功后显示 PTT 按钮
             if appState.isConnected {
-                PTTButton()
-                    .padding(.bottom, 20)
+                ZStack {
+                    #if os(macOS)
+                    PTTKeyboardMonitor()
+                    #endif
+                    PTTButton()
+                        .padding(.bottom, 20)
+                }
             }
         }
         .overlay {
@@ -447,6 +867,25 @@ struct AppRootView: View {
                 .transition(.opacity.animation(.easeInOut(duration: 0.3)))
             }
         }
+        .sheet(isPresented: $showVADOnboarding) {
+            VADOnboardingSplashView {
+                hasCompletedVADOnboarding = true
+                showVADOnboarding = false
+            } onStartAudioTest: {
+                serverManager.startAudioTest()
+            } onStopAudioTest: {
+                serverManager.stopAudioTest()
+            }
+            #if os(iOS)
+            .presentationDetents([.large])
+            #else
+            .frame(minWidth: 400, idealWidth: 600, minHeight: 300, idealHeight: 660)
+            #endif
+            .onAppear {
+                // Defensive start for iOS: avoid race with settings-sheet onDismiss stop.
+                serverManager.startAudioTest()
+            }
+        }
         // macOS 全窗口图片预览 overlay（覆盖整个 App 界面，包括分栏）
         #if os(macOS)
         .overlay {
@@ -463,11 +902,23 @@ struct AppRootView: View {
         .alert(item: $appState.activeError) { error in
             Alert(title: Text(error.title), message: Text(error.message), dismissButton: .default(Text("OK")))
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mumbleShowVADTutorialAgain)) { _ in
+            // Delay to avoid racing with settings-sheet onDismiss stopAudioTest().
+            // We re-open tutorial after settings has fully dismissed.
+            showVADOnboarding = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                showVADOnboarding = true
+            }
+        }
         .onAppear {
             serverManager.activate()
+            if !hasCompletedVADOnboarding {
+                showVADOnboarding = true
+            }
         }
         .animation(.default, value: appState.isConnecting)
         .animation(.spring(), value: appState.isConnected)
+        .animation(.easeInOut(duration: 0.2), value: showVADOnboarding)
     }
     
     // MARK: - iPad Split View Layout
@@ -504,11 +955,11 @@ struct AppRootView: View {
                 }
                 .background(Color.clear) // Detail 区域透明
             }
-            .onChange(of: appState.isConnected) { isConnected in
+            .onChange(of: appState.isConnected) { _, isConnected in
                 preferredCompactColumn = isConnected ? .detail : .sidebar
                 updateSplitVisibility(width: geo.size.width, connectionChanged: true)
             }
-            .onChange(of: geo.size.width) { width in
+            .onChange(of: geo.size.width) { _, width in
                 updateSplitVisibility(width: width, connectionChanged: false)
             }
             .onAppear {
@@ -562,7 +1013,7 @@ struct AppRootView: View {
         .preferredColorScheme(.dark)
         .background(Color.clear)
         // iPhone 需要手动监听连接状态来 Push 界面
-        .onChange(of: appState.isConnected) { isConnected in
+        .onChange(of: appState.isConnected) { _, isConnected in
             if isConnected {
                 navigationManager.navigate(to: .swiftUI(.channelList))
             } else {

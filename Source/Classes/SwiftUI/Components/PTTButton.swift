@@ -6,10 +6,14 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct PTTButton: View {
     // 监听全局设置，决定是否显示
     @AppStorage("AudioTransmitMethod") var transmitMethod: String = "vad"
+    @AppStorage("ShowPTTButton") var showPTTButton: Bool = false
     
     // 按钮按下状态，用于 UI 反馈
     @State private var isPressed = false
@@ -25,7 +29,7 @@ struct PTTButton: View {
     #endif
     
     var body: some View {
-        if transmitMethod == "ptt" {
+        if transmitMethod == "ptt" && showPTTButton {
             GeometryReader { geometry in
                 VStack {
                     Spacer()
@@ -68,6 +72,9 @@ struct PTTButton: View {
                 }
             }
             .allowsHitTesting(true)
+            .onDisappear {
+                stopTransmitting()
+            }
         }
     }
     
@@ -86,3 +93,93 @@ struct PTTButton: View {
         MKAudio.shared()?.setForceTransmit(false)
     }
 }
+
+#if os(macOS)
+struct PTTKeyboardMonitor: View {
+    @AppStorage("AudioTransmitMethod") private var transmitMethod: String = "vad"
+    @AppStorage("PTTHotkeyCode") private var pttHotkeyCode: Int = 49
+    
+    @State private var isPressed = false
+    @State private var keyDownMonitor: Any?
+    @State private var keyUpMonitor: Any?
+    @State private var resignObserver: NSObjectProtocol?
+    
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear {
+                startMonitoring()
+            }
+            .onDisappear {
+                stopMonitoring()
+                stopTransmitting()
+            }
+            .onChange(of: transmitMethod) { _, newValue in
+                if newValue != "ptt" {
+                    stopTransmitting()
+                }
+            }
+            .onChange(of: pttHotkeyCode) { _, _ in
+                stopTransmitting()
+            }
+    }
+    
+    private func startMonitoring() {
+        guard keyDownMonitor == nil, keyUpMonitor == nil else { return }
+        
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard transmitMethod == "ptt" else { return event }
+            guard event.keyCode == UInt16(pttHotkeyCode) else { return event }
+            
+            if !isPressed {
+                isPressed = true
+                MKAudio.shared()?.setForceTransmit(true)
+            }
+            return nil
+        }
+        
+        keyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { event in
+            guard transmitMethod == "ptt" else { return event }
+            guard event.keyCode == UInt16(pttHotkeyCode) else { return event }
+            
+            if isPressed {
+                isPressed = false
+                MKAudio.shared()?.setForceTransmit(false)
+            }
+            return nil
+        }
+        
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                stopTransmitting()
+            }
+        }
+    }
+    
+    private func stopMonitoring() {
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+            self.keyDownMonitor = nil
+        }
+        if let keyUpMonitor {
+            NSEvent.removeMonitor(keyUpMonitor)
+            self.keyUpMonitor = nil
+        }
+        if let resignObserver {
+            NotificationCenter.default.removeObserver(resignObserver)
+            self.resignObserver = nil
+        }
+    }
+    
+    private func stopTransmitting() {
+        if isPressed {
+            isPressed = false
+        }
+        MKAudio.shared()?.setForceTransmit(false)
+    }
+}
+#endif

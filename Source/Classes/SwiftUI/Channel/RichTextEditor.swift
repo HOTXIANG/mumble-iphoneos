@@ -227,7 +227,12 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
         
         // MARK: - WKNavigationDelegate
         
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        @MainActor
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+        ) {
             if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
                 #if os(macOS)
                 NSWorkspace.shared.open(url)
@@ -245,7 +250,7 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
             _ webView: WKWebView,
             runOpenPanelWith parameters: WKOpenPanelParameters,
             initiatedByFrame frame: WKFrameInfo,
-            completionHandler: @escaping ([URL]?) -> Void
+            completionHandler: @escaping @MainActor @Sendable ([URL]?) -> Void
         ) {
             let panel = NSOpenPanel()
             panel.canChooseFiles = true

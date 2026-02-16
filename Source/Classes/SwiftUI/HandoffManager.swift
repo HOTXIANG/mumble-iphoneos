@@ -450,8 +450,7 @@ class HandoffManager: NSObject, ObservableObject {
         
         // 2. 恢复每个用户的本地音量和本地静音
         if shouldSyncLocalAudio && !pendingUserAudioSettings.isEmpty {
-            guard let hostname = serverModel.hostname(),
-                  let rootChannel = serverModel.rootChannel() else { return }
+            guard let hostname = serverModel.hostname() else { return }
             
             // 先将所有设置保存到 LocalUserPreferences（持久化）
             for setting in pendingUserAudioSettings {

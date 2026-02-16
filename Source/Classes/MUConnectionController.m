@@ -13,6 +13,7 @@
 #import <MumbleKit/MKServerModel.h>
 #import <MumbleKit/MKCertificate.h>
 #import <AVFoundation/AVFoundation.h>
+#import <UserNotifications/UserNotifications.h>
 #import <Network/Network.h>
 @import Security;
 
@@ -350,7 +351,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     }
     [_timer invalidate];
 #if TARGET_OS_IOS
-    [[UIApplication sharedApplication] setApplicationIconBadgeNumber:0];
+    [[UNUserNotificationCenter currentNotificationCenter] setBadgeCount:0 withCompletionHandler:nil];
 #endif
     
     // --- 核心修复：发送关闭通知 ---

@@ -38,7 +38,7 @@ struct UserAudioSettingsView: View {
                             Text("300%")
                                 .font(.caption)
                         }
-                        .onChange(of: volume) { newValue in
+                        .onChange(of: volume) { _, newValue in
                             // 调用我们自己写的逻辑
                             manager.setLocalUserVolume(session: userSession, volume: newValue)
                         }
@@ -54,7 +54,7 @@ struct UserAudioSettingsView: View {
                                 .foregroundColor(.red)
                         }
                     }
-                    .onChange(of: isMuted) { _ in
+                    .onChange(of: isMuted) { _, _ in
                         manager.toggleLocalUserMute(session: userSession)
                     }
                 }

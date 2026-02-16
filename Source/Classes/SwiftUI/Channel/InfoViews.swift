@@ -177,7 +177,12 @@ struct HTMLContentView: PlatformViewRepresentable {
         }
         
         // 拦截链接点击，用系统浏览器打开
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        @MainActor
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+        ) {
             if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
                 #if os(macOS)
                 NSWorkspace.shared.open(url)

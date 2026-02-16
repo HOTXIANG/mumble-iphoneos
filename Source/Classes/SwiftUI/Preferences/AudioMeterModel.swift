@@ -18,7 +18,9 @@ class AudioMeterModel: ObservableObject {
         stopMonitoring()
         // 50ms 刷新一次，足够流畅
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            self?.updateLevel()
+            Task { @MainActor [weak self] in
+                self?.updateLevel()
+            }
         }
     }
 

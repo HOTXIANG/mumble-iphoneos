@@ -52,6 +52,11 @@ struct PreviewItem: Identifiable {
     let url: URL
 }
 
+private struct PendingSendImage: Identifiable {
+    let id = UUID()
+    let image: PlatformImage
+}
+
 // MARK: - 3. 主容器 (Stable Container)
 struct MessagesView: View {
     let serverManager: ServerModelManager
@@ -59,7 +64,7 @@ struct MessagesView: View {
     
     // 状态管理中心
     @State private var previewItem: PreviewItem?
-    @State private var selectedImageForSend: PlatformImage?
+    @State private var selectedImageForSend: PendingSendImage?
     
     var body: some View {
         ZStack {
@@ -68,7 +73,7 @@ struct MessagesView: View {
                 serverManager: serverManager,
                 isSplitLayout: isSplitLayout,
                 onPreviewRequest: { image in handleImageTap(image: image) },
-                onImageSelected: { image in selectedImageForSend = image }
+                onImageSelected: { image in selectedImageForSend = PendingSendImage(image: image) }
             )
             
             // 2. 静态锚点层 (所有弹窗都挂在这里)
@@ -82,9 +87,9 @@ struct MessagesView: View {
                 }
                 #endif
                 // 挂载发送确认框 (Sheet)
-                .sheet(item: $selectedImageForSend) { image in
+                .sheet(item: $selectedImageForSend) { item in
                     ImageConfirmationView(
-                        image: image,
+                        image: item.image,
                         onCancel: { selectedImageForSend = nil },
                         onSend: { imageToSend, isHighQuality in
                             await serverManager.sendImageMessage(image: imageToSend, isHighQuality: isHighQuality)
@@ -284,7 +289,7 @@ struct MessagesList: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: serverManager.messages) { scrollToBottom(proxy: proxy) }
-                .onChange(of: isTextFieldFocused) { focused in
+                .onChange(of: isTextFieldFocused) { _, focused in
                     if focused {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                             scrollToBottom(proxy: proxy)
@@ -741,10 +746,6 @@ private struct TextInputBar: View {
         .buttonStyle(.plain)
         .disabled(text.isEmpty)
     }
-}
-
-extension PlatformImage: Identifiable {
-    public var id: String { return UUID().uuidString }
 }
 
 extension CGSize {

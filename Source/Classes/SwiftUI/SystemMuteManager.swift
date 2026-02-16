@@ -24,8 +24,7 @@ class SystemMuteManager {
         // macOS 不使用 AVAudioApplication 的 input mute 管道。
         // 否则调用 setInputMuted 会出现 "input mute handler not set" 日志。
         return
-        #endif
-
+        #else
         guard #available(iOS 17.0, *) else { return }
         
         cleanup()
@@ -50,6 +49,7 @@ class SystemMuteManager {
         // 初始状态同步
         let currentSystemState = AVAudioApplication.shared.isInputMuted
         print("🎙️ SystemMuteManager: Activation initial state -> \(currentSystemState)")
+        #endif
     }
     
     /// 清理监听
@@ -66,17 +66,14 @@ class SystemMuteManager {
         #if os(macOS)
         // macOS 下保持 no-op，Mumble 的自闭麦逻辑仍由 serverModel 控制。
         return
-        #endif
-
+        #else
         guard #available(iOS 17.0, *) else { return }
         
-        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         // 只有 Session 激活时才能设置，否则会报错 "cannot control mic"
         if session.category != .playAndRecord {
             return
         }
-        #endif
         
         do {
             try AVAudioApplication.shared.setInputMuted(isMuted)
@@ -84,6 +81,7 @@ class SystemMuteManager {
         } catch {
             print("❌ SystemMuteManager: setInputMuted failed: \(error.localizedDescription)")
         }
+        #endif
     }
     
     // MARK: - Private Handler

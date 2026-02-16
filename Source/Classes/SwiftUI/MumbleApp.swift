@@ -64,7 +64,7 @@ struct MumbleApp: App {
         #if os(macOS)
         .defaultSize(width: 1100, height: 760)
         #endif
-        .onChange(of: scenePhase) { newPhase in
+        .onChange(of: scenePhase) { _, newPhase in
             // 你可以在这里处理生命周期，慢慢替代 AppDelegate 里的逻辑
             if newPhase == .background {
                 // 例如：触发清理操作

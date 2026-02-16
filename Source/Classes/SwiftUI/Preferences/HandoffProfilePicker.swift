@@ -69,7 +69,7 @@ struct HandoffProfilePicker: View {
         .onAppear {
             loadProfiles()
         }
-        .onChange(of: selectedKey) { _ in
+        .onChange(of: selectedKey) { _, _ in
             // 确保 selection 有效：如果选中的 key 不在 profiles 中也不是 -1，重置为 Automatic
             if selectedKey != -1 && !profiles.contains(where: { $0.primaryKey == selectedKey }) {
                 selectedKey = -1

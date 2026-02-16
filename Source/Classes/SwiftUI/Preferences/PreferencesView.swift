@@ -16,6 +16,26 @@ import CoreAudio
 private let macAudioInputDevicesChangedNotification = Notification.Name("MUMacAudioInputDevicesChanged")
 #endif
 
+private struct PTTHotkeyOption: Identifiable {
+    let keyCode: Int
+    let label: String
+    var id: Int { keyCode }
+}
+
+private let pttHotkeyOptions: [PTTHotkeyOption] = [
+    .init(keyCode: 49, label: "Space"),
+    .init(keyCode: 36, label: "Return"),
+    .init(keyCode: 48, label: "Tab"),
+    .init(keyCode: 56, label: "Left Shift"),
+    .init(keyCode: 60, label: "Right Shift"),
+    .init(keyCode: 58, label: "Left Option"),
+    .init(keyCode: 61, label: "Right Option"),
+    .init(keyCode: 59, label: "Left Control"),
+    .init(keyCode: 62, label: "Right Control"),
+    .init(keyCode: 55, label: "Left Command"),
+    .init(keyCode: 54, label: "Right Command"),
+]
+
 struct NotificationSettingsView: View {
     @AppStorage("NotificationNotifyNormalUserMessages") var notifyNormalUserMessages: Bool = true
     @AppStorage("NotificationNotifyPrivateMessages") var notifyPrivateMessages: Bool = true
@@ -103,14 +123,18 @@ struct NotificationSettingsView: View {
 
 // 1. 传输模式设置视图
 struct AudioTransmissionSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("AudioTransmitMethod") var transmitMethod: String = "vad"
     @AppStorage("AudioVADKind") var vadKind: String = "amplitude"
     @AppStorage("AudioVADBelow") var vadBelow: Double = 0.3
     @AppStorage("AudioVADAbove") var vadAbove: Double = 0.6
+    @AppStorage("AudioVADHoldSeconds") var vadHoldSeconds: Double = 0.1
     
     @AppStorage("AudioPreprocessor") var enablePreprocessor: Bool = true
     @AppStorage("AudioEchoCancel") var enableEchoCancel: Bool = true
     @AppStorage("AudioMicBoost") var micBoost: Double = 1.0
+    @AppStorage("ShowPTTButton") var showPTTButton: Bool = false
+    @AppStorage("PTTHotkeyCode") var pttHotkeyCode: Int = 49
     #if os(macOS)
     @AppStorage("AudioFollowSystemInputDevice") private var followSystemInputDevice: Bool = true
     @AppStorage("AudioPreferredInputDeviceUID") private var preferredInputDeviceUID: String = ""
@@ -120,6 +144,13 @@ struct AudioTransmissionSettingsView: View {
     #endif
     
     @StateObject private var audioMeter = AudioMeterModel()
+    
+    private var vadHoldBinding: Binding<Double> {
+        Binding(
+            get: { min(max(vadHoldSeconds, 0.0), 0.3) },
+            set: { vadHoldSeconds = min(max($0, 0.0), 0.3) }
+        )
+    }
     
     var body: some View {
         Form {
@@ -180,7 +211,7 @@ struct AudioTransmissionSettingsView: View {
                         Text("Signal to Noise").tag("snr")
                     }
                     .pickerStyle(.segmented) // 变成左右切换的滑块样式
-                    .onChange(of: vadKind) { newValue in
+                    .onChange(of: vadKind) { _, newValue in
                         // 如果选择了 SNR 且预处理没开，自动开启
                         if newValue == "snr" && !enablePreprocessor {
                             enablePreprocessor = true
@@ -241,17 +272,48 @@ struct AudioTransmissionSettingsView: View {
                             if !editing { PreferencesModel.shared.notifySettingsChanged() }
                         }
                     }
+
+                    VStack(alignment: .leading) {
+                        Text("Silence Hold: \(Int((vadHoldSeconds * 1000).rounded())) ms")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Slider(value: vadHoldBinding, in: 0...0.3) { editing in
+                            if !editing { PreferencesModel.shared.notifySettingsChanged() }
+                        }
+                    }
                     
                     Text("Adjust sliders so that the bar stays in green when speaking and red when silent.")
                         .font(.caption)
                         .foregroundColor(.gray)
+                    
+                    Button {
+                        NotificationCenter.default.post(name: .mumbleShowVADTutorialAgain, object: nil)
+                        dismiss()
+                    } label: {
+                        Label("Show VAD Tutorial Again", systemImage: "waveform.badge.mic")
+                    }
                 }
             }
             
             if transmitMethod == "ptt" {
-                Section {
-                    Text("In Push-to-Talk mode, a button will appear on the screen. Hold it to speak.")
-                        .font(.caption).foregroundColor(.gray)
+                Section(header: Text("Push-to-Talk Settings")) {
+                    Toggle("Show On-Screen Talk Button", isOn: $showPTTButton)
+                    
+                    #if os(macOS)
+                    Picker("Push-to-Talk Key", selection: $pttHotkeyCode) {
+                        ForEach(pttHotkeyOptions) { option in
+                            Text(option.label).tag(option.keyCode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text("Hold the selected keyboard key to speak.")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    #else
+                    Text("Hold the on-screen talk button (if enabled) to speak.")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    #endif
                 }
             }
         }
@@ -261,6 +323,7 @@ struct AudioTransmissionSettingsView: View {
         .navigationTitle("Input Setting")
         .onChange(of: transmitMethod) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: vadKind) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: vadHoldSeconds) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enablePreprocessor) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enableEchoCancel) { PreferencesModel.shared.notifySettingsChanged() }
         .onAppear {
@@ -436,7 +499,7 @@ private enum MacInputDeviceCatalog {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMaster
+            mElement: kAudioObjectPropertyElementMain
         )
         
         var dataSize: UInt32 = 0
@@ -467,7 +530,7 @@ private enum MacInputDeviceCatalog {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultInputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMaster
+            mElement: kAudioObjectPropertyElementMain
         )
         
         var deviceID = AudioDeviceID(0)
@@ -488,7 +551,7 @@ private enum MacInputDeviceCatalog {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreams,
             mScope: kAudioDevicePropertyScopeInput,
-            mElement: kAudioObjectPropertyElementMaster
+            mElement: kAudioObjectPropertyElementMain
         )
         var size: UInt32 = 0
         let err = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
@@ -499,26 +562,26 @@ private enum MacInputDeviceCatalog {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceUID,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMaster
+            mElement: kAudioObjectPropertyElementMain
         )
-        var value: CFString?
-        var size = UInt32(MemoryLayout<CFString?>.size)
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         let err = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
-        guard err == noErr, let uid = value else { return nil }
-        return uid as String
+        guard err == noErr, let value else { return nil }
+        return value.takeUnretainedValue() as String
     }
     
     private static func deviceName(for deviceID: AudioDeviceID) -> String? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioObjectPropertyName,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMaster
+            mElement: kAudioObjectPropertyElementMain
         )
-        var value: CFString?
-        var size = UInt32(MemoryLayout<CFString?>.size)
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         let err = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
-        guard err == noErr, let name = value else { return nil }
-        return name as String
+        guard err == noErr, let value else { return nil }
+        return value.takeUnretainedValue() as String
     }
 }
 
@@ -648,6 +711,9 @@ struct PreferencesView: View {
         }
         .onAppear {
             serverManager.startAudioTest()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mumbleShowVADTutorialAgain)) { _ in
+            dismiss()
         }
     }
 }

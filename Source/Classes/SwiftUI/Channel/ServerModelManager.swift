@@ -99,6 +99,7 @@ class ServerModelManager: ObservableObject {
     var keepAliveTimer: Timer?
     let systemMuteManager = SystemMuteManager()
     var isRestoringMuteState = false
+    var isRequestingMicrophonePermission = false
     /// 音频重启前保存的闭麦/不听状态（防止系统回调覆盖）
     var savedMuteBeforeRestart: Bool?
     var savedDeafenBeforeRestart: Bool?

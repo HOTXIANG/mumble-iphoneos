@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+private final class NotificationObserverBox: @unchecked Sendable {
+    var token: NSObjectProtocol?
+}
+
 // MARK: - Create Channel View
 
 struct CreateChannelView: View {
@@ -122,8 +126,8 @@ struct CreateChannelView: View {
             let pwd = channelPassword
             let mgr = serverManager
             
-            var observer: NSObjectProtocol?
-            observer = NotificationCenter.default.addObserver(
+            let observerBox = NotificationObserverBox()
+            observerBox.token = NotificationCenter.default.addObserver(
                 forName: ServerModelNotificationManager.channelAddedNotification,
                 object: nil,
                 queue: .main
@@ -134,8 +138,9 @@ struct CreateChannelView: View {
                       newChannel.parent()?.channelId() == parentId else { return }
                 
                 // 移除一次性监听
-                if let obs = observer {
+                if let obs = observerBox.token {
                     NotificationCenter.default.removeObserver(obs)
+                    observerBox.token = nil
                 }
                 
                 let channelRef = UnsafeTransfer(value: newChannel)
@@ -170,8 +175,8 @@ struct CreateChannelView: View {
         
         let channelId = channel.channelId()
         let channelRef = UnsafeTransfer(value: channel)
-        var observer: NSObjectProtocol?
-        observer = NotificationCenter.default.addObserver(
+        let observerBox = NotificationObserverBox()
+        observerBox.token = NotificationCenter.default.addObserver(
             forName: ServerModelNotificationManager.aclReceivedNotification,
             object: nil,
             queue: .main
@@ -181,8 +186,9 @@ struct CreateChannelView: View {
                   let chan = userInfo["channel"] as? MKChannel,
                   chan.channelId() == channelId else { return }
             
-            if let obs = observer {
+            if let obs = observerBox.token {
                 NotificationCenter.default.removeObserver(obs)
+                observerBox.token = nil
             }
             
             let aclTransfer = UnsafeTransfer(value: accessControl)

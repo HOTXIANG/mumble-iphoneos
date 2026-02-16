@@ -11,12 +11,46 @@
 
 #import <MumbleKit/MKCertificate.h>
 
+static UIWindow *MUActiveKeyWindow(void) {
+    UIApplication *application = [UIApplication sharedApplication];
+    for (UIScene *scene in application.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        if (windowScene.activationState != UISceneActivationStateForegroundActive) {
+            continue;
+        }
+        for (UIWindow *window in windowScene.windows) {
+            if (window.isKeyWindow) {
+                return window;
+            }
+        }
+    }
+    return nil;
+}
+
+static UIViewController *MUTopMostViewController(void) {
+    UIViewController *controller = MUActiveKeyWindow().rootViewController;
+    while (controller.presentedViewController) {
+        controller = controller.presentedViewController;
+    }
+    return controller;
+}
+
 static void ShowAlertDialog(NSString *title, NSString *msg) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSString *ok = NSLocalizedString(@"OK", nil);
-        UIAlertView *alert = [[UIAlertView alloc] initWithTitle:title message:msg delegate:nil cancelButtonTitle:ok otherButtonTitles:nil];
-        [alert show];
-        [alert release];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
+                                                                       message:msg
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:ok
+                                                  style:UIAlertActionStyleDefault
+                                                handler:nil]];
+        UIViewController *presenter = MUTopMostViewController();
+        if (presenter) {
+            [presenter presentViewController:alert animated:YES completion:nil];
+        }
     });
 }
 

@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-#if os(iOS)
+#if os(iOS) || os(macOS)
 import AVFoundation
 #endif
 
@@ -18,12 +18,29 @@ extension ServerModelManager {
             return
         }
 
-        print("🎤 Starting Local Audio for Settings/Testing...")
-        isLocalAudioTestRunning = true
-        // 调用 ObjC 的 MKAudio
-        Task.detached(priority: .userInitiated) {
-            MKAudio.shared().restart()
+        #if os(macOS)
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            startLocalAudioEngineForSettings()
+        case .notDetermined:
+            if isRequestingMicrophonePermission { return }
+            isRequestingMicrophonePermission = true
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    self.isRequestingMicrophonePermission = false
+                    guard granted, !self.isConnected, !self.isLocalAudioTestRunning else { return }
+                    self.startLocalAudioEngineForSettings()
+                }
+            }
+        case .denied, .restricted:
+            print("🎤 Microphone permission denied/restricted. Skip local audio test.")
+        @unknown default:
+            print("🎤 Unknown microphone permission status. Skip local audio test.")
         }
+        #else
+        startLocalAudioEngineForSettings()
+        #endif
     }
 
     /// 退出设置界面时调用：关闭麦克风
@@ -52,6 +69,14 @@ extension ServerModelManager {
                 print("⚠️ Failed to deactivate session: \(error)")
             }
             #endif
+        }
+    }
+
+    private func startLocalAudioEngineForSettings() {
+        print("🎤 Starting Local Audio for Settings/Testing...")
+        isLocalAudioTestRunning = true
+        Task.detached(priority: .userInitiated) {
+            MKAudio.shared().start()
         }
     }
 

@@ -272,7 +272,7 @@ struct ACLEntryEditView: View {
                 lastSelectedUserID = entry.userID
             }
         }
-        .onChange(of: entry.group) { newValue in
+        .onChange(of: entry.group) { _, newValue in
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
                 lastSelectedGroup = trimmed

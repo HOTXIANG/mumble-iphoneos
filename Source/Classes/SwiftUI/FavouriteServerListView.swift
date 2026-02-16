@@ -234,7 +234,7 @@ struct FavouriteServerListContentView: View {
                 }
             }
         }
-        .onChange(of: refreshTrigger) { _ in
+        .onChange(of: refreshTrigger) { _, _ in
             viewModel.loadServers()
         }
         .alert("Delete Favourite", isPresented: $showingDeleteAlert, presenting: serverToDelete) { server in
@@ -246,32 +246,41 @@ struct FavouriteServerListContentView: View {
     
     @ViewBuilder
     private var serverListView: some View {
+        #if os(macOS)
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(viewModel.servers, id: \.primaryKey) { server in
+                    FavouriteServerRowView(server: server)
+                        .contentShape(Rectangle())
+                        .onTapGesture { connectToServer(server) }
+                        .contextMenu {
+                            Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
+                            Button("Edit", systemImage: "pencil") { editServer(server) }
+
+                            if isServerPinned(server) {
+                                Button("Remove from Widget", systemImage: "minus.square") {
+                                    unpinFromWidget(server)
+                                }
+                            } else {
+                                Button("Add to Widget", systemImage: "plus.square.on.square") {
+                                    pinToWidget(server)
+                                }
+                            }
+
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                self.serverToDelete = server
+                                self.showingDeleteAlert = true
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 4)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        #else
         List {
             ForEach(viewModel.servers, id: \.primaryKey) { server in
-                #if os(macOS)
-                FavouriteServerRowView(server: server)
-                    .contentShape(Rectangle())
-                    .onTapGesture { connectToServer(server) }
-                    .contextMenu {
-                        Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
-                        Button("Edit", systemImage: "pencil") { editServer(server) }
-
-                        if isServerPinned(server) {
-                            Button("Remove from Widget", systemImage: "minus.square") {
-                                unpinFromWidget(server)
-                            }
-                        } else {
-                            Button("Add to Widget", systemImage: "plus.square.on.square") {
-                                pinToWidget(server)
-                            }
-                        }
-
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            self.serverToDelete = server
-                            self.showingDeleteAlert = true
-                        }
-                    }
-                #else
                 Menu {
                     Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
                     Button("Edit", systemImage: "pencil") { editServer(server) }
@@ -293,18 +302,14 @@ struct FavouriteServerListContentView: View {
                 } label: {
                     FavouriteServerRowView(server: server)
                 }
-                #endif
             }
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            #if os(macOS)
-            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-            #else
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            #endif
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        #endif
     }
     
     private var emptyStateView: some View {

@@ -37,6 +37,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioOutputVolume": 1.0,
             "AudioVADAbove": 0.6,
             "AudioVADBelow": 0.3,
+            "AudioVADHoldSeconds": 0.1,
             "AudioVADKind": "amplitude",
             "AudioTransmitMethod": "vad",
             "AudioPreprocessor": true,
@@ -45,6 +46,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioQualityKind": "balanced",
             "AudioSidetone": false,
             "AudioSidetoneVolume": 0.2,
+            "ShowPTTButton": false,
+            "PTTHotkeyCode": 49,
             "AudioSpeakerPhoneMode": true,
             "AudioFollowSystemInputDevice": true,
             "AudioPreferredInputDeviceUID": "",
@@ -166,6 +169,9 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         
         settings.vadMin = defaults.float(forKey: "AudioVADBelow")
         settings.vadMax = defaults.float(forKey: "AudioVADAbove")
+        let vadHoldSeconds = min(max(defaults.double(forKey: "AudioVADHoldSeconds"), 0.0), 0.3)
+        settings.enableVadGate = ObjCBool(vadHoldSeconds > 0.0)
+        settings.vadGateTimeSeconds = vadHoldSeconds
         
         // Quality
         let quality = defaults.string(forKey: "AudioQualityKind") ?? "balanced"
@@ -219,6 +225,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             defaults.string(forKey: "AudioVADKind") ?? "amplitude",
             String(defaults.double(forKey: "AudioVADBelow")),
             String(defaults.double(forKey: "AudioVADAbove")),
+            String(defaults.double(forKey: "AudioVADHoldSeconds")),
             defaults.string(forKey: "AudioQualityKind") ?? "balanced",
             String(defaults.double(forKey: "AudioMicBoost")),
             String(defaults.bool(forKey: "AudioPreprocessor")),

@@ -28,7 +28,7 @@
         _emailAddress = email;
         
         if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
-            [self.view setBackgroundColor:[UIColor groupTableViewBackgroundColor]];
+            [self.view setBackgroundColor:[UIColor systemGroupedBackgroundColor]];
         }
     }
     return self;

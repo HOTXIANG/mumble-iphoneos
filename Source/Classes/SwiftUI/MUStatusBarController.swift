@@ -151,13 +151,17 @@ final class MUStatusBarController: NSObject {
         observers.append(center.addObserver(
             forName: NSNotification.Name("MUConnectionOpenedNotification"), object: nil, queue: .main
         ) { [weak self] _ in
-            self?.onConnectionChanged(connected: true)
+            Task { @MainActor in
+                self?.onConnectionChanged(connected: true)
+            }
         })
 
         observers.append(center.addObserver(
             forName: NSNotification.Name("MUConnectionClosedNotification"), object: nil, queue: .main
         ) { [weak self] _ in
-            self?.onConnectionChanged(connected: false)
+            Task { @MainActor in
+                self?.onConnectionChanged(connected: false)
+            }
         })
 
         // User talk state changed   (carries userSession + talkState)
