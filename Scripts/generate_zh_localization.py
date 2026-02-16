@@ -65,6 +65,7 @@ MANUAL_TRANSLATIONS = {
     "Force TCP Mode": "强制 TCP 模式",
     "Group name": "组名称",
     "Handoff Profile": "接力设置",
+    "Import": "导入",
     "Import Certificate": "导入证书",
     "Import Failed": "导入失败",
     "Left Shift": "左 Shift",
