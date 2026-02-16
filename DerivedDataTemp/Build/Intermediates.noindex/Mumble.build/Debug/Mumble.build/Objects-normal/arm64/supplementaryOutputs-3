@@ -1,0 +1,37 @@
+{
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUMacApplicationDelegate.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/MumbleApp.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/PlatformHaptics.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/PlatformTypes.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/CertificatePreferencesView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.swiftdeps"
+  }
+}

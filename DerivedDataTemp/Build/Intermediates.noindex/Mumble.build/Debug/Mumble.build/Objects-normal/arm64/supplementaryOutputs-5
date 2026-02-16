@@ -1,0 +1,30 @@
+{
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/InfoViews.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/UserAudioSettingsView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Models/ServerPingModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.swiftdeps"
+  }
+}

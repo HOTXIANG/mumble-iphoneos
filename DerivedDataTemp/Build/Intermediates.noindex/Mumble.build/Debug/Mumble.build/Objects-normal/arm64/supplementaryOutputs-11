@@ -1,0 +1,30 @@
+{
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+AudioState.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Entry.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+HandoffLiveActivity.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/HandoffProfilePicker.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.swiftdeps"
+  }
+}

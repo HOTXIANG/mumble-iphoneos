@@ -1,0 +1,30 @@
+{
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/HandoffManager.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/AudioBarView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/PreferencesModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/PreferencesView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.swiftdeps"
+  }
+}

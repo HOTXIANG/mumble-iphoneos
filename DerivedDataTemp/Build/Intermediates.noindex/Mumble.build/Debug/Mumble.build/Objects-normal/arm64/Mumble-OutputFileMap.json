@@ -1,0 +1,609 @@
+{
+  "" : {
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/Mumble-primary.dia",
+    "emit-module-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/Mumble-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/Mumble-primary-emit-module.dia",
+    "pch" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/Mumble-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/Mumble-primary.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/MumbleWidget/MumbleActivityAttributes.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleActivityAttributes~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/MumbleWidget/WidgetSharedData.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WidgetSharedData~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUMacApplicationDelegate.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUMacApplicationDelegate~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/AppState.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AppState~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelACLEditViews.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLEditViews~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelACLModels.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLModels~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelACLRows.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLRows~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelACLView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelACLView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelDataModels.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelDataModels~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelEditView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelEditView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelInteropTypes.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelInteropTypes~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelListView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelListView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ChannelView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/InfoViews.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/InfoViews~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/MessagesView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MessagesView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/RichTextEditor.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditor~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/RichTextEditorImageCompression.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorImageCompression~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/RichTextEditorShell.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RichTextEditorShell~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerCertificateDetailView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerCertificateDetailView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+AudioState.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+AudioState~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Channels.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Channels~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Controls.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Controls~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Entry.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Entry~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+HandoffLiveActivity.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+HandoffLiveActivity~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Lifecycle.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Lifecycle~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Messaging.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Messaging~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+ModelState.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+ModelState~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Notifications.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Notifications~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Registration.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager+Registration~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelManager~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelNotificationManager.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerModelNotificationManager~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/UserAudioSettingsView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/UserAudioSettingsView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Components/PTTButton.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PTTButton~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Components/ToastView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ToastView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/FavouriteServerEditView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerEditView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/FavouriteServerListView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/FavouriteServerListView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/HandoffManager.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffManager~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/MUStatusBarController.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MUStatusBarController~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Models/LanDiscoveryModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LanDiscoveryModel~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Models/LocalUserPreferences.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/LocalUserPreferences~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Models/RecentServerManager.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/RecentServerManager~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Models/ServerPingModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/ServerPingModel~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/MumbleApp.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleApp~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/MumbleContentView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleContentView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/MumbleNavigationView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleNavigationView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/MumbleUIComponents.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/MumbleUIComponents~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/PlatformHaptics.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformHaptics~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/PlatformTypes.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PlatformTypes~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/AboutView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AboutView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/AudioBarView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioBarView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/AudioMeterModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/AudioMeterModel~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/CertificateModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificateModel~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/CertificatePreferencesView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/CertificatePreferencesView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/HandoffProfilePicker.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/HandoffProfilePicker~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/PreferencesModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesModel~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/PreferencesView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/PreferencesView~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/SwiftRootViewController.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SwiftRootViewController~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/SystemMuteManager.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/SystemMuteManager~partial.swiftmodule"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/WelcomeView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView.dia",
+    "index-unit-output-path" : "/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView.o",
+    "llvm-bc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView.bc",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView.swiftdeps",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Debug/Mumble.build/Objects-normal/arm64/WelcomeView~partial.swiftmodule"
+  }
+}

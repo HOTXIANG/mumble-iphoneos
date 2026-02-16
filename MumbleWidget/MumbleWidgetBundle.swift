@@ -11,7 +11,7 @@ import SwiftUI
 @main
 struct MumbleWidgetBundle: WidgetBundle {
     var body: some Widget {
-        #if !targetEnvironment(macCatalyst)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         MumbleLiveActivity()
         #endif
         MumbleServerWidget()
