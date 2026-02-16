@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0EEEF3B42DF1E5450042C0A8 /* libFMDB-IOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EEEF35C2DF1DC6D0042C0A8 /* libFMDB-IOS.a */; platformFilter = ios; };
-		0EEEF3C12DF1E5450042C0A8 /* FMDB.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EEEF3602DF1DC6D0042C0A8 /* FMDB.framework */; };
+		0EEEF3C12DF1E5450042C0A8 /* FMDB.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EEEF3602DF1DC6D0042C0A8 /* FMDB.framework */; platformFilters = (macos, ); };
 		0EEEF3C42DF1E5450042C0A8 /* FMDB.framework in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 0EEEF3602DF1DC6D0042C0A8 /* FMDB.framework */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		0EF3A4672DC2573900028454 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2861C2AD116BE9B5002B8514 /* AudioToolbox.framework */; };
 		203843CE1AFD4AEBB5A35F7E /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7176F3B54CC74E79BC7D5A94 /* RichTextEditor.swift */; };
@@ -1424,7 +1424,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300300100;
+				CURRENT_PROJECT_VERSION = 300400000;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1516,7 +1516,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300300100;
+				CURRENT_PROJECT_VERSION = 300400000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1601,7 +1601,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300300100;
+				CURRENT_PROJECT_VERSION = 300400000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1686,7 +1686,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300300100;
+				CURRENT_PROJECT_VERSION = 300400000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_NS_ASSERTIONS = NO;
