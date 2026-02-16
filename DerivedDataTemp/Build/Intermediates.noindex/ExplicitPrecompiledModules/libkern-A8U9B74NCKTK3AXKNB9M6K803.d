@@ -1,0 +1,25 @@
+moduledependenciestarget: \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/libkern.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/usr/include/Darwin.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/libkern/OSCacheControl.h \
+  /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/stddef.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/usr/include/stddef.h \
+  /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/module.modulemap \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stddef-CWEBKHOREDCJ0TI5VUEN2TYKI.pcm \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/usr/include/DarwinFoundation1.modulemap \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_AvailabilityInternal-9RI9LJRBYI99WPZYVVLUT4CIU.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/ptrcheck-48RC6VBAZR10RH5PFFL39WIW2.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_DarwinFoundation1-1GAIUHF085MK90RN4JCGZB306.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stdarg-A9D0S4MCEODHHK2DW6ZZ3EGRO.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_DarwinFoundation2-84ROREYCL40Q6N9VZKW99DVXQ.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stdint-2MVEKOPN16AKOYHXDTHQCOCSZ.pcm \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/libkern/OSDebug.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_DarwinFoundation3-54UZICXKOQ5S8LPQS214VCB8O.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_inttypes-DN6FMGYMJG0LMG0IYRRQ8DTUX.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_limits-2594T0XRJRHMP1QTAYXJFUIXD.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stdbool-DIP8BGI5GPUEM4RHI1UOSWOFA.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Darwin-7TVUCXFIO3WQ2KCFXUOLJ9GS3.pcm \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/libkern/OSReturn.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/libkern/OSThermalNotification.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/libkern/OSTypes.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/libkern/OSKextLib.h

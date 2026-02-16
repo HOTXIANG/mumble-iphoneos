@@ -1,0 +1,16 @@
+{
+  "source": "/Users/hotxiang/Coding/mumble-iphoneos/MumbleWidget/MumbleActivityAttributes.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Display Mode",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 28
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,27 @@
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit.pch \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MKAudioInput.m \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKServerModel.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKUser.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKChannel.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKConnection.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKTextMessage.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKPermission.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKAccessControl.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKVersion.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MKPacketDataStream.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MKAudioInput.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MumbleKit/MKAudio.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MKAudioDevice.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MKAudioOutputSidetone.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/src/MKAudioOutputUser.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_types.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_bits.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_preprocess.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_echo.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_resampler.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_jitter.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus_types.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus_defines.h

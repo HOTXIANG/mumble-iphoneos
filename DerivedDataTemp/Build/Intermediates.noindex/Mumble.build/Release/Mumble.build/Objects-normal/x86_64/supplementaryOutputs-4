@@ -1,0 +1,12 @@
+{
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Preferences/CertificateModel.swift" : {
+    "abi-baseline-json" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble.abi.json",
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble-primary.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble-primary.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble-primary.dia",
+    "objc-header" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble-Swift.h",
+    "swiftdoc" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble.swiftdoc",
+    "swiftmodule" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble.swiftmodule",
+    "swiftsourceinfo" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/Release/Mumble.build/Objects-normal/x86_64/Mumble.swiftsourceinfo"
+  }
+}

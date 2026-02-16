@@ -1,0 +1,37 @@
+moduledependenciestarget: \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Symbols.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Symbols.framework/Headers/Symbols.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_AvailabilityInternal-89PMVPVUVG839NVEWAKWW8KTR.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/ptrcheck-82PY6GF88AWD9ZFMUTG3HM5OJ.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_DarwinFoundation1-9000RXXNM26FY9L4GEKOMFJA1.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stddef-5TYFHJJHUAQXL4488S4259HYH.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stdarg-DLYDOCGA77BOL4MRJQDL5JBRY.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_DarwinFoundation2-95UJ8WEWZDG74RJBW0QFISOF1.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_float-8LAW3922S2ATZIG191LRRCT1.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_limits-BYP9DOX4TIXU4K2822VOOHGDS.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stdint-5YIEZR2HEPD3CFOJUXC98XU2U.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_DarwinFoundation3-8MBR3ZPFYV5W5DL3RVUE99O5S.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_inttypes-B6MLR2U42FZ3FZB7XCTS2N31P.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_stdbool-8A0ITV2JP4BLAABIEDWHLYL3U.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Darwin-81EEC2EO3DUP0JCM84K1B8SCQ.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/ptrauth-AK92KCI04R2SQLSZXEG6GIOI1.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/MachO-AYFK9KONX49H0SY0PV4M3HG66.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/ObjectiveC-E8668MIKJROYN4Q5ZWHL43XH.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/os_object-4TXNF3F3S69TI4GO6A27XF931.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/os_workgroup-7NRUXLD0OPTLDVWEMSUIT5OSA.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Dispatch-10S9UPG1LQLSFZ7BRP9RHGCXY.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/CoreFoundation-5J0W5APJ9G5Z3XQ3S6C4NPZOL.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/libkern-7CHBTBFFO22LBIZ3YZ3DOPT0N.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/IOKit-STBCLMHERWFZMVCRT4E0JRHR.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/CoreGraphics-84BIYAY3V11C2ATQWCW0EBEP.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/launch-5SY4K9OOC1420J7YTB1ES76VX.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/XPC-4W7NH5QQLLQA8Q0603B9YSNDU.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/libDER-DQPN9DS5FC5NB8T661O6VI31T.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Security-D1OM4EP30LU4U96B803UES3RZ.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/DiskArbitration-CP8EGD9RU4158TXXHPHA4YX6H.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/_Builtin_intrinsics-4675Y3SWPL1DVLO3CDM94SRKH.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/CFNetwork-5ZG6TRBBVOM9OF4DBUH74S7RU.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/CoreServices-7NHLJFRF0ZNVUZAOCOF7HZMJT.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Foundation-30IULE3RI83WG49JX8Y8DDM4.pcm \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Symbols.framework/Headers/NSSymbolEffect.h

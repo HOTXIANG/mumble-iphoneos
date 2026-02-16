@@ -1,0 +1,25 @@
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speexbuild/Speex.pch \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/nb_celp.c \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speexbuild/config.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/nb_celp.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/modes.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/../include/speex/speex.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_types.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex_bits.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/../include/speex/speex_bits.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/arch.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/../include/speex/speex_types.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/../include/speex/speex_callbacks.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/include/speex/speex.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/vbr.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/filters.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/lpc.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/lsp.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/ltp.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/quant_lsp.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/cb_search.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/stack_alloc.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/vq.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/math_approx.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/os_support.h

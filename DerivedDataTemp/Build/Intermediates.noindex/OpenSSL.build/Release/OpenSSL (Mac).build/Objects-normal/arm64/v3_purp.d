@@ -1,0 +1,34 @@
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/crypto/x509v3/v3_purp.c \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opensslbuild/OpenSSL.pch \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/crypto/cryptlib.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/e_os.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/opensslconf.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/e_os2.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/crypto.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/stack.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/safestack.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/opensslv.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/ossl_typ.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/symhacks.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/buffer.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/bio.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/err.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/lhash.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/x509v3.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/x509.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/evp.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/objects.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/obj_mac.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/asn1.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/bn.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/ec.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/ecdsa.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/ecdh.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/rsa.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/dsa.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/dh.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/sha.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/x509_vfy.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/pkcs7.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/openssl/include/openssl/conf.h

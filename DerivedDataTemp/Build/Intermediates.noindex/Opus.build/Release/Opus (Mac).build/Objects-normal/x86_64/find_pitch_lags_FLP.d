@@ -1,0 +1,31 @@
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opusbuild/Opus.pch \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/float/find_pitch_lags_FLP.c \
+  config.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/float/main_FLP.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/float/SigProc_FLP.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/SigProc_FIX.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/typedef.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus_types.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus_defines.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/resampler_structs.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/macros.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/ecintrin.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/arch.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/Inlines.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/MacroCount.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/MacroDebug.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/float_cast.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/float/structs_FLP.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/main.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/define.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/errors.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/structs.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/entenc.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/entcode.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/entdec.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/tables.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/PLC.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/control.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/debug.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/silk/tuning_parameters.h
