@@ -58,7 +58,7 @@ struct ChannelACLView: View {
             #if os(macOS)
             .frame(minWidth: 500, minHeight: 450)
             #endif
-            .navigationTitle("ACL - \(channel.channelName() ?? "Channel")")
+            .navigationTitle("ACL - \(channel.channelName() ?? NSLocalizedString("Channel", comment: ""))")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

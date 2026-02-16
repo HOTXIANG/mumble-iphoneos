@@ -21,7 +21,7 @@ struct WelcomeNavigationConfig: NavigationConfigurable {
     let onPreferences: () -> Void
     let onAbout: () -> Void
     
-    var title: String { "Mumble" }
+    var title: String { NSLocalizedString("Mumble", comment: "") }
     var leftBarItems: [NavigationBarItem] {
         #if os(macOS)
         [] // macOS: Settings is in the app menu bar
@@ -532,9 +532,30 @@ private struct VADOnboardingSplashView: View {
     }
     private var modeDescription: String {
         if vadKind == "snr" {
-            return "Signal to Noise (SNR): detects speech by comparing voice against background noise. Better in noisy environments."
+            return NSLocalizedString(
+                "Signal to Noise (SNR): detects speech by comparing voice against background noise. Better in noisy environments.",
+                comment: ""
+            )
         }
-        return "Amplitude: detects speech by raw input loudness. Simpler and usually more responsive in quiet environments."
+        return NSLocalizedString(
+            "Amplitude: detects speech by raw input loudness. Simpler and usually more responsive in quiet environments.",
+            comment: ""
+        )
+    }
+    private var vadThresholdHelpText: String {
+        let silenceBelow = NSLocalizedString(
+            "Silence Below: input under this level is treated as silence.",
+            comment: ""
+        )
+        let speechAbove = NSLocalizedString(
+            "Speech Above: input over this level is treated as speech.",
+            comment: ""
+        )
+        let silenceHold = NSLocalizedString(
+            "Silence Hold: when input stays below Silence Below for this duration, it finally switches to silent.",
+            comment: ""
+        )
+        return [silenceBelow, speechAbove, silenceHold].joined(separator: "\n")
     }
     private var systemSheetBackground: Color {
         #if os(macOS)
@@ -625,7 +646,7 @@ private struct VADOnboardingSplashView: View {
                     )
                     
                     HStack {
-                        Text("VAD Below")
+                        Text("Silence Below")
                             .font(.headline)
                         Spacer()
                         Text(belowPercentLabel)
@@ -636,7 +657,7 @@ private struct VADOnboardingSplashView: View {
                         .tint(.indigo)
                     
                     HStack {
-                        Text("VAD Above")
+                        Text("Speech Above")
                             .font(.headline)
                         Spacer()
                         Text(abovePercentLabel)
@@ -658,7 +679,7 @@ private struct VADOnboardingSplashView: View {
                         .tint(.indigo)
                 }
                 
-                Text("Below: input under this level is treated as silence.\nAbove: input over this level is treated as speech.\nSilence Hold: when input stays below Below for this duration, it finally switches to silent.")
+                Text(vadThresholdHelpText)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.leading)
@@ -788,6 +809,7 @@ struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
     
     @StateObject private var serverManager = ServerModelManager()
+    @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("HasCompletedVADOnboarding") private var hasCompletedVADOnboarding: Bool = false
     @State private var showVADOnboarding = false
     
@@ -819,6 +841,7 @@ struct AppRootView: View {
             iPadLayout
             #endif
         }
+        .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .environmentObject(serverManager)
         .focusedValue(\.serverManager, serverManager)
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
@@ -848,7 +871,11 @@ struct AppRootView: View {
                     Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { }
                     VStack(spacing: 12) {
                         ProgressView().controlSize(.large).tint(.white)
-                        Text(appState.isReconnecting ? "Reconnecting..." : "Connecting...")
+                        Text(
+                            appState.isReconnecting
+                                ? NSLocalizedString("Reconnecting...", comment: "")
+                                : NSLocalizedString("Connecting...", comment: "")
+                        )
                             .font(.headline).foregroundColor(.white)
                         Button(action: { appState.cancelConnection() }) {
                             Text("Cancel")
@@ -911,6 +938,7 @@ struct AppRootView: View {
             }
         }
         .onAppear {
+            languageManager.reapplyCurrentLanguage()
             serverManager.activate()
             if !hasCompletedVADOnboarding {
                 showVADOnboarding = true

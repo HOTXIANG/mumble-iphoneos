@@ -85,7 +85,7 @@ struct HandoffProfilePicker: View {
         }
         profiles = servers.compactMap { server in
             guard server.hasPrimaryKey() else { return nil }
-            let name = server.displayName ?? server.hostName ?? "Unknown"
+            let name = server.displayName ?? server.hostName ?? NSLocalizedString("Unknown", comment: "")
             let user = (server.userName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let host = server.hostName ?? ""
             let port = server.port
@@ -112,12 +112,12 @@ struct HandoffProfilePicker: View {
 
     private var selectedLabel: String {
         if selectedKey == -1 {
-            return "Automatic"
+            return NSLocalizedString("Automatic", comment: "")
         }
         if let selected = profiles.first(where: { $0.primaryKey == selectedKey }) {
             return selected.shortLabel
         }
-        return "Automatic"
+        return NSLocalizedString("Automatic", comment: "")
     }
 
     @ViewBuilder

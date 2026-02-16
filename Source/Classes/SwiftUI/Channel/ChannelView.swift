@@ -210,7 +210,7 @@ struct ServerChannelView: View {
                     Image(systemName: "arrow.right.arrow.left")
                         .foregroundColor(.white)
                         .font(.system(size: 12))
-                    Text("Moving \(movingUser.userName() ?? "user") — tap a channel")
+                    Text("Moving \(movingUser.userName() ?? NSLocalizedString("user", comment: "")) — tap a channel")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -247,7 +247,7 @@ struct ServerChannelView: View {
             UserAudioSettingsView(
                 manager: serverManager,
                 userSession: user.session(),
-                userName: user.userName() ?? "User"
+                userName: user.userName() ?? NSLocalizedString("User", comment: "")
             )
             .presentationDetents([.medium])
         }
@@ -294,7 +294,7 @@ struct ServerChannelView: View {
             }
         } message: {
             if let channel = serverManager.passwordPromptChannel {
-                Text("Enter the password to join \"\(channel.channelName() ?? "this channel")\"")
+                Text("Enter the password to join \"\(channel.channelName() ?? NSLocalizedString("this channel", comment: ""))\"")
             }
         }
     }
@@ -406,7 +406,7 @@ struct ChannelTreeRow: View {
                     #else
                     // iOS: 点击弹出菜单
                     Menu {
-                        Text(channel.channelName() ?? "Channel")
+                        Text(channel.channelName() ?? NSLocalizedString("Channel", comment: ""))
                             .font(.subheadline)
                             .foregroundColor(.white)
                             .padding(.bottom, 4)
@@ -646,7 +646,7 @@ struct ChannelRowView: View {
                     .font(.system(size: kChannelIconSize, weight: .semibold))
                     .frame(width: kChannelIconWidth, height: kContentHeight)
                 
-                Text(channel.channelName() ?? "Unknown")
+                Text(channel.channelName() ?? NSLocalizedString("Unknown", comment: ""))
                     .font(.system(size: kFontSize, weight: .medium))
                     .foregroundColor(isCurrentChannel ? .green : .primary)
                     .shadow(radius: 1)
@@ -782,7 +782,7 @@ struct UserRowView: View {
                 AvatarView(talkingState: isTalking ? .talking : .silent)
                 
                 // 用户名
-                Text(user.userName() ?? "Unknown")
+                Text(user.userName() ?? NSLocalizedString("Unknown", comment: ""))
                     .font(.system(size: kFontSize, weight: .medium))
                     .foregroundColor(isMyself ? .cyan : .primary)
                     .shadow(radius: isMyself ? 1 : 0)
@@ -911,7 +911,7 @@ struct UserRowView: View {
                 
                 Menu {
                     // Menu Header
-                    Text(user.userName() ?? "User")
+                    Text(user.userName() ?? NSLocalizedString("User", comment: ""))
                         .font(.caption)
                         .foregroundColor(.gray)
                     
@@ -1087,7 +1087,7 @@ struct PrivateMessageInputView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Private Message")
                             .font(.headline)
-                        Text("To: \(targetUser.userName() ?? "Unknown")")
+                        Text("To: \(targetUser.userName() ?? NSLocalizedString("Unknown", comment: ""))")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -1168,7 +1168,7 @@ struct ListenerRow: View {
                 .shadow(color: hasSpeaker ? .green.opacity(0.6) : .clear, radius: hasSpeaker ? 4 : 0)
             
             // 监听者用户名：自己=cyan（与自己用户行一致），别人=白色
-            Text(listener.userName() ?? "Unknown")
+            Text(listener.userName() ?? NSLocalizedString("Unknown", comment: ""))
                 .font(.system(size: kFontSize, weight: .medium))
                 .foregroundColor(isMyself ? .cyan : .primary)
                 .lineLimit(1)

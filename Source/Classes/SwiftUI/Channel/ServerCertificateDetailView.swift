@@ -82,7 +82,7 @@ struct ServerCertificateDetailView: View {
         if let ref = MUConnectionController.shared()?.currentCertificateRef,
            let cert = MUCertificateController.certificate(withPersistentRef: ref) {
             
-            self.certName = cert.commonName() ?? "Unknown"
+            self.certName = cert.commonName() ?? NSLocalizedString("Unknown", comment: "")
             self.certHash = cert.hexDigest() ?? ""
             self.isAnonymous = false
         } else {

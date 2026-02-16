@@ -87,7 +87,7 @@ struct FavouriteServerEditView: View {
                 // Username (锁定逻辑)
                 settingInputRow(
                     title: "Username",
-                    placeholder: UserDefaults.standard.string(forKey: "DefaultUserName") ?? "User",
+                    placeholder: UserDefaults.standard.string(forKey: "DefaultUserName") ?? NSLocalizedString("User", comment: ""),
                     text: $userName,
                     isLocked: isLocked,
                     lockedText: userName,
@@ -257,6 +257,9 @@ struct FavouriteServerEditView: View {
         isNumberField: Bool = false,
         isUsernameField: Bool = false
     ) -> some View {
+        let localizedTitle = NSLocalizedString(title, comment: "")
+        let localizedPlaceholder = NSLocalizedString(placeholder, comment: "")
+
         #if os(macOS)
         LabeledContent {
             if isLocked {
@@ -273,13 +276,13 @@ struct FavouriteServerEditView: View {
                 .multilineTextAlignment(.leading)
             }
         } label: {
-            Text("\(title)  (\(placeholder))")
+            Text("\(localizedTitle)  (\(localizedPlaceholder))")
                 .foregroundColor(.secondary)
         }
         .padding(.vertical, 1)
         #else
         HStack {
-            Text(title)
+            Text(localizedTitle)
                 .foregroundColor(.primary)
             Spacer()
             if isLocked {
@@ -287,9 +290,9 @@ struct FavouriteServerEditView: View {
             } else {
                 Group {
                     if isSecure {
-                        SecureField(placeholder, text: text)
+                        SecureField(localizedPlaceholder, text: text)
                     } else {
-                        TextField(placeholder, text: text)
+                        TextField(localizedPlaceholder, text: text)
                     }
                 }
                 .multilineTextAlignment(.trailing)
@@ -376,7 +379,7 @@ struct FavouriteServerEditView: View {
     }
 
     private var boundCertificateCompactLabel: String {
-        guard let selected = selectedCertificateRef else { return "None" }
+        guard let selected = selectedCertificateRef else { return NSLocalizedString("None", comment: "") }
 
         if let exact = certModel.certificates.first(where: { $0.id == selected }) {
             return compactUserName(fromCertificateName: exact.name)
@@ -392,12 +395,12 @@ struct FavouriteServerEditView: View {
             return compactUserName(fromCertificateName: name)
         }
 
-        return "Missing"
+        return NSLocalizedString("Missing", comment: "")
     }
 
     private func compactUserName(fromCertificateName raw: String) -> String {
         let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return "Unknown" }
+        guard !name.isEmpty else { return NSLocalizedString("Unknown", comment: "") }
         if let at = name.firstIndex(of: "@"), at > name.startIndex {
             return String(name[..<at])
         }
@@ -407,13 +410,13 @@ struct FavouriteServerEditView: View {
     private func parseCertificateCommonName(_ raw: String) -> (user: String, host: String?) {
         let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else {
-            return ("Unknown", nil)
+            return (NSLocalizedString("Unknown", comment: ""), nil)
         }
         if let at = name.firstIndex(of: "@"), at > name.startIndex {
             let user = String(name[..<at]).trimmingCharacters(in: .whitespacesAndNewlines)
             let hostPart = String(name[name.index(after: at)...]).trimmingCharacters(in: .whitespacesAndNewlines)
             let host = hostPart.isEmpty ? nil : hostPart
-            return (user.isEmpty ? "Unknown" : user, host)
+            return (user.isEmpty ? NSLocalizedString("Unknown", comment: "") : user, host)
         }
         return (name, nil)
     }
@@ -422,7 +425,7 @@ struct FavouriteServerEditView: View {
         let host = hostName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !host.isEmpty { return host }
         let fallback = server?.hostName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return fallback.isEmpty ? "Unknown" : fallback
+        return fallback.isEmpty ? NSLocalizedString("Unknown", comment: "") : fallback
     }
 
     private var currentServerPortForDisplay: UInt {

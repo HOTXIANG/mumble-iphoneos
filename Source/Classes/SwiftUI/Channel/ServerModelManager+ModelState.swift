@@ -27,16 +27,26 @@ extension ServerModelManager {
             }()
 
             if isSelf || isInSameChannel {
-                let displayName = isSelf ? "You" : (user.userName() ?? "Unknown")
+                let displayName = isSelf
+                    ? NSLocalizedString("You", comment: "")
+                    : (user.userName() ?? NSLocalizedString("Unknown", comment: ""))
 
                 if prev.isSelfDeafened != currentDeafened {
                     // 不听状态变化（优先级高于闭麦，因为 deafen 隐含 mute）
-                    let action = currentDeafened ? "deafened" : "undeafened"
-                    addSystemNotification("\(displayName) \(action)", category: .muteDeafen, suppressPush: isSelf)
+                    let key = currentDeafened ? "%@ deafened" : "%@ undeafened"
+                    addSystemNotification(
+                        String(format: NSLocalizedString(key, comment: ""), displayName),
+                        category: .muteDeafen,
+                        suppressPush: isSelf
+                    )
                 } else if prev.isSelfMuted != currentMuted {
                     // 闭麦状态变化
-                    let action = currentMuted ? "muted" : "unmuted"
-                    addSystemNotification("\(displayName) \(action)", category: .muteDeafen, suppressPush: isSelf)
+                    let key = currentMuted ? "%@ muted" : "%@ unmuted"
+                    addSystemNotification(
+                        String(format: NSLocalizedString(key, comment: ""), displayName),
+                        category: .muteDeafen,
+                        suppressPush: isSelf
+                    )
                 }
             }
         }
@@ -150,10 +160,11 @@ extension ServerModelManager {
             for (index, user) in users.enumerated() {
                 applySavedUserPreferences(user: user)
 
-                let userName = user.userName() ?? "Unknown User"
+                let userName = user.userName() ?? NSLocalizedString("Unknown User", comment: "")
+                let channelName = currentChannel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
                 let item = ChannelNavigationItem(
                     title: userName,
-                    subtitle: "in \(currentChannel.channelName() ?? "Unknown Channel")",
+                    subtitle: String(format: NSLocalizedString("in %@", comment: ""), channelName),
                     type: .user,
                     indentLevel: 0,
                     object: user
@@ -168,7 +179,7 @@ extension ServerModelManager {
     }
 
     private func addChannelTreeToModel(channel: MKChannel, indentLevel: Int) {
-        let channelName = channel.channelName() ?? "Unknown Channel"
+        let channelName = channel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
         let channelDescription = channel.channelDescription()
         let channelItem = ChannelNavigationItem(
             title: channelName,
@@ -194,10 +205,10 @@ extension ServerModelManager {
                 // 顺便确保配置被应用 (之前的修复)
                 applySavedUserPreferences(user: user)
 
-                let userName = user.userName() ?? "Unknown User"
+                let userName = user.userName() ?? NSLocalizedString("Unknown User", comment: "")
                 let userItem = ChannelNavigationItem(
                     title: userName,
-                    subtitle: "in \(channelName)",
+                    subtitle: String(format: NSLocalizedString("in %@", comment: ""), channelName),
                     type: .user,
                     indentLevel: indentLevel + 1,
                     object: user

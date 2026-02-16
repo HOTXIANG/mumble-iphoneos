@@ -60,7 +60,7 @@ struct CertificatePreferencesView: View {
             .alert("Import Failed", isPresented: $showingImportErrorAlert, actions: {
                 Button("OK", role: .cancel) { }
             }, message: {
-                Text(certModel.importError ?? "Invalid password or corrupted file.")
+                Text(certModel.importError ?? NSLocalizedString("Invalid password or corrupted file.", comment: ""))
             })
             // --- 导出功能 ---
             .alert("Export Certificate", isPresented: $showingExportPasswordAlert, actions: {

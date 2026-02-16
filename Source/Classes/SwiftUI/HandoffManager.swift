@@ -534,18 +534,17 @@ extension HandoffManager: NSUserActivityDelegate {
             MUConnectionController.shared()?.disconnectFromServer()
             
             // 显示 Toast 提示
-            let deviceInfo: String
-            #if os(macOS)
-            deviceInfo = "another device"
-            #else
-            deviceInfo = "another device"
-            #endif
+            let deviceInfo = NSLocalizedString("another device", comment: "Handoff target device fallback")
+            let handedOffMessage = String(
+                format: NSLocalizedString("Session handed off to %@", comment: "Handoff toast"),
+                deviceInfo
+            )
             
             NotificationCenter.default.post(
                 name: NSNotification.Name("MUAppShowMessageNotification"),
                 object: nil,
                 userInfo: [
-                    "message": NSLocalizedString("Session handed off to \(deviceInfo)", comment: "Handoff toast"),
+                    "message": handedOffMessage,
                     "type": "info"
                 ]
             )

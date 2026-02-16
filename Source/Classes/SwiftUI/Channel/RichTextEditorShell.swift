@@ -27,6 +27,9 @@ extension WYSIWYGEditorView {
         let textColor = isDark ? "#d4d4d4" : "#1e1e1e"
         let borderColor = isDark ? "#444" : "#ccc"
         let toolbarBg = isDark ? "#2d2d2d" : "#f0f0f0"
+        let editorPlaceholder = NSLocalizedString("Enter description...", comment: "")
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
 
         let fullHTML = """
         <!DOCTYPE html>
@@ -110,7 +113,7 @@ extension WYSIWYGEditorView {
                 line-height: 1.5; word-wrap: break-word; overflow-wrap: break-word;
             }
             #editor:empty:before {
-                content: 'Enter description...';
+                content: '\(editorPlaceholder)';
                 color: \(isDark ? "#666" : "#999");
                 pointer-events: none;
             }

@@ -141,12 +141,22 @@ struct GroupEntryRow: View {
 
                 Spacer()
 
-                Text("\(entry.members.count) members")
+                Text(
+                    String(
+                        format: NSLocalizedString("%d members", comment: ""),
+                        entry.members.count
+                    )
+                )
                     .font(.caption)
                     .foregroundColor(.secondary)
 
                 if !entry.inheritedMembers.isEmpty {
-                    Text("+\(entry.inheritedMembers.count) inherited")
+                    Text(
+                        String(
+                            format: NSLocalizedString("+%d inherited", comment: ""),
+                            entry.inheritedMembers.count
+                        )
+                    )
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

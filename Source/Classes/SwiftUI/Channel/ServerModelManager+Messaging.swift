@@ -44,7 +44,7 @@ extension ServerModelManager {
         let selfMessage = ChatMessage(
             id: UUID(),
             type: .userMessage,
-            senderName: serverModel.connectedUser()?.userName() ?? "Me",
+            senderName: serverModel.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: ""),
             attributedMessage: attributedString(from: trimmedText),
             images: [],
             timestamp: Date(),
@@ -65,10 +65,10 @@ extension ServerModelManager {
         serverModel.send(message, to: user)
 
         // 立即在 UI 上显示自己发送的私聊
-        let targetName = user.userName() ?? "Unknown"
+        let targetName = user.userName() ?? NSLocalizedString("Unknown", comment: "")
         let selfMessage = ChatMessage(
             type: .privateMessage,
-            senderName: serverModel.connectedUser()?.userName() ?? "Me",
+            senderName: serverModel.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: ""),
             attributedMessage: attributedString(from: trimmedText),
             timestamp: Date(),
             isSentBySelf: true,
@@ -132,7 +132,7 @@ extension ServerModelManager {
             let localMessage = ChatMessage(
                 id: UUID(),
                 type: .userMessage,
-                senderName: self.serverModel?.connectedUser()?.userName() ?? "Me",
+                senderName: self.serverModel?.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: ""),
                 attributedMessage: AttributedString(""),
                 images: [image],
                 timestamp: Date(),

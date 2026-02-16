@@ -244,8 +244,8 @@
 		1D30AB110D05D00D00671497 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		1D6058910D05DD3D006BFB54 /* Mumble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mumble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1DF5F4DF0D08C38300B7A737 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
-		280256371510D70D00178B08 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = Localizable.strings; sourceTree = "<group>"; };
-		2802563B1510DDCA00178B08 /* da */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = da; path = Localizable.strings; sourceTree = "<group>"; };
+		280256371510D70D00178B08 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = Resources/en.lproj/Localizable.strings; sourceTree = SOURCE_ROOT; };
+		F3A100112F9A000100AABBCC /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = SOURCE_ROOT; };
 		2802ABFE14C9E948000983A5 /* MUDataURL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUDataURL.h; sourceTree = "<group>"; };
 		2802ABFF14C9E948000983A5 /* MUDataURL.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MUDataURL.m; sourceTree = "<group>"; };
 		2802AC0114CB0130000983A5 /* MUImage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MUImage.h; sourceTree = "<group>"; };
@@ -493,24 +493,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		280256351510D70D00178B08 /* en.lproj */ = {
-			isa = PBXGroup;
-			children = (
-				280256361510D70D00178B08 /* Localizable.strings */,
-			);
-			name = en.lproj;
-			path = Resources/en.lproj;
-			sourceTree = "<group>";
-		};
-		280256391510DDCA00178B08 /* da.lproj */ = {
-			isa = PBXGroup;
-			children = (
-				2802563A1510DDCA00178B08 /* Localizable.strings */,
-			);
-			name = da.lproj;
-			path = Resources/da.lproj;
-			sourceTree = "<group>";
-		};
 		2838EA0C1293165700035C5D /* Preferences */ = {
 			isa = PBXGroup;
 			children = (
@@ -576,8 +558,7 @@
 		28DC1C1213DE59120037CDC2 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				280256351510D70D00178B08 /* en.lproj */,
-				280256391510DDCA00178B08 /* da.lproj */,
+				280256361510D70D00178B08 /* Localizable.strings */,
 				28DC1C2713DE596B0037CDC2 /* Continents.plist */,
 				28DC1C2913DE596B0037CDC2 /* Countries.plist */,
 				F26689942EE8A46A008FC7EB /* iTunesArtwork.png */,
@@ -805,7 +786,7 @@
 			hasScannedForEncodings = 1;
 			knownRegions = (
 				en,
-				da,
+				"zh-Hans",
 				de,
 				fr,
 				ja,
@@ -1079,14 +1060,7 @@
 			isa = PBXVariantGroup;
 			children = (
 				280256371510D70D00178B08 /* en */,
-			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
-		};
-		2802563A1510DDCA00178B08 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				2802563B1510DDCA00178B08 /* da */,
+				F3A100112F9A000100AABBCC /* zh-Hans */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";

@@ -283,7 +283,7 @@ struct UserInfoView: View {
                 .foregroundColor(.accentColor)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(user.userName() ?? "Unknown")
+                Text(user.userName() ?? NSLocalizedString("Unknown", comment: ""))
                     .font(.title2.bold())
                 
                 HStack(spacing: 8) {
@@ -451,11 +451,16 @@ struct ChannelInfoView: View {
                 .foregroundColor(.accentColor)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(channel.channelName() ?? "Unknown")
+                Text(channel.channelName() ?? NSLocalizedString("Unknown", comment: ""))
                     .font(.title2.bold())
                 
                 let userCount = (channel.users() as? [MKUser])?.count ?? 0
-                Text("\(userCount) user(s)")
+                Text(
+                    String(
+                        format: NSLocalizedString("%d user(s)", comment: ""),
+                        userCount
+                    )
+                )
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

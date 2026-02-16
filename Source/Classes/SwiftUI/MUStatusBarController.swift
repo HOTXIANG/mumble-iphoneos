@@ -74,16 +74,38 @@ final class MUStatusBarController: NSObject {
     private func buildMenu() {
         let m = NSMenu()
 
-        m.addItem(withTitle: "Mute / Unmute", action: #selector(toggleMute), keyEquivalent: "")
-            .target = self
-        m.addItem(withTitle: "Deafen / Undeafen", action: #selector(toggleDeafen), keyEquivalent: "")
-            .target = self
+        let muteItem = NSMenuItem(
+            title: NSLocalizedString("Mute / Unmute", comment: ""),
+            action: #selector(toggleMute),
+            keyEquivalent: ""
+        )
+        muteItem.target = self
+        muteItem.image = makeMenuItemImage(symbolName: "mic.slash.fill")
+        m.addItem(muteItem)
+
+        let deafenItem = NSMenuItem(
+            title: NSLocalizedString("Deafen / Undeafen", comment: ""),
+            action: #selector(toggleDeafen),
+            keyEquivalent: ""
+        )
+        deafenItem.target = self
+        deafenItem.image = makeMenuItemImage(symbolName: "speaker.slash.fill")
+        m.addItem(deafenItem)
+
         m.addItem(NSMenuItem.separator())
-        m.addItem(withTitle: "Disconnect", action: #selector(disconnect), keyEquivalent: "")
-            .target = self
+
+        let disconnectItem = NSMenuItem(
+            title: NSLocalizedString("Disconnect", comment: ""),
+            action: #selector(disconnect),
+            keyEquivalent: ""
+        )
+        disconnectItem.target = self
+        disconnectItem.image = makeMenuItemImage(symbolName: "xmark.circle")
+        m.addItem(disconnectItem)
 
         menu = m
         statusItem?.menu = m
+        refreshMenuItems()
     }
 
     private func refreshMenuItems() {
@@ -95,9 +117,15 @@ final class MUStatusBarController: NSObject {
         if let muteItem = m.items.first(where: { $0.action == #selector(toggleMute) }) {
             muteItem.isEnabled = isConnected
             if isConnected, let user = MUConnectionController.shared()?.serverModel?.connectedUser() {
-                muteItem.title = user.isSelfMuted() ? "Unmute" : "Mute"
+                muteItem.title = user.isSelfMuted()
+                    ? NSLocalizedString("Unmute", comment: "")
+                    : NSLocalizedString("Mute", comment: "")
+                muteItem.image = makeMenuItemImage(
+                    symbolName: user.isSelfMuted() ? "mic.fill" : "mic.slash.fill"
+                )
             } else {
-                muteItem.title = "Mute / Unmute"
+                muteItem.title = NSLocalizedString("Mute / Unmute", comment: "")
+                muteItem.image = makeMenuItemImage(symbolName: "mic.slash.fill")
             }
         }
 
@@ -105,15 +133,23 @@ final class MUStatusBarController: NSObject {
         if let deafenItem = m.items.first(where: { $0.action == #selector(toggleDeafen) }) {
             deafenItem.isEnabled = isConnected
             if isConnected, let user = MUConnectionController.shared()?.serverModel?.connectedUser() {
-                deafenItem.title = user.isSelfDeafened() ? "Undeafen" : "Deafen"
+                deafenItem.title = user.isSelfDeafened()
+                    ? NSLocalizedString("Undeafen", comment: "")
+                    : NSLocalizedString("Deafen", comment: "")
+                deafenItem.image = makeMenuItemImage(
+                    symbolName: user.isSelfDeafened() ? "speaker.wave.2.fill" : "speaker.slash.fill"
+                )
             } else {
-                deafenItem.title = "Deafen / Undeafen"
+                deafenItem.title = NSLocalizedString("Deafen / Undeafen", comment: "")
+                deafenItem.image = makeMenuItemImage(symbolName: "speaker.slash.fill")
             }
         }
 
         // Disconnect item
         if let disconnectItem = m.items.first(where: { $0.action == #selector(disconnect) }) {
+            disconnectItem.title = NSLocalizedString("Disconnect", comment: "")
             disconnectItem.isEnabled = isConnected
+            disconnectItem.image = makeMenuItemImage(symbolName: "xmark.circle")
         }
     }
 
@@ -262,9 +298,9 @@ final class MUStatusBarController: NSObject {
         case .talking:
             config = ("person.fill", .systemGreen, "Mumble — Talking")
         case .selfMuted:
-            config = ("mic.slash.fill", .systemOrange, "Mumble — Muted")
+            config = ("mic.slash.fill", .systemOrange, NSLocalizedString("Mumble — Muted", comment: ""))
         case .selfDeafened:
-            config = ("speaker.slash.fill", .systemRed, "Mumble — Deafened")
+            config = ("speaker.slash.fill", .systemRed, NSLocalizedString("Mumble — Deafened", comment: ""))
         }
 
         let image = makeStatusBarImage(symbolName: config.symbolName, tintColor: config.color)
@@ -288,6 +324,17 @@ final class MUStatusBarController: NSObject {
         }
 
         image.isTemplate = false
+        return image
+    }
+
+    /// Renders a template SF Symbol used for NSMenuItem leading icon.
+    private func makeMenuItemImage(symbolName: String) -> NSImage? {
+        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        guard let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+            .withSymbolConfiguration(symbolConfig) else {
+            return nil
+        }
+        image.isTemplate = true
         return image
     }
 }

@@ -66,7 +66,7 @@ struct FavouriteServerRowView: View {
     var body: some View {
         HStack(spacing: rowHStackSpacing) {
             VStack(alignment: .leading, spacing: rowVerticalStackSpacing) {
-                Text(server.displayName ?? "Unknown Server")
+                Text(server.displayName ?? NSLocalizedString("Unknown Server", comment: ""))
                     .font(.system(size: titleFontSize, weight: .semibold))
                 
                 Text("\(server.hostName ?? ""):\(String(server.port))")
@@ -240,7 +240,7 @@ struct FavouriteServerListContentView: View {
         .alert("Delete Favourite", isPresented: $showingDeleteAlert, presenting: serverToDelete) { server in
             Button("Delete", role: .destructive) { deleteFavouriteServer(server) }
         } message: { server in
-            Text("Are you sure you want to delete '\(server.displayName ?? "this server")'?")
+            Text("Are you sure you want to delete '\(server.displayName ?? NSLocalizedString("this server", comment: ""))'?")
         }
     }
     
@@ -387,7 +387,7 @@ struct FavouriteServerListContentView: View {
                 port: Int(server.port),
                 username: server.userName ?? ""
             ),
-            displayName: server.displayName ?? server.hostName ?? "Unknown",
+            displayName: server.displayName ?? server.hostName ?? NSLocalizedString("Unknown", comment: ""),
             hostname: server.hostName ?? "",
             port: Int(server.port),
             username: server.userName ?? "",
@@ -398,7 +398,7 @@ struct FavouriteServerListContentView: View {
         
         PlatformNotificationFeedback().notificationOccurred(.success)
         withAnimation {
-            AppState.shared.activeToast = AppToast(message: "Added to Widget", type: .success)
+            AppState.shared.activeToast = AppToast(message: NSLocalizedString("Added to Widget", comment: ""), type: .success)
         }
     }
     
@@ -412,7 +412,7 @@ struct FavouriteServerListContentView: View {
         WidgetDataManager.shared.unpinServer(id: id)
         
         withAnimation {
-            AppState.shared.activeToast = AppToast(message: "Removed from Widget", type: .info)
+            AppState.shared.activeToast = AppToast(message: NSLocalizedString("Removed from Widget", comment: ""), type: .info)
         }
     }
     

@@ -83,7 +83,7 @@ extension ServerModelManager {
         let initialContentState = MumbleActivityAttributes.ContentState(
             speakers: [],
             userCount: 0,
-            channelName: "Connecting...",
+            channelName: NSLocalizedString("Connecting...", comment: ""),
             isSelfMuted: true,
             isSelfDeafened: false
         )

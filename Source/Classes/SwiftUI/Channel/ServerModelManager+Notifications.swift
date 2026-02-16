@@ -96,8 +96,8 @@ extension ServerModelManager {
                 let safeChannel = channelTransfer.value
                 let safeMover = moverTransfer?.value
                 let movingUserSession = safeUser.session()
-                let movingUserName = safeUser.userName() ?? "Unknown"
-                let destChannelName = safeChannel.channelName() ?? "Unknown Channel"
+                let movingUserName = safeUser.userName() ?? NSLocalizedString("Unknown", comment: "")
+                let destChannelName = safeChannel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
                 let destChannelId = safeChannel.channelId()
                 if let connectedUser = self.serverModel?.connectedUser() {
                     if movingUserSession == connectedUser.session() {
@@ -110,10 +110,21 @@ extension ServerModelManager {
                         // 区分自己移动和被管理员移动
                         let movedBySelf = (safeMover == nil || safeMover?.session() == connectedUser.session())
                         if movedBySelf {
-                            self.addSystemNotification("You moved to channel \(destChannelName)", category: .userMoved, suppressPush: true)
+                            self.addSystemNotification(
+                                String(format: NSLocalizedString("You moved to channel %@", comment: ""), destChannelName),
+                                category: .userMoved,
+                                suppressPush: true
+                            )
                         } else {
-                            let moverName = safeMover?.userName() ?? "admin"
-                            self.addSystemNotification("You were moved to channel \(destChannelName) by \(moverName)", category: .movedByAdmin)
+                            let moverName = safeMover?.userName() ?? NSLocalizedString("admin", comment: "")
+                            self.addSystemNotification(
+                                String(
+                                    format: NSLocalizedString("You were moved to channel %@ by %@", comment: ""),
+                                    destChannelName,
+                                    moverName
+                                ),
+                                category: .movedByAdmin
+                            )
                         }
 
                         // 更新 Handoff Activity 的频道信息
@@ -136,7 +147,10 @@ extension ServerModelManager {
                             let isLeavingMyChannel = (originChannelId == myCurrentChannelId)
                             let isEnteringMyChannel = (destChannelId == myCurrentChannelId)
                             if isLeavingMyChannel || isEnteringMyChannel {
-                                self.addSystemNotification("\(movingUserName) moved to \(destChannelName)", category: .userMoved)
+                                self.addSystemNotification(
+                                    String(format: NSLocalizedString("%@ moved to %@", comment: ""), movingUserName, destChannelName),
+                                    category: .userMoved
+                                )
                             }
                         }
                     }
@@ -153,9 +167,12 @@ extension ServerModelManager {
                 guard let self = self else { return }
                 let safeUser = userTransfer.value
                 self.applySavedUserPreferences(user: safeUser)
-                let userName = safeUser.userName() ?? "Unknown User"
+                let userName = safeUser.userName() ?? NSLocalizedString("Unknown User", comment: "")
                 let category: SystemNotifyCategory = self.isUserInSameChannelAsMe(safeUser) ? .userJoinedSameChannel : .userJoinedOtherChannels
-                self.addSystemNotification("\(userName) connected", category: category)
+                self.addSystemNotification(
+                    String(format: NSLocalizedString("%@ connected", comment: ""), userName),
+                    category: category
+                )
                 self.rebuildModelArray()
             }
         })
@@ -166,9 +183,12 @@ extension ServerModelManager {
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 let safeUser = userTransfer.value
-                let userName = safeUser.userName() ?? "Unknown User"
+                let userName = safeUser.userName() ?? NSLocalizedString("Unknown User", comment: "")
                 let category: SystemNotifyCategory = self.isUserInSameChannelAsMe(safeUser) ? .userLeftSameChannel : .userLeftOtherChannels
-                self.addSystemNotification("\(userName) disconnected", category: category)
+                self.addSystemNotification(
+                    String(format: NSLocalizedString("%@ disconnected", comment: ""), userName),
+                    category: category
+                )
                 let session = safeUser.session()
                 // 清除离开用户的监听状态
                 for (channelId, var listeners) in self.channelListeners {
@@ -188,7 +208,7 @@ extension ServerModelManager {
                   let message = userInfo["message"] as? MKTextMessage,
                   let user = userInfo["user"] as? MKUser else { return }
 
-            let senderName = user.userName() ?? "Unknown"
+            let senderName = user.userName() ?? NSLocalizedString("Unknown", comment: "")
             let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
             let senderSession = user.session()
@@ -234,7 +254,7 @@ extension ServerModelManager {
                   let message = userInfo["message"] as? MKTextMessage,
                   let user = userInfo["user"] as? MKUser else { return }
 
-            let senderName = user.userName() ?? "Unknown"
+            let senderName = user.userName() ?? NSLocalizedString("Unknown", comment: "")
             let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
             let senderSession = user.session()
@@ -268,8 +288,11 @@ extension ServerModelManager {
                     return defaults.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
                 }()
                 if notifyEnabled {
-                    let bodyText = plainText.isEmpty ? "[Image]" : plainText
-                    self.sendLocalNotification(title: "PM from \(senderName)", body: bodyText)
+                    let bodyText = plainText.isEmpty ? NSLocalizedString("[Image]", comment: "") : plainText
+                    self.sendLocalNotification(
+                        title: String(format: NSLocalizedString("PM from %@", comment: ""), senderName),
+                        body: bodyText
+                    )
                 }
 
                 #if os(macOS)
@@ -312,11 +335,13 @@ extension ServerModelManager {
                     // 弹出密码提示框
                     self.passwordPromptChannel = ch
                     self.pendingPasswordInput = ""
-                    self.addSystemNotification("Access denied. You may try entering a password.")
+                    self.addSystemNotification(NSLocalizedString("Access denied. You may try entering a password.", comment: ""))
                 } else if let reason = reason {
-                    self.addSystemNotification("Permission denied: \(reason)")
+                    self.addSystemNotification(
+                        String(format: NSLocalizedString("Permission denied: %@", comment: ""), reason)
+                    )
                 } else {
-                    self.addSystemNotification("Permission denied")
+                    self.addSystemNotification(NSLocalizedString("Permission denied", comment: ""))
                 }
             }
         })
@@ -425,8 +450,11 @@ extension ServerModelManager {
                    !isMyself {
                     for channelIdNum in addChannels {
                         if channelIdNum.uintValue == myChannel.channelId() {
-                            let userName = u.userName() ?? "Someone"
-                            self.addSystemNotification("\(userName) started listening to your channel", category: .channelListening)
+                            let userName = u.userName() ?? NSLocalizedString("Someone", comment: "")
+                            self.addSystemNotification(
+                                String(format: NSLocalizedString("%@ started listening to your channel", comment: ""), userName),
+                                category: .channelListening
+                            )
                         }
                     }
                 }
@@ -461,8 +489,11 @@ extension ServerModelManager {
                    !isMyself {
                     for channelIdNum in removeChannels {
                         if channelIdNum.uintValue == myChannel.channelId() {
-                            let userName = u.userName() ?? "Someone"
-                            self.addSystemNotification("\(userName) stopped listening to your channel", category: .channelListening)
+                            let userName = u.userName() ?? NSLocalizedString("Someone", comment: "")
+                            self.addSystemNotification(
+                                String(format: NSLocalizedString("%@ stopped listening to your channel", comment: ""), userName),
+                                category: .channelListening
+                            )
                         }
                     }
                 }
@@ -497,7 +528,7 @@ extension ServerModelManager {
 
             if let welcomeText = userInfo?["welcomeMessage"] as? String, !welcomeText.isEmpty {
                 // 这里也使用带返回值的添加方法，但通常欢迎语不需要发通知
-                self.appendNotificationMessage(text: welcomeText, senderName: "Server")
+                self.appendNotificationMessage(text: welcomeText, senderName: NSLocalizedString("Server", comment: ""))
             }
 
             self.setupServerModel()
@@ -565,7 +596,7 @@ extension ServerModelManager {
     ///   - category: 通知分类（nil 则不推送）
     ///   - suppressPush: 为 true 时只在聊天区域显示，不发送系统推送（用于自己的操作）
     func addSystemNotification(_ text: String, category: SystemNotifyCategory? = nil, suppressPush: Bool = false) {
-        let didAppend = appendNotificationMessage(text: text, senderName: "System")
+        let didAppend = appendNotificationMessage(text: text, senderName: NSLocalizedString("System", comment: ""))
 
         guard didAppend, !suppressPush else { return }
 
@@ -696,7 +727,7 @@ extension ServerModelManager {
 
             // 只有不是自己发的、且开启了通知，才发通知
             if !isSentBySelf && notifyEnabled {
-                let bodyText = plainText.isEmpty ? "[Image]" : plainText
+                let bodyText = plainText.isEmpty ? NSLocalizedString("[Image]", comment: "") : plainText
                 let notificationBody = "\(senderName): \(bodyText)"
                 sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
             }

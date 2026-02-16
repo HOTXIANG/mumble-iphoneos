@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UserNotifications
+import ObjectiveC.runtime
 #if os(iOS)
 import UIKit
 #endif
@@ -35,6 +36,127 @@ private let pttHotkeyOptions: [PTTHotkeyOption] = [
     .init(keyCode: 55, label: "Left Command"),
     .init(keyCode: 54, label: "Right Command"),
 ]
+
+enum AppLanguageOption: String, CaseIterable, Identifiable {
+    case system = "system"
+    case english = "en"
+    case chineseSimplified = "zh-Hans"
+
+    var id: String { rawValue }
+
+    var localizedLabel: String {
+        switch self {
+        case .system:
+            return NSLocalizedString("System Default", comment: "")
+        case .english:
+            return NSLocalizedString("English", comment: "")
+        case .chineseSimplified:
+            return NSLocalizedString("Chinese (Simplified)", comment: "")
+        }
+    }
+}
+
+private enum LanguageBundleAssociation {
+    // Objective-C associated object key. This is only used as an address token.
+    nonisolated(unsafe) static var key: UInt8 = 0
+}
+
+private final class OverridableMainBundle: Bundle, @unchecked Sendable {
+    override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
+        if let bundle = objc_getAssociatedObject(self, &LanguageBundleAssociation.key) as? Bundle {
+            return bundle.localizedString(forKey: key, value: value, table: tableName)
+        }
+        return super.localizedString(forKey: key, value: value, table: tableName)
+    }
+}
+
+private enum BundleLanguageApplier {
+    static func apply(languageCode: String?) {
+        object_setClass(Bundle.main, OverridableMainBundle.self)
+
+        let overrideBundle = languageCode.flatMap { code -> Bundle? in
+            let candidates = [
+                code,
+                code.replacingOccurrences(of: "_", with: "-"),
+                String(code.split(separator: "-").first ?? "")
+            ].filter { !$0.isEmpty }
+
+            for candidate in candidates {
+                if let path = Bundle.main.path(forResource: candidate, ofType: "lproj"),
+                   let bundle = Bundle(path: path) {
+                    return bundle
+                }
+            }
+            return nil
+        }
+
+        objc_setAssociatedObject(
+            Bundle.main,
+            &LanguageBundleAssociation.key,
+            overrideBundle,
+            .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+        )
+    }
+}
+
+@MainActor
+final class AppLanguageManager: ObservableObject {
+    static let shared = AppLanguageManager()
+    static let storageKey = "AppLanguageCode"
+
+    @Published private(set) var selectedOption: AppLanguageOption
+
+    private init() {
+        let savedCode = UserDefaults.standard.string(forKey: Self.storageKey) ?? AppLanguageOption.system.rawValue
+        selectedOption = Self.normalizedOption(from: savedCode)
+        // App launch 时就应用覆盖，避免进入界面后才切语言。
+        BundleLanguageApplier.apply(languageCode: bundleLanguageCode(for: selectedOption))
+    }
+
+    var selectedRawValue: String { selectedOption.rawValue }
+
+    var localeIdentifier: String {
+        switch selectedOption {
+        case .system:
+            return Locale.preferredLanguages.first ?? "en"
+        case .english, .chineseSimplified:
+            return selectedOption.rawValue
+        }
+    }
+
+    func setLanguage(rawValue: String) {
+        let normalized = Self.normalizedOption(from: rawValue)
+        if normalized != selectedOption {
+            selectedOption = normalized
+        }
+        persistLanguagePreference(option: normalized)
+        BundleLanguageApplier.apply(languageCode: bundleLanguageCode(for: normalized))
+    }
+
+    func reapplyCurrentLanguage() {
+        persistLanguagePreference(option: selectedOption)
+        BundleLanguageApplier.apply(languageCode: bundleLanguageCode(for: selectedOption))
+    }
+
+    private func bundleLanguageCode(for option: AppLanguageOption) -> String? {
+        option == .system ? nil : option.rawValue
+    }
+
+    private static func normalizedOption(from rawValue: String) -> AppLanguageOption {
+        AppLanguageOption(rawValue: rawValue) ?? .system
+    }
+
+    private func persistLanguagePreference(option: AppLanguageOption) {
+        let defaults = UserDefaults.standard
+        defaults.set(option.rawValue, forKey: Self.storageKey)
+        if option == .system {
+            defaults.removeObject(forKey: "AppleLanguages")
+        } else {
+            defaults.set([option.rawValue], forKey: "AppleLanguages")
+        }
+        defaults.synchronize()
+    }
+}
 
 struct NotificationSettingsView: View {
     @AppStorage("NotificationNotifyNormalUserMessages") var notifyNormalUserMessages: Bool = true
@@ -258,7 +380,12 @@ struct AudioTransmissionSettingsView: View {
                     .padding(.vertical, 4)
                     
                     VStack(alignment: .leading) {
-                        Text("Silence Below: \(Int(vadBelow * 100))%")
+                        Text(
+                            String(
+                                format: NSLocalizedString("Silence Below: %d%%", comment: ""),
+                                Int(vadBelow * 100)
+                            )
+                        )
                             .font(.caption).foregroundColor(.secondary)
                         Slider(value: $vadBelow, in: 0...1) { editing in
                             if !editing { PreferencesModel.shared.notifySettingsChanged() }
@@ -266,7 +393,12 @@ struct AudioTransmissionSettingsView: View {
                     }
                     
                     VStack(alignment: .leading) {
-                        Text("Speech Above: \(Int(vadAbove * 100))%")
+                        Text(
+                            String(
+                                format: NSLocalizedString("Speech Above: %d%%", comment: ""),
+                                Int(vadAbove * 100)
+                            )
+                        )
                             .font(.caption).foregroundColor(.secondary)
                         Slider(value: $vadAbove, in: 0...1) { editing in
                             if !editing { PreferencesModel.shared.notifySettingsChanged() }
@@ -274,7 +406,12 @@ struct AudioTransmissionSettingsView: View {
                     }
 
                     VStack(alignment: .leading) {
-                        Text("Silence Hold: \(Int((vadHoldSeconds * 1000).rounded())) ms")
+                        Text(
+                            String(
+                                format: NSLocalizedString("Silence Hold: %d ms", comment: ""),
+                                Int((vadHoldSeconds * 1000).rounded())
+                            )
+                        )
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Slider(value: vadHoldBinding, in: 0...0.3) { editing in
@@ -302,7 +439,7 @@ struct AudioTransmissionSettingsView: View {
                     #if os(macOS)
                     Picker("Push-to-Talk Key", selection: $pttHotkeyCode) {
                         ForEach(pttHotkeyOptions) { option in
-                            Text(option.label).tag(option.keyCode)
+                            Text(NSLocalizedString(option.label, comment: "")).tag(option.keyCode)
                         }
                     }
                     .pickerStyle(.menu)
@@ -590,16 +727,37 @@ private enum MacInputDeviceCatalog {
 // 4. 主设置入口视图
 struct PreferencesView: View {
     @EnvironmentObject var serverManager: ServerModelManager
+    @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("AudioOutputVolume") var outputVolume: Double = 1.0
     @AppStorage(MumbleHandoffSyncLocalAudioSettingsKey) var handoffSyncLocalAudioSettings: Bool = true
     @AppStorage("HandoffPreferredProfileKey") var handoffPreferredProfileKey: Int = -1
     @Environment(\.dismiss) var dismiss
+    @State private var showingLanguageChangedAlert = false
     
     // 这里我们还需要暂时保留对旧 Objective-C 证书管理器的引用
     // 因为重写证书逻辑比较复杂，我们先用 Wrapper 兼容
 
     @ViewBuilder
     private var preferencesContent: some View {
+        Section(header: Text("General")) {
+            Picker(
+                "Language",
+                selection: Binding(
+                    get: { languageManager.selectedRawValue },
+                    set: { newValue in
+                        languageManager.setLanguage(rawValue: newValue)
+                        showingLanguageChangedAlert = true
+                    }
+                )
+            ) {
+                ForEach(AppLanguageOption.allCases) { option in
+                    Text(option.localizedLabel)
+                        .tag(option.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+
         // --- 音频部分 ---
         Section(header: Text("Audio")) {
             #if os(macOS)
@@ -709,7 +867,13 @@ struct PreferencesView: View {
                 }
             }
         }
+        .alert(NSLocalizedString("Language Changed", comment: ""), isPresented: $showingLanguageChangedAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(NSLocalizedString("Some texts will fully update after restarting the app.", comment: ""))
+        }
         .onAppear {
+            languageManager.reapplyCurrentLanguage()
             serverManager.startAudioTest()
         }
         .onReceive(NotificationCenter.default.publisher(for: .mumbleShowVADTutorialAgain)) { _ in

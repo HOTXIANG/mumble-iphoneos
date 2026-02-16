@@ -86,7 +86,7 @@ struct CreateChannelView: View {
                     }
                 }
                 
-                Section(footer: Text("Parent: \(parentChannel.channelName() ?? "Root")")) {
+                Section(footer: Text("Parent: \(parentChannel.channelName() ?? NSLocalizedString("Root", comment: ""))")) {
                     EmptyView()
                 }
             }
@@ -257,7 +257,7 @@ struct EditChannelView: View {
             VStack(spacing: 0) {
                 Picker("", selection: $selectedTab) {
                     ForEach(EditTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
+                        Text(NSLocalizedString(tab.rawValue, comment: "")).tag(tab)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -282,7 +282,9 @@ struct EditChannelView: View {
             #if os(macOS)
             .frame(minWidth: 520, minHeight: 500)
             #endif
-            .navigationTitle("Edit: \(channel.channelName() ?? "Channel")")
+            .navigationTitle(
+                "\(NSLocalizedString("Edit", comment: "")): \(channel.channelName() ?? NSLocalizedString("Channel", comment: ""))"
+            )
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -459,7 +461,7 @@ struct ChannelPropertiesView: View {
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to delete \"\(channel.channelName() ?? "this channel")\"? This action cannot be undone.")
+            Text("Are you sure you want to delete \"\(channel.channelName() ?? NSLocalizedString("this channel", comment: ""))\"? This action cannot be undone.")
         }
         .onAppear { loadChannelInfo() }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.channelDescriptionChangedNotification)) { notification in

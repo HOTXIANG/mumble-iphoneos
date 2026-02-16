@@ -60,7 +60,7 @@ struct ChannelListView: View {
         }
         .navigationBarBackButtonHidden(true)
         // 注意：这里 serverName 可能是可选的，提供默认值
-        .navigationTitle(Text(serverManager.serverName ?? "Channel"))
+        .navigationTitle(Text(serverManager.serverName ?? NSLocalizedString("Channel", comment: "")))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         // 隐藏系统默认背景，使用自定义渐变

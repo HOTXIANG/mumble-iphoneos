@@ -9,8 +9,8 @@ import SwiftUI
 
 struct AboutView: View {
     // 动态获取版本号
-    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
-    let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? NSLocalizedString("Unknown", comment: "")
+    let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? NSLocalizedString("Unknown", comment: "")
     
     @ViewBuilder
     private var aboutContent: some View {
