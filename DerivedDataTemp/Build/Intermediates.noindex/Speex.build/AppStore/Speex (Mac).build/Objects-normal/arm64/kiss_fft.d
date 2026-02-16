@@ -1,0 +1,10 @@
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speexbuild/Speex.pch \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/kiss_fft.c \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speexbuild/config.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/_kiss_fft_guts.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/kiss_fft.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/arch.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/../include/speex/speex_types.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/math_approx.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/speex/libspeex/os_support.h

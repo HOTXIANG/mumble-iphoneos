@@ -1,0 +1,23 @@
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opusbuild/Opus.pch \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/celt_lpc.c \
+  config.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/celt_lpc.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/arch.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus_types.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus_defines.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/stack_alloc.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/mathops.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/entcode.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/ecintrin.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/os_support.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/pitch.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/modes.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/celt.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/include/opus_custom.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/entenc.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/entdec.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/mdct.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/kiss_fft.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/cpu_support.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/opus/celt/x86/pitch_sse.h

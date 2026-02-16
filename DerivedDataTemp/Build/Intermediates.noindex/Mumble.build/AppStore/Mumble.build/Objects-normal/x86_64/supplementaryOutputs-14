@@ -1,0 +1,30 @@
+{
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Lifecycle.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Lifecycle.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Lifecycle.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Lifecycle.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Lifecycle.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Lifecycle.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Messaging.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Messaging.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Messaging.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Messaging.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Messaging.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Messaging.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+ModelState.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+ModelState.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+ModelState.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+ModelState.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+ModelState.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+ModelState.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelManager+Registration.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Registration.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Registration.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Registration.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Registration.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelManager+Registration.swiftdeps"
+  }
+}
