@@ -617,6 +617,25 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		F23EEF692F452BB400743254 /* ServerModelManager */ = {
+			isa = PBXGroup;
+			children = (
+				F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */,
+				B1C2D3E42F90200100ABC002 /* ServerModelManager+Controls.swift */,
+				B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */,
+				E1F2A3B42F90500100ABC002 /* ServerModelManager+Notifications.swift */,
+				E1F2A3B52F90500100ABC002 /* ServerModelManager+Messaging.swift */,
+				F1A2B3C42F90600100ABC002 /* ServerModelManager+ModelState.swift */,
+				F1A2B3C52F90600100ABC002 /* ServerModelManager+Registration.swift */,
+				F2A3B4C42F90700100ABC002 /* ServerModelManager+Lifecycle.swift */,
+				F2A3B4C52F90700100ABC002 /* ServerModelManager+AudioState.swift */,
+				F2A3B4C62F90700100ABC002 /* ServerModelManager+HandoffLiveActivity.swift */,
+				F3A4B5C42F90800100ABC002 /* ServerModelManager+Entry.swift */,
+				F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */,
+			);
+			path = ServerModelManager;
+			sourceTree = "<group>";
+		};
 		F28C6AE72EE6E51200DE9CD2 /* Preferences */ = {
 			isa = PBXGroup;
 			children = (
@@ -655,6 +674,7 @@
 		F2C0EF3B2E0E1F3E00B80B44 /* SwiftUI */ = {
 			isa = PBXGroup;
 			children = (
+				F23EEF692F452BB400743254 /* ServerModelManager */,
 				F28C6B2D2EE87C3300DE9CD2 /* Models */,
 				F28C6AF62EE700F600DE9CD2 /* Components */,
 				F28C6AE72EE6E51200DE9CD2 /* Preferences */,
@@ -697,18 +717,6 @@
 				F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */,
 				F2FF56712E0F711A00D76B49 /* ChannelView.swift */,
 				F2FF56722E0F711A00D76B49 /* MessagesView.swift */,
-				F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */,
-				B1C2D3E42F90200100ABC002 /* ServerModelManager+Controls.swift */,
-				B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */,
-				E1F2A3B42F90500100ABC002 /* ServerModelManager+Notifications.swift */,
-				E1F2A3B52F90500100ABC002 /* ServerModelManager+Messaging.swift */,
-				F1A2B3C42F90600100ABC002 /* ServerModelManager+ModelState.swift */,
-				F1A2B3C52F90600100ABC002 /* ServerModelManager+Registration.swift */,
-				F2A3B4C42F90700100ABC002 /* ServerModelManager+Lifecycle.swift */,
-				F2A3B4C52F90700100ABC002 /* ServerModelManager+AudioState.swift */,
-				F2A3B4C62F90700100ABC002 /* ServerModelManager+HandoffLiveActivity.swift */,
-				F3A4B5C42F90800100ABC002 /* ServerModelManager+Entry.swift */,
-				F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */,
 			);
 			path = Channel;
 			sourceTree = "<group>";

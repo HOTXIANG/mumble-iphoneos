@@ -400,7 +400,7 @@ private struct MessageBubbleView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
             .background(
-                message.isSentBySelf ? Color.accentColor : Color.systemGray4,
+                message.isSentBySelf ? Color.accentColor : Color.systemGray3,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
             .foregroundColor(message.isSentBySelf ? .white : .primary)

@@ -120,7 +120,11 @@ struct WelcomeContentView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 16)
                     .contentShape(Rectangle())
+                    #if os(macOS)
+                    .modifier(GlassEffectModifier(cornerRadius: 20))
+                    #else
                     .modifier(GlassEffectModifier(cornerRadius: 27))
+                    #endif
                 }
                 .padding(.horizontal, 20)
                 .buttonStyle(.plain)
