@@ -7,7 +7,13 @@
 //
 
 #import <Foundation/Foundation.h>
+#if __has_include(<fmdb/FMDatabase.h>)
+#import <fmdb/FMDatabase.h>
+#elif __has_include(<FMDB/FMDatabase.h>)
+#import <FMDB/FMDatabase.h>
+#else
 #import "FMDatabase.h"
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 

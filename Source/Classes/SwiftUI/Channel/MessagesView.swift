@@ -399,10 +399,17 @@ private struct MessageBubbleView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
+            #if os(macOS)
+            .background(
+                message.isSentBySelf ? Color.accentColor : Color.systemGray3,
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            #else
             .background(
                 message.isSentBySelf ? Color.accentColor : Color.systemGray3,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
+            #endif
             .foregroundColor(message.isSentBySelf ? .white : .primary)
             
             Text(message.timestamp, style: .time)

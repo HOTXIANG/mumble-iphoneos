@@ -1,6 +1,14 @@
 #import <Foundation/Foundation.h>
+#if __has_include(<fmdb/FMResultSet.h>)
+#import <fmdb/FMResultSet.h>
+#import <fmdb/FMDatabasePool.h>
+#elif __has_include(<FMDB/FMResultSet.h>)
+#import <FMDB/FMResultSet.h>
+#import <FMDB/FMDatabasePool.h>
+#else
 #import "FMResultSet.h"
 #import "FMDatabasePool.h"
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 

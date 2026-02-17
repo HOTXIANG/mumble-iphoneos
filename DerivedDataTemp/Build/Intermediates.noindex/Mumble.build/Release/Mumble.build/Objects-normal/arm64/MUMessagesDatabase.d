@@ -1,15 +1,15 @@
-dependencies: /Users/hotxiang/Coding/mumble-iphoneos/Source/Mumble.pch \
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/FMDB-7LQ0LHHBU1VT4OYU5550YW6Z6.pcm \
+  /Users/hotxiang/Coding/mumble-iphoneos/Source/Mumble.pch \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/DarwinFoundation1.modulemap \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Modules/module.modulemap \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Modules/module.modulemap \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AVFoundation.framework/Modules/module.modulemap \
+  /Users/hotxiang/Coding/mumble-iphoneos/Dependencies/fmdb/.build/index-build/arm64-apple-macosx/debug/FMDB.build/module.modulemap \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Mumble-Bridging-Header.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUFavouriteServer.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUDatabase.h \
-  /Users/hotxiang/Coding/mumble-iphoneos/Dependencies/fmdb/src/FMDB/FMDatabase.h \
-  /Users/hotxiang/Coding/mumble-iphoneos/Dependencies/fmdb/src/FMDB/FMResultSet.h \
-  /Users/hotxiang/Coding/mumble-iphoneos/Dependencies/fmdb/src/FMDB/FMDatabasePool.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUConnectionController.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUTextMessageProcessor.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUCertificateChainBuilder.h \
@@ -33,5 +33,4 @@ dependencies: /Users/hotxiang/Coding/mumble-iphoneos/Source/Mumble.pch \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUMessagesDatabase.m \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUMessagesDatabase.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUTextMessage.h \
-  /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUDataURL.h \
-  Dependencies/fmdb/src/FMDB/FMDatabase.h
+  /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUDataURL.h

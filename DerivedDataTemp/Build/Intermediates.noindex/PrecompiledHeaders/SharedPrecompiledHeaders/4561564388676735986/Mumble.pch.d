@@ -68,9 +68,8 @@ dependencies: /Users/hotxiang/Coding/mumble-iphoneos/Source/Mumble.pch \
   /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/AVFoundation-72C8JV22W0RMJA9ISGP3Q6WE9.pcm \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUFavouriteServer.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUDatabase.h \
-  Dependencies/fmdb/src/FMDB/FMDatabase.h \
-  Dependencies/fmdb/src/FMDB/FMResultSet.h \
-  Dependencies/fmdb/src/FMDB/FMDatabasePool.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/Dependencies/fmdb/.build/index-build/arm64-apple-macosx/debug/FMDB.build/module.modulemap \
+  /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/ExplicitPrecompiledModules/FMDB-2U7HQVVMM1B9MH8QDNVCAVNBZ.pcm \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUConnectionController.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUTextMessageProcessor.h \
   /Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/MUCertificateChainBuilder.h \
