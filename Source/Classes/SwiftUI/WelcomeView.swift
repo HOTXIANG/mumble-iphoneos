@@ -581,7 +581,7 @@ private struct VADOnboardingSplashView: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                VStack(spacing: 12) {
+                VStack(spacing: 8) {
                     #if os(macOS)
                     VStack(alignment: .center, spacing: 8) {
                         Text("Input Device")
@@ -690,7 +690,7 @@ private struct VADOnboardingSplashView: View {
                 }
                 .font(.headline.weight(.semibold))
                 .controlSize(.large)
-                .frame(maxWidth: .infinity, minHeight: 50)
+                .frame(maxWidth: .infinity, minHeight: 32)
                 .buttonStyle(.borderedProminent)
             }
             .padding(24)

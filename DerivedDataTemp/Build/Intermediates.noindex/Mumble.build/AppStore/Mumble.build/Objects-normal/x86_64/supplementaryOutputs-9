@@ -1,30 +1,37 @@
 {
-  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelACLEditViews.swift" : {
-    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelACLEditViews.swiftconstvalues",
-    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelACLEditViews.d",
-    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelACLEditViews.dia",
-    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelACLEditViews.o",
-    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelACLEditViews.swiftdeps"
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/MessagesView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MessagesView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MessagesView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MessagesView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MessagesView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MessagesView.swiftdeps"
   },
-  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ChannelInteropTypes.swift" : {
-    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelInteropTypes.swiftconstvalues",
-    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelInteropTypes.d",
-    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelInteropTypes.dia",
-    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelInteropTypes.o",
-    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ChannelInteropTypes.swiftdeps"
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/ServerModelNotificationManager.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelNotificationManager.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelNotificationManager.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelNotificationManager.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelNotificationManager.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ServerModelNotificationManager.swiftdeps"
   },
-  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/RichTextEditor.swift" : {
-    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditor.swiftconstvalues",
-    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditor.d",
-    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditor.dia",
-    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditor.o",
-    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditor.swiftdeps"
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Components/ToastView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ToastView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ToastView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ToastView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ToastView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/ToastView.swiftdeps"
   },
-  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Channel/RichTextEditorShell.swift" : {
-    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditorShell.swiftconstvalues",
-    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditorShell.d",
-    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditorShell.dia",
-    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditorShell.o",
-    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/RichTextEditorShell.swiftdeps"
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/Models/LanDiscoveryModel.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/LanDiscoveryModel.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/LanDiscoveryModel.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/LanDiscoveryModel.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/LanDiscoveryModel.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/LanDiscoveryModel.swiftdeps"
+  },
+  "/Users/hotxiang/Coding/mumble-iphoneos/Source/Classes/SwiftUI/MumbleContentView.swift" : {
+    "const-values" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MumbleContentView.swiftconstvalues",
+    "dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MumbleContentView.d",
+    "diagnostics" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MumbleContentView.dia",
+    "object" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MumbleContentView.o",
+    "swift-dependencies" : "/Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/Mumble.build/AppStore/Mumble.build/Objects-normal/x86_64/MumbleContentView.swiftdeps"
   }
 }
