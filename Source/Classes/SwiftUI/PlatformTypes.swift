@@ -54,7 +54,7 @@ extension Color {
     static var systemGray3: Color { Color(uiColor: .systemGray).opacity(0.5) }
     static var systemGray4: Color { Color(uiColor: .systemGray).opacity(0.35) }
     static var systemGray5: Color { Color(uiColor: .systemGray).opacity(0.2) }
-    static var secondarySystemBackground: Color { Color(uiColor: .controlBackgroundColor) }
+    static var secondarySystemBackground: Color { Color(uiColor: .secondarySystemBackground) }
 }
 #endif
 
