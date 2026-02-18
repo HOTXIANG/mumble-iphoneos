@@ -1,0 +1,20 @@
+Target dependency graph (10 targets)
+Target 'Mumble' in project 'Mumble'
+➜ Explicit dependency on target 'FMDB-IOS' in project 'fmdb'
+➜ Explicit dependency on target 'FMDB MacOS' in project 'fmdb'
+➜ Explicit dependency on target 'MumbleKit (iOS)' in project 'MumbleKit'
+➜ Explicit dependency on target 'MumbleWidgetExtension' in project 'Mumble'
+Target 'MumbleWidgetExtension' in project 'Mumble' (no dependencies)
+Target 'MumbleKit (iOS)' in project 'MumbleKit'
+➜ Explicit dependency on target 'Opus (iOS)' in project 'Opus'
+➜ Explicit dependency on target 'OpenSSL (iOS)' in project 'OpenSSL'
+➜ Explicit dependency on target 'ProtocolBuffers (iOS)' in project 'ProtocolBuffers'
+➜ Explicit dependency on target 'SpeexDSP (iOS)' in project 'SpeexDSP'
+➜ Explicit dependency on target 'Speex (iOS)' in project 'Speex'
+Target 'Speex (iOS)' in project 'Speex' (no dependencies)
+Target 'SpeexDSP (iOS)' in project 'SpeexDSP' (no dependencies)
+Target 'ProtocolBuffers (iOS)' in project 'ProtocolBuffers' (no dependencies)
+Target 'OpenSSL (iOS)' in project 'OpenSSL' (no dependencies)
+Target 'Opus (iOS)' in project 'Opus' (no dependencies)
+Target 'FMDB MacOS' in project 'fmdb' (no dependencies)
+Target 'FMDB-IOS' in project 'fmdb' (no dependencies)

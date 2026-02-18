@@ -19,42 +19,42 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			UYLIUvHakkvjyKRTqkwjFPHpfj1Psp8QwOHiRh4nIao=
+			FlovL+tAecknsKueuT/apUyOYDczZpVFYHbwy17HtM8=
 			</data>
 		</dict>
 		<key>Headers/FMDatabase.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			FLPnnZkOIyvkGSDu86ZYnlbz1Mc5JcH/lo9zsDfgUpU=
+			eUsFXSZXjozf6ssnoy9uOF6Zlxykr1Dk+rjS37fAWIY=
 			</data>
 		</dict>
 		<key>Headers/FMDatabaseAdditions.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			TF3+jttH5wsOMNIJqHvitx467nVt1q+hQ4MHLhwkQEk=
+			uyIySbJR763hlCGlyQBtzpbyHgFam7b8728PVJSvpB4=
 			</data>
 		</dict>
 		<key>Headers/FMDatabasePool.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			NSe4Xz2PIkfrtwuJ+dg3AP0nV/wy0ig2xae+MH80i3w=
+			cMKy8bHgtCTx1LeggUccDuSMXTjlIr5pMqcZWVK1bxc=
 			</data>
 		</dict>
 		<key>Headers/FMDatabaseQueue.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			q/3ecqGSWo0RpJZCao7BGTYjEYdyrrXwJqsbih9fOi0=
+			Rm9GahPEW63NOxmPGqnE3hNAN9iWXwuiULGnuS19h1Q=
 			</data>
 		</dict>
 		<key>Headers/FMResultSet.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			YcVgHWn9gCX3JsxMrfP4a0bkbUZTrlljOpbn1u6JEdA=
+			uPoXIotTY8ZwQYK6YctyF/EnuzCJoT+AnL2wqITNuT8=
 			</data>
 		</dict>
 		<key>Modules/module.modulemap</key>

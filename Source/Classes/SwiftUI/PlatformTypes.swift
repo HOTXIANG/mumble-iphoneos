@@ -50,11 +50,11 @@ extension Color {
 #if canImport(UIKit)
 // Cross-platform system colors (iOS)
 extension Color {
-    static var systemGray2: Color { Color(uiColor: .systemGray2) }
-    static var systemGray3: Color { Color(uiColor: .systemGray3) }
-    static var systemGray4: Color { Color(uiColor: .systemGray4) }
-    static var systemGray5: Color { Color(uiColor: .systemGray5) }
-    static var secondarySystemBackground: Color { Color(uiColor: .secondarySystemBackground) }
+    static var systemGray2: Color { Color(uiColor: .systemGray).opacity(0.65) }
+    static var systemGray3: Color { Color(uiColor: .systemGray).opacity(0.5) }
+    static var systemGray4: Color { Color(uiColor: .systemGray).opacity(0.35) }
+    static var systemGray5: Color { Color(uiColor: .systemGray).opacity(0.2) }
+    static var secondarySystemBackground: Color { Color(uiColor: .controlBackgroundColor) }
 }
 #endif
 

@@ -1,0 +1,23 @@
+dependencies: \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/ProtocolBuffers_Prefix.pch \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/Bootstrap.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/ForwardDeclarations.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/CodedInputStream.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/CodedOutputStream.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/ExtendableMessage.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/GeneratedMessage.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/AbstractMessage.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/Message.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/ExtensionField.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/WireFormat.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/ExtendableMessage_Builder.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/GeneratedMessage_Builder.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/AbstractMessage_Builder.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/Message_Builder.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/ExtensionRegistry.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/UnknownFieldSet.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/UnknownFieldSet_Builder.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/Utilities.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/Field.m \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/Field.h \
+  /Users/hotxiang/Coding/mumble-iphoneos/MumbleKit/3rdparty/protobuf/src/runtime/Classes/PBArray.h

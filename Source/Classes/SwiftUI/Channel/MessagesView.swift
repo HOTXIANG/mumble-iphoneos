@@ -221,7 +221,7 @@ struct MessagesList: View {
     
     // 回调函数
     let onPreviewRequest: (PlatformImage) -> Void
-    let onImageSelected: (PlatformImage) -> Void // ✅ 新增：通知父视图有图片要发送
+    let onImageSelected: (PlatformImage) -> Void
     
     @State private var newMessage = ""
     @FocusState private var isTextFieldFocused: Bool
@@ -390,21 +390,27 @@ private struct MessageBubbleView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxWidth: 200)
+                                #if os(macOS)
                                 .cornerRadius(8)
+                                #else
+                                .cornerRadius(9)
+                                #endif
                         }
                         .buttonStyle(.plain)
                         .cornerRadius(8)
                     }
                 }
             }
+            #if os(macOS)
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
-            #if os(macOS)
             .background(
                 message.isSentBySelf ? Color.accentColor : Color.systemGray3,
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             #else
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
             .background(
                 message.isSentBySelf ? Color.accentColor : Color.systemGray3,
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)

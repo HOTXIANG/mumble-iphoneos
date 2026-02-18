@@ -1,6 +1,6 @@
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:95:
@@ -746,7 +746,7 @@ In file included from <module-includes>:95:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_stdio.h:488:6: note: insert '_Nonnull' if the pointer should never be null
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -759,7 +759,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -775,7 +775,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -791,7 +791,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -807,7 +807,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -823,7 +823,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -839,7 +839,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -855,7 +855,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -871,7 +871,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -887,7 +887,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -903,7 +903,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -919,7 +919,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -935,7 +935,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -951,7 +951,7 @@ In module '_DarwinFoundation1' imported from /Applications/Xcode.app/Contents/De
       |                 ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation2' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:18:
 In file included from <module-includes>:103:
@@ -961,7 +961,7 @@ In file included from <module-includes>:103:
 161 warnings generated.
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation3' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:31:
 In file included from <module-includes>:18:
@@ -1077,7 +1077,7 @@ In file included from <module-includes>:18:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/signal.h:111:48: note: insert '_Nonnull' if the pointer should never be null
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module '_DarwinFoundation3' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CoreFoundation.h:31:
 In file included from <module-includes>:29:
@@ -1979,7 +1979,7 @@ In file included from <module-includes>:29:
 201 warnings generated.
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Darwin' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFBase.h:75:
 In file included from <module-includes>:2:
@@ -1991,7 +1991,7 @@ In file included from <module-includes>:2:
 1 warning generated.
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 In file included from <module-includes>:1:
@@ -2001,7 +2001,7 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
       | ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 In file included from <module-includes>:1:
@@ -2024,7 +2024,7 @@ In module 'os_object' imported from /Applications/Xcode.app/Contents/Developer/P
       |                               ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 <scratch space>:96:1: note: expanded from here
@@ -2032,7 +2032,7 @@ While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/
       | ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 In file included from <module-includes>:1:
@@ -2040,7 +2040,7 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/dispatch/queue.h:122:1: note: 'OS_dispatch_queue_serial_executor' has been marked as being introduced in macOS 14.0 here, but the deployment target is macOS 11.0.0
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 In file included from <module-includes>:1:
@@ -2064,7 +2064,7 @@ note: (skipping 1 expansions in backtrace; use -fmacro-backtrace-limit=0 to see 
       |                               ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 <scratch space>:95:1: note: expanded from here
@@ -2072,7 +2072,7 @@ While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/
       | ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 In file included from <module-includes>:1:
@@ -2080,7 +2080,7 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/dispatch/queue.h:122:1: note: annotate 'dispatch_queue_serial_executor_t' with an availability attribute to silence this warning
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 In file included from <module-includes>:1:
@@ -2100,7 +2100,7 @@ In module 'os_object' imported from /Applications/Xcode.app/Contents/Developer/P
       |                                                             ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreFoundation' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/Foundation.h:6:
 While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreFoundation.framework/Headers/CFStream.h:20:
 <scratch space>:97:1: note: expanded from here
@@ -2110,7 +2110,7 @@ While building module 'Dispatch' imported from /Applications/Xcode.app/Contents/
 364 warnings generated.
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreGraphics' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSGeometry.h:14:
 In file included from <module-includes>:1:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/CoreGraphics.framework/Versions/A/Headers/CoreGraphics.h:11:
@@ -2128,7 +2128,7 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
 1 warning generated.
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreServices' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSURLError.h:15:
 While building module '_Builtin_intrinsics' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers/MachineExceptions.h:22:
 In file included from <module-includes>:1:
@@ -2137,7 +2137,7 @@ In file included from <module-includes>:1:
       |          ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreServices' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSURLError.h:15:
 While building module '_Builtin_intrinsics' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers/MachineExceptions.h:22:
 In file included from <module-includes>:1:
@@ -2147,7 +2147,7 @@ In file included from /Applications/Xcode.app/Contents/Developer/Toolchains/Xcod
       |          ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreServices' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSURLError.h:15:
 While building module '_Builtin_intrinsics' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers/MachineExceptions.h:22:
 In file included from <module-includes>:1:
@@ -2327,7 +2327,7 @@ In file included from <module-includes>:1:
       |          ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreServices' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSURLError.h:15:
 While building module '_Builtin_intrinsics' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers/MachineExceptions.h:22:
 In file included from <module-includes>:2:
@@ -2348,7 +2348,7 @@ In file included from <module-includes>:2:
       |          ^
 While building module 'Test' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.m:1:
 While building module 'FMDB' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Intermediates.noindex/fmdb.build/Release/FMDB MacOS.build/VerifyModule/FMDB_objective-c_x86_64-apple-macos11.0_gnu99/Test/Test.framework/Headers/Test.h:1:
-While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:1:
+While building module 'Foundation' imported from /Users/hotxiang/Coding/mumble-iphoneos/DerivedDataTemp/Build/Products/Release/FMDB.framework/Headers/FMDB.h:4:
 While building module 'CoreServices' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Foundation.framework/Headers/NSURLError.h:15:
 While building module '_Builtin_intrinsics' imported from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers/MachineExceptions.h:22:
 In file included from <module-includes>:14:
