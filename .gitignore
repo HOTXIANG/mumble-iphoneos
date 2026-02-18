@@ -5,3 +5,7 @@ MumbleKit/build/*
 *.mode1v3
 project.xcworkspace
 xcuserdata
+DerivedData/
+**/DerivedData/
+DerivedDataTemp/
+**/DerivedDataTemp/

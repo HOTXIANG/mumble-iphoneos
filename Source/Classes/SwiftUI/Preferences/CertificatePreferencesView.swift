@@ -172,7 +172,7 @@ struct CertificatePreferencesView: View {
                 Text("Long press on a certificate to Export or Delete.")
                 #endif
             }
-            .foregroundColor(.gray)
+            .foregroundColor(.secondary)
             .font(.caption)
         }
         .padding(.top, 8)
@@ -332,7 +332,7 @@ struct CertificateRow: View {
             if let date = cert.expiry {
                 Text("Expires: \(date.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption2)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 4)

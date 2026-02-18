@@ -50,6 +50,10 @@
 		F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */ = {isa = PBXBuildFile; fileRef = F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */; };
 		F220ECB52F30E6100017CCCC /* MUCertificateCreationProgressView.xib in Resources */ = {isa = PBXBuildFile; fileRef = F220ECB32F30E6100017CCCC /* MUCertificateCreationProgressView.xib */; platformFilter = ios; };
 		F220ECD12F30FB1A0017CCCC /* SystemMuteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */; };
+		F23EEF7D2F45600400743254 /* TransparentLogoBrightGlass.png in Resources */ = {isa = PBXBuildFile; fileRef = F23EEF7C2F45600400743254 /* TransparentLogoBrightGlass.png */; };
+		F23EEF7F2F45600900743254 /* TransparentLogoDarkGlass.png in Resources */ = {isa = PBXBuildFile; fileRef = F23EEF7E2F45600900743254 /* TransparentLogoDarkGlass.png */; };
+		F23EEF812F4563DD00743254 /* TransparentLogoBlack.png in Resources */ = {isa = PBXBuildFile; fileRef = F23EEF802F4563DD00743254 /* TransparentLogoBlack.png */; };
+		F23EEF832F4563E100743254 /* TransparentLogoWhite.png in Resources */ = {isa = PBXBuildFile; fileRef = F23EEF822F4563E100743254 /* TransparentLogoWhite.png */; };
 		F24EB79C2F3E3AB500904644 /* OpenSSL.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F24EB79B2F3E3AB500904644 /* OpenSSL.dylib */; platformFilters = (macos, ); };
 		F24EB79D2F3E3AB500904644 /* OpenSSL.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = F24EB79B2F3E3AB500904644 /* OpenSSL.dylib */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F24EB7A02F3E3AB500904644 /* MumbleKit.framework in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 28990A90132FD9CC0034B406 /* MumbleKit.framework */; platformFilters = (macos, ); settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -59,14 +63,8 @@
 		F25F34B22F17353F00420631 /* LocalUserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B02F17353500420631 /* LocalUserPreferences.swift */; };
 		F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */; };
 		F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* Launch Screen.storyboard */; platformFilter = ios; };
-		F266899C2EE8A46A008FC7EB /* iTunesArtwork.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689942EE8A46A008FC7EB /* iTunesArtwork.png */; };
-		F266899D2EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689972EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png */; };
 		F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */ = {isa = PBXBuildFile; fileRef = F26689952EE8A46A008FC7EB /* LOGO.psd */; };
-		F266899F2EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = F266899A2EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@2x.png */; };
-		F26689A02EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@1x.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689992EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@1x.png */; };
 		F26689A12EE8A46A008FC7EB /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F26689962EE8A46A008FC7EB /* NeoMumble.icon */; };
-		F26689A22EE8A46A008FC7EB /* NeoMumble-iOS-Default-60x60@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689982EE8A46A008FC7EB /* NeoMumble-iOS-Default-60x60@2x.png */; };
-		F26689A32EE8A46A008FC7EB /* NeoMumble-iOS-TintedLight-1024x1024@1x.png in Resources */ = {isa = PBXBuildFile; fileRef = F266899B2EE8A46A008FC7EB /* NeoMumble-iOS-TintedLight-1024x1024@1x.png */; };
 		F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689A42EE8A472008FC7EB /* TransparentLogo.png */; };
 		F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */; };
 		F28C6AEC2EE6E52F00DE9CD2 /* PreferencesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */; };
@@ -308,6 +306,10 @@
 		F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUCertificateCreationProgressView.m; sourceTree = "<group>"; };
 		F220ECB32F30E6100017CCCC /* MUCertificateCreationProgressView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MUCertificateCreationProgressView.xib; sourceTree = "<group>"; };
 		F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMuteManager.swift; sourceTree = "<group>"; };
+		F23EEF7C2F45600400743254 /* TransparentLogoBrightGlass.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TransparentLogoBrightGlass.png; path = Resources/TransparentLogoBrightGlass.png; sourceTree = "<group>"; };
+		F23EEF7E2F45600900743254 /* TransparentLogoDarkGlass.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TransparentLogoDarkGlass.png; path = Resources/TransparentLogoDarkGlass.png; sourceTree = "<group>"; };
+		F23EEF802F4563DD00743254 /* TransparentLogoBlack.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TransparentLogoBlack.png; path = Resources/TransparentLogoBlack.png; sourceTree = "<group>"; };
+		F23EEF822F4563E100743254 /* TransparentLogoWhite.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TransparentLogoWhite.png; path = Resources/TransparentLogoWhite.png; sourceTree = "<group>"; };
 		F24EB79B2F3E3AB500904644 /* OpenSSL.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = OpenSSL.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		F24EB7B02F3E4AB500904644 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = MumbleKit/3rdparty/opensslbuild/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
 		F24EB7CF2F3F5A0000904644 /* MUStatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUStatusBarController.swift; sourceTree = "<group>"; };
@@ -315,14 +317,8 @@
 		F25F34B02F17353500420631 /* LocalUserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUserPreferences.swift; sourceTree = "<group>"; };
 		F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAudioSettingsView.swift; sourceTree = "<group>"; };
 		F26689922EE89F20008FC7EB /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
-		F26689942EE8A46A008FC7EB /* iTunesArtwork.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = iTunesArtwork.png; path = Resources/iTunesArtwork.png; sourceTree = "<group>"; };
 		F26689952EE8A46A008FC7EB /* LOGO.psd */ = {isa = PBXFileReference; lastKnownFileType = file; name = LOGO.psd; path = Resources/LOGO.psd; sourceTree = "<group>"; };
 		F26689962EE8A46A008FC7EB /* NeoMumble.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = NeoMumble.icon; path = Resources/NeoMumble.icon; sourceTree = "<group>"; };
-		F26689972EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "NeoMumble-iOS-Dark-1024x1024@1x.png"; path = "Resources/NeoMumble-iOS-Dark-1024x1024@1x.png"; sourceTree = "<group>"; };
-		F26689982EE8A46A008FC7EB /* NeoMumble-iOS-Default-60x60@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "NeoMumble-iOS-Default-60x60@2x.png"; path = "Resources/NeoMumble-iOS-Default-60x60@2x.png"; sourceTree = "<group>"; };
-		F26689992EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@1x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "NeoMumble-iOS-Default-1024x1024@1x.png"; path = "Resources/NeoMumble-iOS-Default-1024x1024@1x.png"; sourceTree = "<group>"; };
-		F266899A2EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "NeoMumble-iOS-Default-1024x1024@2x.png"; path = "Resources/NeoMumble-iOS-Default-1024x1024@2x.png"; sourceTree = "<group>"; };
-		F266899B2EE8A46A008FC7EB /* NeoMumble-iOS-TintedLight-1024x1024@1x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "NeoMumble-iOS-TintedLight-1024x1024@1x.png"; path = "Resources/NeoMumble-iOS-TintedLight-1024x1024@1x.png"; sourceTree = "<group>"; };
 		F26689A42EE8A472008FC7EB /* TransparentLogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TransparentLogo.png; path = Resources/TransparentLogo.png; sourceTree = "<group>"; };
 		F28C6AE32EE6AA9B00DE9CD2 /* MUTextMessageProcessor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUTextMessageProcessor.h; sourceTree = "<group>"; };
 		F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUTextMessageProcessor.m; sourceTree = "<group>"; };
@@ -561,15 +557,13 @@
 				280256361510D70D00178B08 /* Localizable.strings */,
 				28DC1C2713DE596B0037CDC2 /* Continents.plist */,
 				28DC1C2913DE596B0037CDC2 /* Countries.plist */,
-				F26689942EE8A46A008FC7EB /* iTunesArtwork.png */,
 				F26689952EE8A46A008FC7EB /* LOGO.psd */,
 				F26689962EE8A46A008FC7EB /* NeoMumble.icon */,
-				F26689972EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png */,
-				F26689982EE8A46A008FC7EB /* NeoMumble-iOS-Default-60x60@2x.png */,
-				F26689992EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@1x.png */,
-				F266899A2EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@2x.png */,
-				F266899B2EE8A46A008FC7EB /* NeoMumble-iOS-TintedLight-1024x1024@1x.png */,
 				F26689A42EE8A472008FC7EB /* TransparentLogo.png */,
+				F23EEF802F4563DD00743254 /* TransparentLogoBlack.png */,
+				F23EEF7C2F45600400743254 /* TransparentLogoBrightGlass.png */,
+				F23EEF822F4563E100743254 /* TransparentLogoWhite.png */,
+				F23EEF7E2F45600900743254 /* TransparentLogoDarkGlass.png */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -899,14 +893,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F266899C2EE8A46A008FC7EB /* iTunesArtwork.png in Resources */,
-				F266899D2EE8A46A008FC7EB /* NeoMumble-iOS-Dark-1024x1024@1x.png in Resources */,
 				F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */,
-				F266899F2EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@2x.png in Resources */,
-				F26689A02EE8A46A008FC7EB /* NeoMumble-iOS-Default-1024x1024@1x.png in Resources */,
+				F23EEF832F4563E100743254 /* TransparentLogoWhite.png in Resources */,
+				F23EEF812F4563DD00743254 /* TransparentLogoBlack.png in Resources */,
+				F23EEF7D2F45600400743254 /* TransparentLogoBrightGlass.png in Resources */,
 				F26689A12EE8A46A008FC7EB /* NeoMumble.icon in Resources */,
-				F26689A22EE8A46A008FC7EB /* NeoMumble-iOS-Default-60x60@2x.png in Resources */,
-				F26689A32EE8A46A008FC7EB /* NeoMumble-iOS-TintedLight-1024x1024@1x.png in Resources */,
 				F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */,
 				28DC1C7013DE596B0037CDC2 /* Continents.plist in Resources */,
 				F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */,
@@ -914,6 +905,7 @@
 				28DC1C7213DE596B0037CDC2 /* Countries.plist in Resources */,
 				F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */,
 				280256381510D70D00178B08 /* Localizable.strings in Resources */,
+				F23EEF7F2F45600900743254 /* TransparentLogoDarkGlass.png in Resources */,
 				F24EB7B12F3E4AB500904644 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -941,7 +933,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Re-sign nested dylibs inside MumbleKit.framework so Team IDs match the app\nif [ \"${CODE_SIGNING_ALLOWED}\" != \"YES\" ]; then\n  echo \"Code signing not allowed for this build; skipping re-sign.\"\n  exit 0\nfi\n\nif [ -z \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then\n  echo \"No signing identity available; skipping re-sign.\"\n  exit 0\nfi\n\nMK_FRAMEWORKS=\"${CODESIGNING_FOLDER_PATH}/Contents/Frameworks/MumbleKit.framework\"\nif [ ! -d \"$MK_FRAMEWORKS\" ] && [ -n \"${FRAMEWORKS_FOLDER_PATH}\" ]; then\n  MK_FRAMEWORKS=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MumbleKit.framework\"\nfi\n\necho \"Looking for nested dylibs in: $MK_FRAMEWORKS\"\nif [ -d \"$MK_FRAMEWORKS\" ]; then\n  for dylib in \"$MK_FRAMEWORKS\"/Versions/A/Frameworks/*.dylib; do\n    if [ -f \"$dylib\" ]; then\n      echo \"Re-signing $dylib\"\n      /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$dylib\"\n    fi\n  done\n  # Re-sign the framework itself to update the seal\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$MK_FRAMEWORKS\"\nelse\n  echo \"MumbleKit.framework not found at $MK_FRAMEWORKS\"\nfi\n";
+			shellScript = "# Re-sign nested dylibs inside MumbleKit.framework so Team IDs match the app\nif [ \"${CODE_SIGNING_ALLOWED}\" != \"YES\" ]; then\n  echo \"Code signing not allowed for this build; skipping re-sign.\"\n  exit 0\nfi\n\nif [ -z \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then\n  echo \"No signing identity available; skipping re-sign.\"\n  exit 0\nfi\n\n# Strip problematic extended attributes before the final CodeSign step.\nif [ -n \"${CODESIGNING_FOLDER_PATH}\" ] && [ -d \"${CODESIGNING_FOLDER_PATH}\" ]; then\n  echo \"Stripping extended attributes from ${CODESIGNING_FOLDER_PATH}\"\n  /usr/bin/xattr -cr \"${CODESIGNING_FOLDER_PATH}\" || true\nfi\n\nMK_FRAMEWORKS=\"${CODESIGNING_FOLDER_PATH}/Contents/Frameworks/MumbleKit.framework\"\nif [ ! -d \"$MK_FRAMEWORKS\" ] && [ -n \"${FRAMEWORKS_FOLDER_PATH}\" ]; then\n  MK_FRAMEWORKS=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MumbleKit.framework\"\nfi\n\necho \"Looking for nested dylibs in: $MK_FRAMEWORKS\"\nif [ -d \"$MK_FRAMEWORKS\" ]; then\n  for dylib in \"$MK_FRAMEWORKS\"/Versions/A/Frameworks/*.dylib; do\n    if [ -f \"$dylib\" ]; then\n      echo \"Re-signing $dylib\"\n      /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$dylib\"\n    fi\n  done\n  # Re-sign the framework itself to update the seal\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$MK_FRAMEWORKS\"\nelse\n  echo \"MumbleKit.framework not found at $MK_FRAMEWORKS\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1088,7 +1080,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1114,7 +1106,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1149,7 +1141,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1175,7 +1167,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1222,7 +1214,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1248,7 +1240,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1295,7 +1287,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1321,7 +1313,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1410,7 +1402,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1448,7 +1440,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1506,7 +1498,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1538,7 +1530,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1595,7 +1587,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1627,7 +1619,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1684,7 +1676,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300400100;
+				CURRENT_PROJECT_VERSION = 300500000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1716,7 +1708,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.4.1;
+				MARKETING_VERSION = 3.5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;

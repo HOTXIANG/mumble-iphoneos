@@ -6,9 +6,6 @@
 //
 
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 // 通用菜单行 - 已升级为 Liquid Glass 风格
 struct MenuRowView: View {
@@ -97,9 +94,31 @@ struct ListRowView: View {
 
 // 头部图标视图 - 同样更新图标颜色以保持一致性
 struct WelcomeHeaderView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var preferredLogoName: String {
+        colorScheme == .dark ? "TransparentLogoDarkGlass" : "TransparentLogoBrightGlass"
+    }
+
+    private var logoShadowColor: Color {
+        colorScheme == .light ? .black.opacity(0.30) : .black.opacity(0.22)
+    }
+
+    private var logoShadowRadius: CGFloat {
+        colorScheme == .light ? 22 : 12
+    }
+
+    private var logoShadowYOffset: CGFloat {
+        colorScheme == .light ? 10 : 5
+    }
+
+    private var logoImage: Image {
+        Image(preferredLogoName)
+    }
+
     var body: some View {
         VStack(spacing: 16) {
-            Image("TransparentLogo")
+            logoImage
                 .resizable()
                 .scaledToFit()
                 #if os(macOS)
@@ -107,7 +126,7 @@ struct WelcomeHeaderView: View {
                 #else
                 .frame(maxWidth: 200, maxHeight: 200)
                 #endif
-                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                .shadow(color: logoShadowColor, radius: logoShadowRadius, x: 0, y: logoShadowYOffset)
         }
     }
 }

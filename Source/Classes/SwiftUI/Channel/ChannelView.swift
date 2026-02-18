@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
 
 // MARK: - Configuration Constants (UI 尺寸配置)
@@ -43,6 +44,7 @@ private let kChannelIconWidth: CGFloat = 20.0
 struct ChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
     @StateObject private var appState = AppState.shared
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var userPreferredChatWidth: CGFloat = 320
     private let minChatWidth: CGFloat = 300
@@ -70,7 +72,7 @@ struct ChannelView: View {
                     
                     MessagesView(serverManager: serverManager, isSplitLayout: true)
                         .frame(width: calculateEffectiveChatWidth(totalWidth: geo.size.width))
-                        .background(Color.black.opacity(0.15))
+                        .background(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.06))
                         .onAppear { appState.unreadMessageCount = 0 }
                 }
                 .background(globalGradient)
@@ -103,11 +105,21 @@ struct ChannelView: View {
     }
     
     private var globalGradient: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [
+        let colors: [Color]
+        if colorScheme == .dark {
+            colors = [
                 Color(red: 0.20, green: 0.20, blue: 0.25),
                 Color(red: 0.07, green: 0.07, blue: 0.10)
-            ]),
+            ]
+        } else {
+            colors = [
+                Color(red: 0.92, green: 0.93, blue: 0.98),
+                Color(red: 0.82, green: 0.85, blue: 0.95)
+            ]
+        }
+
+        return LinearGradient(
+            gradient: Gradient(colors: colors),
             startPoint: .top,
             endPoint: .bottom
         )
@@ -140,6 +152,7 @@ struct ChannelView: View {
 struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
     let isSplitLayout: Bool
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedUserForConfig: MKUser? = nil
     @State private var selectedUserForInfo: MKUser? = nil
     @State private var selectedChannelForInfo: MKChannel? = nil
@@ -149,11 +162,12 @@ struct ServerChannelView: View {
     
     var body: some View {
         ZStack {
+            let backgroundColors: [Color] = colorScheme == .dark
+                ? [Color(red: 0.20, green: 0.20, blue: 0.25), Color(red: 0.07, green: 0.07, blue: 0.10)]
+                : [Color(red: 0.92, green: 0.93, blue: 0.98), Color(red: 0.82, green: 0.85, blue: 0.95)]
+
             LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.20, green: 0.20, blue: 0.25),
-                    Color(red: 0.07, green: 0.07, blue: 0.10)
-                ]),
+                gradient: Gradient(colors: backgroundColors),
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -189,10 +203,10 @@ struct ServerChannelView: View {
                         )
                     } else {
                         VStack(spacing: 12) {
-                            ProgressView().tint(.white)
+                            ProgressView().tint(.accentColor)
                             Text("Loading channels...")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 100)
@@ -225,7 +239,7 @@ struct ServerChannelView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(Color.white.opacity(0.25), in: Capsule())
+                            .background(Color.primary.opacity(0.18), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -408,7 +422,7 @@ struct ChannelTreeRow: View {
                     Menu {
                         Text(channel.channelName() ?? NSLocalizedString("Channel", comment: ""))
                             .font(.subheadline)
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .padding(.bottom, 4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
@@ -632,7 +646,7 @@ struct ChannelRowView: View {
             if hasChildren {
                 Image(systemName: "chevron.right")
                     .font(.system(size: kArrowSize, weight: .bold))
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
                     .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                     .frame(width: kArrowWidth, height: kContentHeight)
             } else {
@@ -649,7 +663,12 @@ struct ChannelRowView: View {
                 Text(channel.channelName() ?? NSLocalizedString("Unknown", comment: ""))
                     .font(.system(size: kFontSize, weight: .medium))
                     .foregroundColor(isCurrentChannel ? .green : .primary)
-                    .shadow(radius: 1)
+                    .shadow(
+                        color: isCurrentChannel ? .green.opacity(0.35) : .clear,
+                        radius: isCurrentChannel ? 1.2 : 0,
+                        x: 0,
+                        y: 0
+                    )
                     .lineLimit(1)
                 
                 if channel.isTemporary() {
@@ -667,14 +686,14 @@ struct ChannelRowView: View {
                         .foregroundColor(UInt(userCount) >= channel.maxUsers() ? .red : .secondary)
                         .padding(.horizontal, 6)
                         .frame(minHeight: 20)
-                        .background(Color.black.opacity(0.2), in: Capsule())
+                        .background(Color.primary.opacity(0.12), in: Capsule())
                 } else if userCount > 0 {
                     Text("\(userCount)")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 6)
                         .frame(minHeight: 20)
-                        .background(Color.black.opacity(0.2), in: Capsule())
+                        .background(Color.primary.opacity(0.12), in: Capsule())
                 }
                 
                 // 频道限制标记（最右侧）
@@ -797,9 +816,9 @@ struct UserRowView: View {
                         .padding(.vertical, 1)
                         .background(
                             Capsule()
-                                .fill(Color.black.opacity(0.3))
+                                .fill(Color.primary.opacity(0.14))
                                 .overlay(
-                                    Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                                    Capsule().stroke(Color.secondary.opacity(0.18), lineWidth: 0.5)
                                 )
                         )
                         .transition(.scale.combined(with: .opacity))
@@ -913,7 +932,7 @@ struct UserRowView: View {
                     // Menu Header
                     Text(user.userName() ?? NSLocalizedString("User", comment: ""))
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     
                     Divider()
                     
@@ -1046,7 +1065,7 @@ struct ResizeHandle: View {
                 .padding(.bottom, 8)
                 .contentShape(Rectangle())
             Rectangle()
-                .fill(isHovering ? Color.white.opacity(0.5) : Color.white.opacity(0.1))
+                .fill(isHovering ? Color.primary.opacity(0.35) : Color.primary.opacity(0.12))
                 .frame(width: 4)
                 .padding(.bottom, 8)
                 .cornerRadius(2)
@@ -1069,11 +1088,18 @@ extension MKChannel: Identifiable {
 
 // MARK: - 7. Private Message Input Dialog
 
+private struct PendingPrivateImage: Identifiable {
+    let id = UUID()
+    let image: PlatformImage
+}
+
 struct PrivateMessageInputView: View {
     let targetUser: MKUser
     @ObservedObject var serverManager: ServerModelManager
     
     @State private var messageText: String = ""
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var pendingPrivateImage: PendingPrivateImage?
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -1102,12 +1128,21 @@ struct PrivateMessageInputView: View {
                     .frame(minHeight: 100)
                     .scrollContentBackground(.hidden)
                     .padding(10)
-                    .background(Color.black.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    .background(Color.secondarySystemBackground, in: RoundedRectangle(cornerRadius: 10))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
                     )
                     .padding(.horizontal)
+
+                HStack {
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        Label("Send Image", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                }
+                .padding(.horizontal)
                 
                 Spacer()
             }
@@ -1126,10 +1161,42 @@ struct PrivateMessageInputView: View {
                     .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            .onChange(of: selectedPhoto) { _, item in
+                Task {
+                    guard let item,
+                          let data = try? await item.loadTransferable(type: Data.self),
+                          let image = PlatformImage(data: data) else {
+                        await MainActor.run { selectedPhoto = nil }
+                        return
+                    }
+                    await MainActor.run {
+                        pendingPrivateImage = PendingPrivateImage(image: image)
+                        selectedPhoto = nil
+                    }
+                }
+            }
         }
         #if os(macOS)
         .frame(minWidth: 400, minHeight: 250)
         #endif
+        .sheet(item: $pendingPrivateImage) { pending in
+            ImageConfirmationView(
+                image: pending.image,
+                onCancel: { pendingPrivateImage = nil },
+                onSend: { image, isHighQuality in
+                    await serverManager.sendPrivateImageMessage(
+                        image: image,
+                        isHighQuality: isHighQuality,
+                        to: targetUser
+                    )
+                    await MainActor.run {
+                        pendingPrivateImage = nil
+                        dismiss()
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
     }
     
     private func sendMessage() {

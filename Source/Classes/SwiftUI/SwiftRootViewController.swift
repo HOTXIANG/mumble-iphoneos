@@ -18,7 +18,6 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationController?.setNavigationBarHidden(true, animated: false)
-        overrideUserInterfaceStyle = .dark
         view.backgroundColor = .clear
     }
     
@@ -28,7 +27,7 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
     }
     
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        return .lightContent
+        return .default
     }
 }
 
@@ -56,7 +55,6 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        overrideUserInterfaceStyle = .dark
         view.backgroundColor = .clear
         addChild(hostingController)
         view.addSubview(hostingController.view)
@@ -71,7 +69,7 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
     }
     
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        return .lightContent
+        return .default
     }
     
     override var prefersStatusBarHidden: Bool {

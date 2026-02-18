@@ -63,13 +63,28 @@ extension Color {
 /// ViewModifier that applies glassEffect when available (iOS 26.0+ / macOS 26.0+),
 /// falls back to a simple background on older versions.
 struct GlassEffectModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat = 12
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+            content
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: cornerRadius))
+                .shadow(
+                    color: colorScheme == .light ? .black.opacity(0.10) : .clear,
+                    radius: colorScheme == .light ? 8 : 0,
+                    x: 0,
+                    y: colorScheme == .light ? 3 : 0
+                )
         } else {
-            content.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            content
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+                .shadow(
+                    color: colorScheme == .light ? .black.opacity(0.08) : .clear,
+                    radius: colorScheme == .light ? 6 : 0,
+                    x: 0,
+                    y: colorScheme == .light ? 2 : 0
+                )
         }
     }
 }
@@ -78,11 +93,27 @@ struct GlassEffectModifier: ViewModifier {
 /// iOS 26+/macOS 26+: `.glassEffect(.regular.tint(.red))` in Capsule
 /// Fallback: solid red translucent capsule background
 struct RedGlassCapsuleModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macOS 26.0, *) {
-            content.glassEffect(.regular.tint(.red.opacity(0.5)).interactive(), in: Capsule())
+            content
+                .glassEffect(.regular.tint(.red.opacity(0.5)).interactive(), in: Capsule())
+                .shadow(
+                    color: colorScheme == .light ? .black.opacity(0.10) : .clear,
+                    radius: colorScheme == .light ? 7 : 0,
+                    x: 0,
+                    y: colorScheme == .light ? 2 : 0
+                )
         } else {
-            content.background(.red.opacity(0.6), in: Capsule())
+            content
+                .background(.red.opacity(0.6), in: Capsule())
+                .shadow(
+                    color: colorScheme == .light ? .black.opacity(0.08) : .clear,
+                    radius: colorScheme == .light ? 5 : 0,
+                    x: 0,
+                    y: colorScheme == .light ? 2 : 0
+                )
         }
     }
 }
@@ -91,21 +122,45 @@ struct RedGlassCapsuleModifier: ViewModifier {
 /// iOS 26+: `.glassEffect(.clear.interactive().tint(...))` rounded rect
 /// Fallback: translucent background color
 struct TintedGlassRowModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var isHighlighted: Bool
     var highlightColor: Color
     var cornerRadius: CGFloat = 12
 
     func body(content: Content) -> some View {
+        let highlightTint: Color = colorScheme == .light
+            ? highlightColor.opacity(0.28)
+            : highlightColor.opacity(0.5)
+        let normalTint: Color = colorScheme == .light
+            ? Color.black.opacity(0.10)
+            : Color.clear
+
         if #available(iOS 26.0, macOS 26.0, *) {
-            content.glassEffect(
-                .clear.interactive().tint(isHighlighted ? highlightColor.opacity(0.5) : highlightColor.opacity(0.0)),
-                in: .rect(cornerRadius: cornerRadius)
-            )
+            content
+                .glassEffect(
+                    .clear.interactive().tint(isHighlighted ? highlightTint : normalTint),
+                    in: .rect(cornerRadius: cornerRadius)
+                )
+                .shadow(
+                    color: colorScheme == .light ? .black.opacity(isHighlighted ? 0.08 : 0.06) : .clear,
+                    radius: colorScheme == .light ? 4 : 0,
+                    x: 0,
+                    y: colorScheme == .light ? 1 : 0
+                )
         } else {
-            content.background(
-                isHighlighted ? highlightColor.opacity(0.15) : Color.clear,
-                in: RoundedRectangle(cornerRadius: cornerRadius)
-            )
+            content
+                .background(
+                    isHighlighted
+                        ? (colorScheme == .light ? highlightColor.opacity(0.16) : highlightColor.opacity(0.15))
+                        : (colorScheme == .light ? Color.black.opacity(0.05) : Color.clear),
+                    in: RoundedRectangle(cornerRadius: cornerRadius)
+                )
+                .shadow(
+                    color: colorScheme == .light ? .black.opacity(isHighlighted ? 0.07 : 0.05) : .clear,
+                    radius: colorScheme == .light ? 3 : 0,
+                    x: 0,
+                    y: colorScheme == .light ? 1 : 0
+                )
         }
     }
 }
@@ -114,13 +169,42 @@ struct TintedGlassRowModifier: ViewModifier {
 /// iOS 26+: `.glassEffect(.clear.interactive())` with custom corner radius
 /// Fallback: ultraThinMaterial background
 struct ClearGlassModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat = 12
+    var lightTintOpacity: Double = 0.12
+    var lightFallbackOverlayOpacity: Double = 0.05
+    var lightShadowOpacity: Double = 0.10
+    var lightShadowRadius: CGFloat = 7
+    var lightShadowYOffset: CGFloat = 2
 
     func body(content: Content) -> some View {
+        let subtleDimTint: Color = colorScheme == .light
+            ? Color.black.opacity(lightTintOpacity)
+            : Color.clear
+
         if #available(iOS 26.0, macOS 26.0, *) {
-            content.glassEffect(.clear.interactive(), in: .rect(cornerRadius: cornerRadius))
+            content.glassEffect(
+                .clear.interactive().tint(subtleDimTint),
+                in: .rect(cornerRadius: cornerRadius)
+            )
+            .shadow(
+                color: colorScheme == .light ? .black.opacity(lightShadowOpacity) : .clear,
+                radius: colorScheme == .light ? lightShadowRadius : 0,
+                x: 0,
+                y: colorScheme == .light ? lightShadowYOffset : 0
+            )
         } else {
             content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(colorScheme == .light ? Color.black.opacity(lightFallbackOverlayOpacity) : Color.clear)
+                )
+                .shadow(
+                    color: colorScheme == .light ? .black.opacity(lightShadowOpacity * 0.8) : .clear,
+                    radius: colorScheme == .light ? max(lightShadowRadius - 2, 0) : 0,
+                    x: 0,
+                    y: colorScheme == .light ? lightShadowYOffset : 0
+                )
         }
     }
 }

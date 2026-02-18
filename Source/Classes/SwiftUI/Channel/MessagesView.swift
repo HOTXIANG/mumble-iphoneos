@@ -218,6 +218,7 @@ struct MacImagePreviewOverlay: View {
 struct MessagesList: View {
     @ObservedObject var serverManager: ServerModelManager
     let isSplitLayout: Bool
+    @Environment(\.colorScheme) private var colorScheme
     
     // 回调函数
     let onPreviewRequest: (PlatformImage) -> Void
@@ -228,15 +229,39 @@ struct MessagesList: View {
     @State private var isDragTargeted = false
     
     private let bottomID = "bottomOfMessages"
+
+    private struct SenderIdentity {
+        let key: String
+        let displayName: String
+    }
+
+    private struct SenderMessageRun: Identifiable {
+        let id: String
+        let type: ChatMessageType
+        let displayName: String
+        let isSentBySelf: Bool
+        let messages: [ChatMessage]
+    }
+
+    private enum RenderBlockKind {
+        case senderRun(SenderMessageRun)
+        case notification(ChatMessage)
+    }
+
+    private struct RenderBlock: Identifiable {
+        let id: String
+        let kind: RenderBlockKind
+    }
     
     var body: some View {
+        let backgroundColors: [Color] = colorScheme == .dark
+            ? [Color(red: 0.20, green: 0.20, blue: 0.25), Color(red: 0.07, green: 0.07, blue: 0.10)]
+            : [Color(red: 0.92, green: 0.93, blue: 0.98), Color(red: 0.82, green: 0.85, blue: 0.95)]
+
         ZStack(alignment: .bottom) {
             // 背景
             LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.20, green: 0.20, blue: 0.25),
-                    Color(red: 0.07, green: 0.07, blue: 0.10)
-                ]),
+                gradient: Gradient(colors: backgroundColors),
                 startPoint: .top,
                 endPoint: .bottom
             ).ignoresSafeArea()
@@ -250,21 +275,42 @@ struct MessagesList: View {
                         #else
                         return CGFloat(16)
                         #endif
-                    }()) {
-                        ForEach(serverManager.messages) { message in
-                            switch message.type {
-                            case .userMessage:
-                                MessageBubbleView(
-                                    message: message,
-                                    onImageTap: onPreviewRequest
-                                )
-                            case .notification:
+                    }(), pinnedViews: [.sectionHeaders]) {
+                        ForEach(renderBlocks) { block in
+                            switch block.kind {
+                            case .notification(let message):
                                 NotificationMessageView(message: message)
-                            case .privateMessage:
-                                PrivateMessageBubbleView(
-                                    message: message,
-                                    onImageTap: onPreviewRequest
-                                )
+                            case .senderRun(let run):
+                                Section {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        ForEach(Array(run.messages.enumerated()), id: \.element.id) { index, message in
+                                            switch run.type {
+                                            case .userMessage:
+                                                MessageBubbleView(
+                                                    message: message,
+                                                    onImageTap: onPreviewRequest,
+                                                    showSenderName: false,
+                                                    showTimestamp: shouldShowTimestamp(in: run.messages, index: index)
+                                                )
+                                            case .privateMessage:
+                                                PrivateMessageBubbleView(
+                                                    message: message,
+                                                    onImageTap: onPreviewRequest,
+                                                    showSenderLabel: false,
+                                                    showTimestamp: shouldShowTimestamp(in: run.messages, index: index)
+                                                )
+                                            case .notification:
+                                                NotificationMessageView(message: message)
+                                            }
+                                        }
+                                    }
+                                    .padding(.top, -3)
+                                } header: {
+                                    SenderStickyHeaderView(
+                                        title: run.displayName,
+                                        isSentBySelf: run.isSentBySelf
+                                    )
+                                }
                             }
                         }
                         Spacer().frame(height: 10).id(bottomID)
@@ -308,6 +354,83 @@ struct MessagesList: View {
     }
     
     // MARK: - Logic Helpers
+    private var renderBlocks: [RenderBlock] {
+        var blocks: [RenderBlock] = []
+        var pendingRunMessages: [ChatMessage] = []
+        var pendingRunType: ChatMessageType = .userMessage
+        var pendingRunIdentity: SenderIdentity?
+        var pendingRunIsSentBySelf = false
+
+        func flushPendingRun() {
+            guard let identity = pendingRunIdentity, !pendingRunMessages.isEmpty else { return }
+            let runID = "run-\(pendingRunMessages[0].id.uuidString)"
+            let run = SenderMessageRun(
+                id: runID,
+                type: pendingRunType,
+                displayName: identity.displayName,
+                isSentBySelf: pendingRunIsSentBySelf,
+                messages: pendingRunMessages
+            )
+            blocks.append(RenderBlock(id: runID, kind: .senderRun(run)))
+            pendingRunMessages.removeAll(keepingCapacity: true)
+            pendingRunIdentity = nil
+        }
+
+        for message in serverManager.messages {
+            switch message.type {
+            case .notification:
+                flushPendingRun()
+                let blockID = "notification-\(message.id.uuidString)"
+                blocks.append(RenderBlock(id: blockID, kind: .notification(message)))
+            case .userMessage, .privateMessage:
+                let identity = senderIdentity(for: message)
+                if let pending = pendingRunIdentity, pending.key == identity.key {
+                    pendingRunMessages.append(message)
+                } else {
+                    flushPendingRun()
+                    pendingRunIdentity = identity
+                    pendingRunType = message.type
+                    pendingRunIsSentBySelf = message.isSentBySelf
+                    pendingRunMessages = [message]
+                }
+            }
+        }
+
+        flushPendingRun()
+        return blocks
+    }
+
+    private func senderIdentity(for message: ChatMessage) -> SenderIdentity {
+        switch message.type {
+        case .userMessage:
+            let displayName = message.senderName
+            return SenderIdentity(
+                key: "user|\(message.isSentBySelf)|\(displayName)",
+                displayName: displayName
+            )
+        case .privateMessage:
+            let peerName = message.privatePeerName ?? message.senderName
+            let displayName = message.isSentBySelf ? "PM to \(peerName)" : "PM from \(peerName)"
+            return SenderIdentity(
+                key: "private|\(message.isSentBySelf)|\(peerName)",
+                displayName: displayName
+            )
+        case .notification:
+            return SenderIdentity(
+                key: "notification|\(message.id.uuidString)",
+                displayName: ""
+            )
+        }
+    }
+
+    private func shouldShowTimestamp(in messages: [ChatMessage], index: Int) -> Bool {
+        guard messages.indices.contains(index) else { return false }
+        guard index < messages.count - 1 else { return true }
+        let current = messages[index].timestamp
+        let next = messages[index + 1].timestamp
+        return !Calendar.current.isDate(current, equalTo: next, toGranularity: .minute)
+    }
+
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         for provider in providers {
             if provider.canLoadObject(ofClass: PlatformImage.self) {
@@ -365,13 +488,76 @@ private struct NotificationMessageView: View {
     }
 }
 
+private struct SenderStickyHeaderView: View {
+    let title: String
+    let isSentBySelf: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack {
+            if isSentBySelf {
+                Spacer(minLength: 0)
+            }
+
+            if #available(iOS 26.0, macOS 26.0, *) {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .modifier(BackdropAdaptiveTextModifier())
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .glassEffect(
+                        .clear.tint(colorScheme == .light ? Color.black.opacity(0.08) : Color.clear),
+                        in: .rect(cornerRadius: 13)
+                    )
+                    .shadow(
+                        color: colorScheme == .light ? .black.opacity(0.12) : .black.opacity(0.10),
+                        radius: colorScheme == .light ? 8 : 4,
+                        x: 0,
+                        y: 2
+                    )
+            } else {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .modifier(BackdropAdaptiveTextModifier())
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(colorScheme == .light ? Color.black.opacity(0.03) : Color.clear)
+                    )
+                    .shadow(
+                        color: colorScheme == .light ? .black.opacity(0.10) : .black.opacity(0.08),
+                        radius: colorScheme == .light ? 6 : 3,
+                        x: 0,
+                        y: 2
+                    )
+            }
+
+            if !isSentBySelf {
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 1)
+    }
+}
+
 private struct MessageBubbleView: View {
     let message: ChatMessage
     let onImageTap: (PlatformImage) -> Void
+    let showSenderName: Bool
+    let showTimestamp: Bool
     
     var body: some View {
         VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
-            if !message.isSentBySelf {
+            if showSenderName && !message.isSentBySelf {
                 Text(message.senderName)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.secondary)
@@ -391,37 +577,43 @@ private struct MessageBubbleView: View {
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxWidth: 200)
                                 #if os(macOS)
-                                .cornerRadius(8)
+                                .cornerRadius(10)
                                 #else
-                                .cornerRadius(9)
+                                .cornerRadius(12)
                                 #endif
                         }
                         .buttonStyle(.plain)
-                        .cornerRadius(8)
+                        #if os(macOS)
+                        .cornerRadius(10)
+                        #else
+                        .cornerRadius(12)
+                        #endif
                     }
                 }
             }
             #if os(macOS)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, message.images.isEmpty ? 14 : 10)
             .padding(.vertical, 10)
             .background(
                 message.isSentBySelf ? Color.accentColor : Color.systemGray3,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
             #else
-            .padding(.horizontal, 12)
+            .padding(.horizontal, message.images.isEmpty ? 16 : 12)
             .padding(.vertical, 12)
             .background(
                 message.isSentBySelf ? Color.accentColor : Color.systemGray3,
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
             )
             #endif
             .foregroundColor(message.isSentBySelf ? .white : .primary)
             
-            Text(message.timestamp, style: .time)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4)
+            if showTimestamp {
+                Text(message.timestamp, style: .time)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: message.isSentBySelf ? .trailing : .leading)
     }
@@ -432,23 +624,27 @@ private struct MessageBubbleView: View {
 private struct PrivateMessageBubbleView: View {
     let message: ChatMessage
     let onImageTap: (PlatformImage) -> Void
+    let showSenderLabel: Bool
+    let showTimestamp: Bool
     
     var body: some View {
         VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
             // 私聊标签
-            HStack(spacing: 4) {
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 10))
-                if message.isSentBySelf {
-                    Text("PM to \(message.privatePeerName ?? "?")")
-                        .font(.system(size: 12, weight: .semibold))
-                } else {
-                    Text("PM from \(message.privatePeerName ?? message.senderName)")
-                        .font(.system(size: 12, weight: .semibold))
+            if showSenderLabel {
+                HStack(spacing: 4) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 10))
+                    if message.isSentBySelf {
+                        Text("PM to \(message.privatePeerName ?? "?")")
+                            .font(.system(size: 12, weight: .semibold))
+                    } else {
+                        Text("PM from \(message.privatePeerName ?? message.senderName)")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
                 }
+                .foregroundColor(.purple)
+                .padding(.horizontal, 4)
             }
-            .foregroundColor(.purple)
-            .padding(.horizontal, 4)
             
             // 消息内容
             VStack(alignment: .leading, spacing: 6) {
@@ -464,37 +660,63 @@ private struct PrivateMessageBubbleView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxWidth: 200)
-                                .cornerRadius(8)
+                                #if os(macOS)
+                                .cornerRadius(10)
+                                #else
+                                .cornerRadius(12)
+                                #endif
                         }
                         .buttonStyle(.plain)
-                        .cornerRadius(8)
+                        #if os(macOS)
+                        .cornerRadius(10)
+                        #else
+                        .cornerRadius(12)
+                        #endif
                     }
                 }
             }
-            .padding(.horizontal, 10)
+            #if os(macOS)
+            .padding(.horizontal, message.images.isEmpty ? 14 : 10)
             .padding(.vertical, 10)
             .background(
                 message.isSentBySelf
                     ? Color.purple.opacity(0.7)
                     : Color.purple.opacity(0.25),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.purple.opacity(0.5), lineWidth: 1)
             )
+            #else
+            .padding(.horizontal, message.images.isEmpty ? 16 : 12)
+            .padding(.vertical, 12)
+            .background(
+                message.isSentBySelf
+                    ? Color.purple.opacity(0.7)
+                    : Color.purple.opacity(0.25),
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.purple.opacity(0.5), lineWidth: 1)
+            )
+            #endif
+            
             .foregroundColor(message.isSentBySelf ? .white : .primary)
             
-            Text(message.timestamp, style: .time)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4)
+            if showTimestamp {
+                Text(message.timestamp, style: .time)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: message.isSentBySelf ? .trailing : .leading)
     }
 }
 
-private struct ImageConfirmationView: View {
+struct ImageConfirmationView: View {
     let image: PlatformImage
     let onCancel: () -> Void
     let onSend: (PlatformImage, Bool) async -> Void
@@ -551,6 +773,7 @@ private struct ImageConfirmationView: View {
 }
 
 private struct TextInputBar: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
     let onSendText: () -> Void
@@ -564,6 +787,18 @@ private struct TextInputBar: View {
             legacyBody
         }
     }
+
+    private var inputControlShadowColor: Color {
+        colorScheme == .light ? .black.opacity(0.14) : .black.opacity(0.24)
+    }
+
+    private var inputControlShadowRadius: CGFloat {
+        colorScheme == .light ? 4 : 3
+    }
+
+    private var inputControlShadowYOffset: CGFloat {
+        1
+    }
     
     // MARK: - iOS 26+ / macOS 26+ (GlassEffect)
     
@@ -572,17 +807,38 @@ private struct TextInputBar: View {
         GlassEffectContainer(spacing: 10.0) {
             HStack(alignment: .bottom, spacing: 10.0) {
                 photoPickerView
-                    .glassEffect(.clear.interactive(), in: .circle)
+                    .glassEffect(.clear.interactive().tint(photoPickerGlassTint), in: .circle)
+                    .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
                 
                 messageTextField
-                    .glassEffect(.clear.interactive(), in: .rect(cornerRadius: 20.0))
+                    .glassEffect(.clear.interactive().tint(messageFieldGlassTint), in: .rect(cornerRadius: 20.0))
+                    .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
                 
                 sendButton
-                    .glassEffect(.clear.interactive().tint(text.isEmpty ? .gray.opacity(0.7) : .blue.opacity(0.7)), in: .circle)
+                    .glassEffect(.clear.interactive().tint(sendButtonGlassTint), in: .circle)
+                    .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
         }
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    private var photoPickerGlassTint: Color {
+        colorScheme == .light ? Color.black.opacity(0.14) : Color.clear
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    private var messageFieldGlassTint: Color {
+        colorScheme == .light ? Color.black.opacity(0.10) : Color.clear
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    private var sendButtonGlassTint: Color {
+        if text.isEmpty {
+            return colorScheme == .light ? .gray.opacity(0.55) : .gray.opacity(0.7)
+        }
+        return colorScheme == .light ? .blue.opacity(0.52) : .blue.opacity(0.7)
     }
     
     // MARK: - Fallback (Material)
@@ -590,15 +846,22 @@ private struct TextInputBar: View {
     private var legacyBody: some View {
         HStack(alignment: .bottom, spacing: 10.0) {
             photoPickerView
+                .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
             
             messageTextField
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(colorScheme == .light ? Color.black.opacity(0.06) : Color.clear)
+                )
+                .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
             
             sendButton
                 .background(
                     Circle()
                         .fill(text.isEmpty ? Color.gray.opacity(0.5) : Color.blue)
                 )
+                .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -640,7 +903,13 @@ private struct TextInputBar: View {
     }
     
     private var messageTextField: some View {
-        TextField("Type a message...", text: $text, axis: .vertical)
+        TextField(
+            "",
+            text: $text,
+            prompt: Text("Type a message..."),
+            axis: .vertical
+        )
+            .modifier(BackdropAdaptiveTextModifier(opacity: text.isEmpty ? 0.58 : 1.0))
             .focused($isFocused)
             #if os(macOS)
             .font(.system(size: 12))
@@ -758,6 +1027,16 @@ private struct TextInputBar: View {
         .contentShape(Circle())
         .buttonStyle(.plain)
         .disabled(text.isEmpty)
+    }
+}
+
+private struct BackdropAdaptiveTextModifier: ViewModifier {
+    var opacity: Double = 1.0
+
+    func body(content: Content) -> some View {
+        content
+            .foregroundColor(.white.opacity(opacity))
+            .blendMode(.difference)
     }
 }
 

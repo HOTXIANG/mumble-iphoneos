@@ -78,16 +78,29 @@ extension ServerModelManager {
     }
 
     func sendImageMessage(image: PlatformImage, isHighQuality: Bool) async {
+        await sendImageMessageInternal(image: image, isHighQuality: isHighQuality, targetUser: nil)
+    }
+
+    func sendPrivateImageMessage(image: PlatformImage, isHighQuality: Bool, to user: MKUser) async {
+        await sendImageMessageInternal(image: image, isHighQuality: isHighQuality, targetUser: user)
+    }
+
+    private func sendImageMessageInternal(image: PlatformImage, isHighQuality: Bool, targetUser: MKUser?) async {
         if isHighQuality {
             // 高画质模式：从 1MB 开始，失败后缓慢降级
-            await attemptSendImage(image: image, targetSize: 1024 * 1024, decayRate: 0.9)
+            await attemptSendImage(image: image, targetSize: 1024 * 1024, decayRate: 0.9, targetUser: targetUser)
         } else {
             // 兼容模式：目标 90KB（考虑 Base64 开销）
-            await attemptSendImage(image: image, targetSize: 90 * 1024, decayRate: 0.9)
+            await attemptSendImage(image: image, targetSize: 90 * 1024, decayRate: 0.9, targetUser: targetUser)
         }
     }
 
-    private func attemptSendImage(image: PlatformImage, targetSize: Int, decayRate: Double) async {
+    private func attemptSendImage(
+        image: PlatformImage,
+        targetSize: Int,
+        decayRate: Double,
+        targetUser: MKUser?
+    ) async {
         // 保底 20KB，再小没意义了
         guard targetSize > 20 * 1024 else {
             print("❌ Image too small to compress further. Give up.")
@@ -103,41 +116,58 @@ extension ServerModelManager {
         let msg = MKTextMessage(plainText: htmlBody)
 
         let failName = Notification.Name("MUMessageSendFailed")
-        let task = Task {
-            if let channel = self.serverModel?.connectedUser()?.channel() {
-                self.serverModel?.send(msg, to: channel)
-            }
-            try? await Task.sleep(nanoseconds: 800 * 1_000_000)
-        }
 
         let failureBox = MessageSendFailureBox()
         let observer = NotificationCenter.default.addObserver(forName: failName, object: nil, queue: .main) { _ in
             failureBox.markFailed()
         }
-        _ = await task.result
+
+        if let targetUser {
+            self.serverModel?.send(msg, to: targetUser)
+        } else if let channel = self.serverModel?.connectedUser()?.channel() {
+            self.serverModel?.send(msg, to: channel)
+        }
+
+        try? await Task.sleep(nanoseconds: 800 * 1_000_000)
         NotificationCenter.default.removeObserver(observer)
 
         if failureBox.didFail {
             print("⚠️ Send failed. Reducing size by 10%...")
             let newTarget = Int(Double(targetSize) * decayRate)
-            await attemptSendImage(image: image, targetSize: newTarget, decayRate: decayRate)
+            await attemptSendImage(image: image, targetSize: newTarget, decayRate: decayRate, targetUser: targetUser)
         } else {
             print("✅ Send success!")
-            await appendLocalMessage(image: image)
+            await appendLocalMessage(image: image, targetUser: targetUser)
         }
     }
 
-    private func appendLocalMessage(image: PlatformImage) async {
+    private func appendLocalMessage(image: PlatformImage, targetUser: MKUser?) async {
         await MainActor.run {
-            let localMessage = ChatMessage(
-                id: UUID(),
-                type: .userMessage,
-                senderName: self.serverModel?.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: ""),
-                attributedMessage: AttributedString(""),
-                images: [image],
-                timestamp: Date(),
-                isSentBySelf: true
-            )
+            let selfName = self.serverModel?.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: "")
+            let localMessage: ChatMessage
+            if let targetUser {
+                let targetName = targetUser.userName() ?? NSLocalizedString("Unknown", comment: "")
+                localMessage = ChatMessage(
+                    id: UUID(),
+                    type: .privateMessage,
+                    senderName: selfName,
+                    attributedMessage: AttributedString(""),
+                    images: [image],
+                    timestamp: Date(),
+                    isSentBySelf: true,
+                    privatePeerName: targetName
+                )
+            } else {
+                localMessage = ChatMessage(
+                    id: UUID(),
+                    type: .userMessage,
+                    senderName: selfName,
+                    attributedMessage: AttributedString(""),
+                    images: [image],
+                    timestamp: Date(),
+                    isSentBySelf: true
+                )
+            }
             self.messages.append(localMessage)
         }
     }

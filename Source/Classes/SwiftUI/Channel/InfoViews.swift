@@ -225,7 +225,7 @@ struct UserInfoView: View {
                     // 用户名头部
                     userHeader
                     
-                    Divider().background(Color.white.opacity(0.2))
+                    Divider().background(Color.secondary.opacity(0.3))
                     
                     // Comment 区域
                     if isEditing {
@@ -334,7 +334,7 @@ struct UserInfoView: View {
                     .frame(height: contentHeight)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .padding(4)
-                    .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
             }
         }
     }
@@ -405,7 +405,7 @@ struct ChannelInfoView: View {
                     // 频道名头部
                     channelHeader
                     
-                    Divider().background(Color.white.opacity(0.2))
+                    Divider().background(Color.secondary.opacity(0.3))
                     
                     // Description 区域
                     descriptionSection
@@ -494,7 +494,7 @@ struct ChannelInfoView: View {
                     .frame(height: contentHeight)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .padding(4)
-                    .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
             }
         }
     }

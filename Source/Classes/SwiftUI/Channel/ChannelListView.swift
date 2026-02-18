@@ -5,6 +5,7 @@ import SwiftUI
 struct ChannelListView: View {
     @EnvironmentObject var serverManager: ServerModelManager
     @ObservedObject var appState = AppState.shared
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showingPrefs = false
     @State private var showingCertInfo = false
     
@@ -33,21 +34,21 @@ struct ChannelListView: View {
             if appState.isRegistering {
                 ZStack {
                     // 半透明背景，遮住底下的列表可能变空的过程
-                    Color.black.opacity(0.6)
+                    Color.black.opacity(colorScheme == .dark ? 0.58 : 0.28)
                         .ignoresSafeArea()
                     
                     VStack(spacing: 12) {
                         ProgressView()
                             .controlSize(.large)
-                            .tint(.white)
+                            .tint(.accentColor)
                         
                         VStack(spacing: 8) {
                             Text("Registering...")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             Text("Generating certificate and reconnecting")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                         }
                     }
                     .padding(.horizontal, 48).padding(.vertical, 32)

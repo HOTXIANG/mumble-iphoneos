@@ -33,6 +33,7 @@ struct FavouriteServerRowView: View {
     let server: MUFavouriteServer
     @StateObject private var pingModel: ServerPingModel
     @ObservedObject var certModel = CertificateModel.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     #if os(macOS)
     private let rowHStackSpacing: CGFloat = 10
@@ -131,7 +132,24 @@ struct FavouriteServerRowView: View {
         .foregroundColor(.primary)
         .padding(.horizontal, rowHorizontalPadding)
         .padding(.vertical, rowVerticalPadding)
+        #if os(macOS)
+        .modifier(
+            ClearGlassModifier(
+                cornerRadius: rowCornerRadius,
+                lightTintOpacity: colorScheme == .light ? 0.0 : 0.12,
+                lightFallbackOverlayOpacity: colorScheme == .light ? 0.0 : 0.05,
+                lightShadowOpacity: 0.16,
+                lightShadowRadius: 10,
+                lightShadowYOffset: 3
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous)
+                .fill(colorScheme == .light ? Color.white.opacity(0.08) : Color.clear)
+        )
+        #else
         .modifier(ClearGlassModifier(cornerRadius: rowCornerRadius))
+        #endif
         .onAppear {
             // startPinging 内部已异步化（不会阻塞主线程）
             pingModel.startPinging()
@@ -316,13 +334,13 @@ struct FavouriteServerListContentView: View {
         VStack(spacing: 20) {
             Image(systemName: "heart.slash")
                 .font(.system(size: 60, weight: .light))
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
             Text("No Favourite Servers")
                 .font(.title2)
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
             Text("Tap + to add a favourite server")
                 .font(.body)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
         }.padding()
     }

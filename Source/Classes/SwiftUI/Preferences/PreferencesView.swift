@@ -56,9 +56,56 @@ enum AppLanguageOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum AppColorSchemeOption: String, CaseIterable, Identifiable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+
+    var id: String { rawValue }
+
+    var localizedLabel: String {
+        switch self {
+        case .system:
+            return NSLocalizedString("System Default", comment: "")
+        case .light:
+            return NSLocalizedString("Light", comment: "")
+        case .dark:
+            return NSLocalizedString("Dark", comment: "")
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+
+    static func normalized(from rawValue: String) -> AppColorSchemeOption {
+        AppColorSchemeOption(rawValue: rawValue) ?? .system
+    }
+}
+
 private enum LanguageBundleAssociation {
     // Objective-C associated object key. This is only used as an address token.
     nonisolated(unsafe) static var key: UInt8 = 0
+}
+
+private struct SettingsColorSchemeOverrideModifier: ViewModifier {
+    let option: AppColorSchemeOption
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if option == .system {
+            content
+        } else {
+            content.preferredColorScheme(option.preferredColorScheme)
+        }
+    }
 }
 
 private final class OverridableMainBundle: Bundle, @unchecked Sendable {
@@ -421,7 +468,7 @@ struct AudioTransmissionSettingsView: View {
                     
                     Text("Adjust sliders so that the bar stays in green when speaking and red when silent.")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     
                     Button {
                         NotificationCenter.default.post(name: .mumbleShowVADTutorialAgain, object: nil)
@@ -445,11 +492,11 @@ struct AudioTransmissionSettingsView: View {
                     .pickerStyle(.menu)
                     Text("Hold the selected keyboard key to speak.")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     #else
                     Text("Hold the on-screen talk button (if enabled) to speak.")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                     #endif
                 }
             }
@@ -611,7 +658,7 @@ struct AdvancedAudioSettingsView: View {
             Section(header: Text("Network")) {
                 Toggle("Force TCP Mode", isOn: $forceTCP)
                 Text("Requires reconnection to take effect.")
-                    .font(.caption).foregroundColor(.gray)
+                    .font(.caption).foregroundColor(.secondary)
             }
         }
         #if os(macOS)
@@ -728,11 +775,16 @@ private enum MacInputDeviceCatalog {
 struct PreferencesView: View {
     @EnvironmentObject var serverManager: ServerModelManager
     @StateObject private var languageManager = AppLanguageManager.shared
+    @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
     @AppStorage("AudioOutputVolume") var outputVolume: Double = 1.0
     @AppStorage(MumbleHandoffSyncLocalAudioSettingsKey) var handoffSyncLocalAudioSettings: Bool = true
     @AppStorage("HandoffPreferredProfileKey") var handoffPreferredProfileKey: Int = -1
     @Environment(\.dismiss) var dismiss
     @State private var showingLanguageChangedAlert = false
+
+    private var selectedAppColorScheme: AppColorSchemeOption {
+        AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
+    }
     
     // 这里我们还需要暂时保留对旧 Objective-C 证书管理器的引用
     // 因为重写证书逻辑比较复杂，我们先用 Wrapper 兼容
@@ -751,6 +803,22 @@ struct PreferencesView: View {
                 )
             ) {
                 ForEach(AppLanguageOption.allCases) { option in
+                    Text(option.localizedLabel)
+                        .tag(option.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Picker(
+                "Appearance",
+                selection: Binding(
+                    get: { AppColorSchemeOption.normalized(from: appColorSchemeRawValue).rawValue },
+                    set: { newValue in
+                        appColorSchemeRawValue = AppColorSchemeOption.normalized(from: newValue).rawValue
+                    }
+                )
+            ) {
+                ForEach(AppColorSchemeOption.allCases) { option in
                     Text(option.localizedLabel)
                         .tag(option.rawValue)
                 }
@@ -856,6 +924,8 @@ struct PreferencesView: View {
             }
             #endif
         }
+        .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
+        .modifier(SettingsColorSchemeOverrideModifier(option: selectedAppColorScheme))
         .navigationTitle("Settings")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

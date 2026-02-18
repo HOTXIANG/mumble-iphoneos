@@ -59,7 +59,7 @@ struct ServerCertificateDetailView: View {
                     Section {
                         Text("Tip: You can generate a certificate and register this username by tapping 'Register User' in the menu.")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                     }
                 }
             }

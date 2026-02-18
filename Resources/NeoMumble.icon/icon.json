@@ -8,9 +8,16 @@
       "hidden" : false,
       "layers" : [
         {
-          "fill" : "automatic",
-          "image-name" : "TransparentLogo.png",
-          "name" : "TransparentLogo"
+          "blend-mode" : "normal",
+          "fill" : {
+            "linear-gradient" : [
+              "extended-gray:1.00000,1.00000",
+              "extended-gray:1.00000,0.32702"
+            ]
+          },
+          "hidden" : false,
+          "image-name" : "TransparentLogoWhite.png",
+          "name" : "TransparentLogoWhite"
         }
       ],
       "opacity" : 1,

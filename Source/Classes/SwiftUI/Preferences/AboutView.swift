@@ -8,28 +8,41 @@
 import SwiftUI
 
 struct AboutView: View {
+    @Environment(\.colorScheme) private var colorScheme
     // 动态获取版本号
     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? NSLocalizedString("Unknown", comment: "")
     let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? NSLocalizedString("Unknown", comment: "")
+
+    private var preferredLogoName: String {
+        colorScheme == .dark ? "TransparentLogoDarkGlass" : "TransparentLogoBrightGlass"
+    }
+
+    private var logoShadowColor: Color {
+        colorScheme == .light ? .black.opacity(0.30) : .black.opacity(0.22)
+    }
+
+    private var logoShadowRadius: CGFloat {
+        colorScheme == .light ? 22 : 12
+    }
+
+    private var logoShadowYOffset: CGFloat {
+        colorScheme == .light ? 10 : 5
+    }
+
+    private var aboutLogoImage: Image {
+        Image(preferredLogoName)
+    }
     
     @ViewBuilder
     private var aboutContent: some View {
         // App 图标与版本区
         Section {
             VStack(spacing: 4) {
-                #if os(iOS)
-                Image(uiImage: UIImage(named: "TransparentLogo") ?? UIImage(systemName: "mic.circle.fill")!)
+                aboutLogoImage
                     .resizable()
                     .scaledToFit()
                     .frame(width: 160, height: 160)
-                    .shadow(radius: 10)
-                #else
-                Image(nsImage: NSImage(named: "TransparentLogo") ?? NSImage(systemSymbolName: "mic.circle.fill", accessibilityDescription: nil)!)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 160, height: 160)
-                    .shadow(radius: 10)
-                #endif
+                    .shadow(color: logoShadowColor, radius: logoShadowRadius, x: 0, y: logoShadowYOffset)
                 
                 VStack(spacing: 4) {
                     #if os(macOS)

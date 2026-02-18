@@ -38,23 +38,74 @@ struct WelcomeNavigationConfig: NavigationConfigurable {
 
 struct WelcomeContentView: View {
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var lanModel = LanDiscoveryModel()
     @ObservedObject private var recentManager = RecentServerManager.shared
     
     @State private var favouriteServers: [MUFavouriteServer] = []
     @State private var showFavouritesSheet = false
+
+    #if os(macOS)
+    private let logoSize: CGFloat = 130
+    private let logoShadowWidth: CGFloat = 130
+    private let logoShadowHeight: CGFloat = 110
+    #else
+    private let logoSize: CGFloat = 190
+    private let logoShadowWidth: CGFloat = 150
+    private let logoShadowHeight: CGFloat = 120
+    #endif
+
+    private var logoBlockShadowColor: Color {
+        colorScheme == .light ? .black.opacity(0.46) : .black.opacity(0.22)
+    }
+
+    private var logoBlockShadowRadius: CGFloat {
+        colorScheme == .light ? 40 : 14
+    }
+
+    private var logoBlockShadowYOffset: CGFloat {
+        colorScheme == .light ? 8 : 6
+    }
+
+    private var recentConnectionsRowBackground: AnyView {
+        #if os(macOS)
+        return AnyView(Color.clear)
+        #else
+        return AnyView(
+            Rectangle()
+                .fill(.regularMaterial)
+                .overlay(Color.black.opacity(colorScheme == .light ? 0.06 : 0.04))
+        )
+        #endif
+    }
     
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部 Logo 区域
-            WelcomeHeaderView()
-                #if os(macOS)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
-                #else
-                .padding(.top, 10)
-                .padding(.bottom, 20)
-                #endif
+            ZStack {
+                Ellipse()
+                    .fill(logoBlockShadowColor)
+                    .frame(width: logoShadowWidth, height: logoShadowHeight)
+                    .blur(radius: logoBlockShadowRadius)
+                    .offset(y: logoBlockShadowYOffset)
+                Image("TransparentLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: logoSize, height: logoSize)
+            }
+                .padding(.top, 8)
+                .padding(.bottom, 10)
+
+            VStack(spacing: 6) {
+                Text("Join a Server")
+                    .font(.system(.title2, design: .rounded, weight: .semibold))
+                    .foregroundColor(.primary)
+                Text("Choose a favourite server to connect quickly")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 16)
             
             VStack(spacing: 0) {
                 
@@ -80,10 +131,10 @@ struct WelcomeContentView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Favourite Servers")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 Text("Your saved servers")
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.secondary)
                             }
                             
                             Spacer()
@@ -103,10 +154,10 @@ struct WelcomeContentView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Favourite")
                                     .font(.headline)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 Text("Servers")
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.secondary)
                             }
                             
                             Spacer()
@@ -160,11 +211,7 @@ struct WelcomeContentView: View {
                         }
                         #endif
                     }
-                    #if os(macOS)
-                    .listRowBackground(Color.clear)
-                    #else
-                    .listRowBackground(Rectangle().fill(.regularMaterial.opacity(0.6))).listRowBackground(Rectangle().fill(.regularMaterial.opacity(0.6)))
-                    #endif
+                    .listRowBackground(recentConnectionsRowBackground)
                 } else if lanModel.servers.isEmpty {
                     // 如果既没有最近记录，也没有 LAN 服务器，显示一个占位提示
                     Section {
@@ -811,9 +858,11 @@ private struct VADOnboardingSplashView: View {
 
 struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
+    @Environment(\.colorScheme) private var colorScheme
     
     @StateObject private var serverManager = ServerModelManager()
     @StateObject private var languageManager = AppLanguageManager.shared
+    @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
     @AppStorage("HasCompletedVADOnboarding") private var hasCompletedVADOnboarding: Bool = false
     @State private var showVADOnboarding = false
     
@@ -831,6 +880,10 @@ struct AppRootView: View {
     #else
     private let narrowWindowThreshold: CGFloat = 1100
     #endif
+
+    private var selectedAppColorScheme: AppColorSchemeOption {
+        AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
+    }
     
     var body: some View {
         // 内容区域
@@ -846,6 +899,7 @@ struct AppRootView: View {
             #endif
         }
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
+        .preferredColorScheme(selectedAppColorScheme.preferredColorScheme)
         .environmentObject(serverManager)
         .focusedValue(\.serverManager, serverManager)
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
@@ -872,15 +926,21 @@ struct AppRootView: View {
         .overlay {
             if appState.isConnecting {
                 ZStack {
-                    Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { }
+                    Color.black
+                        .opacity(colorScheme == .dark ? 0.58 : 0.28)
+                        .ignoresSafeArea()
+                        .onTapGesture { }
                     VStack(spacing: 12) {
-                        ProgressView().controlSize(.large).tint(.white)
+                        ProgressView()
+                            .controlSize(.large)
+                            .tint(.accentColor)
                         Text(
                             appState.isReconnecting
                                 ? NSLocalizedString("Reconnecting...", comment: "")
                                 : NSLocalizedString("Connecting...", comment: "")
                         )
-                            .font(.headline).foregroundColor(.white)
+                            .font(.headline)
+                            .foregroundColor(.primary)
                         Button(action: { appState.cancelConnection() }) {
                             Text("Cancel")
                                 .font(.subheadline).fontWeight(.semibold).foregroundColor(.white)
@@ -1006,7 +1066,6 @@ struct AppRootView: View {
             .navigationSplitViewStyle(.prominentDetail)
             #endif
             .background(Color.clear)
-            .preferredColorScheme(.dark)
         }
     }
 
@@ -1042,7 +1101,6 @@ struct AppRootView: View {
                 }
         }
         .environmentObject(navigationManager)
-        .preferredColorScheme(.dark)
         .background(Color.clear)
         // iPhone 需要手动监听连接状态来 Push 界面
         .onChange(of: appState.isConnected) { _, isConnected in
