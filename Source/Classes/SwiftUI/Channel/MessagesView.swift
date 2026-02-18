@@ -726,7 +726,11 @@ struct ImageConfirmationView: View {
     var body: some View {
         VStack(spacing: 20) {
             if isSending {
-                ProgressView("Compressing and Sending...")
+                VStack(spacing: 20) {
+                    ProgressView()
+                    Text("Compressing and Sending...")
+                        .foregroundColor(.secondary)
+                }
                     .padding(.vertical, 60)
                     .padding(.horizontal, 80)
             } else {
@@ -760,10 +764,12 @@ struct ImageConfirmationView: View {
                 HStack(spacing: 20) {
                     Button("Cancel", role: .cancel, action: onCancel)
                         .buttonStyle(.bordered).controlSize(.large)
+                        .keyboardShortcut(.cancelAction)
                     Button("Send") {
                         Task { isSending = true; await onSend(image, isHighQuality) }
                     }
                     .buttonStyle(.borderedProminent).controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
                 }
             }
         }
@@ -789,15 +795,15 @@ private struct TextInputBar: View {
     }
 
     private var inputControlShadowColor: Color {
-        colorScheme == .light ? .black.opacity(0.14) : .black.opacity(0.24)
+        colorScheme == .light ? .black.opacity(0.18) : .black.opacity(0.28)
     }
 
     private var inputControlShadowRadius: CGFloat {
-        colorScheme == .light ? 4 : 3
+        colorScheme == .light ? 6 : 4
     }
 
     private var inputControlShadowYOffset: CGFloat {
-        1
+        2
     }
     
     // MARK: - iOS 26+ / macOS 26+ (GlassEffect)
