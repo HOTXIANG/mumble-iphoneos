@@ -300,6 +300,7 @@ struct AudioTransmissionSettingsView: View {
     @AppStorage("AudioVADHoldSeconds") var vadHoldSeconds: Double = 0.1
     
     @AppStorage("AudioPreprocessor") var enablePreprocessor: Bool = true
+    @AppStorage("AudioStereoInput") var enableStereoInput: Bool = false
     @AppStorage("AudioEchoCancel") var enableEchoCancel: Bool = true
     @AppStorage("AudioMicBoost") var micBoost: Double = 1.0
     @AppStorage("ShowPTTButton") var showPTTButton: Bool = false
@@ -326,7 +327,12 @@ struct AudioTransmissionSettingsView: View {
             #if os(macOS)
             Section(header: Text("Input Device")) {
                 Picker("Microphone", selection: selectedInputDeviceTag) {
-                    Text("Follow System Default (\(systemDefaultName))").tag(followSystemToken)
+                    Text(
+                        String(
+                            format: NSLocalizedString("Follow System Default (%@)", comment: ""),
+                            systemDefaultName
+                        )
+                    ).tag(followSystemToken)
                     if devices.isEmpty {
                         Text("No Input Device").tag("")
                     } else {
@@ -353,11 +359,17 @@ struct AudioTransmissionSettingsView: View {
             
             Section(header: Text("Processing")) {
                 Toggle("Preprocessing", isOn: $enablePreprocessor)
+                Toggle("Stereo Input", isOn: $enableStereoInput)
                 if enablePreprocessor {
                     Toggle("Echo Cancellation", isOn: $enableEchoCancel)
                 } else {
                     VStack(alignment: .leading) {
-                        Text("Mic Volume: \(Int(micBoost * 100))%")
+                        Text(
+                            String(
+                                format: NSLocalizedString("Mic Volume: %d%%", comment: ""),
+                                Int(micBoost * 100)
+                            )
+                        )
                         Slider(value: $micBoost, in: 0...3.0, step: 0.1) { editing in
                             if !editing { PreferencesModel.shared.notifySettingsChanged() }
                         }
@@ -509,6 +521,7 @@ struct AudioTransmissionSettingsView: View {
         .onChange(of: vadKind) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: vadHoldSeconds) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enablePreprocessor) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: enableStereoInput) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enableEchoCancel) { PreferencesModel.shared.notifySettingsChanged() }
         .onAppear {
             #if os(macOS)
@@ -622,6 +635,7 @@ struct AudioQualitySettingsView: View {
 // 3. 高级音频设置视图
 struct AdvancedAudioSettingsView: View {
     @AppStorage("AudioQualityKind") var qualityKind: String = "balanced"
+    @AppStorage("AudioStereoOutput") var enableStereoOutput: Bool = true
     @AppStorage("AudioSidetone") var enableSidetone: Bool = false
     @AppStorage("AudioSidetoneVolume") var sidetoneVolume: Double = 0.2
     @AppStorage("AudioSpeakerPhoneMode") var speakerPhoneMode: Bool = true
@@ -635,6 +649,7 @@ struct AdvancedAudioSettingsView: View {
                 Toggle("Speakerphone Mode", isOn: $speakerPhoneMode)
                 }
                 #endif
+                Toggle("Stereo Output", isOn: $enableStereoOutput)
                 Toggle("Sidetone (Hear yourself)", isOn: $enableSidetone)
                 if enableSidetone {
                     VStack(alignment: .leading) {
@@ -665,6 +680,7 @@ struct AdvancedAudioSettingsView: View {
         .formStyle(.grouped)
         #endif
         .navigationTitle("Advanced")
+        .onChange(of: enableStereoOutput) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enableSidetone) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: speakerPhoneMode) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: qualityKind) { PreferencesModel.shared.notifySettingsChanged() }
@@ -900,11 +916,21 @@ struct PreferencesView: View {
         } footer: {
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
             #if os(macOS)
-            Text("Mumble macOS v\(version)")
+            Text(
+                String(
+                    format: NSLocalizedString("Mumble macOS v%@", comment: ""),
+                    version
+                )
+            )
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.top)
             #else
-            Text("Mumble iOS v\(version)")
+            Text(
+                String(
+                    format: NSLocalizedString("Mumble iOS v%@", comment: ""),
+                    version
+                )
+            )
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.top)
             #endif

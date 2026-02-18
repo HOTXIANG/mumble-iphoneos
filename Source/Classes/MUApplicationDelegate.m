@@ -33,7 +33,7 @@
     NSTimeInterval _lastAudioRestartTime;
 
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
-    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%f|%d|%d|%d",
+    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%d|%d",
             [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
             [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
             [defaults doubleForKey:@"AudioVADBelow"],
@@ -42,6 +42,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
             [defaults stringForKey:@"AudioQualityKind"] ?: @"balanced",
             [defaults doubleForKey:@"AudioMicBoost"],
             [defaults boolForKey:@"AudioPreprocessor"],
+            [defaults boolForKey:@"AudioStereoInput"],
+            [defaults boolForKey:@"AudioStereoOutput"],
             [defaults boolForKey:@"AudioEchoCancel"],
             [defaults boolForKey:@"AudioSidetone"],
             [defaults doubleForKey:@"AudioSidetoneVolume"],
@@ -83,6 +85,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
                                                                 @"amplitude",                      @"AudioVADKind",
                                                                 @"vad",                            @"AudioTransmitMethod",
                                                                 [NSNumber numberWithBool:YES],     @"AudioPreprocessor",
+                                                                [NSNumber numberWithBool:NO],      @"AudioStereoInput",
+                                                                [NSNumber numberWithBool:YES],     @"AudioStereoOutput",
                                                                 [NSNumber numberWithBool:YES],     @"AudioEchoCancel",
                                                                 [NSNumber numberWithFloat:1.0f],   @"AudioMicBoost",
                                                                 @"balanced",                       @"AudioQualityKind",
@@ -274,6 +278,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     settings.outputDelay = 0; /* 10 ms */
     settings.micBoost = [defaults floatForKey:@"AudioMicBoost"];
     settings.enablePreprocessor = [defaults boolForKey:@"AudioPreprocessor"];
+    settings.enableStereoInput = [defaults boolForKey:@"AudioStereoInput"];
+    settings.enableStereoOutput = [defaults boolForKey:@"AudioStereoOutput"];
     if (settings.enablePreprocessor) {
         settings.enableEchoCancellation = [defaults boolForKey:@"AudioEchoCancel"];
     } else {

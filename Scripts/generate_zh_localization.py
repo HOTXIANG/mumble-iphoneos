@@ -169,6 +169,7 @@ MANUAL_TRANSLATIONS = {
     "Cancel": "取消",
     "OK": "确定",
     "Done": "完成",
+    "Enable": "启用",
     "Save": "保存",
     "Edit": "编辑",
     "Comment": "备注",
@@ -210,11 +211,14 @@ MANUAL_TRANSLATIONS = {
     "Removed from Widget": "已从小组件移除",
     "Session handed off to %@": "会话已接力到 %@",
     "Show On-Screen Talk Button": "在屏幕上显示说话按钮",
+    "Show VAD Tutorial Again": "再次显示 VAD 教程",
     "Push-to-Talk Key": "说话按键",
+    "Send Image": "发送图片",
     "Sidetone": "返听",
     "Sidetone (Hear yourself)": "返听（听到自己的声音）",
     "Sidetone Volume": "返听音量",
     "Speakerphone Mode": "扬声器模式",
+    "Stereo Output": "立体声输出",
     "Sync Local User Volume on Handoff": "接力时同步本地用户音量",
     "Temporary Channel": "临时频道",
     "Third Party Libraries": "第三方库",
@@ -243,6 +247,8 @@ MANUAL_TRANSLATIONS = {
     "Handoff": "接力",
     "Certificates": "证书",
     "About Mumble": "关于 Mumble",
+    "Mumble for macOS": "Mumble macOS 版",
+    "Mumble for iOS": "Mumble iOS 版",
     "Mumble macOS v%@": "Mumble macOS v%@",
     "Mumble iOS v%@": "Mumble iOS v%@",
     "No Favourite Servers": "暂无收藏的服务器",
@@ -267,6 +273,7 @@ MANUAL_TRANSLATIONS = {
     "Identity fields are locked to maintain certificate integrity.": "为保持证书一致性，身份字段已锁定。",
     "You can update your username/password since the original certificate is lost.": "由于原证书丢失，你可以修改用户名/密码。",
     "You can manually bind a certificate for this profile. The selected certificate will be used when connecting from Favourite Servers.": "你可以为该配置手动绑定证书。从服务器收藏夹连接时将使用所选证书。",
+    "Choose which profile to use when continuing a session from another device. 'Automatic' will match by server address.": "选择从其他设备继续会话时使用的配置文件。自动将按服务器地址匹配。",
     "Channel Name": "频道名称",
     "Settings": "设置",
     "Position": "位置",
@@ -340,14 +347,36 @@ VALUE_FIXUPS = {
 
 
 def strings_escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("\"", "\\\"")
+    return (
+        value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+    )
+
+
+def strings_unescape(value: str) -> str:
+    # Decode common .strings escape sequences to runtime string form.
+    return (
+        value
+        .replace("\\n", "\n")
+        .replace("\\\"", "\"")
+        .replace("\\\\", "\\")
+    )
 
 
 def parse_strings(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
-    text = path.read_text(encoding="utf-16")
-    return {m.group(1): m.group(2) for m in KEY_VALUE_RE.finditer(text)}
+    try:
+        text = path.read_text(encoding="utf-16")
+    except UnicodeDecodeError:
+        # Backward compatibility: handle legacy UTF-16LE files without BOM.
+        text = path.read_text(encoding="utf-16-le")
+    return {
+        strings_unescape(m.group(1)): strings_unescape(m.group(2))
+        for m in KEY_VALUE_RE.finditer(text)
+    }
 
 
 def parse_en_keys() -> list[str]:
@@ -409,9 +438,12 @@ def get_translation(key: str, seed_map: dict[str, str]) -> str:
         return "静音阈值：低于此值会被视为静音。\\n语音阈值：高于此值会被视为语音。\\n静音保持：当输入持续低于静音阈值达到该时长后，才会切换为静音。"
 
     if key in MANUAL_TRANSLATIONS:
-        return MANUAL_TRANSLATIONS[key]
+        return strings_unescape(MANUAL_TRANSLATIONS[key])
+    escaped_key = strings_escape(key)
+    if escaped_key in MANUAL_TRANSLATIONS:
+        return strings_unescape(MANUAL_TRANSLATIONS[escaped_key])
     if key in VALUE_FIXUPS:
-        return VALUE_FIXUPS[key]
+        return strings_unescape(VALUE_FIXUPS[key])
 
     seed = seed_map.get(key)
     if seed:
@@ -484,7 +516,8 @@ def main():
 
     ZH_DIR.mkdir(parents=True, exist_ok=True)
     output = "\n".join(lines) + "\n"
-    ZH_PATH.write_text(output, encoding="utf-16")
+    # Write UTF-16 with BOM explicitly so Xcode/plutil can detect encoding reliably.
+    ZH_PATH.write_bytes(output.encode("utf-16"))
     print(f"Wrote: {ZH_PATH}")
     print(f"Total entries: {len(all_keys)}")
 

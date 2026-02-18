@@ -410,7 +410,9 @@ struct MessagesList: View {
             )
         case .privateMessage:
             let peerName = message.privatePeerName ?? message.senderName
-            let displayName = message.isSentBySelf ? "PM to \(peerName)" : "PM from \(peerName)"
+            let displayName = message.isSentBySelf
+                ? String(format: NSLocalizedString("PM to %@", comment: ""), peerName)
+                : String(format: NSLocalizedString("PM from %@", comment: ""), peerName)
             return SenderIdentity(
                 key: "private|\(message.isSentBySelf)|\(peerName)",
                 displayName: displayName
@@ -635,10 +637,20 @@ private struct PrivateMessageBubbleView: View {
                     Image(systemName: "envelope.fill")
                         .font(.system(size: 10))
                     if message.isSentBySelf {
-                        Text("PM to \(message.privatePeerName ?? "?")")
+                        Text(
+                            String(
+                                format: NSLocalizedString("PM to %@", comment: ""),
+                                message.privatePeerName ?? "?"
+                            )
+                        )
                             .font(.system(size: 12, weight: .semibold))
                     } else {
-                        Text("PM from \(message.privatePeerName ?? message.senderName)")
+                        Text(
+                            String(
+                                format: NSLocalizedString("PM from %@", comment: ""),
+                                message.privatePeerName ?? message.senderName
+                            )
+                        )
                             .font(.system(size: 12, weight: .semibold))
                     }
                 }

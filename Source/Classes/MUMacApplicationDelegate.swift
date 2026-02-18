@@ -41,6 +41,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioVADKind": "amplitude",
             "AudioTransmitMethod": "vad",
             "AudioPreprocessor": true,
+            "AudioStereoInput": false,
+            "AudioStereoOutput": true,
             "AudioEchoCancel": true,
             "AudioMicBoost": 1.0,
             "AudioQualityKind": "balanced",
@@ -201,6 +203,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         settings.outputDelay = 0
         settings.micBoost = defaults.float(forKey: "AudioMicBoost")
         settings.enablePreprocessor = ObjCBool(defaults.bool(forKey: "AudioPreprocessor"))
+        settings.enableStereoInput = ObjCBool(defaults.bool(forKey: "AudioStereoInput"))
+        settings.enableStereoOutput = ObjCBool(defaults.bool(forKey: "AudioStereoOutput"))
         settings.enableEchoCancellation = ObjCBool(settings.enablePreprocessor.boolValue && defaults.bool(forKey: "AudioEchoCancel"))
         settings.enableSideTone = ObjCBool(defaults.bool(forKey: "AudioSidetone"))
         settings.sidetoneVolume = defaults.float(forKey: "AudioSidetoneVolume")
@@ -229,6 +233,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             defaults.string(forKey: "AudioQualityKind") ?? "balanced",
             String(defaults.double(forKey: "AudioMicBoost")),
             String(defaults.bool(forKey: "AudioPreprocessor")),
+            String(defaults.bool(forKey: "AudioStereoInput")),
+            String(defaults.bool(forKey: "AudioStereoOutput")),
             String(defaults.bool(forKey: "AudioEchoCancel")),
             String(defaults.bool(forKey: "AudioSidetone")),
             String(defaults.double(forKey: "AudioSidetoneVolume")),
