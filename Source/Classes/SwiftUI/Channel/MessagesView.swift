@@ -505,7 +505,7 @@ private struct SenderStickyHeaderView: View {
                 Text(title)
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .modifier(BackdropAdaptiveTextModifier())
+                    .modifier(StickyHeaderAdaptiveTextModifier())
                     .lineLimit(1)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -524,7 +524,7 @@ private struct SenderStickyHeaderView: View {
                 Text(title)
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .modifier(BackdropAdaptiveTextModifier())
+                    .modifier(StickyHeaderAdaptiveTextModifier())
                     .lineLimit(1)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -778,8 +778,11 @@ struct ImageConfirmationView: View {
                         .buttonStyle(.bordered).controlSize(.large)
                         .keyboardShortcut(.cancelAction)
                     Button("Send") {
-                        Task { isSending = true; await onSend(image, isHighQuality) }
+                        guard !isSending else { return }
+                        isSending = true
+                        Task { await onSend(image, isHighQuality) }
                     }
+                    .disabled(isSending)
                     .buttonStyle(.borderedProminent).controlSize(.large)
                     .keyboardShortcut(.defaultAction)
                 }
@@ -927,7 +930,7 @@ private struct TextInputBar: View {
             prompt: Text("Type a message..."),
             axis: .vertical
         )
-            .modifier(BackdropAdaptiveTextModifier(opacity: text.isEmpty ? 0.58 : 1.0))
+            .modifier(StickyHeaderAdaptiveTextModifier(opacity: text.isEmpty ? 0.58 : 1.0))
             .focused($isFocused)
             #if os(macOS)
             .font(.system(size: 12))
@@ -1048,13 +1051,21 @@ private struct TextInputBar: View {
     }
 }
 
-private struct BackdropAdaptiveTextModifier: ViewModifier {
+private struct StickyHeaderAdaptiveTextModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     var opacity: Double = 1.0
+    var brightnessBoost: Double = 0.18
 
     func body(content: Content) -> some View {
-        content
-            .foregroundColor(.white.opacity(opacity))
-            .blendMode(.difference)
+        ZStack {
+            if colorScheme == .dark {
+                content
+                    .foregroundColor(.white.opacity(opacity * brightnessBoost))
+            }
+            content
+                .foregroundColor(.white.opacity(opacity))
+                .blendMode(.difference)
+        }
     }
 }
 

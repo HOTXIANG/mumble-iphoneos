@@ -306,10 +306,6 @@ extension AdvancedAudioSettingsView {
             }
         }
         
-        LabeledContent("Force TCP Mode:") {
-            Toggle("", isOn: $forceTCP)
-                .labelsHidden()
-        }
         LabeledContent("Audio Quality:") {
             Picker("", selection: $qualityKind) {
                 Text("Low (60kbit/s)").tag("low")
@@ -318,6 +314,10 @@ extension AdvancedAudioSettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+        }
+        LabeledContent("Force TCP Mode:") {
+            Toggle("", isOn: $forceTCP)
+                .labelsHidden()
         }
         Text("Requires reconnection to take effect.")
             .font(.caption)
@@ -562,19 +562,19 @@ struct MacSettingsRootView: View {
         var preferredContentSize: NSSize {
             switch self {
             case .general:
-                return NSSize(width: 500, height: 200)
+                return NSSize(width: 550, height: 200)
             case .input:
-                return NSSize(width: 600, height: 500)
+                return NSSize(width: 550, height: 500)
             case .output:
-                return NSSize(width: 500, height: 200)
+                return NSSize(width: 550, height: 200)
             case .notifications:
-                return NSSize(width: 500, height: 360)
+                return NSSize(width: 550, height: 360)
             case .handoff:
-                return NSSize(width: 500, height: 220)
+                return NSSize(width: 550, height: 220)
             case .certificates:
-                return NSSize(width: 500, height: 600)
+                return NSSize(width: 550, height: 600)
             case .advanced:
-                return NSSize(width: 500, height: 200)
+                return NSSize(width: 550, height: 200)
             }
         }
     }
