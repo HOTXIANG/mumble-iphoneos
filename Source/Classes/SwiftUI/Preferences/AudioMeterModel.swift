@@ -8,53 +8,61 @@
 import SwiftUI
 import Combine
 
-@MainActor
-class AudioMeterModel: ObservableObject {
+final class AudioMeterModel: ObservableObject, @unchecked Sendable {
     @Published var currentLevel: Float = 0.0
-    private var timer: Timer?
+    private var timer: DispatchSourceTimer?
+    private let samplingQueue = DispatchQueue(label: "cn.hotxiang.mumble.audio-meter", qos: .userInteractive)
+    private let updateInterval: TimeInterval = 0.03
+    private var monitorSessionID: UInt = 0
 
-    // 开始监听麦克风音量
+    // 后台任务负责节拍，采样与 UI 更新在主线程执行（MKAudio 线程安全要求）
     func startMonitoring() {
         stopMonitoring()
-        // 50ms 刷新一次，足够流畅
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.updateLevel()
+        monitorSessionID &+= 1
+        let sessionID = monitorSessionID
+
+        let source = DispatchSource.makeTimerSource(queue: samplingQueue)
+        source.schedule(deadline: .now(), repeating: updateInterval, leeway: .milliseconds(10))
+        source.setEventHandler { [weak self] in
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.monitorSessionID == sessionID else { return }
+                self.currentLevel = Self.sampleLevel()
             }
         }
+        timer = source
+        source.resume()
     }
 
     // 停止监听（节省资源）
     func stopMonitoring() {
-        timer?.invalidate()
+        timer?.setEventHandler {}
+        timer?.cancel()
         timer = nil
-        currentLevel = 0.0
+        monitorSessionID &+= 1
+        if Thread.isMainThread {
+            currentLevel = 0.0
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.currentLevel = 0.0
+            }
+        }
     }
 
-    private func updateLevel() {
-        // 调用底层 MumbleKit 的 MKAudio 单例
-        guard let audio = MKAudio.shared() else { return }
-        
+    private static func sampleLevel() -> Float {
+        guard let audio = MKAudio.shared() else { return 0.0 }
+
         let vadKind = UserDefaults.standard.string(forKey: "AudioVADKind") ?? "amplitude"
         let preprocessor = UserDefaults.standard.bool(forKey: "AudioPreprocessor")
-        
-        // 逻辑复刻自旧版 MUAudioBarView.m
-        // 如果未开启预处理，强制使用振幅模式
         let effectiveKind = preprocessor ? vadKind : "amplitude"
-        
+
+        let rawLevel: Float
         if effectiveKind == "snr" {
-            // 信噪比模式 (Signal-to-Noise Ratio)
-            currentLevel = audio.speechProbablity()
+            rawLevel = audio.speechProbablity()
         } else {
-            // 振幅模式 (Amplitude)
-            // peakCleanMic 返回的是分贝值 (dB)，通常在 -96.0 到 0.0 之间
             let peak = audio.peakCleanMic()
-            // 归一化到 0.0 - 1.0 范围
-            currentLevel = (peak + 96.0) / 96.0
+            rawLevel = (peak + 96.0) / 96.0
         }
-        
-        // 确保数值在 0-1 之间
-        if currentLevel < 0 { currentLevel = 0 }
-        if currentLevel > 1 { currentLevel = 1 }
+
+        return min(max(rawLevel, 0.0), 1.0)
     }
 }

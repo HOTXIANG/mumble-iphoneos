@@ -6,12 +6,13 @@ struct ChannelListView: View {
     @EnvironmentObject var serverManager: ServerModelManager
     @ObservedObject var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
+    #if os(iOS)
     @State private var showingPrefs = false
+    #endif
     @State private var showingCertInfo = false
     
     #if os(macOS)
     // macOS: 监听菜单栏通知
-    private let showSettingsPublisher = NotificationCenter.default.publisher(for: .mumbleShowSettings)
     private let showCertInfoPublisher = NotificationCenter.default.publisher(for: .mumbleShowCertInfo)
     private let disconnectPublisher = NotificationCenter.default.publisher(for: .mumbleInitiateDisconnect)
     private let registerUserPublisher = NotificationCenter.default.publisher(for: .mumbleRegisterUser)
@@ -75,23 +76,18 @@ struct ChannelListView: View {
             leadingToolbarItems
             trailingToolbarItems
         }
+        #if os(iOS)
         .sheet(isPresented: $showingPrefs) {
             NavigationStack {
                 PreferencesView()
                     .environmentObject(serverManager)
             }
-            #if os(macOS)
-            .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
-            #endif
         }
+        #endif
         .sheet(isPresented: $showingCertInfo) {
             ServerCertificateDetailView()
         }
         #if os(macOS)
-        .onReceive(showSettingsPublisher) { _ in
-            guard appState.isConnected else { return }
-            showingPrefs = true
-        }
         .onReceive(showCertInfoPublisher) { _ in showingCertInfo = true }
         .onReceive(disconnectPublisher) { _ in initiateDisconnect() }
         .onReceive(registerUserPublisher) { _ in

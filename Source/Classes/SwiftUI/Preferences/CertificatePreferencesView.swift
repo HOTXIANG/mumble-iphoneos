@@ -39,7 +39,6 @@ struct CertificatePreferencesView: View {
     var body: some View {
         certificateList
             .navigationTitle("Certificates")
-            .toolbar { toolbarContent }
             // --- 导入功能 ---
             #if os(iOS)
             .fileImporter(isPresented: $showingImportPicker, allowedContentTypes: [.pkcs12], allowsMultipleSelection: false, onCompletion: handleImportSelection)
@@ -93,7 +92,15 @@ struct CertificatePreferencesView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             }, message: { cert in
-                Text("Warning: If you do not have a backup of '\(cert.name)', you may permanently lose access to servers and usernames registered with this identity.\n\nAre you sure you want to delete it?")
+                Text(
+                    String(
+                        format: NSLocalizedString(
+                            "Warning: If you do not have a backup of '%@', you may permanently lose access to servers and usernames registered with this identity.\\n\\nAre you sure you want to delete it?",
+                            comment: ""
+                        ),
+                        cert.name
+                    )
+                )
             })
             .onAppear {
                 certModel.refreshCertificates()
@@ -110,6 +117,30 @@ struct CertificatePreferencesView: View {
                     .foregroundColor(.secondary)
                     .padding(.vertical)
             } else {
+                #if os(macOS)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 6) {
+                        ForEach(certModel.certificates) { cert in
+                            CertificateRow(cert: cert)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contextMenu {
+                                    Button {
+                                        prepareExport(cert)
+                                    } label: {
+                                        Label("Export .p12", systemImage: "square.and.arrow.up")
+                                    }
+                                    
+                                    Button(role: .destructive) {
+                                        prepareDelete(cert)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                        }
+                    }
+                }
+                .frame(minHeight: 180, maxHeight: 340)
+                #else
                 ForEach(certModel.certificates) { cert in
                     CertificateRow(cert: cert)
                         .contextMenu {
@@ -126,7 +157,16 @@ struct CertificatePreferencesView: View {
                             }
                         }
                 }
+                #endif
             }
+            
+            Button(action: triggerImport) {
+                Label("Import Certificate", systemImage: "square.and.arrow.down")
+                    .frame(maxWidth: .infinity, minHeight: 24, alignment: .center)
+                    .foregroundColor(.white)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.vertical, 6)
         }
     }
     
@@ -136,26 +176,11 @@ struct CertificatePreferencesView: View {
             Form {
                 certificateContent
             }
-            .formStyle(.grouped)
             #else
             List {
                 certificateContent
             }
             #endif
-        }
-    }
-    
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .automatic) {
-            Button(action: {
-                #if os(macOS)
-                openImportPanelMacOS()
-                #else
-                showingImportPicker = true
-                #endif
-            }) {
-                Label("Import", systemImage: "square.and.arrow.down")
-            }
         }
     }
     
@@ -307,6 +332,14 @@ struct CertificatePreferencesView: View {
     private func prepareDelete(_ cert: CertificateItem) {
         self.certToDelete = cert
         self.showingDeleteConfirmation = true
+    }
+    
+    private func triggerImport() {
+        #if os(macOS)
+        openImportPanelMacOS()
+        #else
+        showingImportPicker = true
+        #endif
     }
 }
 

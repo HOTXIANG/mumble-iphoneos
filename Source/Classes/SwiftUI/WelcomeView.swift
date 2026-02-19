@@ -353,6 +353,7 @@ struct WelcomeView: MumbleContentView {
     
     var contentBody: some View {
         WelcomeContentView()
+            #if os(iOS)
             .sheet(isPresented: $showingPreferences, onDismiss: {
                 serverManager.stopAudioTest()
             }) {
@@ -363,11 +364,6 @@ struct WelcomeView: MumbleContentView {
                 #if os(macOS)
                 .frame(minWidth: 500, idealWidth: 600, minHeight: 500, idealHeight: 650)
                 #endif
-            }
-            #if os(macOS)
-            .onReceive(NotificationCenter.default.publisher(for: .mumbleShowSettings)) { _ in
-                guard !AppState.shared.isConnected else { return }
-                showingPreferences = true
             }
             #endif
     }
@@ -638,7 +634,12 @@ private struct VADOnboardingSplashView: View {
                         Text("Input Device")
                             .font(.headline)
                         Picker("", selection: selectedInputDeviceTag) {
-                            Text("Follow System Default (\(systemDefaultName))").tag(followSystemToken)
+                            Text(
+                                String(
+                                    format: NSLocalizedString("Follow System Default (%@)", comment: ""),
+                                    systemDefaultName
+                                )
+                            ).tag(followSystemToken)
                             if devices.isEmpty {
                                 Text("No Input Device").tag("")
                             } else {
@@ -726,7 +727,7 @@ private struct VADOnboardingSplashView: View {
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    Slider(value: holdBinding, in: 0...0.3)
+                    Slider(value: holdBinding, in: 0...0.3, step: 0.01)
                         .tint(.indigo)
                 }
                 
@@ -860,7 +861,7 @@ struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
     
-    @StateObject private var serverManager = ServerModelManager()
+    @StateObject private var serverManager: ServerModelManager
     @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
     @AppStorage("HasCompletedVADOnboarding") private var hasCompletedVADOnboarding: Bool = false
@@ -883,6 +884,10 @@ struct AppRootView: View {
 
     private var selectedAppColorScheme: AppColorSchemeOption {
         AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
+    }
+
+    init(serverManager: ServerModelManager = ServerModelManager()) {
+        _serverManager = StateObject(wrappedValue: serverManager)
     }
     
     var body: some View {

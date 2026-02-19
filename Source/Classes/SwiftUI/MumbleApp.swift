@@ -34,6 +34,7 @@ struct MumbleApp: App {
     
     // 监听环境变化，用于处理 Scene 相位（后台/前台）
     @Environment(\.scenePhase) var scenePhase
+    @StateObject private var serverManager = ServerModelManager()
     
     /// 处理用户点击系统通知后跳转到聊天界面
     @StateObject private var notificationDelegate = NotificationDelegate()
@@ -41,7 +42,7 @@ struct MumbleApp: App {
     var body: some Scene {
         WindowGroup {
             // 这里直接使用你之前的 Wrapper，或者直接换成 MainView
-            AppRootView()
+            AppRootView(serverManager: serverManager)
                 .environmentObject(AppState.shared) // 建议注入 AppState，防止子视图崩溃
                 #if os(macOS)
                 .frame(minWidth: 600, minHeight: 400)
@@ -73,6 +74,13 @@ struct MumbleApp: App {
         #if os(macOS)
         .commands {
             MumbleMenuCommands()
+        }
+        #endif
+        #if os(macOS)
+        Settings {
+            MacSettingsRootView()
+                .environmentObject(serverManager)
+                .frame(minWidth: 400, idealWidth: 500, minHeight: 100, idealHeight: 200)
         }
         #endif
     }
@@ -183,21 +191,11 @@ struct MumbleMenuCommands: Commands {
             .disabled(!appState.isConnected)
         }
         
-        // "Mumble" 菜单 - 添加设置项
-        CommandGroup(after: .appSettings) {
-            Button {
-                NotificationCenter.default.post(name: .mumbleShowSettings, object: nil)
-            } label: {
-                Label("Settings...", systemImage: "gearshape")
-            }
-            .keyboardShortcut(",", modifiers: [.command])
-        }
     }
 }
 
 // Menu bar notification names
 extension Notification.Name {
-    static let mumbleShowSettings = Notification.Name("MumbleShowSettingsNotification")
     static let mumbleShowCertInfo = Notification.Name("MumbleShowCertInfoNotification")
     static let mumbleInitiateDisconnect = Notification.Name("MumbleInitiateDisconnectFromMenuNotification")
     static let mumbleRegisterUser = Notification.Name("MumbleRegisterUserNotification")

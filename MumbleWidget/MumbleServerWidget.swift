@@ -3,13 +3,33 @@
 
 import WidgetKit
 import SwiftUI
+#if os(iOS)
 import AppIntents
+#endif
 
 // MARK: - Widget Timeline Provider
 
-struct ServerWidgetProvider: AppIntentTimelineProvider {
+private func serverLimit(for family: WidgetFamily) -> Int {
+    switch family {
+    case .systemSmall: return 3
+    case .systemMedium: return 3
+    case .systemLarge: return 6
+    default: return 3
+    }
+}
+
+private func makeEntry(displayMode: ServerDisplayMode, family: WidgetFamily) -> ServerWidgetEntry {
+    let limit = serverLimit(for: family)
+    return ServerWidgetEntry(
+        date: Date(),
+        favouriteServers: WidgetDataManager.shared.loadPinnedServers(limit: limit),
+        recentServers: WidgetDataManager.shared.loadRecentServers(limit: limit),
+        displayMode: displayMode
+    )
+}
+
+struct ServerWidgetProvider: TimelineProvider {
     typealias Entry = ServerWidgetEntry
-    typealias Intent = ServerWidgetConfigIntent
     
     func placeholder(in context: Context) -> ServerWidgetEntry {
         ServerWidgetEntry(
@@ -24,37 +44,37 @@ struct ServerWidgetProvider: AppIntentTimelineProvider {
         )
     }
     
+    func getSnapshot(in context: Context, completion: @escaping (ServerWidgetEntry) -> Void) {
+        completion(makeEntry(displayMode: .favourites, family: context.family))
+    }
+    
+    func getTimeline(in context: Context, completion: @escaping (Timeline<ServerWidgetEntry>) -> Void) {
+        let entry = makeEntry(displayMode: .favourites, family: context.family)
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
+        completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
+    }
+}
+
+#if os(iOS)
+struct ServerWidgetIntentProvider: AppIntentTimelineProvider {
+    typealias Entry = ServerWidgetEntry
+    typealias Intent = ServerWidgetConfigIntent
+    
+    func placeholder(in context: Context) -> ServerWidgetEntry {
+        ServerWidgetProvider().placeholder(in: context)
+    }
+    
     func snapshot(for configuration: ServerWidgetConfigIntent, in context: Context) async -> ServerWidgetEntry {
-        let limit = serverLimit(for: context.family)
-        return ServerWidgetEntry(
-            date: Date(),
-            favouriteServers: WidgetDataManager.shared.loadPinnedServers(limit: limit),
-            recentServers: WidgetDataManager.shared.loadRecentServers(limit: limit),
-            displayMode: configuration.displayMode
-        )
+        makeEntry(displayMode: configuration.displayMode, family: context.family)
     }
     
     func timeline(for configuration: ServerWidgetConfigIntent, in context: Context) async -> Timeline<ServerWidgetEntry> {
-        let limit = serverLimit(for: context.family)
-        let entry = ServerWidgetEntry(
-            date: Date(),
-            favouriteServers: WidgetDataManager.shared.loadPinnedServers(limit: limit),
-            recentServers: WidgetDataManager.shared.loadRecentServers(limit: limit),
-            displayMode: configuration.displayMode
-        )
+        let entry = makeEntry(displayMode: configuration.displayMode, family: context.family)
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
         return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
-    
-    private func serverLimit(for family: WidgetFamily) -> Int {
-        switch family {
-        case .systemSmall: return 3
-        case .systemMedium: return 3
-        case .systemLarge: return 6
-        default: return 3
-        }
-    }
 }
+#endif
 
 // MARK: - Widget Entry
 
@@ -67,10 +87,13 @@ struct ServerWidgetEntry: TimelineEntry {
 
 // MARK: - App Intent 配置
 
-enum ServerDisplayMode: String, AppEnum {
+enum ServerDisplayMode: String {
     case favourites
     case recent
-    
+}
+
+#if os(iOS)
+extension ServerDisplayMode: AppEnum {
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Display Mode"
     static var caseDisplayRepresentations: [ServerDisplayMode: DisplayRepresentation] = [
         .favourites: DisplayRepresentation(title: "Favourites", subtitle: "Show favourite servers"),
@@ -85,6 +108,7 @@ struct ServerWidgetConfigIntent: WidgetConfigurationIntent {
     @Parameter(title: "Display Mode", default: .favourites)
     var displayMode: ServerDisplayMode
 }
+#endif
 
 // MARK: - Widget Views
 
@@ -137,7 +161,7 @@ struct MumbleServerWidgetEntryView: View {
         HStack(alignment: .top, spacing: 12) {
             // 左列 - Favourites
             serverColumn(
-                title: "Favourites",
+                title: NSLocalizedString("Favourites", comment: ""),
                 icon: "star.fill",
                 servers: entry.favouriteServers,
                 maxCount: family == .systemLarge ? 6 : 3
@@ -145,7 +169,7 @@ struct MumbleServerWidgetEntryView: View {
 
             // 右列 - Recent
             serverColumn(
-                title: "Recent",
+                title: NSLocalizedString("Recent", comment: ""),
                 icon: "clock.fill",
                 servers: entry.recentServers,
                 maxCount: family == .systemLarge ? 6 : 3
@@ -162,7 +186,7 @@ struct MumbleServerWidgetEntryView: View {
                 Spacer(minLength: 0)
                 HStack {
                     Spacer()
-                    Text("No \(title)")
+                    Text(String(format: NSLocalizedString("No %@", comment: ""), title))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -204,7 +228,7 @@ struct MumbleServerWidgetEntryView: View {
             Image(systemName: "server.rack")
                 .font(.system(size: 28))
                 .foregroundStyle(.tertiary)
-            Text("No \(title)")
+            Text(String(format: NSLocalizedString("No %@", comment: ""), title))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -255,13 +279,23 @@ struct MumbleServerWidget: Widget {
     let kind: String = "MumbleServerWidget"
     
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: kind, intent: ServerWidgetConfigIntent.self, provider: ServerWidgetProvider()) { entry in
+        #if os(iOS)
+        AppIntentConfiguration(kind: kind, intent: ServerWidgetConfigIntent.self, provider: ServerWidgetIntentProvider()) { entry in
             MumbleServerWidgetEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("Mumble Servers")
         .description("Quickly connect to your favourite Mumble servers.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        #else
+        StaticConfiguration(kind: kind, provider: ServerWidgetProvider()) { entry in
+            MumbleServerWidgetEntryView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName("Mumble Servers")
+        .description("Quickly connect to your favourite Mumble servers.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        #endif
     }
 }
 

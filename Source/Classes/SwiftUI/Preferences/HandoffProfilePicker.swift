@@ -18,9 +18,17 @@ struct HandoffProfileOption: Identifiable {
 struct HandoffProfilePicker: View {
     @Binding var selectedKey: Int
     @State private var profiles: [HandoffProfileOption] = []
+    
+    private var handoffProfileTitle: String {
+        #if os(iOS)
+        NSLocalizedString("Handoff Profile", comment: "")
+        #else
+        NSLocalizedString("Handoff Profile:", comment: "")
+        #endif
+    }
 
     var body: some View {
-        LabeledContent("Handoff Profile") {
+        LabeledContent(handoffProfileTitle) {
             Menu {
                 Button {
                     selectedKey = -1
