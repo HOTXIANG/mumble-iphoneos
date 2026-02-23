@@ -116,6 +116,7 @@ extension AudioTransmissionSettingsView {
                         Slider(value: $micBoost, in: 0...3.0, step: 0.1) { editing in
                             if !editing { PreferencesModel.shared.notifySettingsChanged() }
                         }
+                        .frame(maxWidth: 220)
                     }
                 }
             }
@@ -564,7 +565,7 @@ struct MacSettingsRootView: View {
             case .general:
                 return NSSize(width: 550, height: 200)
             case .input:
-                return NSSize(width: 550, height: 500)
+                return NSSize(width: 550, height: 520)
             case .output:
                 return NSSize(width: 550, height: 200)
             case .notifications:

@@ -48,7 +48,13 @@ struct ChannelView: View {
     
     @State private var userPreferredChatWidth: CGFloat = 320
     private let minChatWidth: CGFloat = 300
-    private let minServerListWidth: CGFloat = 400
+    private let minServerListWidth: CGFloat = {
+        #if os(macOS)
+        350
+        #else
+        400
+        #endif
+    }()
 
     var body: some View {
         GeometryReader { geo in

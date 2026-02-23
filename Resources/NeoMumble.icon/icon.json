@@ -8,13 +8,34 @@
       "hidden" : false,
       "layers" : [
         {
-          "blend-mode" : "normal",
-          "fill" : {
-            "linear-gradient" : [
-              "extended-gray:1.00000,1.00000",
-              "extended-gray:1.00000,0.32702"
-            ]
-          },
+          "blend-mode-specializations" : [
+            {
+              "value" : "normal"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "normal"
+            }
+          ],
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "extended-gray:1.00000,1.00000",
+                  "extended-gray:1.00000,0.32702"
+                ]
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:0.39647,0.35505,1.00000,1.00000",
+                  "display-p3:0.67334,0.68586,1.00000,0.50000"
+                ]
+              }
+            }
+          ],
           "hidden" : false,
           "image-name" : "TransparentLogoWhite.png",
           "name" : "TransparentLogoWhite"
