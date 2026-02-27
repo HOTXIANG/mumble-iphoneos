@@ -93,6 +93,8 @@ class ServerModelManager: ObservableObject {
     var serverModel: MKServerModel?
     var userIndexMap: [UInt: Int] = [:]
     var channelIndexMap: [UInt: Int] = [:]
+    /// 用户最近一次已知所在频道（用于 userLeft 时正确判断“同频道/其他频道”）
+    var lastKnownChannelIdByUserSession: [UInt: UInt] = [:]
     #if os(iOS)
     var liveActivity: Activity<MumbleActivityAttributes>?
     #endif

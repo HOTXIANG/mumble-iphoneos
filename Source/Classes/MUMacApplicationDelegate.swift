@@ -40,10 +40,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioVADHoldSeconds": 0.1,
             "AudioVADKind": "amplitude",
             "AudioTransmitMethod": "vad",
-            "AudioPreprocessor": true,
             "AudioStereoInput": false,
             "AudioStereoOutput": true,
-            "AudioEchoCancel": true,
             "AudioMicBoost": 1.0,
             "AudioQualityKind": "balanced",
             "AudioSidetone": false,
@@ -70,6 +68,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         // Listen for preferences changes
         NotificationCenter.default.addObserver(self, selector: #selector(reloadPreferences), name: NSNotification.Name("MumblePreferencesChanged"), object: nil)
         
+        NotificationCenter.default.addObserver(self, selector: #selector(handleVPIOToHALTransition), name: NSNotification.Name("MUMacAudioVPIOToHALTransition"), object: nil)
+        
         // Initialize audio settings
         reloadPreferences()
         
@@ -89,6 +89,12 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             name: NSWindow.didBecomeMainNotification,
             object: nil
         )
+        
+        // 系统重启后自动恢复应用时，窗口可能存在但不可见。
+        // 延迟执行以等待 SwiftUI WindowGroup 完成窗口创建，然后强制激活并显示。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.ensureMainWindowVisible()
+        }
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -99,6 +105,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         // macOS 分栏模式下，窗口重新激活时自动清除堆积的系统通知和未读徽章
         AppState.shared.unreadMessageCount = 0
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        
+        ensureMainWindowVisible()
     }
     
     func applicationWillTerminate(_ notification: Notification) {
@@ -202,10 +210,11 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         settings.volume = defaults.float(forKey: "AudioOutputVolume")
         settings.outputDelay = 0
         settings.micBoost = defaults.float(forKey: "AudioMicBoost")
-        settings.enablePreprocessor = ObjCBool(defaults.bool(forKey: "AudioPreprocessor"))
+        settings.enablePreprocessor = ObjCBool(false)
         settings.enableStereoInput = ObjCBool(defaults.bool(forKey: "AudioStereoInput"))
         settings.enableStereoOutput = ObjCBool(defaults.bool(forKey: "AudioStereoOutput"))
-        settings.enableEchoCancellation = ObjCBool(settings.enablePreprocessor.boolValue && defaults.bool(forKey: "AudioEchoCancel"))
+        settings.enableEchoCancellation = ObjCBool(false)
+        settings.enableDenoise = ObjCBool(false)
         settings.enableSideTone = ObjCBool(defaults.bool(forKey: "AudioSidetone"))
         settings.sidetoneVolume = defaults.float(forKey: "AudioSidetoneVolume")
         settings.preferReceiverOverSpeaker = ObjCBool(!defaults.bool(forKey: "AudioSpeakerPhoneMode"))
@@ -232,10 +241,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             String(defaults.double(forKey: "AudioVADHoldSeconds")),
             defaults.string(forKey: "AudioQualityKind") ?? "balanced",
             String(defaults.double(forKey: "AudioMicBoost")),
-            String(defaults.bool(forKey: "AudioPreprocessor")),
             String(defaults.bool(forKey: "AudioStereoInput")),
             String(defaults.bool(forKey: "AudioStereoOutput")),
-            String(defaults.bool(forKey: "AudioEchoCancel")),
             String(defaults.bool(forKey: "AudioSidetone")),
             String(defaults.double(forKey: "AudioSidetoneVolume")),
             String(defaults.bool(forKey: "AudioSpeakerPhoneMode")),
@@ -246,6 +253,36 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         ].joined(separator: "|")
     }
 
+    // MARK: - VPIO→HALOutput 过渡通知
+    
+    @objc private func handleVPIOToHALTransition() {
+        Task { @MainActor in
+            AppState.shared.activeToast = AppToast(
+                message: NSLocalizedString("Switched to external mic. Re-select Voice Isolation mode, then restart app for it to take effect.", comment: ""),
+                type: .info
+            )
+        }
+    }
+    
+    // MARK: - 窗口可见性保障
+    
+    /// 确保至少有一个主窗口可见（应对系统重启后自动恢复时窗口不显示的问题）
+    private func ensureMainWindowVisible() {
+        NSApp.activate(ignoringOtherApps: true)
+        
+        let contentWindows = NSApp.windows.filter {
+            !($0.className.contains("StatusBar") || $0.className.contains("_NSPopover"))
+                && $0.level == .normal
+        }
+        let hasVisible = contentWindows.contains { $0.isVisible && !$0.isMiniaturized }
+        if !hasVisible {
+            if let window = contentWindows.first {
+                window.deminiaturize(nil)
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+    }
+    
     // MARK: - 窗口最小尺寸约束
     
     /// 对所有已存在的窗口设置 minSize

@@ -99,6 +99,7 @@ extension ServerModelManager {
                 let movingUserName = safeUser.userName() ?? NSLocalizedString("Unknown", comment: "")
                 let destChannelName = safeChannel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
                 let destChannelId = safeChannel.channelId()
+                self.lastKnownChannelIdByUserSession[movingUserSession] = destChannelId
                 if let connectedUser = self.serverModel?.connectedUser() {
                     if movingUserSession == connectedUser.session() {
                         // 如果是通过密码进入的频道，标记为密码频道（橙色锁）
@@ -168,6 +169,9 @@ extension ServerModelManager {
                 let safeUser = userTransfer.value
                 self.applySavedUserPreferences(user: safeUser)
                 let userName = safeUser.userName() ?? NSLocalizedString("Unknown User", comment: "")
+                if let channelId = safeUser.channel()?.channelId() {
+                    self.lastKnownChannelIdByUserSession[safeUser.session()] = channelId
+                }
                 let category: SystemNotifyCategory = self.isUserInSameChannelAsMe(safeUser) ? .userJoinedSameChannel : .userJoinedOtherChannels
                 self.addSystemNotification(
                     String(format: NSLocalizedString("%@ connected", comment: ""), userName),
@@ -184,12 +188,19 @@ extension ServerModelManager {
                 guard let self = self else { return }
                 let safeUser = userTransfer.value
                 let userName = safeUser.userName() ?? NSLocalizedString("Unknown User", comment: "")
-                let category: SystemNotifyCategory = self.isUserInSameChannelAsMe(safeUser) ? .userLeftSameChannel : .userLeftOtherChannels
+                let session = safeUser.session()
+                let myChannelId = self.serverModel?.connectedUser()?.channel()?.channelId()
+                let leavingChannelId =
+                    safeUser.channel()?.channelId()
+                    ?? self.lastKnownChannelIdByUserSession[session]
+                    ?? self.inferredChannelId(forUserSession: session)
+                let isLeavingSameChannel = (myChannelId != nil && leavingChannelId == myChannelId)
+                let category: SystemNotifyCategory = isLeavingSameChannel ? .userLeftSameChannel : .userLeftOtherChannels
                 self.addSystemNotification(
                     String(format: NSLocalizedString("%@ disconnected", comment: ""), userName),
                     category: category
                 )
-                let session = safeUser.session()
+                self.lastKnownChannelIdByUserSession.removeValue(forKey: session)
                 // 清除离开用户的监听状态
                 for (channelId, var listeners) in self.channelListeners {
                     listeners.remove(session)

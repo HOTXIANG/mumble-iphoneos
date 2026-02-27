@@ -52,11 +52,9 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
         guard let audio = MKAudio.shared() else { return 0.0 }
 
         let vadKind = UserDefaults.standard.string(forKey: "AudioVADKind") ?? "amplitude"
-        let preprocessor = UserDefaults.standard.bool(forKey: "AudioPreprocessor")
-        let effectiveKind = preprocessor ? vadKind : "amplitude"
 
         let rawLevel: Float
-        if effectiveKind == "snr" {
+        if vadKind == "snr" {
             rawLevel = audio.speechProbablity()
         } else {
             let peak = audio.peakCleanMic()

@@ -529,7 +529,6 @@ private struct VADOnboardingSplashView: View {
     @StateObject private var audioMeter = AudioMeterModel()
     
     @AppStorage("AudioVADKind") private var vadKind: String = "amplitude"
-    @AppStorage("AudioPreprocessor") private var enablePreprocessor: Bool = true
     @AppStorage("AudioVADBelow") private var vadBelow: Double = 0.3
     @AppStorage("AudioVADAbove") private var vadAbove: Double = 0.6
     @AppStorage("AudioVADHoldSeconds") private var vadHoldSeconds: Double = 0.1
@@ -676,11 +675,6 @@ private struct VADOnboardingSplashView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .layoutPriority(1)
                         
-                        if vadKind == "snr" && !enablePreprocessor {
-                            Text("SNR requires preprocessing. It will be enabled automatically.")
-                                .font(.caption)
-                                .foregroundColor(.yellow)
-                        }
                     }
                     
                     HStack {
@@ -755,10 +749,6 @@ private struct VADOnboardingSplashView: View {
             refreshDevices()
             normalizeSelectionIfNeeded()
             #endif
-            if vadKind == "snr" && !enablePreprocessor {
-                enablePreprocessor = true
-                PreferencesModel.shared.notifySettingsChanged()
-            }
             onStartAudioTest()
             // Defensive delayed start to survive any late stop from settings dismissal.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
@@ -781,9 +771,6 @@ private struct VADOnboardingSplashView: View {
         }
         #endif
         .onChange(of: vadKind) { _, newValue in
-            if newValue == "snr" && !enablePreprocessor {
-                enablePreprocessor = true
-            }
             // Keep splash behavior aligned with Input Setting.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 PreferencesModel.shared.notifySettingsChanged()

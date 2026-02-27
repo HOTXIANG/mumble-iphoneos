@@ -260,18 +260,18 @@ struct NotificationSettingsView: View {
 }
 
 private struct TransmissionMethodPickerRow: View {
-    let titleKey: String
+    let title: String
     @Binding var transmitMethod: String
     @State private var localSelection: String
     
     init(title: String, transmitMethod: Binding<String>) {
-        self.titleKey = title
+        self.title = title
         self._transmitMethod = transmitMethod
         self._localSelection = State(initialValue: transmitMethod.wrappedValue)
     }
     
     var body: some View {
-        Picker(NSLocalizedString(titleKey, comment: ""), selection: $localSelection) {
+        Picker(title, selection: $localSelection) {
             Text("Voice Activated").tag("vad" as String)
             Text("Push-to-Talk").tag("ptt" as String)
             Text("Continuous").tag("continuous" as String)
@@ -299,9 +299,7 @@ struct AudioTransmissionSettingsView: View {
     @AppStorage("AudioVADAbove") var vadAbove: Double = 0.6
     @AppStorage("AudioVADHoldSeconds") var vadHoldSeconds: Double = 0.1
     
-    @AppStorage("AudioPreprocessor") var enablePreprocessor: Bool = true
     @AppStorage("AudioStereoInput") var enableStereoInput: Bool = false
-    @AppStorage("AudioEchoCancel") var enableEchoCancel: Bool = true
     @AppStorage("AudioMicBoost") var micBoost: Double = 1.0
     @AppStorage("ShowPTTButton") var showPTTButton: Bool = false
     @AppStorage("PTTHotkeyCode") var pttHotkeyCode: Int = 49
@@ -326,9 +324,9 @@ struct AudioTransmissionSettingsView: View {
             platformProcessingSection
 
             #if os(iOS)
-            TransmissionMethodPickerRow(title: "Transmission Method", transmitMethod: $transmitMethod)
+            TransmissionMethodPickerRow(title: NSLocalizedString("Transmission Method", comment: ""), transmitMethod: $transmitMethod)
             #else
-            TransmissionMethodPickerRow(title: "Transmission Method:", transmitMethod: $transmitMethod)
+            TransmissionMethodPickerRow(title: NSLocalizedString("Transmission Method:", comment: ""), transmitMethod: $transmitMethod)
             #endif
             
             if transmitMethod == "vad" {
@@ -348,9 +346,7 @@ struct AudioTransmissionSettingsView: View {
             PreferencesModel.shared.notifySettingsChanged()
         }
         .onChange(of: vadHoldSeconds) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: enablePreprocessor) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enableStereoInput) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: enableEchoCancel) { PreferencesModel.shared.notifySettingsChanged() }
         .onAppear {
             serverManager.startAudioTest()
             platformRefreshDevices()
@@ -378,9 +374,6 @@ struct AudioTransmissionSettingsView: View {
     }
 
     func handleVADKindSelectionChange(_ newValue: String) {
-        if newValue == "snr" && !enablePreprocessor {
-            enablePreprocessor = true
-        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             PreferencesModel.shared.notifySettingsChanged()
         }
@@ -388,22 +381,6 @@ struct AudioTransmissionSettingsView: View {
 
     @ViewBuilder
     var vadDetailControls: some View {
-        if vadKind == "snr" && !enablePreprocessor {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.yellow)
-                Text("SNR requires Preprocessing")
-                    .font(.caption)
-                Spacer()
-                Button("Enable") {
-                    enablePreprocessor = true
-                    PreferencesModel.shared.notifySettingsChanged()
-                }
-                .font(.caption)
-                .buttonStyle(.bordered)
-            }
-        }
-
         platformVADDetailControlsContent
 
         Text("Adjust sliders so that the bar stays in green when speaking and red when silent.")

@@ -101,23 +101,18 @@ extension AudioTransmissionSettingsView {
     var platformProcessingSection: some View {
         LabeledContent("Audio Processing:") {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Preprocessing", isOn: $enablePreprocessor)
                 Toggle("Stereo Input", isOn: $enableStereoInput)
-                if enablePreprocessor {
-                    Toggle("Echo Cancellation", isOn: $enableEchoCancel)
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(
-                            String(
-                                format: NSLocalizedString("Mic Volume: %d%%", comment: ""),
-                                Int(micBoost * 100)
-                            )
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(
+                        String(
+                            format: NSLocalizedString("Mic Volume: %d%%", comment: ""),
+                            Int(micBoost * 100)
                         )
-                        Slider(value: $micBoost, in: 0...3.0, step: 0.1) { editing in
-                            if !editing { PreferencesModel.shared.notifySettingsChanged() }
-                        }
-                        .frame(maxWidth: 220)
+                    )
+                    Slider(value: $micBoost, in: 0...3.0, step: 0.1) { editing in
+                        if !editing { PreferencesModel.shared.notifySettingsChanged() }
                     }
+                    .frame(maxWidth: 220)
                 }
             }
         }
@@ -358,6 +353,7 @@ private struct MacAudioOutputSettingsTabView: View {
                                 if !editing { PreferencesModel.shared.notifySettingsChanged() }
                             }
                         }
+                        .frame(maxWidth: 300)
                     }
                 }
             }
@@ -567,7 +563,7 @@ struct MacSettingsRootView: View {
             case .input:
                 return NSSize(width: 550, height: 520)
             case .output:
-                return NSSize(width: 550, height: 200)
+                return NSSize(width: 550, height: 220)
             case .notifications:
                 return NSSize(width: 550, height: 360)
             case .handoff:

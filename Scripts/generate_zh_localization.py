@@ -165,6 +165,7 @@ MANUAL_TRANSLATIONS = {
     "Detection Mode": "检测模式",
     "Detection Type:": "检测类型：",
     "Device List:": "设备列表：",
+    "Voice Isolation": "语音突显",
     "Amplitude": "振幅",
     "Signal to Noise": "信噪比",
     "SNR requires preprocessing. It will be enabled automatically.": "SNR 需要预处理，将自动启用。",
@@ -304,6 +305,7 @@ MANUAL_TRANSLATIONS = {
     "You can manually bind a certificate for this profile. The selected certificate will be used when connecting from Favourite Servers.": "你可以为该配置手动绑定证书。从服务器收藏夹连接时将使用所选证书。",
     "Choose which profile to use when continuing a session from another device. 'Automatic' will match by server address.": "选择从其他设备继续会话时使用的配置文件。自动将按服务器地址匹配。",
     "Warning: If you do not have a backup of '%@', you may permanently lose access to servers and usernames registered with this identity.\\n\\nAre you sure you want to delete it?": "警告：如果你没有“%@”的备份，你可能会永久失去通过此身份在服务器上注册的用户名及访问权限。\\n\\n确定要删除吗？",
+    "Switched to external mic. Re-select Voice Isolation mode, then restart app for it to take effect.": "已切换到外接麦克风。请重新选择语音突显模式，然后重启应用以使其生效。",
     "Channel Name": "频道名称",
     "Settings": "设置",
     "Position": "位置",
@@ -534,6 +536,8 @@ def main():
         "Properties",
         "Property ACL",
         "Property",
+        "Voice Isolation",
+        "Switched to external mic. Re-select Voice Isolation mode, then restart app for it to take effect.",
     }
 
     all_keys = sorted(set(parse_en_keys()) | collect_swiftui_literals() | format_keys)

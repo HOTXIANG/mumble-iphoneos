@@ -12,6 +12,9 @@ extension ServerModelManager {
               let user = modelItems[index].object as? MKUser else {
             return
         }
+        if let channelId = user.channel()?.channelId() {
+            lastKnownChannelIdByUserSession[session] = channelId
+        }
 
         // 检测 mute/deafen 状态变化，生成系统消息
         let currentMuted = user.isSelfMuted()
@@ -172,6 +175,7 @@ extension ServerModelManager {
                 updateUserItemState(item: item, user: user)
                 modelItems.append(item)
                 userIndexMap[user.session()] = index
+                lastKnownChannelIdByUserSession[user.session()] = currentChannel.channelId()
             }
         }
 
@@ -215,6 +219,7 @@ extension ServerModelManager {
                 )
                 updateUserItemState(item: userItem, user: user)
                 userIndexMap[user.session()] = modelItems.count
+                lastKnownChannelIdByUserSession[user.session()] = channel.channelId()
                 modelItems.append(userItem)
             }
         } else {

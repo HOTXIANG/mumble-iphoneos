@@ -109,8 +109,6 @@
 - (void) tickTock {
     MKAudio *audio = [MKAudio sharedAudio];
     NSString *kind = [[NSUserDefaults standardUserDefaults] objectForKey:@"AudioVADKind"];
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"AudioPreprocessor"])
-        kind = @"amplitude";
     if ([kind isEqualToString:@"snr"]) {
         _value = [audio speechProbablity];
     } else {

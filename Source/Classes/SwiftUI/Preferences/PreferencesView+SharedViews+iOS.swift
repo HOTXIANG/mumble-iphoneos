@@ -36,21 +36,16 @@ extension AudioTransmissionSettingsView {
     @ViewBuilder
     var platformProcessingSection: some View {
         Section(header: Text("Processing")) {
-            Toggle("Preprocessing", isOn: $enablePreprocessor)
             Toggle("Stereo Input", isOn: $enableStereoInput)
-            if enablePreprocessor {
-                Toggle("Echo Cancellation", isOn: $enableEchoCancel)
-            } else {
-                VStack(alignment: .leading) {
-                    Text(
-                        String(
-                            format: NSLocalizedString("Mic Volume: %d%%", comment: ""),
-                            Int(micBoost * 100)
-                        )
+            VStack(alignment: .leading) {
+                Text(
+                    String(
+                        format: NSLocalizedString("Mic Volume: %d%%", comment: ""),
+                        Int(micBoost * 100)
                     )
-                    Slider(value: $micBoost, in: 0...3.0, step: 0.1) { editing in
-                        if !editing { PreferencesModel.shared.notifySettingsChanged() }
-                    }
+                )
+                Slider(value: $micBoost, in: 0...3.0, step: 0.1) { editing in
+                    if !editing { PreferencesModel.shared.notifySettingsChanged() }
                 }
             }
         }

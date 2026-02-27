@@ -123,6 +123,7 @@ extension ServerModelManager {
         modelItems = []
         userIndexMap = [:]
         channelIndexMap = [:]
+        lastKnownChannelIdByUserSession.removeAll()
         isConnected = false
         serverName = nil
 
