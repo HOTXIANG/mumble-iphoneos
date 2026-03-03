@@ -123,7 +123,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     return _serverModel;
 }
 
-- (void) connetToHostname:(NSString *)hostName
+- (void) connectToHostname:(NSString *)hostName
                      port:(NSUInteger)port
              withUsername:(NSString *)userName
               andPassword:(NSString *)password
@@ -276,17 +276,12 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 }
 
 - (void) establishConnection {
-    // 只有在 connetToHostname 中才重置为 0
+    // 只有在 connectToHostname 中才重置为 0
     _isUserInitiatedDisconnect = NO;
     
     // 启动网络监控
     [self startNetworkMonitor];
-    
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        NSLog(@"🎤 [Async] Starting Audio Engine...");
-        [[MKAudio sharedAudio] restart];
-    });
-    
+
     _connection = [[MKConnection alloc] init];
     [_connection setDelegate:self];
     [_connection setForceTCP:[[NSUserDefaults standardUserDefaults] boolForKey:@"NetworkForceTCP"]];
@@ -332,6 +327,10 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
             NSLog(@"👤 Connecting anonymously (No certificate).");
         }
     }
+    
+    // Ensure audio starts with a valid connection snapshot already attached.
+    NSLog(@"🎤 Starting Audio Engine...");
+    [[MKAudio sharedAudio] restart];
     
     [_connection connectToHost:_hostname port:_port];
 }

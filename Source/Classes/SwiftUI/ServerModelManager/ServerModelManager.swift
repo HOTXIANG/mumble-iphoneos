@@ -1,6 +1,7 @@
 // 文件: ServerModelManager.swift (已添加 serverName 属性)
 
 import SwiftUI
+import os
 #if os(iOS)
 import ActivityKit
 #endif
@@ -122,13 +123,11 @@ class ServerModelManager: ObservableObject {
     }
     
     init() {
-        print(
-            "✅ ServerModelManager: INIT (Lazy)"
-        )
+        MumbleLogger.model.debug("ServerModelManager init")
     }
 
     deinit {
-        print("🔴 ServerModelManager: DEINIT")
+        MumbleLogger.model.debug("ServerModelManager deinit")
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -153,13 +152,13 @@ class ServerModelManager: ObservableObject {
         // iOS 16.1 之前不支持
         guard #available(iOS 16.1, *) else { return }
         
-        print("🛑 Force ending Live Activities (Blocking)...")
+        MumbleLogger.general.info("Force ending Live Activities (blocking)")
         let semaphore = DispatchSemaphore(value: 0)
         
         // 使用 detached 任务，脱离当前上下文，提高存活率
         Task.detached(priority: .userInitiated) {
             for activity in Activity<MumbleActivityAttributes>.activities {
-                print("🛑 Ending activity: \(activity.id)")
+                MumbleLogger.general.debug("Ending activity: \(activity.id)")
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
             // 任务完成，发送信号
@@ -170,9 +169,9 @@ class ServerModelManager: ObservableObject {
         // 这强迫系统不要立即杀掉进程，直到我们的清理请求发出去
         let result = semaphore.wait(timeout: .now() + 2.0)
         if result == .timedOut {
-            print("⚠️ LiveActivity cleanup timed out.")
+            MumbleLogger.general.warning("LiveActivity cleanup timed out")
         } else {
-            print("✅ LiveActivity cleanup finished successfully.")
+            MumbleLogger.general.info("LiveActivity cleanup finished")
         }
         #endif
     }

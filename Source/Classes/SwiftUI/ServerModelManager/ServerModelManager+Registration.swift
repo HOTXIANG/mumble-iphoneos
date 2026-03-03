@@ -70,7 +70,7 @@ extension ServerModelManager {
             connectionController.disconnectFromServer()
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                connectionController.connet(
+                connectionController.connect(
                     toHostname: serverToUpdate.hostName,
                     port: UInt(serverToUpdate.port),
                     withUsername: serverToUpdate.userName,
@@ -100,7 +100,7 @@ extension ServerModelManager {
             connectionController.disconnectFromServer()
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                connectionController.connet(
+                connectionController.connect(
                     toHostname: newFav.hostName,
                     port: UInt(newFav.port),
                     withUsername: newFav.userName,

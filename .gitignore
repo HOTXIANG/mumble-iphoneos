@@ -9,3 +9,5 @@ DerivedData/
 **/DerivedData/
 DerivedDataTemp/
 **/DerivedDataTemp/
+Dependencies/fmdb/.build/
+.venv/

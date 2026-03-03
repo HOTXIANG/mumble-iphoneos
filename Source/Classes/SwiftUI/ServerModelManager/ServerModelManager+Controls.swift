@@ -45,9 +45,14 @@ extension ServerModelManager {
 
     /// 退出设置界面时调用：关闭麦克风
     func stopAudioTest() {
+        let connectionController = MUConnectionController.shared()
+        let connectionInProgressOrActive = connectionController?.isConnected() ?? false
+        
         // 如果当前连接着服务器，绝对不能关麦，否则通话断了
-        if self.isConnected {
-            print("🎤 Connected to server, keeping audio active.")
+        if self.isConnected || connectionInProgressOrActive {
+            // We're leaving local test mode; do not stop engine when server connection is active/starting.
+            isLocalAudioTestRunning = false
+            print("🎤 Connection active/in-progress, keeping audio engine running.")
             return
         }
 
@@ -59,6 +64,10 @@ extension ServerModelManager {
         isLocalAudioTestRunning = false
         // 关闭引擎并释放 AudioSession
         Task.detached(priority: .userInitiated) {
+            if MUConnectionController.shared()?.isConnected() == true {
+                // A server connection was started right after dismissal; keep engine alive.
+                return
+            }
             MKAudio.shared().stop()
 
             #if os(iOS)

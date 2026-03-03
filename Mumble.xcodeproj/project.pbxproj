@@ -1109,7 +1109,6 @@
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Source/Classes/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
 					"\"${PROJECT_DIR}/MumbleKit/3rdparty/openssl/include\"/**",
@@ -1171,7 +1170,6 @@
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Source/Classes/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
 					"\"${PROJECT_DIR}/MumbleKit/3rdparty/openssl/include\"/**",
@@ -1244,7 +1242,6 @@
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Source/Classes/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
 					"\"${PROJECT_DIR}/MumbleKit/3rdparty/openssl/include\"/**",
@@ -1317,7 +1314,6 @@
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Source/Classes/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb\"/**",
 					"\"${PROJECT_DIR}/MumbleKit/3rdparty/openssl/include\"/**",
@@ -1440,7 +1436,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb/\"/**",
 				);
 				INFOPLIST_FILE = MumbleWidget/Info.plist;
@@ -1530,7 +1525,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb/\"/**",
 				);
 				INFOPLIST_FILE = MumbleWidget/Info.plist;
@@ -1619,7 +1613,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb/\"/**",
 				);
 				INFOPLIST_FILE = MumbleWidget/Info.plist;
@@ -1708,7 +1701,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
-					"\"${PROJECT_DIR}/Dependencies/MKNumberBadgeView/\"",
 					"\"${PROJECT_DIR}/Dependencies/fmdb/\"/**",
 				);
 				INFOPLIST_FILE = MumbleWidget/Info.plist;

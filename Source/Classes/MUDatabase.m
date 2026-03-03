@@ -5,6 +5,7 @@
 #import "MUDatabase.h"
 #import "MUFavouriteServer.h"
 #import <dispatch/dispatch.h>
+@import Security;
 
 static FMDatabase *db = nil;
 static dispatch_queue_t dbQueue = nil;
@@ -17,6 +18,11 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
 + (void) ensureQueue;
 + (void) performSync:(dispatch_block_t)block;
 + (id) performSyncReturningObject:(id (^)(void))block;
++ (NSString *) keychainKeyForHostname:(NSString *)hostname port:(NSUInteger)port username:(NSString *)username;
++ (void) keychainSetPassword:(NSString *)password forKey:(NSString *)key;
++ (NSString *) keychainGetPasswordForKey:(NSString *)key;
++ (void) keychainDeletePasswordForKey:(NSString *)key;
++ (void) migratePasswordsFromDatabaseToKeychain;
 @end
 
 @implementation MUDatabase
@@ -190,6 +196,8 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
         if ([db hadError]) {
             NSLog(@"MUDatabase: Error: %@ (Code: %i)", [db lastErrorMessage], [db lastErrorCode]);
         }
+
+        [MUDatabase migratePasswordsFromDatabaseToKeychain];
     }];
 }
 
@@ -203,6 +211,13 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
 
 // Store a single favourite
 + (void) storeFavourite:(MUFavouriteServer *)favServ {
+    NSString *kcKey = [self keychainKeyForHostname:[favServ hostName]
+                                              port:[favServ port]
+                                          username:[favServ userName]];
+    if (kcKey) {
+        [self keychainSetPassword:([favServ password] ?: @"") forKey:kcKey];
+    }
+
     [self performSync:^{
         if (!db) return;
 
@@ -212,7 +227,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
                 [self nilToNull:[favServ hostName]],
                 [NSNumber numberWithUnsignedInteger:[favServ port]],
                 [self nilToNull:[favServ userName]],
-                [self nilToNull:[favServ password]],
+                @"",
                 [self nilToNull:[favServ certificateRef]],
                 [NSNumber numberWithBool:[favServ isHidden]],
                 [NSNumber numberWithInteger:[favServ primaryKey]]];
@@ -222,7 +237,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
                 [self nilToNull:[favServ hostName]],
                 [NSNumber numberWithUnsignedInteger:[favServ port]],
                 [self nilToNull:[favServ userName]],
-                [self nilToNull:[favServ password]],
+                @"",
                 [self nilToNull:[favServ certificateRef]],
                 [NSNumber numberWithBool:[favServ isHidden]]];
 
@@ -238,6 +253,12 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
 // Delete a particular favourite
 + (void) deleteFavourite:(MUFavouriteServer *)favServ {
     NSAssert([favServ hasPrimaryKey], @"Cannot delete a FavouriteServer not originated from the database.");
+    NSString *kcKey = [self keychainKeyForHostname:[favServ hostName]
+                                              port:[favServ port]
+                                          username:[favServ userName]];
+    if (kcKey) {
+        [self keychainDeletePasswordForKey:kcKey];
+    }
     [self performSync:^{
         [db executeUpdate:@"DELETE FROM `favourites` WHERE `id`=?", [NSNumber numberWithInteger:[favServ primaryKey]]];
     }];
@@ -269,7 +290,11 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
             [fs setHostName:[res stringForColumnIndex:2]];
             [fs setPort:[res intForColumnIndex:3]];
             [fs setUserName:[res stringForColumnIndex:4]];
-            [fs setPassword:[res stringForColumnIndex:5]];
+            NSString *kcKey = [MUDatabase keychainKeyForHostname:[fs hostName]
+                                                            port:[fs port]
+                                                        username:[fs userName]];
+            NSString *pwd = kcKey ? [MUDatabase keychainGetPasswordForKey:kcKey] : nil;
+            [fs setPassword:(pwd ?: [res stringForColumnIndex:5])];
             [fs setCertificateRef:[res dataForColumnIndex:6]];
             [fs setIsHidden:[res boolForColumnIndex:7]];
             [favs addObject:fs];
@@ -293,7 +318,11 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
             [fs setHostName:[res stringForColumnIndex:2]];
             [fs setPort:[res intForColumnIndex:3]];
             [fs setUserName:[res stringForColumnIndex:4]];
-            [fs setPassword:[res stringForColumnIndex:5]];
+            NSString *kcKey = [MUDatabase keychainKeyForHostname:[fs hostName]
+                                                            port:[fs port]
+                                                        username:[fs userName]];
+            NSString *pwd = kcKey ? [MUDatabase keychainGetPasswordForKey:kcKey] : nil;
+            [fs setPassword:(pwd ?: [res stringForColumnIndex:5])];
             [fs setCertificateRef:[res dataForColumnIndex:6]];
             [fs setIsHidden:NO];
             [favs addObject:fs];
@@ -393,6 +422,92 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
         [result close];
         return tokens;
     }];
+}
+
+#pragma mark - Keychain Password Storage
+
+static NSString *const kMUKeychainServiceName = @"cn.hotxiang.Mumble.ServerPasswords";
+
++ (NSString *) keychainKeyForHostname:(NSString *)hostname port:(NSUInteger)port username:(NSString *)username {
+    if (!hostname || hostname.length == 0) return nil;
+    return [NSString stringWithFormat:@"%@:%lu:%@",
+            [hostname lowercaseString], (unsigned long)port, username ?: @""];
+}
+
++ (void) keychainSetPassword:(NSString *)password forKey:(NSString *)key {
+    if (!key) return;
+    [self keychainDeletePasswordForKey:key];
+    if (!password || password.length == 0) return;
+
+    NSData *data = [password dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *query = @{
+        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: kMUKeychainServiceName,
+        (__bridge id)kSecAttrAccount: key,
+        (__bridge id)kSecValueData:   data,
+        (__bridge id)kSecAttrAccessible: (__bridge id)kSecAttrAccessibleAfterFirstUnlock,
+    };
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)query, NULL);
+    if (status != errSecSuccess) {
+        NSLog(@"MUDatabase: Keychain add failed (%d) for key %@", (int)status, key);
+    }
+}
+
++ (NSString *) keychainGetPasswordForKey:(NSString *)key {
+    if (!key) return nil;
+    NSDictionary *query = @{
+        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: kMUKeychainServiceName,
+        (__bridge id)kSecAttrAccount: key,
+        (__bridge id)kSecReturnData:  (__bridge id)kCFBooleanTrue,
+        (__bridge id)kSecMatchLimit:  (__bridge id)kSecMatchLimitOne,
+    };
+    CFTypeRef result = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    if (status == errSecSuccess && result) {
+        NSString *pwd = [[NSString alloc] initWithData:(__bridge_transfer NSData *)result encoding:NSUTF8StringEncoding];
+        return pwd;
+    }
+    return nil;
+}
+
++ (void) keychainDeletePasswordForKey:(NSString *)key {
+    if (!key) return;
+    NSDictionary *query = @{
+        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: kMUKeychainServiceName,
+        (__bridge id)kSecAttrAccount: key,
+    };
+    SecItemDelete((__bridge CFDictionaryRef)query);
+}
+
++ (void) migratePasswordsFromDatabaseToKeychain {
+    if (!db) return;
+    BOOL didMigrate = [[NSUserDefaults standardUserDefaults] boolForKey:@"MUPasswordKeychainMigrated"];
+    if (didMigrate) return;
+
+    NSLog(@"MUDatabase: Migrating passwords from SQLite to Keychain...");
+    FMResultSet *res = [db executeQuery:@"SELECT `hostname`, `port`, `username`, `password` FROM `favourites` WHERE `password` IS NOT NULL AND `password` != ''"];
+    int count = 0;
+    while ([res next]) {
+        NSString *host = [res stringForColumnIndex:0];
+        NSUInteger port = [res intForColumnIndex:1];
+        NSString *user = [res stringForColumnIndex:2];
+        NSString *pwd  = [res stringForColumnIndex:3];
+        NSString *key = [MUDatabase keychainKeyForHostname:host port:port username:user];
+        if (key && pwd.length > 0) {
+            [MUDatabase keychainSetPassword:pwd forKey:key];
+            count++;
+        }
+    }
+    [res close];
+
+    if (count > 0) {
+        [db executeUpdate:@"UPDATE `favourites` SET `password` = '' WHERE `password` IS NOT NULL AND `password` != ''"];
+        NSLog(@"MUDatabase: Migrated %d passwords to Keychain and cleared DB.", count);
+    }
+
+    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"MUPasswordKeychainMigrated"];
 }
 
 @end

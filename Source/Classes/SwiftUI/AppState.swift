@@ -2,6 +2,44 @@
 
 import SwiftUI
 import Combine
+import os
+
+// MARK: - Centralized Logger
+
+enum MumbleLogger {
+    static let connection = Logger(subsystem: "cn.hotxiang.Mumble", category: "Connection")
+    static let audio      = Logger(subsystem: "cn.hotxiang.Mumble", category: "Audio")
+    static let ui         = Logger(subsystem: "cn.hotxiang.Mumble", category: "UI")
+    static let model      = Logger(subsystem: "cn.hotxiang.Mumble", category: "Model")
+    static let handoff    = Logger(subsystem: "cn.hotxiang.Mumble", category: "Handoff")
+    static let general    = Logger(subsystem: "cn.hotxiang.Mumble", category: "General")
+}
+
+// MARK: - Centralized Notification Names (ObjC-bridged)
+
+extension Notification.Name {
+    static let muConnectionOpened     = Notification.Name("MUConnectionOpenedNotification")
+    static let muConnectionClosed     = Notification.Name("MUConnectionClosedNotification")
+    static let muConnectionConnecting = Notification.Name("MUConnectionConnectingNotification")
+    static let muConnectionError      = Notification.Name("MUConnectionErrorNotification")
+    static let muAppShowMessage       = Notification.Name("MUAppShowMessageNotification")
+    static let muConnectionReady      = Notification.Name("MUConnectionReadyForSwiftUI")
+    static let muMessageSendFailed    = Notification.Name("MUMessageSendFailed")
+
+    static let mkAudioDidRestart         = Notification.Name("MKAudioDidRestartNotification")
+    static let mkAudioError              = Notification.Name("MKAudioErrorNotification")
+    static let mkListeningChannelAdd     = Notification.Name("MKListeningChannelAddNotification")
+    static let mkListeningChannelRemove  = Notification.Name("MKListeningChannelRemoveNotification")
+
+    static let muPreferencesChanged      = Notification.Name("MumblePreferencesChanged")
+
+    #if os(macOS)
+    static let muMacAudioInputDevicesChanged = Notification.Name("MUMacAudioInputDevicesChanged")
+    static let muMacAudioVPIOToHALTransition = Notification.Name("MUMacAudioVPIOToHALTransition")
+    #endif
+}
+
+// MARK: - Toast / Error types
 
 struct AppToast: Identifiable, Equatable {
     let id = UUID()
@@ -81,19 +119,19 @@ class AppState: ObservableObject {
         let center = NotificationCenter.default
         
         // 1. 监听连接成功
-        center.publisher(for: NSNotification.Name("MUConnectionOpenedNotification"))
+        center.publisher(for: .muConnectionOpened)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
                 guard let self = self else { return }
                 
-                print("🟢 AppState: Connection Opened")
+                MumbleLogger.connection.info("Connection opened")
                 if let userInfo = notification.userInfo,
                    let displayName = userInfo["displayName"] as? String {
                     self.serverDisplayName = displayName
                 }
                 
                 if self.pendingRegistration {
-                    print("🔄 Reconnection successful. Executing pending registration...")
+                    MumbleLogger.connection.info("Reconnection successful, executing pending registration")
                     
                     // 延迟 0.5 秒确保连接稳定
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -125,17 +163,17 @@ class AppState: ObservableObject {
             .store(in: &cancellables)
         
         // 2. 监听连接断开
-        center.publisher(for: NSNotification.Name("MUConnectionClosedNotification"))
+        center.publisher(for: .muConnectionClosed)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self = self else { return }
     
                 if self.isRegistering {
-                    print("🔵 AppState: Keeping UI alive for registration process (ignoring disconnect)")
+                    MumbleLogger.connection.debug("Keeping UI alive for registration (ignoring disconnect)")
                     return
                 }
                 
-                print("🔴 AppState: Connection Closed")
+                MumbleLogger.connection.info("Connection closed")
                 self.isConnecting = false
                 self.isReconnecting = false
                 self.isConnected = false
@@ -145,8 +183,8 @@ class AppState: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // 3. 监听正在连接 (我们在 ObjC 中新加的通知)
-        center.publisher(for: NSNotification.Name("MUConnectionConnectingNotification"))
+        // 3. 监听正在连接
+        center.publisher(for: .muConnectionConnecting)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
                 guard let self = self else { return }
@@ -155,7 +193,7 @@ class AppState: ObservableObject {
                 
                 let isReconnecting = (notification.userInfo?["isReconnecting"] as? Bool) ?? false
                 
-                print("🟡 AppState: Connecting... (Reconnecting: \(isReconnecting))")
+                MumbleLogger.connection.info("Connecting (reconnecting: \(isReconnecting))")
                 withAnimation {
                     self.isConnecting = true
                     self.isReconnecting = isReconnecting
@@ -163,8 +201,8 @@ class AppState: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // 4. 监听连接错误 (我们在 ObjC 中新加的通知)
-        center.publisher(for: NSNotification.Name("MUConnectionErrorNotification"))
+        // 4. 监听连接错误
+        center.publisher(for: .muConnectionError)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
                 guard let self = self else { return }
@@ -178,13 +216,13 @@ class AppState: ObservableObject {
                 if let userInfo = notification.userInfo,
                    let title = userInfo["title"] as? String,
                    let msg = userInfo["message"] as? String {
-                    print("⚠️ AppState: Error - \(title): \(msg)")
+                    MumbleLogger.connection.error("Connection error: \(title) - \(msg)")
                     self.activeError = AppError(title: title, message: msg)
                 }
             }
             .store(in: &cancellables)
         
-        center.publisher(for: NSNotification.Name("MUAppShowMessageNotification"))
+        center.publisher(for: .muAppShowMessage)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
                 if let userInfo = notification.userInfo,

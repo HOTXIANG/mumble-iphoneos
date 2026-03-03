@@ -19,7 +19,7 @@ extern NSString *MUConnectionErrorNotification;
 
 @interface MUConnectionController : NSObject
 + (MUConnectionController *) sharedController;
-- (void) connetToHostname:(NSString *)hostName
+- (void) connectToHostname:(NSString *)hostName
                      port:(NSUInteger)port
              withUsername:(NSString *)userName
               andPassword:(NSString *)password

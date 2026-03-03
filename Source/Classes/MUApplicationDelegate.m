@@ -152,7 +152,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname
+        [connController connectToHostname:hostname
                                     port:port ? [port integerValue] : 64738
                             withUsername:username
                              andPassword:password
@@ -173,7 +173,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
         NSNumber *port = [url port];
         NSString *username = [url user];
         NSString *password = [url password];
-        [connController connetToHostname:hostname
+        [connController connectToHostname:hostname
                                     port:port ? [port integerValue] : 64738
                             withUsername:username
                              andPassword:password

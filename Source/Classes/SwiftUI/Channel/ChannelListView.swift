@@ -272,7 +272,7 @@ struct ChannelListView: View {
         notificationHaptic.prepare()
         notificationHaptic.notificationOccurred(.warning)
         print("🟡 Initiating disconnect sequence...")
-        disconnectObserver = NotificationCenter.default.addObserver(forName: NSNotification.Name("MUConnectionClosedNotification"), object: nil, queue: .main) { [self] _ in
+        disconnectObserver = NotificationCenter.default.addObserver(forName: .muConnectionClosed, object: nil, queue: .main) { [self] _ in
             Task { @MainActor in
                 print("✅ Disconnection confirmed by notification.")
                 withAnimation(.spring()) { AppState.shared.isConnected = false }

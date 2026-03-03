@@ -49,12 +49,12 @@ struct MumbleApp: App {
                 .background(WindowMinSizeSetter(minSize: NSSize(width: 600, height: 400)))
                 #endif
                 .onAppear {
-                    print("🚀 MumbleApp: SwiftUI Lifecycle Started")
+                    MumbleLogger.general.info("SwiftUI lifecycle started")
                     UNUserNotificationCenter.current().delegate = notificationDelegate
                 }
                 // Handoff 接力：当其他设备的 Mumble 正在连接服务器时，本设备可以接力
                 .onContinueUserActivity(MumbleHandoffActivityType) { userActivity in
-                    print("📲 MumbleApp: Received Handoff activity")
+                    MumbleLogger.handoff.info("Received Handoff activity")
                     HandoffManager.shared.handleIncomingActivity(userActivity)
                 }
                 // Widget 深链接：用户从 Widget 点击服务器直接连接
@@ -93,7 +93,7 @@ struct MumbleApp: App {
         
         let connController = MUConnectionController.shared()
         guard connController?.isConnected() != true else {
-            print("⚠️ MumbleApp: Already connected, ignoring widget URL")
+            MumbleLogger.connection.info("Already connected, ignoring widget URL")
             return
         }
         
@@ -104,7 +104,7 @@ struct MumbleApp: App {
         
         guard !hostname.isEmpty else { return }
         
-        print("🔗 MumbleApp: Opening mumble URL → \(hostname):\(port) as \(username)")
+        MumbleLogger.connection.info("Opening mumble URL: \(hostname):\(port) as \(username)")
         
         // 从收藏夹中查找匹配的服务器，以获取证书和其他配置
         let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
@@ -119,7 +119,7 @@ struct MumbleApp: App {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
         
-        connController?.connet(
+        connController?.connect(
             toHostname: hostname,
             port: UInt(port),
             withUsername: username.isEmpty ? (matchingFav?.userName ?? "MumbleUser") : username,

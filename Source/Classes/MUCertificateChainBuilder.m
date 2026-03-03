@@ -31,7 +31,6 @@ static BOOL IsSignedBy(SecCertificateRef child, SecCertificateRef parent) {
     SecTrustSetNetworkFetchAllowed(trust, false);
     
     SecTrustResultType result;
-    // 忽略 SecTrustEvaluate 在 iOS 13+ 的废弃警告
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     status = SecTrustEvaluate(trust, &result);
@@ -39,7 +38,6 @@ static BOOL IsSignedBy(SecCertificateRef child, SecCertificateRef parent) {
     
     CFRelease(trust);
     
-    // 如果验证成功 (Proceed) 或 未指定 (Unspecified, 通常指自签名或手动信任)，则认为签名匹配
     return (status == errSecSuccess && (result == kSecTrustResultUnspecified || result == kSecTrustResultProceed));
 }
 
