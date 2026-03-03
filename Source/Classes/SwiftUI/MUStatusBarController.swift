@@ -185,7 +185,7 @@ final class MUStatusBarController: NSObject {
 
         // Connection open / close
         observers.append(center.addObserver(
-            forName: NSNotification.Name("MUConnectionOpenedNotification"), object: nil, queue: .main
+            forName: .muConnectionOpened, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.onConnectionChanged(connected: true)
@@ -193,7 +193,7 @@ final class MUStatusBarController: NSObject {
         })
 
         observers.append(center.addObserver(
-            forName: NSNotification.Name("MUConnectionClosedNotification"), object: nil, queue: .main
+            forName: .muConnectionClosed, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.onConnectionChanged(connected: false)

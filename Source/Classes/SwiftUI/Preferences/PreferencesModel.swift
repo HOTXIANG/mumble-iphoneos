@@ -8,9 +8,7 @@
 import SwiftUI
 import Combine
 
-// 定义通知名称，用于通知 AppDelegate 重载音频设置
 extension Notification.Name {
-    static let MumblePreferencesChanged = Notification.Name("MumblePreferencesChanged")
     static let mumbleShowVADTutorialAgain = Notification.Name("MumbleShowVADTutorialAgain")
 }
 
@@ -27,8 +25,8 @@ class PreferencesModel: ObservableObject {
             
         // 2. 创建一个新的任务
         let requestWorkItem = DispatchWorkItem {
-            print("⚙️ Applying audio settings (Engine Restart)...")
-            NotificationCenter.default.post(name: .MumblePreferencesChanged, object: nil)
+            MumbleLogger.audio.info("Applying audio settings (engine restart)")
+            NotificationCenter.default.post(name: .muPreferencesChanged, object: nil)
         }
             
         // 3. 保存这个任务的引用

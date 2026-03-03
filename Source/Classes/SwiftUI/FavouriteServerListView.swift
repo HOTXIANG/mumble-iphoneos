@@ -350,7 +350,7 @@ struct FavouriteServerListContentView: View {
         AppState.shared.serverDisplayName = server.displayName
         PlatformImpactFeedback(style: .medium).impactOccurred()
         
-        MUConnectionController.shared()?.connet(
+        MUConnectionController.shared()?.connect(
             toHostname: server.hostName,
             port: UInt(server.port),
             withUsername: server.userName,

@@ -127,7 +127,7 @@ class HandoffManager: NSObject, ObservableObject {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(connectionOpened(_:)),
-            name: NSNotification.Name("MUConnectionOpenedNotification"),
+            name: .muConnectionOpened,
             object: nil
         )
     }
@@ -357,7 +357,7 @@ class HandoffManager: NSObject, ObservableObject {
         AppState.shared.serverDisplayName = connectDisplayName
         
         // 4. 发起连接
-        MUConnectionController.shared()?.connet(
+        MUConnectionController.shared()?.connect(
             toHostname: serverInfo.hostname,
             port: UInt(serverInfo.port),
             withUsername: connectUsername,
@@ -541,7 +541,7 @@ extension HandoffManager: NSUserActivityDelegate {
             )
             
             NotificationCenter.default.post(
-                name: NSNotification.Name("MUAppShowMessageNotification"),
+                name: .muAppShowMessage,
                 object: nil,
                 userInfo: [
                     "message": handedOffMessage,

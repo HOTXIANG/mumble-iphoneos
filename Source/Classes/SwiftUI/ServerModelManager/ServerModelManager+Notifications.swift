@@ -60,7 +60,7 @@ extension ServerModelManager {
         // 1. 先清理旧的，防止叠加
         tokenHolder.removeAll()
 
-        NotificationCenter.default.removeObserver(self, name: NSNotification.Name("MUConnectionOpenedNotification"), object: nil)
+        NotificationCenter.default.removeObserver(self, name: .muConnectionOpened, object: nil)
 
         let center = NotificationCenter.default
 
@@ -431,7 +431,7 @@ extension ServerModelManager {
         })
 
         // 监听频道变更通知（来自服务器回传的 UserState）
-        tokenHolder.add(center.addObserver(forName: NSNotification.Name("MKListeningChannelAddNotification"), object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: .mkListeningChannelAdd, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo,
                   let user = userInfo["user"] as? MKUser,
                   let addChannels = userInfo["addChannels"] as? [NSNumber] else { return }
@@ -473,7 +473,7 @@ extension ServerModelManager {
             }
         })
 
-        tokenHolder.add(center.addObserver(forName: NSNotification.Name("MKListeningChannelRemoveNotification"), object: nil, queue: nil) { [weak self] notification in
+        tokenHolder.add(center.addObserver(forName: .mkListeningChannelRemove, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo,
                   let user = userInfo["user"] as? MKUser,
                   let removeChannels = userInfo["removeChannels"] as? [NSNumber] else { return }
@@ -513,7 +513,7 @@ extension ServerModelManager {
         })
 
         // 音频设置即将变更 → 保存当前闭麦状态，防止系统回调在 restart 期间覆盖
-        center.addObserver(self, selector: #selector(handlePreferencesAboutToChange), name: NSNotification.Name("MumblePreferencesChanged"), object: nil)
+        center.addObserver(self, selector: #selector(handlePreferencesAboutToChange), name: .muPreferencesChanged, object: nil)
 
         // 音频引擎重启后恢复闭麦/不听状态（修改音频设置时 MKAudio.restart() 会重置音频输入）
         tokenHolder.add(center.addObserver(forName: NSNotification.Name.MKAudioDidRestart, object: nil, queue: nil) { [weak self] _ in
@@ -523,7 +523,7 @@ extension ServerModelManager {
             }
         })
 
-        center.addObserver(self, selector: #selector(handleConnectionOpened), name: NSNotification.Name("MUConnectionOpenedNotification"), object: nil)
+        center.addObserver(self, selector: #selector(handleConnectionOpened), name: .muConnectionOpened, object: nil)
     }
 
     @objc func handleConnectionOpened(_ notification: Notification) {

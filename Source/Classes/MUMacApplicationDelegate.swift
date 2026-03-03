@@ -21,8 +21,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         NSWindow.allowsAutomaticWindowTabbing = false
         
         // Listen for connection state changes
-        NotificationCenter.default.addObserver(self, selector: #selector(connectionOpened), name: NSNotification.Name("MUConnectionOpenedNotification"), object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(connectionClosed), name: NSNotification.Name("MUConnectionClosedNotification"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(connectionOpened), name: .muConnectionOpened, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(connectionClosed), name: .muConnectionClosed, object: nil)
         
         // Set MumbleKit release string
         let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
@@ -66,9 +66,9 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(false, forKey: "AudioMixerDebug")
         
         // Listen for preferences changes
-        NotificationCenter.default.addObserver(self, selector: #selector(reloadPreferences), name: NSNotification.Name("MumblePreferencesChanged"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(reloadPreferences), name: .muPreferencesChanged, object: nil)
         
-        NotificationCenter.default.addObserver(self, selector: #selector(handleVPIOToHALTransition), name: NSNotification.Name("MUMacAudioVPIOToHALTransition"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleVPIOToHALTransition), name: .muMacAudioVPIOToHALTransition, object: nil)
         
         // Initialize audio settings
         reloadPreferences()

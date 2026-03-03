@@ -96,10 +96,10 @@ struct WelcomeContentView: View {
                 .padding(.bottom, 10)
 
             VStack(spacing: 6) {
-                Text("Join a Server")
+                Text(NSLocalizedString("Join a Server", comment: ""))
                     .font(.system(.title2, design: .rounded, weight: .semibold))
                     .foregroundColor(.primary)
-                Text("Choose a favourite server to connect quickly")
+                Text(NSLocalizedString("Choose a favourite server to connect quickly", comment: ""))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -129,10 +129,10 @@ struct WelcomeContentView: View {
                                 .frame(width: 30)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Favourite Servers")
+                                Text(NSLocalizedString("Favourite Servers", comment: ""))
                                     .font(.headline)
                                     .foregroundColor(.primary)
-                                Text("Your saved servers")
+                                Text(NSLocalizedString("Your saved servers", comment: ""))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -152,10 +152,10 @@ struct WelcomeContentView: View {
                                 .foregroundColor(.yellow)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Favourite")
+                                Text(NSLocalizedString("Favourite", comment: ""))
                                     .font(.headline)
                                     .foregroundColor(.primary)
-                                Text("Servers")
+                                Text(NSLocalizedString("Servers", comment: ""))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -185,7 +185,7 @@ struct WelcomeContentView: View {
             List {
                 // --- 最近访问 ---
                 if !recentManager.recents.isEmpty {
-                    Section(header: Text("Recent Connections")) {
+                    Section(header: Text(NSLocalizedString("Recent Connections", comment: ""))) {
                         ForEach(recentManager.recents) { server in
                             ServerListRow(
                                 title: server.displayName,
@@ -215,7 +215,7 @@ struct WelcomeContentView: View {
                 } else if lanModel.servers.isEmpty {
                     // 如果既没有最近记录，也没有 LAN 服务器，显示一个占位提示
                     Section {
-                        Text("No recent connections.")
+                        Text(NSLocalizedString("No recent connections.", comment: ""))
                             .font(.caption)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .foregroundColor(.secondary)
@@ -225,7 +225,7 @@ struct WelcomeContentView: View {
                 
                 // --- LAN ---
                 if !lanModel.servers.isEmpty {
-                    Section(header: Text("Local Network")) {
+                    Section(header: Text(NSLocalizedString("Local Network", comment: ""))) {
                         ForEach(lanModel.servers) { server in
                             ServerListRow(
                                 title: server.name,
@@ -286,7 +286,7 @@ struct WelcomeContentView: View {
             password = match.password ?? ""
         }
         
-        MUConnectionController.shared()?.connet(
+        MUConnectionController.shared()?.connect(
             toHostname: hostname,
             port: UInt(port),
             withUsername: username,
@@ -619,9 +619,9 @@ private struct VADOnboardingSplashView: View {
                     .foregroundColor(.indigo)
                 
                 VStack(spacing: 8) {
-                    Text("Welcome to Mumble")
+                    Text(NSLocalizedString("Welcome to Mumble", comment: ""))
                         .font(.system(.title2, design: .rounded, weight: .bold))
-                    Text("Let's quickly tune your voice activity threshold for better automatic mic detection.")
+                    Text(NSLocalizedString("Let's quickly tune your voice activity threshold for better automatic mic detection.", comment: ""))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -1031,9 +1031,9 @@ struct AppRootView: View {
                         }
                     } else {
                         ContentUnavailableView {
-                            Label("No Server Connected", systemImage: "server.rack")
+                            Label(NSLocalizedString("No Server Connected", comment: ""), systemImage: "server.rack")
                         } description: {
-                            Text("Select a server from the sidebar to start chatting.")
+                            Text(NSLocalizedString("Select a server from the sidebar to start chatting.", comment: ""))
                         }
                     }
                 }
