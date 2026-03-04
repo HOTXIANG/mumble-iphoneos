@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import OSLog
 #if os(iOS)
 import AVFAudio
 #endif
@@ -16,7 +17,7 @@ extension ServerModelManager {
         }
 
         guard let newModel = connectionController.serverModel else {
-            print("⚠️ ServerModel not ready. Retrying in 0.5s...")
+            Logger.connection.debug("ServerModel not ready. Retrying in 0.5s...")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.setupServerModel()
             }
@@ -24,18 +25,18 @@ extension ServerModelManager {
         }
 
         if self.serverModel === newModel {
-            print("✅ ServerModel identity match. Skipping setup to prevent duplicates.")
+            Logger.connection.debug("ServerModel identity match. Skipping setup to prevent duplicates.")
             // 兜底：如果界面是空的，强制刷新一下
             if self.modelItems.isEmpty { rebuildModelArray() }
             return
         }
 
         if self.serverModel != nil {
-            print("🔄 Switching Server Model. Performing cleanup...")
+            Logger.connection.info("Switching Server Model. Performing cleanup...")
             self.cleanup()
         }
 
-        print("🔗 Binding new ServerModel...")
+        Logger.connection.info("Binding new ServerModel...")
         self.serverModel = newModel
 
         let wrapper = ServerModelDelegateWrapper()
@@ -48,7 +49,7 @@ extension ServerModelManager {
         let currentPort = Int(model.port())
 
         if let savedName = RecentServerManager.shared.getDisplayName(hostname: currentHost, port: currentPort) {
-            print("📖 ServerModelManager: Resolved name from Recents: '\(savedName)'")
+            Logger.connection.debug("Resolved name from Recents: '\(savedName)'")
             self.serverName = savedName
         } else {
             self.serverName = currentHost
@@ -96,7 +97,7 @@ extension ServerModelManager {
     }
 
     func cleanup() {
-        print("🧹 ServerModelManager: CLEANUP (Data Only)")
+        Logger.connection.info("ServerModelManager: CLEANUP (Data Only)")
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
 
@@ -110,7 +111,7 @@ extension ServerModelManager {
         // 保存当前监听频道以便重连后恢复
         if !listeningChannels.isEmpty {
             savedListeningChannelIds = listeningChannels
-            print("💾 Saved \(savedListeningChannelIds.count) listening channels for reconnect")
+            Logger.connection.debug("Saved \(savedListeningChannelIds.count) listening channels for reconnect")
         }
         listeningChannels.removeAll()
         channelListeners.removeAll()

@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import OSLog
 #if os(iOS)
 import AVFAudio
 #endif
@@ -13,15 +14,15 @@ extension ServerModelManager {
         systemMuteManager.onSystemMuteChanged = { [weak self] isSystemMuted in
             guard let self = self, let user = self.serverModel?.connectedUser() else { return }
 
-            // 如果正在恢复状态（路由切换中），忽略系统的“自动开麦”通知
+            // 如果正在恢复状态（路由切换中），忽略系统的”自动开麦”通知
             if self.isRestoringMuteState {
-                print("🔒 Route changing: Ignoring system mute notification (\(isSystemMuted)) to preserve App state.")
+                Logger.audio.debug(“Route changing: Ignoring system mute notification (\(isSystemMuted)) to preserve App state.”)
                 return
             }
 
             // 只有当 Mumble 内部状态不一致时才更新
             if user.isSelfMuted() != isSystemMuted {
-                print("🔄 Sync: System(\(isSystemMuted)) -> App")
+                Logger.audio.info(“Sync: System(\(isSystemMuted)) -> App”)
                 self.serverModel?.setSelfMuted(isSystemMuted, andSelfDeafened: user.isSelfDeafened())
                 self.updateUserBySession(user.session())
                 self.updateLiveActivity()
@@ -53,14 +54,14 @@ extension ServerModelManager {
             return
         }
 
-        print("🎧 Audio Route Changed. Reason: \(reason.rawValue)")
+        Logger.audio.info(“Audio Route Changed. Reason: \(reason.rawValue)”)
 
         switch reason {
         case .newDeviceAvailable:
-            // 立即上锁，防止重启期间系统发出的“开麦”通知把 App 状态带偏
+            // 立即上锁，防止重启期间系统发出的”开麦”通知把 App 状态带偏
             self.isRestoringMuteState = true
 
-            print("🎧 New Device Detected. Scheduling Full Reactivation...")
+            Logger.audio.info(“New Device Detected. Scheduling Full Reactivation...”)
 
             Task { @MainActor in
                 // 等待蓝牙握手
@@ -69,10 +70,10 @@ extension ServerModelManager {
                 self.systemMuteManager.cleanup()
                 self.systemMuteManager.activate()
 
-                // 强制把 App 的状态“刷”给新耳机
+                // 强制把 App 的状态”刷”给新耳机
                 if let user = self.serverModel?.connectedUser() {
                     let targetState = user.isSelfMuted()
-                    print("🔄 Syncing App State (\(targetState)) to New Hardware...")
+                    Logger.audio.debug(“Syncing App State (\(targetState)) to New Hardware...”)
                     self.systemMuteManager.setSystemMute(targetState)
                 }
 
@@ -82,7 +83,7 @@ extension ServerModelManager {
 
         case .oldDeviceUnavailable:
             self.isRestoringMuteState = true
-            print("🎧 Device Removed. Restoring mute state...")
+            Logger.audio.info(“Device Removed. Restoring mute state...”)
 
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 500_000_000)
@@ -92,7 +93,7 @@ extension ServerModelManager {
 
                 if let user = self.serverModel?.connectedUser() {
                     let targetState = user.isSelfMuted()
-                    print("🔄 Syncing App State (\(targetState)) to Speaker after device removal...")
+                    Logger.audio.debug(“Syncing App State (\(targetState)) to Speaker after device removal...”)
                     self.systemMuteManager.setSystemMute(targetState)
                 }
 
@@ -116,19 +117,19 @@ extension ServerModelManager {
         }
 
         let shouldBeMuted = user.isSelfMuted()
-        print("🔄 Route changed. Locking state and enforcing: \(shouldBeMuted)...")
+        Logger.audio.debug(“Route changed. Locking state and enforcing: \(shouldBeMuted)...”)
 
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 500_000_000)
 
             if self.serverModel?.connectedUser() != nil {
                 self.systemMuteManager.setSystemMute(shouldBeMuted)
-                print("✅ Enforced state to System: \(shouldBeMuted)")
+                Logger.audio.debug(“Enforced state to System: \(shouldBeMuted)”)
             }
 
             try? await Task.sleep(nanoseconds: 500_000_000)
             self.isRestoringMuteState = false
-            print("🔓 Route change handling complete. State lock released.")
+            Logger.audio.debug(“Route change handling complete. State lock released.”)
         }
     }
 
@@ -139,7 +140,7 @@ extension ServerModelManager {
         savedMuteBeforeRestart = user.isSelfMuted()
         savedDeafenBeforeRestart = user.isSelfDeafened()
         isRestoringMuteState = true
-        print("🔒 Preferences changing - saved mute state: muted=\(savedMuteBeforeRestart ?? false), deafened=\(savedDeafenBeforeRestart ?? false)")
+        Logger.audio.debug(“Preferences changing - saved mute state: muted=\(savedMuteBeforeRestart ?? false), deafened=\(savedDeafenBeforeRestart ?? false)”)
     }
 
     /// 音频引擎重启后恢复闭麦/不听状态
@@ -154,10 +155,10 @@ extension ServerModelManager {
         let targetMuted = savedMuteBeforeRestart ?? user.isSelfMuted()
         let targetDeafened = savedDeafenBeforeRestart ?? user.isSelfDeafened()
 
-        print("🔄 Audio restarted - restoring mute state: muted=\(targetMuted), deafened=\(targetDeafened)")
+        Logger.audio.info(“Audio restarted - restoring mute state: muted=\(targetMuted), deafened=\(targetDeafened)”)
 
         if user.isSelfMuted() != targetMuted || user.isSelfDeafened() != targetDeafened {
-            print("⚠️ State drifted during restart! Forcing correct state back to server.")
+            Logger.audio.warning(“State drifted during restart! Forcing correct state back to server.”)
             serverModel?.setSelfMuted(targetMuted, andSelfDeafened: targetDeafened)
             updateUserBySession(user.session())
         }
@@ -171,7 +172,7 @@ extension ServerModelManager {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 500_000_000)
             self.isRestoringMuteState = false
-            print("🔓 Audio restart state lock released.")
+            Logger.audio.debug(“Audio restart state lock released.”)
         }
     }
 

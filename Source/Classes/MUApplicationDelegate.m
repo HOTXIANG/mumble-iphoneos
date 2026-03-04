@@ -10,6 +10,7 @@
 #import "MUNotificationController.h"
 #import "MURemoteControlServer.h"
 #import "MUImage.h"
+#import "MumbleLogger.h"
 
 #import "Mumble-Swift.h"  // 这是 Xcode 自动生成的 Swift 桥接头文件
 #import <MumbleKit/MKAudio.h>
@@ -193,7 +194,6 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 }
 
 - (void) setupAudio {
-    NSLog(@"[DEBUG] 🔧 setupAudio CALLED! Time: %f", [[NSDate date] timeIntervalSince1970]); // <--- 添加这行
     // Set up a good set of default audio settings.
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSString *restartSignature = MURestartSignatureFromDefaults(defaults);
@@ -202,9 +202,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     if (now - _lastAudioRestartTime < 0.5) {
-        NSLog(@"⚠️ Audio restart ignored (too frequent)");
-        // 如果你需要确保最后一次设置生效，这里其实应该用 NSTimer 再次尝试
-        // 但配合 Swift 端的 Debounce，这里直接 return 也是一种保护防止崩坏
+        MULogDebug(audio, "Audio restart ignored (too frequent)");
         return;
     }
     _lastAudioRestartTime = now;
@@ -298,14 +296,14 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
         && ![_lastAudioRestartSignature isEqualToString:restartSignature];
     [audio updateAudioSettings:&settings];
     if (shouldRestart) {
-        NSLog(@"[DEBUG] 🔧 Settings changed while active. Restarting audio engine...");
+        MULogInfo(audio, "Settings changed while active. Restarting audio engine.");
         [audio restart];
     } else {
-        NSLog(@"[DEBUG] 💤 Settings updated without restart.");
+        MULogDebug(audio, "Settings updated without restart.");
     }
     _lastAudioRestartSignature = [restartSignature copy];
-    
-    NSLog(@"[DEBUG] ✅ setupAudio FINISHED. Engine should be running.");
+
+    MULogInfo(audio, "Audio setup completed.");
 }
 
 // Reload application preferences...

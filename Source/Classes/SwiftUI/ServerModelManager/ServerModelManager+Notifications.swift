@@ -6,6 +6,7 @@
 import SwiftUI
 import UserNotifications
 import AudioToolbox
+import OSLog
 
 #if os(macOS)
 import AppKit
@@ -18,9 +19,9 @@ extension ServerModelManager {
     func requestNotificationAccess() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if granted {
-                print("🔔 Notifications authorized")
+                Logger.notification.info("Notifications authorized")
             } else if let error = error {
-                print("🚫 Notifications permission error: \(error.localizedDescription)")
+                Logger.notification.error("Notifications permission error: \(error.localizedDescription)")
             }
         }
     }
@@ -44,7 +45,7 @@ extension ServerModelManager {
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("❌ Failed to schedule notification: \(error)")
+                Logger.notification.error("Failed to schedule notification: \(error)")
             }
         }
     }

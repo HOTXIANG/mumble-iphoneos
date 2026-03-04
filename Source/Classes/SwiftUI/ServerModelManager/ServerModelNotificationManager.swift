@@ -1,6 +1,7 @@
 // 文件: ServerModelNotificationManager.swift (已更新)
 
 import Foundation
+import OSLog
 
 class ServerModelNotificationManager {
     nonisolated(unsafe) static let shared = ServerModelNotificationManager()
@@ -116,7 +117,7 @@ class ServerModelNotificationManager {
     }
     
     func serverModel(_ model: MKServerModel, textMessageReceived msg: MKTextMessage, from user: MKUser) {
-            print("✅ DEBUG: Correct delegate method 'textMessageReceived:fromUser:' called.")
+            Logger.notification.debug("Text message received from user")
             ServerModelNotificationManager.shared.postTextMessageReceived(msg, from: user)
         }
     

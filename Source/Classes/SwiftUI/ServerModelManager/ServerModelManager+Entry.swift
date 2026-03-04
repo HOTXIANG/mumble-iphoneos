@@ -5,10 +5,11 @@
 
 import SwiftUI
 import UserNotifications
+import OSLog
 
 extension ServerModelManager {
     func activate() {
-        print("🚀 ServerModelManager: ACTIVATE - Activating model and notifications.")
+        Logger.connection.debug("ServerModelManager: ACTIVATE - Activating model and notifications.")
         setupServerModel()
         setupNotifications()
         requestNotificationAccess()
