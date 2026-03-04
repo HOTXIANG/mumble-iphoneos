@@ -3,6 +3,7 @@
 // 当设备连接到 Mumble 服务器时，同一 iCloud 账户的其他设备可以通过 Handoff 快速加入同一服务器和频道
 
 import Foundation
+import OSLog
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -202,8 +203,8 @@ class HandoffManager: NSObject, ObservableObject {
         // 使其成为当前 activity
         activity.becomeCurrent()
         self.currentActivity = activity
-        
-        print("📡 Handoff: Published activity for \(hostname):\(port) as \(username)")
+
+        Logger.connection.debug("Handoff: Published activity for \(hostname):\(port) as \(username)")
     }
     
     /// 更新正在广播的 activity 的频道信息（当用户切换频道时）
@@ -223,8 +224,8 @@ class HandoffManager: NSObject, ObservableObject {
         }
         activity.addUserInfoEntries(from: updatedInfo as! [String : Any])
         activity.needsSave = true
-        
-        print("📡 Handoff: Updated channel → \(channelName ?? "nil") (id: \(channelId ?? -1))")
+
+        Logger.connection.debug("Handoff: Updated channel → \(channelName ?? "nil") (id: \(channelId ?? -1))")
     }
     
     /// 更新正在广播的 activity 的闭麦/不听状态和用户音频设置
@@ -251,24 +252,24 @@ class HandoffManager: NSObject, ObservableObject {
     func invalidateActivity() {
         currentActivity?.invalidate()
         currentActivity = nil
-        print("📡 Handoff: Activity invalidated")
+        Logger.connection.debug("Handoff: Activity invalidated")
     }
-    
+
     // MARK: - 处理接收到的 Handoff（目标设备端）
-    
+
     /// 处理从其他设备接力过来的 NSUserActivity
     func handleIncomingActivity(_ userActivity: NSUserActivity) {
         guard userActivity.activityType == MumbleHandoffActivityType else {
-            print("⚠️ Handoff: Unknown activity type: \(userActivity.activityType)")
+            Logger.connection.warning("Handoff: Unknown activity type: \(userActivity.activityType)")
             return
         }
-        
+
         guard let serverInfo = HandoffServerInfo(from: userActivity.userInfo) else {
-            print("⚠️ Handoff: Failed to parse server info from userActivity")
+            Logger.connection.warning("Handoff: Failed to parse server info from userActivity")
             return
         }
-        
-        print("📲 Handoff: Received activity for \(serverInfo.hostname):\(serverInfo.port)")
+
+        Logger.connection.info("Handoff: Received activity for \(serverInfo.hostname):\(serverInfo.port)")
         
         isProcessingHandoff = true
         isHandoffConnection = true
@@ -284,7 +285,7 @@ class HandoffManager: NSObject, ObservableObject {
         
         // 如果当前已经连接到某个服务器，先断开
         if MUConnectionController.shared()?.isConnected() == true {
-            print("📲 Handoff: Disconnecting current server before handoff...")
+            Logger.connection.info("Handoff: Disconnecting current server before handoff...")
             MUConnectionController.shared()?.disconnectFromServer()
             // 等待断开后再连接
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -313,27 +314,27 @@ class HandoffManager: NSObject, ObservableObject {
         } else {
             preferredKey = -1
         }
-        print("📲 Handoff: Preferred profile key = \(preferredKey)")
+        Logger.connection.debug("Handoff: Preferred profile key = \(preferredKey)")
         if preferredKey > 0, let preferredProfile = findFavouriteByPrimaryKey(preferredKey) {
             connectUsername = preferredProfile.userName ?? "\(serverInfo.username)-\(HandoffManager.deviceTypeSuffix)"
             connectPassword = preferredProfile.password
             connectCertRef = preferredProfile.certificateRef as NSData?
             connectDisplayName = preferredProfile.displayName
-            print("📲 Handoff: Using user-preferred profile (key=\(preferredKey)). Username: \(connectUsername)")
+            Logger.connection.debug("Handoff: Using user-preferred profile (key=\(preferredKey)). Username: \(connectUsername)")
         } else {
             // 自动匹配：查找 Favourite Servers 中所有匹配的服务器
             let matchedServers = findMatchingFavouriteServers(
                 hostname: serverInfo.hostname,
                 port: serverInfo.port
             )
-            
+
             // 1. 优先匹配有证书的注册用户
             if let registered = matchedServers.first(where: { $0.certificateRef != nil && $0.userName != nil && !$0.userName!.isEmpty }) {
                 connectUsername = registered.userName!
                 connectPassword = registered.password
                 connectCertRef = registered.certificateRef as NSData?
                 connectDisplayName = registered.displayName
-                print("📲 Handoff: Found registered favourite (with cert). Using: \(connectUsername)")
+                Logger.connection.debug("Handoff: Found registered favourite (with cert). Using: \(connectUsername)")
             }
             // 2. 其次匹配无证书但有用户名的收藏
             else if let unregistered = matchedServers.first(where: { $0.userName != nil && !$0.userName!.isEmpty }) {
@@ -341,7 +342,7 @@ class HandoffManager: NSObject, ObservableObject {
                 connectPassword = unregistered.password
                 connectCertRef = nil
                 connectDisplayName = unregistered.displayName
-                print("📲 Handoff: Found favourite (no cert). Using: \(connectUsername)")
+                Logger.connection.debug("Handoff: Found favourite (no cert). Using: \(connectUsername)")
             }
             // 3. 没有收藏 → 使用源设备的用户名 + 设备类型后缀
             else {
@@ -349,13 +350,13 @@ class HandoffManager: NSObject, ObservableObject {
                 connectPassword = serverInfo.password
                 connectCertRef = nil
                 connectDisplayName = serverInfo.displayName
-                print("📲 Handoff: No favourite found. Using suffixed username: \(connectUsername)")
+                Logger.connection.debug("Handoff: No favourite found. Using suffixed username: \(connectUsername)")
             }
         }
-        
+
         // 3. 设置 AppState 的显示名称
         AppState.shared.serverDisplayName = connectDisplayName
-        
+
         // 4. 发起连接
         MUConnectionController.shared()?.connect(
             toHostname: serverInfo.hostname,
@@ -365,8 +366,8 @@ class HandoffManager: NSObject, ObservableObject {
             certificateRef: connectCertRef as Data?,
             displayName: connectDisplayName
         )
-        
-        print("📲 Handoff: Connecting to \(serverInfo.hostname):\(serverInfo.port) as \(connectUsername)")
+
+        Logger.connection.info("Handoff: Connecting to \(serverInfo.hostname):\(serverInfo.port) as \(connectUsername)")
     }
     
     /// 根据 primaryKey 查找收藏服务器
@@ -405,7 +406,7 @@ class HandoffManager: NSObject, ObservableObject {
     /// 在连接成功后尝试加入目标频道
     private func joinPendingChannel() {
         guard let serverModel = MUConnectionController.shared()?.serverModel else {
-            print("⚠️ Handoff: ServerModel not available for channel join")
+            Logger.connection.warning("Handoff: ServerModel not available for channel join")
             resetHandoffState()
             return
         }
@@ -414,7 +415,7 @@ class HandoffManager: NSObject, ObservableObject {
         if let channelId = pendingChannelId, channelId > 0 {
             if let targetChannel = serverModel.channel(withId: UInt(channelId)) {
                 serverModel.join(targetChannel)
-                print("✅ Handoff: Joined channel by ID: \(channelId) → \(targetChannel.channelName() ?? "Unknown")")
+                Logger.connection.info("Handoff: Joined channel by ID: \(channelId)")
             }
         }
         // 如果 channelId 不匹配，尝试通过名称查找
@@ -422,11 +423,11 @@ class HandoffManager: NSObject, ObservableObject {
             if let rootChannel = serverModel.rootChannel() {
                 if let targetChannel = findChannel(named: channelName, in: rootChannel) {
                     serverModel.join(targetChannel)
-                    print("✅ Handoff: Joined channel by name: \(channelName)")
+                    Logger.connection.info("Handoff: Joined channel by name: \(channelName)")
                 }
             }
         } else {
-            print("ℹ️ Handoff: Target channel not found. Staying in default channel.")
+            Logger.connection.debug("Handoff: Target channel not found. Staying in default channel.")
         }
         
         // 加入频道后，延迟一小段时间再恢复音频状态（等待频道切换完成）
@@ -445,13 +446,13 @@ class HandoffManager: NSObject, ObservableObject {
         // 1. 恢复闭麦/不听状态
         if pendingSelfMuted || pendingSelfDeafened {
             serverModel.setSelfMuted(pendingSelfMuted, andSelfDeafened: pendingSelfDeafened)
-            print("🔇 Handoff: Restored mute=\(pendingSelfMuted), deaf=\(pendingSelfDeafened)")
+            Logger.audio.debug("Handoff: Restored mute=\(pendingSelfMuted), deaf=\(pendingSelfDeafened)")
         }
-        
+
         // 2. 恢复每个用户的本地音量和本地静音
         if shouldSyncLocalAudio && !pendingUserAudioSettings.isEmpty {
             guard let hostname = serverModel.hostname() else { return }
-            
+
             // 先将所有设置保存到 LocalUserPreferences（持久化）
             for setting in pendingUserAudioSettings {
                 LocalUserPreferences.shared.save(
@@ -460,13 +461,13 @@ class HandoffManager: NSObject, ObservableObject {
                     for: setting.userName,
                     on: hostname
                 )
-                print("🔊 Handoff: Saved user '\(setting.userName)' vol=\(setting.volume) mute=\(setting.isLocalMuted)")
+                Logger.audio.debug("Handoff: Saved user '\(setting.userName)' vol=\(setting.volume) mute=\(setting.isLocalMuted)")
             }
-            
+
             // 通知 ServerModelManager 重新加载所有用户偏好（同步 UI + 音频引擎）
             NotificationCenter.default.post(name: MumbleHandoffRestoreUserPreferencesNotification, object: nil)
         } else if !shouldSyncLocalAudio {
-            print("ℹ️ Handoff: Local user audio settings sync is disabled by user preference.")
+            Logger.audio.debug("Handoff: Local user audio settings sync is disabled by user preference.")
         }
     }
     
@@ -521,25 +522,25 @@ extension HandoffManager: NSUserActivityDelegate {
     /// 当另一台设备继续了此 activity 时被调用（源设备端）
     /// 用于实现"接力后源设备自动断开"
     nonisolated func userActivityWasContinued(_ userActivity: NSUserActivity) {
-        print("📡 Handoff: Activity was continued by another device! Disconnecting source...")
-        
+        Logger.connection.info("Handoff: Activity was continued by another device! Disconnecting source...")
+
         DispatchQueue.main.async {
             // 发送通知，让 UI 层知道接力发生了
             NotificationCenter.default.post(
                 name: MumbleHandoffContinuedNotification,
                 object: nil
             )
-            
+
             // 断开源设备的连接
             MUConnectionController.shared()?.disconnectFromServer()
-            
+
             // 显示 Toast 提示
             let deviceInfo = NSLocalizedString("another device", comment: "Handoff target device fallback")
             let handedOffMessage = String(
                 format: NSLocalizedString("Session handed off to %@", comment: "Handoff toast"),
                 deviceInfo
             )
-            
+
             NotificationCenter.default.post(
                 name: .muAppShowMessage,
                 object: nil,
@@ -550,10 +551,10 @@ extension HandoffManager: NSUserActivityDelegate {
             )
         }
     }
-    
+
     /// 系统请求更新 userInfo（当 needsSave = true 时）
     nonisolated func userActivityWillSave(_ userActivity: NSUserActivity) {
         // 可以在这里刷新最新的频道信息等
-        print("📡 Handoff: Activity will save")
+        Logger.connection.debug("Handoff: Activity will save")
     }
 }
