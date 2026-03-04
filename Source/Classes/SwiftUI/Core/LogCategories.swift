@@ -9,6 +9,8 @@ import Foundation
 import OSLog
 
 // MARK: - Log Categories
+// 注意：Logger 扩展已在 AppState.swift 中定义
+// 此文件仅包含 LogCategory 枚举定义，供其他模块参考
 
 /// 日志分类枚举，用于区分不同模块的日志输出
 enum LogCategory: String, CaseIterable {
@@ -24,26 +26,4 @@ enum LogCategory: String, CaseIterable {
     case notification = "Notification"
     /// UI 状态相关
     case ui = "UI"
-}
-
-// MARK: - Logger Extension
-
-extension Logger {
-    /// 连接状态日志
-    static let connection = Logger(subsystem: "com.mumble.Mumble", category: LogCategory.connection.rawValue)
-
-    /// 音频引擎日志
-    static let audio = Logger(subsystem: "com.mumble.Mumble", category: LogCategory.audio.rawValue)
-
-    /// 数据库操作日志
-    static let database = Logger(subsystem: "com.mumble.Mumble", category: LogCategory.database.rawValue)
-
-    /// 证书管理日志
-    static let certificate = Logger(subsystem: "com.mumble.Mumble", category: LogCategory.certificate.rawValue)
-
-    /// 通知系统日志
-    static let notification = Logger(subsystem: "com.mumble.Mumble", category: LogCategory.notification.rawValue)
-
-    /// UI 状态日志
-    static let ui = Logger(subsystem: "com.mumble.Mumble", category: LogCategory.ui.rawValue)
 }

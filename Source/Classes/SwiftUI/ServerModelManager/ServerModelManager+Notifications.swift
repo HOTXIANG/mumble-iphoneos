@@ -19,9 +19,9 @@ extension ServerModelManager {
     func requestNotificationAccess() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if granted {
-                Logger.notification.info("Notifications authorized")
+                MumbleLogger.notification.info("Notifications authorized")
             } else if let error = error {
-                Logger.notification.error("Notifications permission error: \(error.localizedDescription)")
+                MumbleLogger.notification.error("Notifications permission error: \(error.localizedDescription)")
             }
         }
     }
@@ -45,7 +45,7 @@ extension ServerModelManager {
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                Logger.notification.error("Failed to schedule notification: \(error)")
+                MumbleLogger.notification.error("Failed to schedule notification: \(error)")
             }
         }
     }

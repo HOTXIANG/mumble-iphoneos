@@ -8,25 +8,10 @@
 import Foundation
 
 // MARK: - Notification Names
+// 注意：主要的连接通知已在 AppState.swift 中定义
+// 此文件仅包含 ServerModelManager 相关的通知名称
 
 extension Notification.Name {
-    // MARK: - Connection Notifications
-
-    /// 连接已建立
-    static let muConnectionOpened = Notification.Name("MUConnectionOpenedNotification")
-
-    /// 连接已关闭
-    static let muConnectionClosed = Notification.Name("MUConnectionClosedNotification")
-
-    /// 正在连接
-    static let muConnectionConnecting = Notification.Name("MUConnectionConnectingNotification")
-
-    /// 连接错误
-    static let muConnectionError = Notification.Name("MUConnectionErrorNotification")
-
-    /// 显示消息
-    static let muAppShowMessage = Notification.Name("MUAppShowMessageNotification")
-
     // MARK: - Certificate Notifications
 
     /// 证书已创建
@@ -42,9 +27,4 @@ extension Notification.Name {
 
     /// 请求恢复用户偏好
     static let mumbleHandoffRestoreUserPreferences = Notification.Name("MumbleHandoffRestoreUserPreferencesNotification")
-
-    // MARK: - Preferences Notifications
-
-    /// 偏好设置已更改
-    static let mumblePreferencesChanged = Notification.Name("MumblePreferencesChanged")
 }

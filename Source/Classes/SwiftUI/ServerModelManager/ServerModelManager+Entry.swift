@@ -9,7 +9,7 @@ import OSLog
 
 extension ServerModelManager {
     func activate() {
-        Logger.connection.debug("ServerModelManager: ACTIVATE - Activating model and notifications.")
+        MumbleLogger.connection.debug("ServerModelManager: ACTIVATE - Activating model and notifications.")
         setupServerModel()
         setupNotifications()
         requestNotificationAccess()

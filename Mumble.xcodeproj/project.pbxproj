@@ -41,6 +41,7 @@
 		B1C2D3E42F90200100ABC001 /* ServerModelManager+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E42F90200100ABC002 /* ServerModelManager+Controls.swift */; };
 		B1C2D3E52F90200100ABC001 /* ServerModelManager+Channels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */; };
 		C1D2E3F42F90300100ABC001 /* ChannelInteropTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F42F90300100ABC002 /* ChannelInteropTypes.swift */; };
+		C4E9D1012F9B000100A1B2C3 /* Core/LogCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E9D1022F9B000100A1B2C3 /* Core/LogCategories.swift */; };
 		D1E2F3A42F90400100ABC001 /* HandoffProfilePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */; };
 		D1E2F3A52F90400100ABC001 /* AudioBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A52F90400100ABC002 /* AudioBarView.swift */; };
 		E1F2A3B42F90500100ABC001 /* ServerModelManager+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B42F90500100ABC002 /* ServerModelManager+Notifications.swift */; };
@@ -79,6 +80,16 @@
 		F2A3B4C42F90700100ABC001 /* ServerModelManager+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3B4C42F90700100ABC002 /* ServerModelManager+Lifecycle.swift */; };
 		F2A3B4C52F90700100ABC001 /* ServerModelManager+AudioState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3B4C52F90700100ABC002 /* ServerModelManager+AudioState.swift */; };
 		F2A3B4C62F90700100ABC001 /* ServerModelManager+HandoffLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A3B4C62F90700100ABC002 /* ServerModelManager+HandoffLiveActivity.swift */; };
+		F2A6585B2F589059009AF31D /* DatabaseAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584E2F589059009AF31D /* DatabaseAsync.swift */; };
+		F2A6585C2F589059009AF31D /* StringConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658512F589059009AF31D /* StringConstants.swift */; };
+		F2A6585D2F589059009AF31D /* MumbleError+Localized.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658552F589059009AF31D /* MumbleError+Localized.swift */; };
+		F2A6585E2F589059009AF31D /* MumbleLogger.m in Sources */ = {isa = PBXBuildFile; fileRef = F2A658592F589059009AF31D /* MumbleLogger.m */; };
+		F2A6585F2F589059009AF31D /* UIConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658522F589059009AF31D /* UIConstants.swift */; };
+		F2A658602F589059009AF31D /* MumbleError.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658542F589059009AF31D /* MumbleError.swift */; };
+		F2A658612F589059009AF31D /* CertificateAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584C2F589059009AF31D /* CertificateAsync.swift */; };
+		F2A658622F589059009AF31D /* ConnectionAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584D2F589059009AF31D /* ConnectionAsync.swift */; };
+		F2A658632F589059009AF31D /* LogCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658572F589059009AF31D /* LogCategories.swift */; };
+		F2A658642F589059009AF31D /* NotificationConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658502F589059009AF31D /* NotificationConstants.swift */; };
 		F2AD3A5D2E0E2F3900FC7006 /* MumbleNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A5B2E0E2F3500FC7006 /* MumbleNavigationView.swift */; };
 		F2AD3A642E0E2F7900FC7006 /* MumbleContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A622E0E2F7300FC7006 /* MumbleContentView.swift */; };
 		F2AD3A692E0E2FC100FC7006 /* MumbleUIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A672E0E2FBA00FC7006 /* MumbleUIComponents.swift */; };
@@ -298,6 +309,7 @@
 		B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerModelManager+Channels.swift"; sourceTree = "<group>"; };
 		B28D0404640C4B43A5A953CD /* ChannelEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelEditView.swift; sourceTree = "<group>"; };
 		C1D2E3F42F90300100ABC002 /* ChannelInteropTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelInteropTypes.swift; sourceTree = "<group>"; };
+		C4E9D1022F9B000100A1B2C3 /* Core/LogCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/LogCategories.swift; sourceTree = "<group>"; };
 		D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffProfilePicker.swift; sourceTree = "<group>"; };
 		D1E2F3A52F90400100ABC002 /* AudioBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioBarView.swift; sourceTree = "<group>"; };
 		DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
@@ -337,6 +349,17 @@
 		F2A3B4C42F90700100ABC002 /* ServerModelManager+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerModelManager+Lifecycle.swift"; sourceTree = "<group>"; };
 		F2A3B4C52F90700100ABC002 /* ServerModelManager+AudioState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerModelManager+AudioState.swift"; sourceTree = "<group>"; };
 		F2A3B4C62F90700100ABC002 /* ServerModelManager+HandoffLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerModelManager+HandoffLiveActivity.swift"; sourceTree = "<group>"; };
+		F2A6584C2F589059009AF31D /* CertificateAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateAsync.swift; sourceTree = "<group>"; };
+		F2A6584D2F589059009AF31D /* ConnectionAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionAsync.swift; sourceTree = "<group>"; };
+		F2A6584E2F589059009AF31D /* DatabaseAsync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseAsync.swift; sourceTree = "<group>"; };
+		F2A658502F589059009AF31D /* NotificationConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationConstants.swift; sourceTree = "<group>"; };
+		F2A658512F589059009AF31D /* StringConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringConstants.swift; sourceTree = "<group>"; };
+		F2A658522F589059009AF31D /* UIConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIConstants.swift; sourceTree = "<group>"; };
+		F2A658542F589059009AF31D /* MumbleError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleError.swift; sourceTree = "<group>"; };
+		F2A658552F589059009AF31D /* MumbleError+Localized.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MumbleError+Localized.swift"; sourceTree = "<group>"; };
+		F2A658572F589059009AF31D /* LogCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCategories.swift; sourceTree = "<group>"; };
+		F2A658582F589059009AF31D /* MumbleLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MumbleLogger.h; sourceTree = "<group>"; };
+		F2A658592F589059009AF31D /* MumbleLogger.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MumbleLogger.m; sourceTree = "<group>"; };
 		F2AD3A5B2E0E2F3500FC7006 /* MumbleNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleNavigationView.swift; sourceTree = "<group>"; };
 		F2AD3A622E0E2F7300FC7006 /* MumbleContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleContentView.swift; sourceTree = "<group>"; };
 		F2AD3A672E0E2FBA00FC7006 /* MumbleUIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleUIComponents.swift; sourceTree = "<group>"; };
@@ -674,9 +697,52 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		F2A6584F2F589059009AF31D /* AsyncWrappers */ = {
+			isa = PBXGroup;
+			children = (
+				F2A6584C2F589059009AF31D /* CertificateAsync.swift */,
+				F2A6584D2F589059009AF31D /* ConnectionAsync.swift */,
+				F2A6584E2F589059009AF31D /* DatabaseAsync.swift */,
+			);
+			path = AsyncWrappers;
+			sourceTree = "<group>";
+		};
+		F2A658532F589059009AF31D /* Constants */ = {
+			isa = PBXGroup;
+			children = (
+				F2A658502F589059009AF31D /* NotificationConstants.swift */,
+				F2A658512F589059009AF31D /* StringConstants.swift */,
+				F2A658522F589059009AF31D /* UIConstants.swift */,
+			);
+			path = Constants;
+			sourceTree = "<group>";
+		};
+		F2A658562F589059009AF31D /* Errors */ = {
+			isa = PBXGroup;
+			children = (
+				F2A658542F589059009AF31D /* MumbleError.swift */,
+				F2A658552F589059009AF31D /* MumbleError+Localized.swift */,
+			);
+			path = Errors;
+			sourceTree = "<group>";
+		};
+		F2A6585A2F589059009AF31D /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				F2A6584F2F589059009AF31D /* AsyncWrappers */,
+				F2A658532F589059009AF31D /* Constants */,
+				F2A658562F589059009AF31D /* Errors */,
+				F2A658572F589059009AF31D /* LogCategories.swift */,
+				F2A658582F589059009AF31D /* MumbleLogger.h */,
+				F2A658592F589059009AF31D /* MumbleLogger.m */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
 		F2C0EF3B2E0E1F3E00B80B44 /* SwiftUI */ = {
 			isa = PBXGroup;
 			children = (
+				F2A6585A2F589059009AF31D /* Core */,
 				F23EEF692F452BB400743254 /* ServerModelManager */,
 				F28C6B2D2EE87C3300DE9CD2 /* Models */,
 				F28C6AF62EE700F600DE9CD2 /* Components */,
@@ -696,6 +762,7 @@
 				F25F34AC2F1729BF00420631 /* MumbleApp.swift */,
 				AA000002BBBB000000000002 /* PlatformTypes.swift */,
 				AA000002BBBB000000000004 /* PlatformHaptics.swift */,
+				C4E9D1022F9B000100A1B2C3 /* Core/LogCategories.swift */,
 				F2DBFD1B2E0E2216004EFA06 /* Mumble-Bridging-Header.h */,
 			);
 			path = SwiftUI;
@@ -1018,11 +1085,22 @@
 				2822AC0614878AC500E9DB17 /* MUConnectionController.m in Sources */,
 				F2E9CC0C2F07D00600464F79 /* AboutView.swift in Sources */,
 				F2DF4AA02E1FB2AD00A0C166 /* AppState.swift in Sources */,
+				C4E9D1012F9B000100A1B2C3 /* Core/LogCategories.swift in Sources */,
 				2802AC0014C9E948000983A5 /* MUDataURL.m in Sources */,
 				2802AC0314CB0131000983A5 /* MUImage.m in Sources */,
 				2802AC0D14CB2E2B000983A5 /* MUTextMessage.m in Sources */,
 				F25F34B22F17353F00420631 /* LocalUserPreferences.swift in Sources */,
 				28EF155D14D8738C008A35A4 /* MUMessagesDatabase.m in Sources */,
+				F2A6585B2F589059009AF31D /* DatabaseAsync.swift in Sources */,
+				F2A6585C2F589059009AF31D /* StringConstants.swift in Sources */,
+				F2A6585D2F589059009AF31D /* MumbleError+Localized.swift in Sources */,
+				F2A6585E2F589059009AF31D /* MumbleLogger.m in Sources */,
+				F2A6585F2F589059009AF31D /* UIConstants.swift in Sources */,
+				F2A658602F589059009AF31D /* MumbleError.swift in Sources */,
+				F2A658612F589059009AF31D /* CertificateAsync.swift in Sources */,
+				F2A658622F589059009AF31D /* ConnectionAsync.swift in Sources */,
+				F2A658632F589059009AF31D /* LogCategories.swift in Sources */,
+				F2A658642F589059009AF31D /* NotificationConstants.swift in Sources */,
 				2836767D1525053A0015958E /* MUCertificateChainBuilder.m in Sources */,
 				F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */,
 				28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */,

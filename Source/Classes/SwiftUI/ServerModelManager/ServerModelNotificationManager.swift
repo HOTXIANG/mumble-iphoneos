@@ -117,7 +117,7 @@ class ServerModelNotificationManager {
     }
     
     func serverModel(_ model: MKServerModel, textMessageReceived msg: MKTextMessage, from user: MKUser) {
-            Logger.notification.debug("Text message received from user")
+            MumbleLogger.notification.debug("Text message received from user")
             ServerModelNotificationManager.shared.postTextMessageReceived(msg, from: user)
         }
     
