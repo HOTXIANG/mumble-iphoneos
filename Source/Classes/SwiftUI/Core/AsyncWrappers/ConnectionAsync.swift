@@ -79,10 +79,8 @@ extension MUConnectionController {
     }
 
     /// 异步断开连接
-    func disconnectAsync() async {
-        await MainActor.run {
-            self.disconnectFromServer()
-        }
+    @MainActor func disconnectAsync() async {
+        self.disconnectFromServer()
     }
 
     /// 检查是否已连接（同步访问）
