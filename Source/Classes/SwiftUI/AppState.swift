@@ -13,6 +13,7 @@ enum MumbleLogger {
     static let model      = Logger(subsystem: "cn.hotxiang.Mumble", category: "Model")
     static let handoff    = Logger(subsystem: "cn.hotxiang.Mumble", category: "Handoff")
     static let general    = Logger(subsystem: "cn.hotxiang.Mumble", category: "General")
+    static let notification = Logger(subsystem: "cn.hotxiang.Mumble", category: "Notification")
 }
 
 // MARK: - Centralized Notification Names (ObjC-bridged)

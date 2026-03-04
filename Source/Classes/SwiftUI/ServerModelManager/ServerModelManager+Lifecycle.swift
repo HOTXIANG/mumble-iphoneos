@@ -17,7 +17,7 @@ extension ServerModelManager {
         }
 
         guard let newModel = connectionController.serverModel else {
-            Logger.connection.debug("ServerModel not ready. Retrying in 0.5s...")
+            MumbleLogger.connection.debug("ServerModel not ready. Retrying in 0.5s...")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.setupServerModel()
             }
@@ -25,18 +25,18 @@ extension ServerModelManager {
         }
 
         if self.serverModel === newModel {
-            Logger.connection.debug("ServerModel identity match. Skipping setup to prevent duplicates.")
+            MumbleLogger.connection.debug("ServerModel identity match. Skipping setup to prevent duplicates.")
             // 兜底：如果界面是空的，强制刷新一下
             if self.modelItems.isEmpty { rebuildModelArray() }
             return
         }
 
         if self.serverModel != nil {
-            Logger.connection.info("Switching Server Model. Performing cleanup...")
+            MumbleLogger.connection.info("Switching Server Model. Performing cleanup...")
             self.cleanup()
         }
 
-        Logger.connection.info("Binding new ServerModel...")
+        MumbleLogger.connection.info("Binding new ServerModel...")
         self.serverModel = newModel
 
         let wrapper = ServerModelDelegateWrapper()
@@ -49,7 +49,7 @@ extension ServerModelManager {
         let currentPort = Int(model.port())
 
         if let savedName = RecentServerManager.shared.getDisplayName(hostname: currentHost, port: currentPort) {
-            Logger.connection.debug("Resolved name from Recents: '\(savedName)'")
+            MumbleLogger.connection.debug("Resolved name from Recents: '\(savedName)'")
             self.serverName = savedName
         } else {
             self.serverName = currentHost
@@ -97,7 +97,7 @@ extension ServerModelManager {
     }
 
     func cleanup() {
-        Logger.connection.info("ServerModelManager: CLEANUP (Data Only)")
+        MumbleLogger.connection.info("ServerModelManager: CLEANUP (Data Only)")
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
 
@@ -110,8 +110,8 @@ extension ServerModelManager {
         pendingACLUserNameQueries.removeAll()
         // 保存当前监听频道以便重连后恢复
         if !listeningChannels.isEmpty {
-            savedListeningChannelIds = listeningChannels
-            Logger.connection.debug("Saved \(savedListeningChannelIds.count) listening channels for reconnect")
+            self.savedListeningChannelIds = listeningChannels
+            MumbleLogger.connection.debug("Saved \(self.savedListeningChannelIds.count) listening channels for reconnect")
         }
         listeningChannels.removeAll()
         channelListeners.removeAll()
