@@ -41,7 +41,6 @@
 		B1C2D3E42F90200100ABC001 /* ServerModelManager+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E42F90200100ABC002 /* ServerModelManager+Controls.swift */; };
 		B1C2D3E52F90200100ABC001 /* ServerModelManager+Channels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */; };
 		C1D2E3F42F90300100ABC001 /* ChannelInteropTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F42F90300100ABC002 /* ChannelInteropTypes.swift */; };
-		C4E9D1012F9B000100A1B2C3 /* Core/LogCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E9D1022F9B000100A1B2C3 /* Core/LogCategories.swift */; };
 		D1E2F3A42F90400100ABC001 /* HandoffProfilePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */; };
 		D1E2F3A52F90400100ABC001 /* AudioBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A52F90400100ABC002 /* AudioBarView.swift */; };
 		E1F2A3B42F90500100ABC001 /* ServerModelManager+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B42F90500100ABC002 /* ServerModelManager+Notifications.swift */; };
@@ -309,7 +308,6 @@
 		B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerModelManager+Channels.swift"; sourceTree = "<group>"; };
 		B28D0404640C4B43A5A953CD /* ChannelEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelEditView.swift; sourceTree = "<group>"; };
 		C1D2E3F42F90300100ABC002 /* ChannelInteropTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelInteropTypes.swift; sourceTree = "<group>"; };
-		C4E9D1022F9B000100A1B2C3 /* Core/LogCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/LogCategories.swift; sourceTree = "<group>"; };
 		D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffProfilePicker.swift; sourceTree = "<group>"; };
 		D1E2F3A52F90400100ABC002 /* AudioBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioBarView.swift; sourceTree = "<group>"; };
 		DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUMacApplicationDelegate.swift; sourceTree = "<group>"; };
@@ -762,7 +760,6 @@
 				F25F34AC2F1729BF00420631 /* MumbleApp.swift */,
 				AA000002BBBB000000000002 /* PlatformTypes.swift */,
 				AA000002BBBB000000000004 /* PlatformHaptics.swift */,
-				C4E9D1022F9B000100A1B2C3 /* Core/LogCategories.swift */,
 				F2DBFD1B2E0E2216004EFA06 /* Mumble-Bridging-Header.h */,
 			);
 			path = SwiftUI;
@@ -1085,7 +1082,6 @@
 				2822AC0614878AC500E9DB17 /* MUConnectionController.m in Sources */,
 				F2E9CC0C2F07D00600464F79 /* AboutView.swift in Sources */,
 				F2DF4AA02E1FB2AD00A0C166 /* AppState.swift in Sources */,
-				C4E9D1012F9B000100A1B2C3 /* Core/LogCategories.swift in Sources */,
 				2802AC0014C9E948000983A5 /* MUDataURL.m in Sources */,
 				2802AC0314CB0131000983A5 /* MUImage.m in Sources */,
 				2802AC0D14CB2E2B000983A5 /* MUTextMessage.m in Sources */,
@@ -1170,7 +1166,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1195,7 +1191,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1231,7 +1227,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1256,7 +1252,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1303,7 +1299,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1328,7 +1324,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1375,7 +1371,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1400,7 +1396,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1490,7 +1486,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1527,7 +1523,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1585,7 +1581,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1616,7 +1612,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1673,7 +1669,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1704,7 +1700,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1761,7 +1757,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 300900000;
+				CURRENT_PROJECT_VERSION = 400000000;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1792,7 +1788,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.9.0;
+				MARKETING_VERSION = 4.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;

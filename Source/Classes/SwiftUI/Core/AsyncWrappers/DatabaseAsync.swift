@@ -42,8 +42,14 @@ enum DatabaseAsync {
     /// 异步保存收藏服务器
     static func storeFavourite(_ server: MUFavouriteServer) async {
         await withCheckedContinuation { continuation in
+            // 使用 @unchecked Sendable 包装器避免 Sendable 警告
+            struct UncheckedSendable<T>: @unchecked Sendable {
+                let value: T
+            }
+            let wrapped = UncheckedSendable(value: server)
+
             DispatchQueue.global(qos: .userInitiated).async {
-                MUDatabase.storeFavourite(server)
+                MUDatabase.storeFavourite(wrapped.value)
                 continuation.resume()
             }
         }
@@ -52,8 +58,14 @@ enum DatabaseAsync {
     /// 异步删除收藏服务器
     static func deleteFavourite(_ server: MUFavouriteServer) async {
         await withCheckedContinuation { continuation in
+            // 使用 @unchecked Sendable 包装器避免 Sendable 警告
+            struct UncheckedSendable<T>: @unchecked Sendable {
+                let value: T
+            }
+            let wrapped = UncheckedSendable(value: server)
+
             DispatchQueue.global(qos: .userInitiated).async {
-                MUDatabase.deleteFavourite(server)
+                MUDatabase.deleteFavourite(wrapped.value)
                 continuation.resume()
             }
         }
