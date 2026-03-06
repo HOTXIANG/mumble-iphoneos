@@ -4,6 +4,9 @@
 import UIKit
 import SwiftUI
 
+private let MUIOSImmersiveStatusBarVisibilityDidChangeNotification =
+    Notification.Name("MUIOSImmersiveStatusBarVisibilityDidChangeNotification")
+
 // --- 核心修改：将 rootView 修改为 AppRootView ---
 class SwiftRootViewController: UIHostingController<AppRootView> {
     
@@ -34,6 +37,7 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
 // --- Wrapper 部分保持不变 ---
 @objc class SwiftRootViewControllerWrapper: UIViewController {
     private var hostingController: SwiftRootViewController!
+    private var shouldHideStatusBar = false
     
     @objc override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
         super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
@@ -66,6 +70,27 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
             hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleImmersiveStatusBarVisibilityNotification(_:)),
+            name: MUIOSImmersiveStatusBarVisibilityDidChangeNotification,
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc
+    private func handleImmersiveStatusBarVisibilityNotification(_ notification: Notification) {
+        let shouldHide = (notification.object as? Bool) ?? false
+        guard shouldHideStatusBar != shouldHide else { return }
+        shouldHideStatusBar = shouldHide
+        setNeedsStatusBarAppearanceUpdate()
+        navigationController?.setNeedsStatusBarAppearanceUpdate()
+        hostingController?.setNeedsStatusBarAppearanceUpdate()
     }
     
     override var preferredStatusBarStyle: UIStatusBarStyle {
@@ -73,7 +98,11 @@ class SwiftRootViewController: UIHostingController<AppRootView> {
     }
     
     override var prefersStatusBarHidden: Bool {
-        return false
+        return shouldHideStatusBar
+    }
+    
+    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
+        return .fade
     }
 }
 #endif // os(iOS)

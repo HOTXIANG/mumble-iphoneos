@@ -222,6 +222,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     } else if ([[defaults stringForKey:@"AudioVADKind"] isEqualToString:@"amplitude"]) {
         settings.vadKind = MKVADKindAmplitude;
     }
+    BOOL snrModeEnabled = ([[defaults stringForKey:@"AudioVADKind"] isEqualToString:@"snr"]);
     
     settings.vadMin = [defaults floatForKey:@"AudioVADBelow"];
     settings.vadMax = [defaults floatForKey:@"AudioVADAbove"];
@@ -271,7 +272,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     settings.volume = [defaults floatForKey:@"AudioOutputVolume"];
     settings.outputDelay = 0; /* 10 ms */
     settings.micBoost = [defaults floatForKey:@"AudioMicBoost"];
-    settings.enablePreprocessor = NO;
+    // Keep preprocessing internal-only for SNR mode so SNR meter/VAD remain functional
+    settings.enablePreprocessor = snrModeEnabled;
     settings.enableStereoInput = [defaults boolForKey:@"AudioStereoInput"];
     settings.enableStereoOutput = [defaults boolForKey:@"AudioStereoOutput"];
     settings.enableEchoCancellation = NO;

@@ -969,18 +969,55 @@ struct AppRootView: View {
                 serverManager.startAudioTest()
             }
         }
-        // macOS 全窗口图片预览 overlay（覆盖整个 App 界面，包括分栏）
-        #if os(macOS)
+        #if os(iOS)
+        // iOS 全局图片预览 overlay（覆盖整个 App 界面，包括 iPad 分栏）
         .overlay {
-            if let image = appState.previewImage {
-                MacImagePreviewOverlay(image: image) {
-                    appState.previewImage = nil
-                }
+            if let preview = appState.activeImagePreview {
+                IOSMessageImageFullscreenPreview(
+                    item: preview,
+                    onEntryAnimationCompleted: {
+                        // Hide source thumbnail only after entry animation finishes.
+                        if appState.activeImagePreview?.id == preview.id {
+                            appState.hiddenPreviewSourceID = preview.id
+                        }
+                    },
+                    onDismissWillStart: {
+                        appState.isImmersiveStatusBarHidden = false
+                    },
+                    onDismiss: {
+                        appState.activeImagePreview = nil
+                        appState.isImmersiveStatusBarHidden = false
+                        appState.hiddenPreviewSourceID = nil
+                    }
+                )
                 .transition(.opacity)
                 .zIndex(10000)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: appState.previewImage != nil)
+        .animation(.easeInOut(duration: 0.2), value: appState.activeImagePreview != nil)
+        #endif
+        // macOS 全窗口图片预览 overlay（覆盖整个 App 界面，包括分栏）
+        #if os(macOS)
+        .overlay {
+            if let preview = appState.activeMacImagePreview {
+                MacImagePreviewOverlay(
+                    item: preview,
+                    onEntryAnimationCompleted: {
+                        appState.hiddenMacPreviewSourceID = preview.id
+                    },
+                    onDismissWillStart: {
+                        // Keep source hidden until close animation finishes.
+                    },
+                    onDismiss: {
+                        appState.activeMacImagePreview = nil
+                        appState.hiddenMacPreviewSourceID = nil
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(10000)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: appState.activeMacImagePreview != nil)
         #endif
         .alert(item: $appState.activeError) { error in
             Alert(title: Text(error.title), message: Text(error.message), dismissButton: .default(Text("OK")))

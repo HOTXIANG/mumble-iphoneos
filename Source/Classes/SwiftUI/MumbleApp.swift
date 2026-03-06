@@ -35,15 +35,20 @@ struct MumbleApp: App {
     // 监听环境变化，用于处理 Scene 相位（后台/前台）
     @Environment(\.scenePhase) var scenePhase
     @StateObject private var serverManager = ServerModelManager()
+    @ObservedObject private var appState = AppState.shared
     
     /// 处理用户点击系统通知后跳转到聊天界面
     @StateObject private var notificationDelegate = NotificationDelegate()
 
-    var body: some Scene {
+    @SceneBuilder
+    private var mainWindowScene: some Scene {
         WindowGroup {
             // 这里直接使用你之前的 Wrapper，或者直接换成 MainView
             AppRootView(serverManager: serverManager)
                 .environmentObject(AppState.shared) // 建议注入 AppState，防止子视图崩溃
+                #if os(iOS)
+                .statusBar(hidden: appState.isImmersiveStatusBarHidden)
+                #endif
                 #if os(macOS)
                 .frame(minWidth: 600, minHeight: 400)
                 .background(WindowMinSizeSetter(minSize: NSSize(width: 600, height: 400)))
@@ -76,6 +81,10 @@ struct MumbleApp: App {
             MumbleMenuCommands()
         }
         #endif
+    }
+
+    var body: some Scene {
+        mainWindowScene
         #if os(macOS)
         Settings {
             MacSettingsRootView()
@@ -148,23 +157,23 @@ struct MumbleMenuCommands: Commands {
         
         // "Server" 菜单
         CommandMenu("Server") {
-            Button {
-                NotificationCenter.default.post(name: .mumbleToggleMute, object: nil)
-            } label: {
-                Label("Mute/Unmute", systemImage: "mic.slash.fill")
+            if appState.isConnected {
+                Button {
+                    NotificationCenter.default.post(name: .mumbleToggleMute, object: nil)
+                } label: {
+                    Label("Mute/Unmute", systemImage: "mic.slash.fill")
+                }
+                .keyboardShortcut("m", modifiers: [.command, .shift])
+                
+                Button {
+                    NotificationCenter.default.post(name: .mumbleToggleDeafen, object: nil)
+                } label: {
+                    Label("Deafen/Undeafen", systemImage: "speaker.slash.fill")
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+                
+                Divider()
             }
-            .keyboardShortcut("m", modifiers: [.command, .shift])
-            .disabled(!appState.isConnected)
-            
-            Button {
-                NotificationCenter.default.post(name: .mumbleToggleDeafen, object: nil)
-            } label: {
-                Label("Deafen/Undeafen", systemImage: "speaker.slash.fill")
-            }
-            .keyboardShortcut("d", modifiers: [.command, .shift])
-            .disabled(!appState.isConnected)
-            
-            Divider()
             
             Button {
                 NotificationCenter.default.post(name: .mumbleRegisterUser, object: nil)

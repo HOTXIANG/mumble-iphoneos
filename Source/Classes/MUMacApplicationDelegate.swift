@@ -176,6 +176,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         // VAD kind
         let vadKind = defaults.string(forKey: "AudioVADKind") ?? "amplitude"
         settings.vadKind = (vadKind == "snr") ? MKVADKindSignalToNoise : MKVADKindAmplitude
+        let snrModeEnabled = (vadKind == "snr")
         
         settings.vadMin = defaults.float(forKey: "AudioVADBelow")
         settings.vadMax = defaults.float(forKey: "AudioVADAbove")
@@ -210,7 +211,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         settings.volume = defaults.float(forKey: "AudioOutputVolume")
         settings.outputDelay = 0
         settings.micBoost = defaults.float(forKey: "AudioMicBoost")
-        settings.enablePreprocessor = ObjCBool(false)
+        // Keep preprocessing internal-only for SNR mode so SNR meter/VAD remain functional
+        settings.enablePreprocessor = ObjCBool(snrModeEnabled)
         settings.enableStereoInput = ObjCBool(defaults.bool(forKey: "AudioStereoInput"))
         settings.enableStereoOutput = ObjCBool(defaults.bool(forKey: "AudioStereoOutput"))
         settings.enableEchoCancellation = ObjCBool(false)

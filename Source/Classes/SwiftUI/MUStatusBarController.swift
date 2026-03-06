@@ -73,6 +73,17 @@ final class MUStatusBarController: NSObject {
 
     private func buildMenu() {
         let m = NSMenu()
+        
+        let showAppItem = NSMenuItem(
+            title: NSLocalizedString("Show Mumble", comment: ""),
+            action: #selector(bringToFront),
+            keyEquivalent: ""
+        )
+        showAppItem.target = self
+        showAppItem.image = makeMenuItemImage(symbolName: "macwindow.on.rectangle")
+        m.addItem(showAppItem)
+
+        m.addItem(NSMenuItem.separator())
 
         let muteItem = NSMenuItem(
             title: NSLocalizedString("Mute / Unmute", comment: ""),
@@ -112,9 +123,11 @@ final class MUStatusBarController: NSObject {
         guard let m = menu else { return }
 
         let isConnected = MUConnectionController.shared()?.isConnected() == true
+        let separators = m.items.filter(\.isSeparatorItem)
 
         // Mute item
         if let muteItem = m.items.first(where: { $0.action == #selector(toggleMute) }) {
+            muteItem.isHidden = !isConnected
             muteItem.isEnabled = isConnected
             if isConnected, let user = MUConnectionController.shared()?.serverModel?.connectedUser() {
                 muteItem.title = user.isSelfMuted()
@@ -131,6 +144,7 @@ final class MUStatusBarController: NSObject {
 
         // Deafen item
         if let deafenItem = m.items.first(where: { $0.action == #selector(toggleDeafen) }) {
+            deafenItem.isHidden = !isConnected
             deafenItem.isEnabled = isConnected
             if isConnected, let user = MUConnectionController.shared()?.serverModel?.connectedUser() {
                 deafenItem.title = user.isSelfDeafened()
@@ -143,6 +157,12 @@ final class MUStatusBarController: NSObject {
                 deafenItem.title = NSLocalizedString("Deafen / Undeafen", comment: "")
                 deafenItem.image = makeMenuItemImage(symbolName: "speaker.slash.fill")
             }
+        }
+        
+        // Keep separators tidy: hide the one above mute/deafen and between controls/disconnect when disconnected
+        if separators.count >= 2 {
+            separators[0].isHidden = !isConnected
+            separators[1].isHidden = !isConnected
         }
 
         // Disconnect item
@@ -176,6 +196,20 @@ final class MUStatusBarController: NSObject {
 
     @objc private func disconnect() {
         NotificationCenter.default.post(name: .mumbleInitiateDisconnect, object: nil)
+    }
+
+    @objc private func bringToFront() {
+        NSApp.activate(ignoringOtherApps: true)
+        
+        let contentWindows = NSApp.windows.filter {
+            !($0.className.contains("StatusBar") || $0.className.contains("_NSPopover"))
+                && $0.level == .normal
+        }
+        guard let window = contentWindows.first else { return }
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Notifications
@@ -292,11 +326,23 @@ final class MUStatusBarController: NSObject {
 
         switch currentState {
         case .disconnected:
-            config = ("person.fill", .tertiaryLabelColor, "Mumble — Disconnected")
+            config = (
+                "person.fill",
+                .tertiaryLabelColor,
+                NSLocalizedString("Mumble — Disconnected", comment: "")
+            )
         case .passive:
-            config = ("person.fill", .secondaryLabelColor, "Mumble — Idle")
+            config = (
+                "person.fill",
+                .secondaryLabelColor,
+                NSLocalizedString("Mumble — Idle", comment: "")
+            )
         case .talking:
-            config = ("person.fill", .systemGreen, "Mumble — Talking")
+            config = (
+                "person.fill",
+                .systemGreen,
+                NSLocalizedString("Mumble — Talking", comment: "")
+            )
         case .selfMuted:
             config = ("mic.slash.fill", .systemOrange, NSLocalizedString("Mumble — Muted", comment: ""))
         case .selfDeafened:
