@@ -866,7 +866,7 @@ struct AppRootView: View {
     #if os(iOS)
     private let narrowWindowThreshold: CGFloat = 700
     #else
-    private let narrowWindowThreshold: CGFloat = 1100
+    private let narrowWindowThreshold: CGFloat = 900
     #endif
 
     private var selectedAppColorScheme: AppColorSchemeOption {
@@ -1070,71 +1070,73 @@ struct AppRootView: View {
     
     var iPadLayout: some View {
         GeometryReader { geo in
-            NavigationSplitView(columnVisibility: $splitVisibility, preferredCompactColumn: $preferredCompactColumn) {
-                // 左侧 Sidebar：使用独立的 sidebarNavigationManager
-                NavigationStack(path: $sidebarNavigationManager.navigationPath) {
-                    WelcomeView()
-                        .navigationDestination(for: NavigationDestination.self) { destination in
-                            destinationView(for: destination, navigationManager: sidebarNavigationManager)
-                                .environmentObject(sidebarNavigationManager)
-                        }
-                        .background(Color.clear)
-                }
-                .environmentObject(sidebarNavigationManager)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
-                .background(Color.clear)
-            } detail: {
-                ZStack {
-                    if appState.isConnected {
-                        NavigationStack {
-                            ChannelListView()
-                                .environmentObject(NavigationManager())
-                        }
-                    } else {
-                        ContentUnavailableView {
-                            Label(NSLocalizedString("No Server Connected", comment: ""), systemImage: "server.rack")
-                        } description: {
-                            Text(NSLocalizedString("Select a server from the sidebar to start chatting.", comment: ""))
-                        }
+            iPadSplitView(geo: geo)
+        }
+    }
+
+    private func iPadSplitView(geo: GeometryProxy) -> some View {
+        NavigationSplitView(columnVisibility: $splitVisibility, preferredCompactColumn: $preferredCompactColumn) {
+            NavigationStack(path: $sidebarNavigationManager.navigationPath) {
+                WelcomeView()
+                    .navigationDestination(for: NavigationDestination.self) { destination in
+                        destinationView(for: destination, navigationManager: sidebarNavigationManager)
+                            .environmentObject(sidebarNavigationManager)
+                    }
+                    .background(Color.clear)
+            }
+            .environmentObject(sidebarNavigationManager)
+            .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
+            .background(Color.clear)
+        } detail: {
+            ZStack {
+                if appState.isConnected {
+                    NavigationStack {
+                        ChannelListView()
+                            .environmentObject(NavigationManager())
+                    }
+                } else {
+                    ContentUnavailableView {
+                        Label(NSLocalizedString("No Server Connected", comment: ""), systemImage: "server.rack")
+                    } description: {
+                        Text(NSLocalizedString("Select a server from the sidebar to start chatting.", comment: ""))
                     }
                 }
-                .background(Color.clear) // Detail 区域透明
             }
-            .onChange(of: appState.isConnected) { _, isConnected in
-                preferredCompactColumn = isConnected ? .detail : .sidebar
-                updateSplitVisibility(width: geo.size.width, connectionChanged: true)
-            }
-            .onChange(of: geo.size.width) { _, width in
-                updateSplitVisibility(width: width, connectionChanged: false)
-            }
-            .onAppear {
-                if appState.isConnected {
-                    preferredCompactColumn = .detail
-                }
-                updateSplitVisibility(width: geo.size.width, connectionChanged: false)
-            }
-            #if os(iOS)
-            .navigationSplitViewStyle(.balanced)
-            #else
-            .navigationSplitViewStyle(.prominentDetail)
-            #endif
             .background(Color.clear)
         }
+        .onChange(of: appState.isConnected) { _, isConnected in
+            preferredCompactColumn = isConnected ? .detail : .sidebar
+            updateSplitVisibility(width: geo.size.width, connectionChanged: true)
+        }
+        .onChange(of: geo.size.width) { _, width in
+            updateSplitVisibility(width: width, connectionChanged: false)
+        }
+        .onAppear {
+            if appState.isConnected {
+                preferredCompactColumn = .detail
+            }
+            updateSplitVisibility(width: geo.size.width, connectionChanged: false)
+        }
+        #if os(iOS)
+        .navigationSplitViewStyle(.balanced)
+        #else
+        .navigationSplitViewStyle(.prominentDetail)
+        #endif
+        .background(Color.clear)
     }
 
     private func updateSplitVisibility(width: CGFloat, connectionChanged: Bool) {
         #if os(iOS)
-        // iPad：连接服务器后主动关闭侧边栏，调整窗口大小时不自动弹出
-        if connectionChanged {
-            if appState.isConnected {
+        if appState.isConnected {
+            if width < 960 {
                 splitVisibility = .detailOnly
-            } else {
-                splitVisibility = .all
+            } else if connectionChanged {
+                splitVisibility = .detailOnly
             }
+        } else if connectionChanged {
+            splitVisibility = .all
         }
-        // 宽度变化时不主动改变侧边栏状态，用户可通过按钮手动打开
         #else
-        // macOS：根据窗口宽度自动切换
         if appState.isConnected && width < narrowWindowThreshold {
             splitVisibility = .detailOnly
         } else {

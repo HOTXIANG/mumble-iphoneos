@@ -50,8 +50,8 @@ struct MumbleApp: App {
                 .statusBar(hidden: appState.isImmersiveStatusBarHidden)
                 #endif
                 #if os(macOS)
-                .frame(minWidth: 600, minHeight: 400)
-                .background(WindowMinSizeSetter(minSize: NSSize(width: 600, height: 400)))
+                .frame(minWidth: 480, minHeight: 400)
+                .background(WindowMinSizeSetter(minSize: NSSize(width: 480, height: 400)))
                 #endif
                 .onAppear {
                     MumbleLogger.general.info("SwiftUI lifecycle started")

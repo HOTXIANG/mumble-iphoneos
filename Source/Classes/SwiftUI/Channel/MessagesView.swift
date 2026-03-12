@@ -945,16 +945,10 @@ struct MessagesView: View {
     @State private var isLayoutLockActive = false
     @State private var lockedTopAnchorMinY: CGFloat?
     @State private var latestTopAnchorMinY: CGFloat = 0
-    @State private var topLayoutCompensationY: CGFloat = 0
+    @State private var topLayoutCompensationY: CGFloat = 01
     @State private var messagesLayoutCompensationY: CGFloat = 0
     @State private var selectedImageForSend: PendingSendImage?
     @State private var messageImageFrames: [String: CGRect] = [:]
-    
-    private var backgroundColors: [Color] {
-        colorScheme == .dark
-            ? [Color(red: 0.20, green: 0.20, blue: 0.25), Color(red: 0.07, green: 0.07, blue: 0.10)]
-            : [Color(red: 0.92, green: 0.93, blue: 0.98), Color(red: 0.82, green: 0.85, blue: 0.95)]
-    }
     
     private var hiddenPreviewSourceID: String? {
         #if os(iOS)
@@ -966,14 +960,6 @@ struct MessagesView: View {
     
     var body: some View {
         ZStack {
-            // Keep the top occupied area visually consistent during chrome fade.
-            LinearGradient(
-                gradient: Gradient(colors: backgroundColors),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
             // 1. 动态内容层
             MessagesList(
                 serverManager: serverManager,
@@ -1621,18 +1607,7 @@ struct MessagesList: View {
     }
     
     var body: some View {
-        let backgroundColors: [Color] = colorScheme == .dark
-            ? [Color(red: 0.20, green: 0.20, blue: 0.25), Color(red: 0.07, green: 0.07, blue: 0.10)]
-            : [Color(red: 0.92, green: 0.93, blue: 0.98), Color(red: 0.82, green: 0.85, blue: 0.95)]
-
         ZStack(alignment: .bottom) {
-            // 背景
-            LinearGradient(
-                gradient: Gradient(colors: backgroundColors),
-                startPoint: .top,
-                endPoint: .bottom
-            ).ignoresSafeArea()
-            
             // 消息列表
             ScrollViewReader { proxy in
                 ScrollView {
@@ -1690,6 +1665,7 @@ struct MessagesList: View {
                     .padding(.trailing, 16)
                     .offset(y: layoutCompensationY)
                 }
+                .scrollClipDisabled(true)
                 .safeAreaInset(edge: .bottom) {
                     TextInputBar(
                         text: $newMessage,
@@ -2095,17 +2071,16 @@ private struct SenderStickyHeaderView: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .background(
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(colorScheme == .dark ? Color.black.opacity(0.15) : Color.white.opacity(0.15))
+                            .fill(colorScheme == .dark ? Color.clear : Color.white.opacity(0.15))
                     )
                     .glassEffect(
-                        .clear.tint(colorScheme == .light ? Color.black.opacity(0.08) : Color.clear),
+                        .regular,
                         in: .rect(cornerRadius: 13)
                     )
                     .shadow(
-                        color: colorScheme == .light ? .black.opacity(0.12) : .black.opacity(0.10),
-                        radius: colorScheme == .light ? 8 : 4,
-                        x: 0,
-                        y: 2
+                        color: colorScheme == .light ? .black.opacity(0.10) : .black.opacity(0.08),
+                        radius: colorScheme == .light ? 6 : 3,
+                        x: 0, y: 1
                     )
             } else {
                 Text(title)
@@ -2119,13 +2094,12 @@ private struct SenderStickyHeaderView: View {
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(colorScheme == .light ? Color.black.opacity(0.03) : Color.clear)
+                            .fill(colorScheme == .dark ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
                     )
                     .shadow(
-                        color: colorScheme == .light ? .black.opacity(0.10) : .black.opacity(0.08),
-                        radius: colorScheme == .light ? 6 : 3,
-                        x: 0,
-                        y: 2
+                        color: colorScheme == .light ? .black.opacity(0.08) : .black.opacity(0.06),
+                        radius: colorScheme == .light ? 5 : 2,
+                        x: 0, y: 1
                     )
             }
 
@@ -2482,18 +2456,15 @@ private struct TextInputBar: View {
         GlassEffectContainer(spacing: 10.0) {
             HStack(alignment: .bottom, spacing: 10.0) {
                 photoPickerView
-                    .background(Circle().fill(glassReadabilityColor))
-                    .glassEffect(.clear.interactive().tint(photoPickerGlassTint), in: .circle)
+                    .glassEffect(.regular.interactive(), in: .circle)
                     .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
                 
                 messageTextField
-                    .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(glassReadabilityColor))
-                    .glassEffect(.clear.interactive().tint(messageFieldGlassTint), in: .rect(cornerRadius: 20.0))
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20.0))
                     .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
                 
                 sendButton
-                    .background(Circle().fill(glassReadabilityColor))
-                    .glassEffect(.clear.interactive().tint(sendButtonGlassTint), in: .circle)
+                    .glassEffect(.regular.interactive().tint(sendButtonGlassTint), in: .circle)
                     .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
             }
             .padding(.horizontal)
@@ -2501,26 +2472,12 @@ private struct TextInputBar: View {
         }
     }
 
-    private var glassReadabilityColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.35) : Color.white.opacity(0.35)
-    }
-
-    @available(iOS 26.0, macOS 26.0, *)
-    private var photoPickerGlassTint: Color {
-        colorScheme == .light ? Color.black.opacity(0.14) : Color.clear
-    }
-
-    @available(iOS 26.0, macOS 26.0, *)
-    private var messageFieldGlassTint: Color {
-        colorScheme == .light ? Color.black.opacity(0.10) : Color.clear
-    }
-
     @available(iOS 26.0, macOS 26.0, *)
     private var sendButtonGlassTint: Color {
         if text.isEmpty {
             return colorScheme == .light ? .gray.opacity(0.55) : .gray.opacity(0.7)
         }
-        return colorScheme == .light ? .blue.opacity(0.52) : .blue.opacity(0.7)
+        return colorScheme == .light ? .blue.opacity(0.8) : .blue.opacity(0.7)
     }
     
     // MARK: - Fallback (Material)
@@ -2534,7 +2491,7 @@ private struct TextInputBar: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(colorScheme == .light ? Color.black.opacity(0.06) : Color.clear)
+                        .fill(colorScheme == .dark ? Color.black.opacity(0.06) : Color.clear)
                 )
                 .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
             
@@ -2719,19 +2676,10 @@ private struct TextInputBar: View {
 }
 
 private struct StickyHeaderAdaptiveTextModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-    var opacity: Double = 1.0
-    var brightnessBoost: Double = 0.18
-
     func body(content: Content) -> some View {
         ZStack {
-            if colorScheme == .dark {
-                content
-                    .foregroundColor(.white.opacity(opacity * brightnessBoost))
-            }
             content
-                .foregroundColor(.white.opacity(opacity))
-                .blendMode(.difference)
+                .foregroundColor(.primary)
         }
     }
 }

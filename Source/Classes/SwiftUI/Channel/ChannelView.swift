@@ -46,7 +46,7 @@ struct ChannelView: View {
     @StateObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
     
-    @State private var userPreferredChatWidth: CGFloat = 420
+    @State private var userPreferredChatWidth: CGFloat = -1
     private let minChatWidth: CGFloat = 300
     private let minServerListWidth: CGFloat = {
         #if os(macOS)
@@ -55,54 +55,64 @@ struct ChannelView: View {
         400
         #endif
     }()
+    private let splitThreshold: CGFloat = {
+        #if os(macOS)
+        return 550
+        #else
+        return 600
+        #endif
+    }()
 
     var body: some View {
         GeometryReader { geo in
-            if geo.size.width > 700 {
-                // [宽屏模式]
-                HStack(spacing: 0) {
-                    ServerChannelView(serverManager: serverManager, isSplitLayout: true)
-                        .frame(maxWidth: .infinity)
-                    
-                    ResizeHandle()
-                        .gesture(
-                            DragGesture(minimumDistance: 1, coordinateSpace: .named("ChannelViewSpace"))
-                                .onChanged { value in
-                                    let newWidth = geo.size.width - value.location.x
-                                    let maxSafe = geo.size.width - minServerListWidth
-                                    let limit = min(geo.size.width * 0.7, maxSafe)
-                                    userPreferredChatWidth = min(max(newWidth, minChatWidth), limit)
-                                }
-                        )
-                        .zIndex(10)
-                    
-                    MessagesView(serverManager: serverManager, isSplitLayout: true)
-                        .frame(width: calculateEffectiveChatWidth(totalWidth: geo.size.width))
-                        .background(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.06))
-                        .onAppear { appState.unreadMessageCount = 0 }
+            ZStack {
+                if geo.size.width > splitThreshold {
+                    // [宽屏模式]
+                    HStack(spacing: 0) {
+                        ServerChannelView(serverManager: serverManager, isSplitLayout: true)
+                            .frame(maxWidth: .infinity)
+                        
+                        ResizeHandle()
+                            .gesture(
+                                DragGesture(minimumDistance: 1, coordinateSpace: .named("ChannelViewSpace"))
+                                    .onChanged { value in
+                                        let handleHalfWidth: CGFloat = 12
+                                        let newWidth = geo.size.width - value.location.x - handleHalfWidth
+                                        let maxSafe = geo.size.width - minServerListWidth
+                                        let limit = min(geo.size.width * 0.7, maxSafe)
+                                        userPreferredChatWidth = min(max(newWidth, minChatWidth), limit)
+                                    }
+                            )
+                            .zIndex(10)
+                        
+                        MessagesView(serverManager: serverManager, isSplitLayout: true)
+                            .frame(width: calculateEffectiveChatWidth(totalWidth: geo.size.width))
+                            .onAppear { appState.unreadMessageCount = 0 }
+                    }
+                } else {
+                    // [窄屏模式]
+                    TabView(selection: $appState.currentTab) {
+                        ServerChannelView(serverManager: serverManager, isSplitLayout: false)
+                            .tabItem { Label("Channels", systemImage: "person.3.fill") }
+                            .tag(AppState.Tab.channels)
+                        
+                        MessagesView(serverManager: serverManager, isSplitLayout: false)
+                            .tabItem { Label("Messages", systemImage: "message.fill") }
+                            .tag(AppState.Tab.messages)
+                            .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
+                    }
+                    #if os(iOS)
+                    .toolbarBackground(.clear, for: .tabBar)
+                    .toolbarBackground(.hidden, for: .tabBar)
+                    #endif
+                    .onChange(of: appState.currentTab) {
+                        if appState.currentTab == .messages { serverManager.markAsRead() }
+                    }
+                    .onAppear { configureTabBarAppearance() }
                 }
-                .background(globalGradient)
-            } else {
-                // [窄屏模式]
-                TabView(selection: $appState.currentTab) {
-                    ServerChannelView(serverManager: serverManager, isSplitLayout: false)
-                        .tabItem { Label("Channels", systemImage: "person.3.fill") }
-                        .tag(AppState.Tab.channels)
-                    
-                    MessagesView(serverManager: serverManager, isSplitLayout: false)
-                        .tabItem { Label("Messages", systemImage: "message.fill") }
-                        .tag(AppState.Tab.messages)
-                        .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
-                }
-                .background(globalGradient)
-                #if os(iOS)
-                .toolbarBackground(.clear, for: .tabBar)
-                .toolbarBackground(.hidden, for: .tabBar)
-                #endif
-                .onChange(of: appState.currentTab) {
-                    if appState.currentTab == .messages { serverManager.markAsRead() }
-                }
-                .onAppear { configureTabBarAppearance() }
+
+                globalGradient
+                    .allowsHitTesting(false)
             }
         }
         .coordinateSpace(name: "ChannelViewSpace")
@@ -111,21 +121,11 @@ struct ChannelView: View {
     }
     
     private var globalGradient: some View {
-        let colors: [Color]
-        if colorScheme == .dark {
-            colors = [
-                Color(red: 0.20, green: 0.20, blue: 0.25),
-                Color(red: 0.07, green: 0.07, blue: 0.10)
-            ]
-        } else {
-            colors = [
-                Color(red: 0.92, green: 0.93, blue: 0.98),
-                Color(red: 0.82, green: 0.85, blue: 0.95)
-            ]
-        }
-
-        return LinearGradient(
-            gradient: Gradient(colors: colors),
+        LinearGradient(
+            colors: [
+                Color(red: 0.30, green: 0.30, blue: 0.62).opacity(0.07),
+                Color(red: 0.33, green: 0.32, blue: 0.75).opacity(0.10)
+            ],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -133,8 +133,12 @@ struct ChannelView: View {
     }
     
     private func calculateEffectiveChatWidth(totalWidth: CGFloat) -> CGFloat {
+        let handleWidth: CGFloat = 24
+        let preferred = userPreferredChatWidth < 0
+            ? (totalWidth - handleWidth) / 2
+            : userPreferredChatWidth
         let maxSafeWidth = totalWidth - minServerListWidth
-        let effective = min(userPreferredChatWidth, maxSafeWidth)
+        let effective = min(preferred, maxSafeWidth)
         return max(effective, minChatWidth)
     }
     
@@ -168,17 +172,6 @@ struct ServerChannelView: View {
     
     var body: some View {
         ZStack {
-            let backgroundColors: [Color] = colorScheme == .dark
-                ? [Color(red: 0.20, green: 0.20, blue: 0.25), Color(red: 0.07, green: 0.07, blue: 0.10)]
-                : [Color(red: 0.92, green: 0.93, blue: 0.98), Color(red: 0.82, green: 0.85, blue: 0.95)]
-
-            LinearGradient(
-                gradient: Gradient(colors: backgroundColors),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: kRowSpacing) {
                     Color.clear.frame(height: 10)
