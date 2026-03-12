@@ -50,7 +50,9 @@ extension ServerModelManager {
             timestamp: Date(),
             isSentBySelf: true
         )
-        messages.append(selfMessage)
+        DispatchQueue.main.async {
+            self.messages.append(selfMessage)
+        }
     }
 
     func sendPrivateMessage(_ text: String, to user: MKUser) {
@@ -74,7 +76,9 @@ extension ServerModelManager {
             isSentBySelf: true,
             privatePeerName: targetName
         )
-        messages.append(selfMessage)
+        DispatchQueue.main.async {
+            self.messages.append(selfMessage)
+        }
     }
 
     func sendImageMessage(image: PlatformImage, isHighQuality: Bool) async {

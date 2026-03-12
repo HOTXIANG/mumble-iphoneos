@@ -17,6 +17,11 @@ extern NSString *MUAppShowMessageNotification;
 // userInfo key: @"title", @"message"
 extern NSString *MUConnectionErrorNotification;
 
+// SSL 证书信任失败通知
+// userInfo keys: @"hostname", @"port", @"subjectName", @"issuerName",
+//               @"fingerprint", @"notBefore", @"notAfter", @"isChanged"
+extern NSString *MUCertificateTrustFailureNotification;
+
 @interface MUConnectionController : NSObject
 + (MUConnectionController *) sharedController;
 - (void) connectToHostname:(NSString *)hostName
@@ -27,6 +32,8 @@ extern NSString *MUConnectionErrorNotification;
               displayName:(NSString *)displayName;
 - (BOOL) isConnected;
 - (void) disconnectFromServer;
+- (void) acceptCertificateTrust;
+- (void) rejectCertificateTrust;
 @property (nonatomic, strong, readonly) NSString *lastWelcomeMessage;
 @property (nonatomic, readonly) MKServerModel *serverModel;
 @property (nonatomic, readonly) NSData *currentCertificateRef;

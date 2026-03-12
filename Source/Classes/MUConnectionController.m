@@ -21,6 +21,7 @@ NSString *MUConnectionOpenedNotification = @"MUConnectionOpenedNotification";
 NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
 NSString *MUConnectionConnectingNotification = @"MUConnectionConnectingNotification";
 NSString *MUConnectionErrorNotification = @"MUConnectionErrorNotification";
+NSString *MUCertificateTrustFailureNotification = @"MUCertificateTrustFailureNotification";
 
 NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
 
@@ -83,6 +84,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     NSString                   *_displayName;
     
     BOOL            _isUserInitiatedDisconnect;
+    BOOL            _waitingForCertDecision;
     NSTimer         *_reconnectTimer;
     NSInteger       _retryCount; // 重试计数器
     
@@ -276,8 +278,8 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 }
 
 - (void) establishConnection {
-    // 只有在 connectToHostname 中才重置为 0
     _isUserInitiatedDisconnect = NO;
+    _waitingForCertDecision = NO;
     
     // 启动网络监控
     [self startNetworkMonitor];
@@ -285,7 +287,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     _connection = [[MKConnection alloc] init];
     [_connection setDelegate:self];
     [_connection setForceTCP:[[NSUserDefaults standardUserDefaults] boolForKey:@"NetworkForceTCP"]];
-    [_connection setIgnoreSSLVerification:YES];
+    [_connection setIgnoreSSLVerification:NO];
     
     _serverModel = [[MKServerModel alloc] initWithConnection:_connection];
     [_serverModel addDelegate:self];
@@ -426,6 +428,11 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         return;
     }
     
+    if (_waitingForCertDecision) {
+        NSLog(@"🔐 Ignoring closedWithError while waiting for certificate trust decision.");
+        return;
+    }
+    
     // If the error is a codec incompatibility, don't retry — it will always fail
     if ([[err domain] isEqualToString:@"MKConnection"]) {
         NSLog(@"❌ Connection closed due to unrecoverable error: %@", [err localizedFailureReason] ?: [err localizedDescription]);
@@ -466,23 +473,77 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 }
 
 - (void) connection:(MKConnection*)conn unableToConnectWithError:(NSError *)err {
+    if (_waitingForCertDecision) return;
+    
     NSString *msg = [err localizedDescription];
     if ([[err domain] isEqualToString:NSOSStatusErrorDomain] && [err code] == -9806) {
         msg = NSLocalizedString(@"The TLS connection was closed due to an error.", nil);
     }
-    // 无法连接 -> 报错 -> teardown -> 回到首页
     [self postErrorWithTitle:NSLocalizedString(@"Unable to connect", nil) message:msg];
 }
 
 // ... (Rest of methods: trustFailure, rejected, serverModel delegates... ALL UNCHANGED) ...
 // 请保持剩余代码与之前一致
 - (void) connection:(MKConnection *)conn trustFailureInCertificateChain:(NSArray *)chain {
-    NSLog(@"⚠️ Certificate Trust Failure - Automatically trusting for now.");
     MKCertificate *cert = [[conn peerCertificates] firstObject];
     NSString *serverDigest = [cert hexDigest];
-    [MUDatabase storeDigest:serverDigest forServerWithHostname:[conn hostname] port:[conn port]];
-    [conn setIgnoreSSLVerification:YES];
-    [conn reconnect];
+    NSString *storedDigest = [MUDatabase digestForServerWithHostname:[conn hostname]
+                                                                port:(NSInteger)[conn port]];
+
+    if (storedDigest && [storedDigest isEqualToString:serverDigest]) {
+        NSLog(@"🔐 Certificate matches stored digest — auto-trusting.");
+        [conn setIgnoreSSLVerification:YES];
+        [conn reconnect];
+        return;
+    }
+
+    NSLog(@"⚠️ Certificate trust failure — prompting user (changed=%@).", storedDigest ? @"YES" : @"NO");
+    _waitingForCertDecision = YES;
+
+    NSString *subjectName = [cert subjectName] ?: NSLocalizedString(@"Unknown", nil);
+    NSString *issuerName  = [cert issuerName]  ?: NSLocalizedString(@"Unknown", nil);
+    NSString *fingerprint = serverDigest       ?: NSLocalizedString(@"Unknown", nil);
+
+    NSDateFormatter *df = [[NSDateFormatter alloc] init];
+    [df setDateStyle:NSDateFormatterMediumStyle];
+    [df setTimeStyle:NSDateFormatterShortStyle];
+    NSString *notBefore = [cert notBefore] ? [df stringFromDate:[cert notBefore]] : @"—";
+    NSString *notAfter  = [cert notAfter]  ? [df stringFromDate:[cert notAfter]]  : @"—";
+
+    NSDictionary *info = @{
+        @"hostname":    [conn hostname] ?: @"",
+        @"port":        @([conn port]),
+        @"subjectName": subjectName,
+        @"issuerName":  issuerName,
+        @"fingerprint": fingerprint,
+        @"notBefore":   notBefore,
+        @"notAfter":    notAfter,
+        @"isChanged":   @(storedDigest != nil),
+    };
+
+    [CertTrustBridge handleTrustFailure:info];
+}
+
+- (void) acceptCertificateTrust {
+    _waitingForCertDecision = NO;
+
+    MKCertificate *cert = [_connection peerCertificates].firstObject;
+    NSString *digest = [cert hexDigest];
+    if (digest) {
+        [MUDatabase storeDigest:digest forServerWithHostname:_hostname port:(NSInteger)_port];
+        NSLog(@"🔐 User accepted certificate trust — digest stored.");
+    }
+
+    [self teardownConnection];
+    [self establishConnection];
+}
+
+- (void) rejectCertificateTrust {
+    _waitingForCertDecision = NO;
+    NSLog(@"🚫 User rejected certificate trust.");
+    [self teardownConnection];
+    [self postErrorWithTitle:NSLocalizedString(@"Connection Rejected", nil)
+                     message:NSLocalizedString(@"The server's certificate was not trusted.", nil)];
 }
 
 - (void) connection:(MKConnection *)conn rejectedWithReason:(MKRejectReason)reason explanation:(NSString *)explanation {

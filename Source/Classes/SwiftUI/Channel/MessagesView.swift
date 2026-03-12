@@ -2006,12 +2006,13 @@ private struct PlatformMessageTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate {
         func textView(
             _ textView: UITextView,
-            shouldInteractWith url: URL,
-            in characterRange: NSRange,
-            interaction: UITextItemInteraction
-        ) -> Bool {
-            UIApplication.shared.open(url)
-            return false
+            primaryActionFor textItem: UITextItem,
+            defaultAction: UIAction
+        ) -> UIAction? {
+            if case .link(let url) = textItem.content {
+                return UIAction { _ in UIApplication.shared.open(url) }
+            }
+            return defaultAction
         }
     }
 }

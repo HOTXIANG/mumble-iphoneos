@@ -1022,6 +1022,30 @@ struct AppRootView: View {
         .alert(item: $appState.activeError) { error in
             Alert(title: Text(error.title), message: Text(error.message), dismissButton: .default(Text("OK")))
         }
+        .alert(item: $appState.pendingCertTrust) { info in
+            let title = info.isChanged
+                ? NSLocalizedString("Certificate Changed", comment: "")
+                : NSLocalizedString("Untrusted Certificate", comment: "")
+            let body = """
+            \(info.hostname):\(info.port)
+
+            \(NSLocalizedString("Subject", comment: "")): \(info.subjectName)
+            \(NSLocalizedString("Issuer", comment: "")): \(info.issuerName)
+            \(NSLocalizedString("Valid", comment: "")): \(info.notBefore) – \(info.notAfter)
+
+            SHA1: \(info.fingerprint)
+            """
+            return Alert(
+                title: Text(title),
+                message: Text(body),
+                primaryButton: .default(Text(NSLocalizedString("Trust", comment: ""))) {
+                    MUConnectionController.shared()?.acceptCertificateTrust()
+                },
+                secondaryButton: .cancel {
+                    MUConnectionController.shared()?.rejectCertificateTrust()
+                }
+            )
+        }
         .onReceive(NotificationCenter.default.publisher(for: .mumbleShowVADTutorialAgain)) { _ in
             // Delay to avoid racing with settings-sheet onDismiss stopAudioTest().
             // We re-open tutorial after settings has fully dismissed.

@@ -33,6 +33,7 @@ extension Notification.Name {
     static let mkListeningChannelRemove  = Notification.Name("MKListeningChannelRemoveNotification")
 
     static let muPreferencesChanged      = Notification.Name("MumblePreferencesChanged")
+    static let muCertificateTrustFailure = Notification.Name("MUCertificateTrustFailureNotification")
 
     #if os(macOS)
     static let muMacAudioInputDevicesChanged = Notification.Name("MUMacAudioInputDevicesChanged")
@@ -61,6 +62,46 @@ struct AppError: Identifiable {
     let message: String
 }
 
+struct CertTrustInfo: Identifiable {
+    let id = UUID()
+    let hostname: String
+    let port: Int
+    let subjectName: String
+    let issuerName: String
+    let fingerprint: String
+    let notBefore: String
+    let notAfter: String
+    let isChanged: Bool
+}
+
+@objc class CertTrustBridge: NSObject {
+    @objc static func handleTrustFailure(_ info: NSDictionary) {
+        NSLog("📜 CertTrustBridge.handleTrustFailure called")
+        let hostname    = info["hostname"]    as? String ?? ""
+        let port        = (info["port"]       as? NSNumber)?.intValue ?? 0
+        let subjectName = info["subjectName"] as? String ?? "Unknown"
+        let issuerName  = info["issuerName"]  as? String ?? "Unknown"
+        let fingerprint = info["fingerprint"] as? String ?? "Unknown"
+        let notBefore   = info["notBefore"]   as? String ?? "—"
+        let notAfter    = info["notAfter"]    as? String ?? "—"
+        let isChanged   = (info["isChanged"]  as? NSNumber)?.boolValue ?? false
+
+        DispatchQueue.main.async {
+            let state = AppState.shared
+            state.isConnecting = false
+            state.pendingCertTrust = CertTrustInfo(
+                hostname: hostname, port: port,
+                subjectName: subjectName, issuerName: issuerName,
+                fingerprint: fingerprint,
+                notBefore: notBefore, notAfter: notAfter,
+                isChanged: isChanged
+            )
+            NSLog("📜 CertTrustBridge: isConnecting=%d, pendingCertTrust=%@",
+                  state.isConnecting, state.pendingCertTrust != nil ? "SET" : "nil")
+        }
+    }
+}
+
 @MainActor
 class AppState: ObservableObject {
     // --- 核心修改 1：将 Tab 的定义移到这里 ---
@@ -75,6 +116,7 @@ class AppState: ObservableObject {
     @Published var isUserAuthenticated: Bool = false
     @Published var activeError: AppError?
     @Published var activeToast: AppToast?
+    @Published var pendingCertTrust: CertTrustInfo?
     @Published var isRegistering: Bool = false
     
     var pendingRegistration = false
@@ -230,6 +272,8 @@ class AppState: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Certificate trust failure is now handled directly via CertTrustBridge.handleTrustFailure(_:)
+
         center.publisher(for: .muAppShowMessage)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
