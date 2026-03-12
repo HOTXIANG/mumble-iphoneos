@@ -125,7 +125,11 @@ struct TintedGlassRowModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     var isHighlighted: Bool
     var highlightColor: Color
+    #if os(iOS)
+    var cornerRadius: CGFloat = 13
+    #else
     var cornerRadius: CGFloat = 12
+    #endif
 
     func body(content: Content) -> some View {
         let highlightTint: Color = colorScheme == .light

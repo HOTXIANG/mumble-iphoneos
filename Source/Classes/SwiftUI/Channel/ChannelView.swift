@@ -46,7 +46,7 @@ struct ChannelView: View {
     @StateObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
     
-    @State private var userPreferredChatWidth: CGFloat = 320
+    @State private var userPreferredChatWidth: CGFloat = 420
     private let minChatWidth: CGFloat = 300
     private let minServerListWidth: CGFloat = {
         #if os(macOS)

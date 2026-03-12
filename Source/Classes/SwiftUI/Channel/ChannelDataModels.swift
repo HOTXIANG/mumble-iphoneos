@@ -111,6 +111,6 @@ struct ChatMessage: Identifiable, Equatable {
     
     // 为了方便，我们保留一个纯文本的计算属性
     var plainTextMessage: String {
-        return attributedMessage.description
+        String(attributedMessage.characters)
     }
 }

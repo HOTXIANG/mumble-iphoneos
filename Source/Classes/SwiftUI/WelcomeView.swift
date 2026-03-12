@@ -1057,7 +1057,7 @@ struct AppRootView: View {
                         .background(Color.clear)
                 }
                 .environmentObject(sidebarNavigationManager)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 290, max: 360)
+                .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
                 .background(Color.clear)
             } detail: {
                 ZStack {

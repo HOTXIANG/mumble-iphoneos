@@ -1454,6 +1454,7 @@ private struct MacPreviewCloseButtonGlassModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macOS 26.0, *) {
             content
+                .background(Circle().fill(colorScheme == .dark ? Color.black.opacity(0.15) : Color.white.opacity(0.15)))
                 .glassEffect(.clear.interactive().tint(glassTint), in: .circle)
                 .shadow(
                     color: colorScheme == .light ? .black.opacity(0.10) : .black.opacity(0.18),
@@ -1681,10 +1682,10 @@ struct MessagesList: View {
                                 }
                             }
                         }
-                        Spacer().frame(height: 10).id(bottomID)
+                        Color.clear.frame(height: 1).id(bottomID)
                     }
                     .padding(.top, 16)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 4)
                     .padding(.leading, isSplitLayout ? 4 : 16)
                     .padding(.trailing, 16)
                     .offset(y: layoutCompensationY)
@@ -1877,6 +1878,200 @@ private struct NotificationMessageView: View {
     }
 }
 
+#if os(macOS)
+private typealias MessagePlatformColor = NSColor
+private typealias MessagePlatformFont = NSFont
+#else
+private typealias MessagePlatformColor = UIColor
+private typealias MessagePlatformFont = UIFont
+#endif
+
+private func makeMessageBodyAttributedString(
+    text: String,
+    baseColor: MessagePlatformColor,
+    linkColor: MessagePlatformColor,
+    font: MessagePlatformFont
+) -> NSAttributedString {
+    let mutable = NSMutableAttributedString(string: text)
+    let fullRange = NSRange(location: 0, length: mutable.length)
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.lineBreakMode = .byCharWrapping
+    
+    mutable.addAttributes(
+        [
+            .font: font,
+            .foregroundColor: baseColor,
+            .paragraphStyle: paragraphStyle
+        ],
+        range: fullRange
+    )
+    
+    if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
+        detector.enumerateMatches(in: text, options: [], range: fullRange) { result, _, _ in
+            guard let result, let url = result.url else { return }
+            mutable.addAttributes(
+                [
+                    .link: url,
+                    .foregroundColor: linkColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue
+                ],
+                range: result.range
+            )
+        }
+    }
+    
+    return mutable
+}
+
+private struct MessageBodyTextView: View {
+    let text: String
+    let isSentBySelf: Bool
+    
+    #if os(macOS)
+    @Environment(\.colorScheme) private var colorScheme
+    #endif
+    
+    private var attributedText: NSAttributedString {
+        #if os(macOS)
+        let baseColor = isSentBySelf ? NSColor.white : NSColor.labelColor
+        let linkColor = NSColor.systemPink
+        let font = NSFont.systemFont(ofSize: 13)
+        #else
+        let baseColor = isSentBySelf ? UIColor.white : UIColor.label
+        let linkColor = UIColor.systemPink
+        let font = UIFont.systemFont(ofSize: 17)
+        #endif
+        
+        return makeMessageBodyAttributedString(
+            text: text,
+            baseColor: baseColor,
+            linkColor: linkColor,
+            font: font
+        )
+    }
+    
+    var body: some View {
+        Text(text)
+            #if os(macOS)
+            .font(.system(size: 13))
+            #else
+            .font(.system(size: 17))
+            #endif
+            .fixedSize(horizontal: false, vertical: true)
+            .hidden()
+            .overlay(alignment: .topLeading) {
+                PlatformMessageTextView(attributedText: attributedText)
+            }
+    }
+}
+
+#if os(iOS)
+private struct PlatformMessageTextView: UIViewRepresentable {
+    let attributedText: NSAttributedString
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView(frame: .zero)
+        textView.backgroundColor = .clear
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isScrollEnabled = false
+        textView.delegate = context.coordinator
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.textContainer.lineBreakMode = .byCharWrapping
+        textView.adjustsFontForContentSizeCategory = true
+        textView.linkTextAttributes = [
+            .foregroundColor: UIColor.systemPink,
+            .underlineStyle: NSUnderlineStyle.single.rawValue
+        ]
+        return textView
+    }
+    
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        uiView.attributedText = attributedText
+    }
+    
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        let width = proposal.width ?? 0
+        guard width > 0 else { return nil }
+        let target = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+        let size = uiView.sizeThatFits(target)
+        return CGSize(width: width, height: ceil(size.height))
+    }
+    
+    final class Coordinator: NSObject, UITextViewDelegate {
+        func textView(
+            _ textView: UITextView,
+            shouldInteractWith url: URL,
+            in characterRange: NSRange,
+            interaction: UITextItemInteraction
+        ) -> Bool {
+            UIApplication.shared.open(url)
+            return false
+        }
+    }
+}
+#else
+private struct PlatformMessageTextView: NSViewRepresentable {
+    let attributedText: NSAttributedString
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    func makeNSView(context: Context) -> NSTextView {
+        let textView = NSTextView(frame: .zero)
+        textView.drawsBackground = false
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = true
+        textView.importsGraphics = false
+        textView.allowsUndo = false
+        textView.delegate = context.coordinator
+        textView.textContainerInset = .zero
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.lineBreakMode = .byCharWrapping
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = true
+        textView.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.linkTextAttributes = [
+            .foregroundColor: NSColor.systemPink,
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .cursor: NSCursor.pointingHand
+        ]
+        return textView
+    }
+    
+    func updateNSView(_ nsView: NSTextView, context: Context) {
+        nsView.textStorage?.setAttributedString(attributedText)
+    }
+    
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSTextView, context: Context) -> CGSize? {
+        let width = proposal.width ?? 0
+        guard width > 0, let textContainer = nsView.textContainer, let layoutManager = nsView.layoutManager else {
+            return nil
+        }
+        textContainer.containerSize = CGSize(width: width, height: .greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        return CGSize(width: width, height: ceil(usedRect.height))
+    }
+    
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+            guard let url = link as? URL else { return false }
+            NSWorkspace.shared.open(url)
+            return true
+        }
+    }
+}
+#endif
+
 private struct SenderStickyHeaderView: View {
     let title: String
     let isSentBySelf: Bool
@@ -1897,6 +2092,10 @@ private struct SenderStickyHeaderView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .fixedSize(horizontal: true, vertical: false)
+                    .background(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(colorScheme == .dark ? Color.black.opacity(0.15) : Color.white.opacity(0.15))
+                    )
                     .glassEffect(
                         .clear.tint(colorScheme == .light ? Color.black.opacity(0.08) : Color.clear),
                         in: .rect(cornerRadius: 13)
@@ -1945,8 +2144,18 @@ private struct MessageBubbleView: View {
     let showSenderName: Bool
     let showTimestamp: Bool
     
+    #if os(macOS)
+    private let selfMinGap: CGFloat = 60
+    private let otherMinGap: CGFloat = 80
+    #else
+    private let selfMinGap: CGFloat = 32
+    private let otherMinGap: CGFloat = 40
+    #endif
+    
     var body: some View {
-        VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
+        HStack {
+            if message.isSentBySelf { Spacer(minLength: selfMinGap) }
+            VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
             if showSenderName && !message.isSentBySelf {
                 Text(message.senderName)
                     .font(.system(size: 13, weight: .semibold))
@@ -1955,9 +2164,10 @@ private struct MessageBubbleView: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 if !message.plainTextMessage.isEmpty {
-                    Text(message.attributedMessage)
-                        .tint(.pink)
-                        .textSelection(.enabled)
+                    MessageBodyTextView(
+                        text: message.plainTextMessage,
+                        isSentBySelf: message.isSentBySelf
+                    )
                 }
                 if !message.images.isEmpty {
                     ForEach(0..<message.images.count, id: \.self) { index in
@@ -2008,6 +2218,7 @@ private struct MessageBubbleView: View {
                 message.isSentBySelf ? Color.accentColor : Color.systemGray3,
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
+            .foregroundColor(message.isSentBySelf ? .white : .primary)
             #else
             .padding(.horizontal, message.images.isEmpty ? 16 : 12)
             .padding(.vertical, 12)
@@ -2015,8 +2226,8 @@ private struct MessageBubbleView: View {
                 message.isSentBySelf ? Color.accentColor : Color.systemGray3,
                 in: RoundedRectangle(cornerRadius: 24, style: .continuous)
             )
-            #endif
             .foregroundColor(message.isSentBySelf ? .white : .primary)
+            #endif
             
             if showTimestamp {
                 Text(message.timestamp, style: .time)
@@ -2024,8 +2235,9 @@ private struct MessageBubbleView: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 4)
             }
+            }
+            if !message.isSentBySelf { Spacer(minLength: otherMinGap) }
         }
-        .frame(maxWidth: .infinity, alignment: message.isSentBySelf ? .trailing : .leading)
     }
 }
 
@@ -2038,8 +2250,18 @@ private struct PrivateMessageBubbleView: View {
     let showSenderLabel: Bool
     let showTimestamp: Bool
     
+    #if os(macOS)
+    private let selfMinGap: CGFloat = 60
+    private let otherMinGap: CGFloat = 80
+    #else
+    private let selfMinGap: CGFloat = 32
+    private let otherMinGap: CGFloat = 40
+    #endif
+    
     var body: some View {
-        VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
+        HStack {
+            if message.isSentBySelf { Spacer(minLength: selfMinGap) }
+            VStack(alignment: message.isSentBySelf ? .trailing : .leading, spacing: 4) {
             // 私聊标签
             if showSenderLabel {
                 HStack(spacing: 4) {
@@ -2070,9 +2292,10 @@ private struct PrivateMessageBubbleView: View {
             // 消息内容
             VStack(alignment: .leading, spacing: 6) {
                 if !message.plainTextMessage.isEmpty {
-                    Text(message.attributedMessage)
-                        .tint(.pink)
-                        .textSelection(.enabled)
+                    MessageBodyTextView(
+                        text: message.plainTextMessage,
+                        isSentBySelf: message.isSentBySelf
+                    )
                 }
                 if !message.images.isEmpty {
                     ForEach(0..<message.images.count, id: \.self) { index in
@@ -2129,6 +2352,7 @@ private struct PrivateMessageBubbleView: View {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.purple.opacity(0.5), lineWidth: 1)
             )
+            .foregroundColor(message.isSentBySelf ? .white : .primary)
             #else
             .padding(.horizontal, message.images.isEmpty ? 16 : 12)
             .padding(.vertical, 12)
@@ -2142,9 +2366,8 @@ private struct PrivateMessageBubbleView: View {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .stroke(Color.purple.opacity(0.5), lineWidth: 1)
             )
-            #endif
-            
             .foregroundColor(message.isSentBySelf ? .white : .primary)
+            #endif
             
             if showTimestamp {
                 Text(message.timestamp, style: .time)
@@ -2152,8 +2375,9 @@ private struct PrivateMessageBubbleView: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 4)
             }
+            }
+            if !message.isSentBySelf { Spacer(minLength: otherMinGap) }
         }
-        .frame(maxWidth: .infinity, alignment: message.isSentBySelf ? .trailing : .leading)
     }
 }
 
@@ -2257,20 +2481,27 @@ private struct TextInputBar: View {
         GlassEffectContainer(spacing: 10.0) {
             HStack(alignment: .bottom, spacing: 10.0) {
                 photoPickerView
+                    .background(Circle().fill(glassReadabilityColor))
                     .glassEffect(.clear.interactive().tint(photoPickerGlassTint), in: .circle)
                     .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
                 
                 messageTextField
+                    .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(glassReadabilityColor))
                     .glassEffect(.clear.interactive().tint(messageFieldGlassTint), in: .rect(cornerRadius: 20.0))
                     .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
                 
                 sendButton
+                    .background(Circle().fill(glassReadabilityColor))
                     .glassEffect(.clear.interactive().tint(sendButtonGlassTint), in: .circle)
                     .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
         }
+    }
+
+    private var glassReadabilityColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.35) : Color.white.opacity(0.35)
     }
 
     @available(iOS 26.0, macOS 26.0, *)
@@ -2356,10 +2587,10 @@ private struct TextInputBar: View {
         TextField(
             "",
             text: $text,
-            prompt: Text("Type a message..."),
+            prompt: Text("Type a message...").foregroundColor(.secondary),
             axis: .vertical
         )
-            .modifier(StickyHeaderAdaptiveTextModifier(opacity: text.isEmpty ? 0.58 : 1.0))
+            .foregroundStyle(.primary)
             .focused($isFocused)
             #if os(macOS)
             .font(.system(size: 12))
@@ -2381,14 +2612,21 @@ private struct TextInputBar: View {
                 }
                 return .ignored
             }
-            // macOS: 当剪贴板里只有图片（无字符串）时，NSTextField 会把系统 Paste 菜单置灰。
-            // 这里直接拦截 ⌘V，从 NSPasteboard 读图并触发发送图片弹窗。
             .onKeyPress(KeyEquivalent("v"), phases: .down) { keyPress in
                 guard keyPress.modifiers.contains(.command) else { return .ignored }
                 return handleMacPasteFromPasteboard() ? .handled : .ignored
             }
             .onPasteCommand(of: [.image]) { providers in
                 handlePastedImages(providers)
+            }
+            #else
+            .onKeyPress(.return, phases: .down) { keyPress in
+                if keyPress.modifiers.contains(.command) {
+                    text += "\n"
+                    return .handled
+                }
+                onSendText()
+                return .handled
             }
             #endif
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -2457,24 +2695,23 @@ private struct TextInputBar: View {
     
     private var sendButton: some View {
         Button(action: onSendText) {
-            Image(systemName: "arrow.up")
+            Circle()
+                .fill(Color.white.opacity(0.001))
                 #if os(macOS)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
                 .frame(width: 32, height: 32)
                 #else
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
                 .frame(width: 40, height: 40)
                 #endif
+                .overlay(
+                    Image(systemName: "arrow.up")
+                        #if os(macOS)
+                        .font(.system(size: 16, weight: .semibold))
+                        #else
+                        .font(.system(size: 17, weight: .semibold))
+                        #endif
+                        .foregroundColor(.white)
+                )
         }
-        #if os(macOS)
-        .frame(width: 32, height: 32)
-        #else
-        .frame(width: 40, height: 40)
-        #endif
-        .clipShape(Circle())
-        .contentShape(Circle())
         .buttonStyle(.plain)
         .disabled(text.isEmpty)
     }

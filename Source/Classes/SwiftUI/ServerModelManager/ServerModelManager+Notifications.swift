@@ -653,15 +653,8 @@ extension ServerModelManager {
 
     // 新增：一个用于将纯文本转换为 AttributedString 的辅助函数
     func attributedString(from plainText: String) -> AttributedString {
-        do {
-            // 使用 Markdown 解析器来自动识别链接
-            // `inlineOnlyPreservingWhitespace` 选项能最好地保留原始文本的格式
-            return try AttributedString(markdown: plainText, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
-        } catch {
-            // 如果 Markdown 解析失败，则返回一个普通的字符串
-            print("Could not parse markdown: \(error)")
-            return AttributedString(plainText)
-        }
+        // 保持原始纯文本，避免 Markdown 解析在超长 URL 场景下吞掉内容。
+        AttributedString(plainText)
     }
 
     // 替换为系统级、更健壮的 Data URI 解析方法
