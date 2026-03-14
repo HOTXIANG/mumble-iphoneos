@@ -219,4 +219,85 @@ extension ServerModelManager {
             wasMutedBeforeServerDeafen.removeValue(forKey: session)
         }
     }
+
+    // MARK: - Kick/Ban Operations
+
+    /// 踢出用户（管理员操作，需要 Kick 权限）
+    func kickUser(_ user: MKUser, reason: String? = nil) {
+        serverModel?.kick(user, forReason: reason)
+    }
+
+    /// 封禁用户（管理员操作，需要 Ban 权限）
+    func banUser(_ user: MKUser, reason: String? = nil) {
+        serverModel?.ban(user, forReason: reason)
+    }
+
+    // MARK: - Channel Link Operations
+
+    /// 链接两个频道（管理员操作，需要 LinkChannel 权限）
+    func linkChannel(_ channel: MKChannel, to target: MKChannel) {
+        serverModel?.linkChannel(channel, to: target)
+    }
+
+    /// 取消两个频道的链接
+    func unlinkChannel(_ channel: MKChannel, from target: MKChannel) {
+        serverModel?.unlinkChannel(channel, from: target)
+    }
+
+    /// 取消频道的所有链接
+    func unlinkAllForChannel(_ channel: MKChannel) {
+        serverModel?.unlinkAll(for: channel)
+    }
+
+    // MARK: - Priority Speaker
+
+    /// 设置优先说话者状态（管理员操作）
+    func setPrioritySpeaker(_ prioritySpeaker: Bool, for user: MKUser) {
+        serverModel?.setPrioritySpeaker(prioritySpeaker, for: user)
+    }
+
+    // MARK: - User Comment Reset
+
+    /// 重置其他用户的评论（管理员操作）
+    func resetUserComment(for user: MKUser) {
+        serverModel?.setSelfComment("")
+    }
+
+    // MARK: - Ban List Operations
+
+    /// 请求服务器的封禁列表
+    func requestBanList() {
+        serverModel?.requestBanList()
+    }
+
+    /// 发送更新后的封禁列表到服务器
+    func sendBanList(_ entries: [Any]) {
+        serverModel?.sendBanList(entries)
+    }
+
+    // MARK: - Registered User List
+
+    /// 请求注册用户列表
+    func requestRegisteredUserList() {
+        serverModel?.requestUserList()
+    }
+
+    // MARK: - User Stats
+
+    /// 请求用户统计信息
+    func requestUserStats(for user: MKUser) {
+        serverModel?.requestStats(for: user)
+    }
+
+    // MARK: - User Texture
+
+    /// 设置当前用户的头像
+    func setSelfTexture(_ data: Data?) {
+        serverModel?.setSelfTexture(data)
+    }
+
+    /// 移除当前用户的头像
+    func removeSelfTexture() {
+        serverModel?.setSelfTexture(nil)
+    }
 }

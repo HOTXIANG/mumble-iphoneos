@@ -10,6 +10,10 @@ struct ChannelListView: View {
     @State private var showingPrefs = false
     #endif
     @State private var showingCertInfo = false
+    @State private var showingBanList = false
+    @State private var showingUserList = false
+    @State private var showingTokens = false
+    @State private var channelSearchText = ""
     
     #if os(macOS)
     // macOS: 监听菜单栏通知
@@ -72,6 +76,7 @@ struct ChannelListView: View {
         .toolbarBackground(.clear, for: .windowToolbar)
         .toolbarBackground(.hidden, for: .windowToolbar)
         #endif
+        .searchable(text: $channelSearchText, prompt: "Search channels and users")
         .toolbar {
             leadingToolbarItems
             trailingToolbarItems
@@ -86,6 +91,15 @@ struct ChannelListView: View {
         #endif
         .sheet(isPresented: $showingCertInfo) {
             ServerCertificateDetailView()
+        }
+        .sheet(isPresented: $showingBanList) {
+            BanListView(serverManager: serverManager)
+        }
+        .sheet(isPresented: $showingUserList) {
+            RegisteredUserListView(serverManager: serverManager)
+        }
+        .sheet(isPresented: $showingTokens) {
+            AccessTokensView(serverManager: serverManager)
         }
         #if os(macOS)
         .onReceive(showCertInfoPublisher) { _ in showingCertInfo = true }
@@ -251,6 +265,24 @@ struct ChannelListView: View {
         } else {
             Button(action: { serverManager.registerSelf() }) {
                 Label("Register User", systemImage: "person.badge.plus")
+            }
+        }
+        
+        Divider()
+        
+        Button(action: { showingTokens = true }) {
+            Label("Access Tokens", systemImage: "key")
+        }
+        
+        if serverManager.hasRootPermission(MKPermissionBan) {
+            Button(action: { showingBanList = true }) {
+                Label("Ban List", systemImage: "nosign")
+            }
+        }
+        
+        if serverManager.hasRootPermission(MKPermissionRegister) {
+            Button(action: { showingUserList = true }) {
+                Label("Registered Users", systemImage: "person.2")
             }
         }
         

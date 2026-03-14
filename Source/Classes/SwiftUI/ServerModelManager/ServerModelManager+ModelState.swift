@@ -100,7 +100,8 @@ extension ServerModelManager {
             isDeafenedByServer: user.isDeafened(),
             isLocallyMuted: user.isLocalMuted(),
             isSuppressed: user.isSuppressed(),
-            isPrioritySpeaker: user.isPrioritySpeaker()
+            isPrioritySpeaker: user.isPrioritySpeaker(),
+            isRecording: user.isRecording()
         )
         item.state = state
 

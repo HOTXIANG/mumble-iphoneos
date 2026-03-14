@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import PhotosUI
 
 // MARK: - HTML WebView (WKWebView wrapper for full HTML rendering)
 
@@ -216,6 +217,7 @@ struct UserInfoView: View {
     @State private var editText: String = ""
     @State private var isLoading: Bool = true
     @State private var contentHeight: CGFloat = 60
+    @State private var showingAvatarPicker = false
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -249,13 +251,39 @@ struct UserInfoView: View {
                 }
                 if isSelf && !isEditing {
                     ToolbarItem(placement: .automatic) {
-                        Button("Edit") {
-                            editText = comment
-                            isEditing = true
+                        Menu {
+                            Button("Edit Comment") {
+                                editText = comment
+                                isEditing = true
+                            }
+                            Divider()
+                            Button("Change Avatar") {
+                                showingAvatarPicker = true
+                            }
+                            Button("Remove Avatar", role: .destructive) {
+                                MUConnectionController.shared()?.serverModel?.setSelfTexture(nil)
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
                         }
                     }
                 }
             }
+            #if os(iOS)
+            .photosPicker(isPresented: $showingAvatarPicker, selection: Binding(
+                get: { nil as PhotosPickerItem? },
+                set: { item in
+                    guard let item = item else { return }
+                    Task {
+                        if let data = try? await item.loadTransferable(type: Data.self) {
+                            await MainActor.run {
+                                MUConnectionController.shared()?.serverModel?.setSelfTexture(data)
+                            }
+                        }
+                    }
+                }
+            ))
+            #endif
         }
         .onAppear {
             loadComment()

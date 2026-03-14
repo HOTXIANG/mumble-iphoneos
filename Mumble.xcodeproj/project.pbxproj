@@ -32,7 +32,10 @@
 		28F79CA9147AB62B0003B8BA /* MUNotificationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79CA8147AB6280003B8BA /* MUNotificationController.m */; };
 		28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */; };
 		44E53C4DB0AD4B088D21543C /* ChannelACLView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887CCAF0AFAE458197F53930 /* ChannelACLView.swift */; };
+		487C45A59D5135DF946B8FFB /* UserStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF64934909A8082804D6BBC /* UserStatsView.swift */; };
+		78094BC6859362D7EA9854EB /* RegisteredUserListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FB44BFADE5C80A0B70511D /* RegisteredUserListView.swift */; };
 		8A6AB2D5876A40B1BA1F9378 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */; };
+		983C46298C9629FBE379324A /* AccessTokensView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803F4F108CE0874978A2BE58 /* AccessTokensView.swift */; };
 		A1B2C3D42F90100100ABC001 /* RichTextEditorShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42F90100100ABC002 /* RichTextEditorShell.swift */; };
 		A1B2C3D52F90100100ABC001 /* RichTextEditorImageCompression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D52F90100100ABC002 /* RichTextEditorImageCompression.swift */; };
 		AA000002BBBB000000000001 /* PlatformTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002BBBB000000000002 /* PlatformTypes.swift */; };
@@ -41,6 +44,7 @@
 		B1C2D3E42F90200100ABC001 /* ServerModelManager+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E42F90200100ABC002 /* ServerModelManager+Controls.swift */; };
 		B1C2D3E52F90200100ABC001 /* ServerModelManager+Channels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */; };
 		C1D2E3F42F90300100ABC001 /* ChannelInteropTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F42F90300100ABC002 /* ChannelInteropTypes.swift */; };
+		C96B4F96B9E21D00CBF36130 /* BanListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63644AF383CF5E35BD96204F /* BanListView.swift */; };
 		D1E2F3A42F90400100ABC001 /* HandoffProfilePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */; };
 		D1E2F3A52F90400100ABC001 /* AudioBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A52F90400100ABC002 /* AudioBarView.swift */; };
 		E1F2A3B42F90500100ABC001 /* ServerModelManager+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B42F90500100ABC002 /* ServerModelManager+Notifications.swift */; };
@@ -297,9 +301,12 @@
 		28F9E1BD15EBDF2400D52001 /* MURemoteControlServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MURemoteControlServer.h; sourceTree = "<group>"; };
 		28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MURemoteControlServer.m; sourceTree = "<group>"; };
 		32CA4F630368D1EE00C91783 /* Mumble.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Mumble.pch; path = Source/Mumble.pch; sourceTree = "<group>"; };
+		63644AF383CF5E35BD96204F /* BanListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BanListView.swift; path = Source/Classes/SwiftUI/Channel/BanListView.swift; sourceTree = SOURCE_ROOT; };
 		7176F3B54CC74E79BC7D5A94 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
+		803F4F108CE0874978A2BE58 /* AccessTokensView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccessTokensView.swift; path = Source/Classes/SwiftUI/Channel/AccessTokensView.swift; sourceTree = SOURCE_ROOT; };
 		887CCAF0AFAE458197F53930 /* ChannelACLView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelACLView.swift; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Source/Info.plist; plistStructureDefinitionIdentifier = "com.apple.xcode.plist.structure-definition.iphone.info-plist"; sourceTree = "<group>"; };
+		99FB44BFADE5C80A0B70511D /* RegisteredUserListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RegisteredUserListView.swift; path = Source/Classes/SwiftUI/Channel/RegisteredUserListView.swift; sourceTree = SOURCE_ROOT; };
 		A1B2C3D42F90100100ABC002 /* RichTextEditorShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditorShell.swift; sourceTree = "<group>"; };
 		A1B2C3D52F90100100ABC002 /* RichTextEditorImageCompression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditorImageCompression.swift; sourceTree = "<group>"; };
 		AA000002BBBB000000000002 /* PlatformTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformTypes.swift; sourceTree = "<group>"; };
@@ -395,17 +402,18 @@
 		F4D1A0B32FA1000100AABBCC /* PreferencesView+iOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+iOS.swift"; sourceTree = "<group>"; };
 		F4D1A0B42FA1000100AABBCC /* PreferencesView+macOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+macOS.swift"; sourceTree = "<group>"; };
 		F4D1A0B62FA1000100AABBCC /* PreferencesView+SharedViews+iOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+SharedViews+iOS.swift"; sourceTree = "<group>"; };
+		FFF64934909A8082804D6BBC /* UserStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = UserStatsView.swift; path = Source/Classes/SwiftUI/Channel/UserStatsView.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		F2CBB0612F090CE300D88E21 /* Exceptions for "MumbleWidget" folder in "MumbleWidgetExtension" target */ = {
+		F2CBB0612F090CE300D88E21 = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
 			target = F2CBB04A2F090CE200D88E21 /* MumbleWidgetExtension */;
 		};
-		F2CBB06B2F090FD700D88E21 /* Exceptions for "MumbleWidget" folder in "Mumble" target */ = {
+		F2CBB06B2F090FD700D88E21 = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				MumbleActivityAttributes.swift,
@@ -416,15 +424,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		F2CBB0502F090CE200D88E21 /* MumbleWidget */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				F2CBB06B2F090FD700D88E21 /* Exceptions for "MumbleWidget" folder in "Mumble" target */,
-				F2CBB0612F090CE300D88E21 /* Exceptions for "MumbleWidget" folder in "MumbleWidgetExtension" target */,
-			);
-			path = MumbleWidget;
-			sourceTree = "<group>";
-		};
+		F2CBB0502F090CE200D88E21 /* MumbleWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (F2CBB06B2F090FD700D88E21, F2CBB0612F090CE300D88E21, ); path = MumbleWidget; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -610,6 +610,10 @@
 				29B97323FDCFA39411CA2CEA /* Frameworks */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
 				285E2A5F150D7287008AE185 /* Build Configuration */,
+				63644AF383CF5E35BD96204F /* BanListView.swift */,
+				803F4F108CE0874978A2BE58 /* AccessTokensView.swift */,
+				99FB44BFADE5C80A0B70511D /* RegisteredUserListView.swift */,
+				FFF64934909A8082804D6BBC /* UserStatsView.swift */,
 			);
 			name = CustomTemplate;
 			sourceTree = "<group>";
@@ -819,9 +823,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = F2CBB0622F090CE300D88E21 /* Build configuration list for PBXNativeTarget "MumbleWidgetExtension" */;
 			buildPhases = (
-				F2CBB0472F090CE200D88E21 /* Sources */,
 				F2CBB0482F090CE200D88E21 /* Frameworks */,
-				F2CBB0492F090CE200D88E21 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -983,13 +985,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		F2CBB0492F090CE200D88E21 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
@@ -1103,13 +1098,10 @@
 				F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */,
 				F28C6AFB2EE7010300DE9CD2 /* PTTButton.swift in Sources */,
 				F28C6AF42EE6F74500DE9CD2 /* AudioMeterModel.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F2CBB0472F090CE200D88E21 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
+				C96B4F96B9E21D00CBF36130 /* BanListView.swift in Sources */,
+				983C46298C9629FBE379324A /* AccessTokensView.swift in Sources */,
+				78094BC6859362D7EA9854EB /* RegisteredUserListView.swift in Sources */,
+				487C45A59D5135DF946B8FFB /* UserStatsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

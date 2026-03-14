@@ -11,7 +11,7 @@ enum TalkingState {
 
 // 2. UserState 结构体保持不变
 struct UserState {
-    let isAuthenticated: Bool; let isSelfDeafened: Bool; let isSelfMuted: Bool; let isMutedByServer: Bool; let isDeafenedByServer: Bool; let isLocallyMuted: Bool; let isSuppressed: Bool; let isPrioritySpeaker: Bool
+    let isAuthenticated: Bool; let isSelfDeafened: Bool; let isSelfMuted: Bool; let isMutedByServer: Bool; let isDeafenedByServer: Bool; let isLocallyMuted: Bool; let isSuppressed: Bool; let isPrioritySpeaker: Bool; let isRecording: Bool
     var isMutedOrDeafened: Bool {
         isSelfMuted || isMutedByServer || isLocallyMuted || isSuppressed || isSelfDeafened || isDeafenedByServer
     }

@@ -26,6 +26,11 @@ class ServerModelNotificationManager {
     static let channelRemovedNotification = Notification.Name("ServerModelChannelRemoved")
     static let permissionQueryResultNotification = Notification.Name("ServerModelPermissionQueryResult")
     static let aclUserNamesResolvedNotification = Notification.Name("ServerModelACLUserNamesResolved")
+    static let serverConfigReceivedNotification = Notification.Name("ServerModelServerConfigReceived")
+    static let banListReceivedNotification = Notification.Name("ServerModelBanListReceived")
+    static let userListReceivedNotification = Notification.Name("ServerModelUserListReceived")
+    static let userStatsReceivedNotification = Notification.Name("ServerModelUserStatsReceived")
+    static let userRecordingStateChangedNotification = Notification.Name("ServerModelUserRecordingStateChanged")
     
     // --- 核心修改 2：添加一个发送新通知的方法 ---
     func postUserMoved(user: MKUser, to channel: MKChannel, by mover: MKUser? = nil) {
@@ -103,6 +108,28 @@ class ServerModelNotificationManager {
     func postChannelRemoved(_ channel: MKChannel) {
         let userInfo: [String: Any] = ["channel": channel]
         NotificationCenter.default.post(name: Self.channelRemovedNotification, object: nil, userInfo: userInfo)
+    }
+    
+    func postServerConfigReceived(_ config: Any) {
+        NotificationCenter.default.post(name: Self.serverConfigReceivedNotification, object: nil, userInfo: ["config": config])
+    }
+    
+    func postBanListReceived(_ banList: Any) {
+        NotificationCenter.default.post(name: Self.banListReceivedNotification, object: nil, userInfo: ["banList": banList])
+    }
+    
+    func postUserListReceived(_ userList: Any) {
+        NotificationCenter.default.post(name: Self.userListReceivedNotification, object: nil, userInfo: ["userList": userList])
+    }
+    
+    func postUserStatsReceived(_ stats: Any, for user: MKUser?) {
+        var userInfo: [String: Any] = ["stats": stats]
+        if let user = user { userInfo["user"] = user }
+        NotificationCenter.default.post(name: Self.userStatsReceivedNotification, object: nil, userInfo: userInfo)
+    }
+    
+    func postUserRecordingStateChanged(userSession: UInt) {
+        NotificationCenter.default.post(name: Self.userRecordingStateChangedNotification, object: nil, userInfo: ["userSession": userSession])
     }
 }
 
@@ -204,5 +231,31 @@ class ServerModelNotificationManager {
         if !resolved.isEmpty {
             ServerModelNotificationManager.shared.postACLUserNamesResolved(resolved)
         }
+    }
+    
+    // ServerConfig
+    func serverModel(_ model: MKServerModel, didReceiveServerConfig config: Any) {
+        ServerModelNotificationManager.shared.postServerConfigReceived(config)
+    }
+    
+    // BanList
+    func serverModel(_ model: MKServerModel, didReceiveBanList banList: Any) {
+        ServerModelNotificationManager.shared.postBanListReceived(banList)
+    }
+    
+    // UserList（注册用户列表）
+    func serverModel(_ model: MKServerModel, didReceiveUserList userList: Any) {
+        ServerModelNotificationManager.shared.postUserListReceived(userList)
+    }
+    
+    // UserStats
+    func serverModel(_ model: MKServerModel, didReceiveUserStats stats: Any, for user: MKUser?) {
+        ServerModelNotificationManager.shared.postUserStatsReceived(stats, for: user)
+    }
+    
+    // Recording 状态变化
+    func serverModel(_ model: MKServerModel, userRecordingStateChanged user: MKUser) {
+        ServerModelNotificationManager.shared.postUserRecordingStateChanged(userSession: user.session())
+        ServerModelNotificationManager.shared.postUserStateUpdated(userSession: user.session())
     }
 }

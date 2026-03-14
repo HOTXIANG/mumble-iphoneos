@@ -55,6 +55,33 @@ extension ServerModelManager {
         }
     }
 
+    /// 发送文本消息到当前频道及其所有子频道（频道树）
+    func sendTextMessageToTree(_ text: String) {
+        guard let serverModel = serverModel, !text.isEmpty else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        
+        guard let userChannel = serverModel.connectedUser()?.channel() else { return }
+        
+        let htmlMessage = MUTextMessageProcessor.processedHTML(fromPlainTextMessage: trimmed)
+        let msg = MKTextMessage(string: htmlMessage)
+        
+        serverModel.send(msg, toTree: userChannel)
+        
+        let selfMessage = ChatMessage(
+            id: UUID(),
+            type: .userMessage,
+            senderName: serverModel.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: ""),
+            attributedMessage: attributedString(from: trimmed),
+            images: [],
+            timestamp: Date(),
+            isSentBySelf: true
+        )
+        DispatchQueue.main.async {
+            self.messages.append(selfMessage)
+        }
+    }
+
     func sendPrivateMessage(_ text: String, to user: MKUser) {
         guard let serverModel = serverModel, !text.isEmpty else { return }
 

@@ -268,14 +268,12 @@ struct WelcomeContentView: View {
         }
     }
     
-    private func connectTo(hostname: String, port: Int, username: String, displayName: String) {
-        // 触发连接
+    private func connectTo(hostname: String, port: Int, username: String, displayName: String, password overridePassword: String? = nil) {
         AppState.shared.serverDisplayName = hostname
         PlatformImpactFeedback(style: .medium).impactOccurred()
         
-        // 尝试从收藏夹查找匹配的证书和密码（大小写不敏感匹配 hostname）
         var certRef: Data? = nil
-        var password: String = ""
+        var password: String = overridePassword ?? ""
         let allFavs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
         if let match = allFavs.first(where: {
             $0.hostName?.caseInsensitiveCompare(hostname) == .orderedSame
@@ -283,7 +281,9 @@ struct WelcomeContentView: View {
             && $0.userName == username
         }) {
             certRef = match.certificateRef
-            password = match.password ?? ""
+            if overridePassword == nil || overridePassword?.isEmpty == true {
+                password = match.password ?? ""
+            }
         }
         
         MUConnectionController.shared()?.connect(
@@ -294,9 +294,6 @@ struct WelcomeContentView: View {
             certificateRef: certRef,
             displayName: displayName
         )
-        
-        // 最近连接由 MUConnectionController 内部调用 RecentServerManager.addRecent 自动记录
-        // Widget 数据也由 RecentServerManager 自动同步
     }
 
     private func deleteRecentConnection(hostname: String, port: Int, username: String) {

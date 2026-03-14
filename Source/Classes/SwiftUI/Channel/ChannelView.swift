@@ -165,6 +165,7 @@ struct ServerChannelView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedUserForConfig: MKUser? = nil
     @State private var selectedUserForInfo: MKUser? = nil
+    @State private var selectedUserForStats: MKUser? = nil
     @State private var selectedChannelForInfo: MKChannel? = nil
     @State private var selectedUserForPM: MKUser? = nil
     @State private var selectedChannelForEdit: MKChannel? = nil
@@ -192,6 +193,9 @@ struct ServerChannelView: View {
                             },
                             onUserPMTap: { user in
                                 self.selectedUserForPM = user
+                            },
+                            onUserStatsTap: { user in
+                                self.selectedUserForStats = user
                             },
                             onChannelEditTap: { channel in
                                 self.selectedChannelForEdit = channel
@@ -268,6 +272,9 @@ struct ServerChannelView: View {
             let isSelf = user.session() == MUConnectionController.shared()?.serverModel?.connectedUser()?.session()
             UserInfoView(user: user, isSelf: isSelf)
         }
+        .sheet(item: $selectedUserForStats) { user in
+            UserStatsView(user: user, serverManager: serverManager)
+        }
         .sheet(item: $selectedChannelForInfo) { channel in
             ChannelInfoView(channel: channel)
         }
@@ -324,6 +331,7 @@ struct ChannelTreeRow: View {
     let onUserInfoTap: (MKUser) -> Void
     let onChannelInfoTap: (MKChannel) -> Void
     var onUserPMTap: ((MKUser) -> Void)? = nil
+    var onUserStatsTap: ((MKUser) -> Void)? = nil
     var onChannelEditTap: ((MKChannel) -> Void)? = nil
     var onChannelCreateTap: ((MKChannel) -> Void)? = nil
     
@@ -398,23 +406,53 @@ struct ChannelTreeRow: View {
                                 }
                             }
                             
-                            // 监听频道（功能暂时搁置）
-                            // if canListenToChannel {
-                            //     Divider()
-                            //     if serverManager.listeningChannels.contains(channel.channelId()) {
-                            //         Button {
-                            //             serverManager.stopListening(to: channel)
-                            //         } label: {
-                            //             Label("Stop Listening", systemImage: "ear")
-                            //         }
-                            //     } else {
-                            //         Button {
-                            //             serverManager.startListening(to: channel)
-                            //         } label: {
-                            //             Label("Listen to Channel", systemImage: "ear")
-                            //         }
-                            //     }
-                            // }
+                            if canListenToChannel {
+                                Divider()
+                                if serverManager.listeningChannels.contains(channel.channelId()) {
+                                    Button {
+                                        serverManager.stopListening(to: channel)
+                                    } label: {
+                                        Label("Stop Listening", systemImage: "ear.fill")
+                                    }
+                                } else {
+                                    Button {
+                                        serverManager.startListening(to: channel)
+                                    } label: {
+                                        Label("Listen to Channel", systemImage: "ear")
+                                    }
+                                }
+                            }
+                            
+                            if hasLinkPermission {
+                                Divider()
+                                if isLinkedToMyChannel {
+                                    Button {
+                                        unlinkFromMyChannel()
+                                    } label: {
+                                        Label("Unlink Channel", systemImage: "link.badge.minus")
+                                    }
+                                } else {
+                                    Button {
+                                        linkToMyChannel()
+                                    } label: {
+                                        Label("Link Channel", systemImage: "link.badge.plus")
+                                    }
+                                }
+                                if hasLinkedChannels {
+                                    Button(role: .destructive) {
+                                        serverManager.unlinkAllForChannel(channel)
+                                    } label: {
+                                        Label("Unlink All", systemImage: "link.badge.minus")
+                                    }
+                                }
+                            }
+                            
+                            Divider()
+                            Button {
+                                copyChannelURL()
+                            } label: {
+                                Label("Copy URL", systemImage: "doc.on.doc")
+                            }
                         }
                     #else
                     // iOS: 点击弹出菜单
@@ -454,23 +492,53 @@ struct ChannelTreeRow: View {
                             }
                         }
                         
-                        // 监听频道（功能暂时搁置）
-                        // if canListenToChannel {
-                        //     Divider()
-                        //     if serverManager.listeningChannels.contains(channel.channelId()) {
-                        //         Button {
-                        //             serverManager.stopListening(to: channel)
-                        //         } label: {
-                        //             Label("Stop Listening", systemImage: "ear")
-                        //         }
-                        //     } else {
-                        //         Button {
-                        //             serverManager.startListening(to: channel)
-                        //         } label: {
-                        //             Label("Listen to Channel", systemImage: "ear")
-                        //         }
-                        //     }
-                        // }
+                        if canListenToChannel {
+                            Divider()
+                            if serverManager.listeningChannels.contains(channel.channelId()) {
+                                Button {
+                                    serverManager.stopListening(to: channel)
+                                } label: {
+                                    Label("Stop Listening", systemImage: "ear.fill")
+                                }
+                            } else {
+                                Button {
+                                    serverManager.startListening(to: channel)
+                                } label: {
+                                    Label("Listen to Channel", systemImage: "ear")
+                                }
+                            }
+                        }
+                        
+                        if hasLinkPermission {
+                            Divider()
+                            if isLinkedToMyChannel {
+                                Button {
+                                    unlinkFromMyChannel()
+                                } label: {
+                                    Label("Unlink Channel", systemImage: "link.badge.minus")
+                                }
+                            } else {
+                                Button {
+                                    linkToMyChannel()
+                                } label: {
+                                    Label("Link Channel", systemImage: "link.badge.plus")
+                                }
+                            }
+                            if hasLinkedChannels {
+                                Button(role: .destructive) {
+                                    serverManager.unlinkAllForChannel(channel)
+                                } label: {
+                                    Label("Unlink All", systemImage: "link.badge.minus")
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        Button {
+                            copyChannelURL()
+                        } label: {
+                            Label("Copy URL", systemImage: "doc.on.doc")
+                        }
                     } label: {
                         Color.clear
                     }
@@ -505,7 +573,8 @@ struct ChannelTreeRow: View {
                         serverManager: serverManager,
                         onTap: { onUserTap(user) },
                         onInfoTap: { u in onUserInfoTap(u) },
-                        onPMTap: onUserPMTap
+                        onPMTap: onUserPMTap,
+                        onStatsTap: onUserStatsTap
                     )
                     .opacity(isInMoveMode ? 0.3 : 1.0)
                     .allowsHitTesting(!isInMoveMode)
@@ -541,6 +610,7 @@ struct ChannelTreeRow: View {
                         onUserInfoTap: onUserInfoTap,
                         onChannelInfoTap: onChannelInfoTap,
                         onUserPMTap: onUserPMTap,
+                        onUserStatsTap: onUserStatsTap,
                         onChannelEditTap: onChannelEditTap,
                         onChannelCreateTap: onChannelCreateTap
                     )
@@ -603,10 +673,69 @@ struct ChannelTreeRow: View {
         guard let connectedUser = MUConnectionController.shared()?.serverModel?.connectedUser() else {
             return false
         }
-        // 不能监听自己当前所在的频道
         if connectedUser.channel()?.channelId() == channel.channelId() { return false }
-        // 检查用户是否已认证（简易权限检查，服务器会做最终校验）
         return connectedUser.isAuthenticated()
+    }
+    
+    /// 是否有频道链接权限
+    private var hasLinkPermission: Bool {
+        let chId = channel.channelId()
+        return serverManager.hasPermission(MKPermissionLinkChannel, forChannelId: chId) ||
+               serverManager.hasRootPermission(MKPermissionLinkChannel)
+    }
+    
+    /// 当前频道是否已与我所在频道链接
+    private var isLinkedToMyChannel: Bool {
+        guard let myChannel = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel() else { return false }
+        return channel.isLinked(to: myChannel)
+    }
+    
+    /// 频道是否有任何链接
+    private var hasLinkedChannels: Bool {
+        (channel.linkedChannels() as? [MKChannel])?.isEmpty == false
+    }
+    
+    /// 将当前频道链接到自己所在频道
+    private func linkToMyChannel() {
+        guard let myChannel = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel() else { return }
+        serverManager.linkChannel(myChannel, to: channel)
+    }
+    
+    /// 取消当前频道与自己所在频道的链接
+    private func unlinkFromMyChannel() {
+        guard let myChannel = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel() else { return }
+        serverManager.unlinkChannel(myChannel, from: channel)
+    }
+    
+    /// 复制频道的 mumble:// URL 到剪贴板
+    private func copyChannelURL() {
+        guard let conn = MUConnectionController.shared()?.connection else { return }
+        let host = conn.hostname() ?? "localhost"
+        let port = conn.port()
+        
+        var pathComponents: [String] = []
+        var current: MKChannel? = channel
+        while let ch = current, ch.parent() != nil {
+            if let name = ch.channelName() {
+                pathComponents.insert(name, at: 0)
+            }
+            current = ch.parent()
+        }
+        let path = pathComponents.map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? $0 }.joined(separator: "/")
+        
+        let urlString: String
+        if port == 64738 {
+            urlString = "mumble://\(host)/\(path)"
+        } else {
+            urlString = "mumble://\(host):\(port)/\(path)"
+        }
+        
+        #if os(iOS)
+        UIPasteboard.general.string = urlString
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(urlString, forType: .string)
+        #endif
     }
     
     /// 处理拖拽用户到频道的 drop 操作
@@ -754,7 +883,8 @@ struct UserRowView: View {
     let onTap: () -> Void
     var onInfoTap: ((MKUser) -> Void)? = nil
     var onPMTap: ((MKUser) -> Void)? = nil
-    
+    var onStatsTap: ((MKUser) -> Void)? = nil
+
     private var currentVolume: Float {
         if let vol = serverManager.userVolumes[user.session()] {
             return vol
@@ -786,6 +916,18 @@ struct UserRowView: View {
         let userChannelId = user.channel()?.channelId() ?? 0
         return serverManager.hasPermission(MKPermissionMuteDeafen, forChannelId: userChannelId) ||
                serverManager.hasRootPermission(MKPermissionMuteDeafen)
+    }
+    
+    private var hasKickPermission: Bool {
+        let userChannelId = user.channel()?.channelId() ?? 0
+        return serverManager.hasPermission(MKPermissionKick, forChannelId: userChannelId) ||
+               serverManager.hasRootPermission(MKPermissionKick)
+    }
+    
+    private var hasBanPermission: Bool {
+        let userChannelId = user.channel()?.channelId() ?? 0
+        return serverManager.hasPermission(MKPermissionBan, forChannelId: userChannelId) ||
+               serverManager.hasRootPermission(MKPermissionBan)
     }
     
     var body: some View {
@@ -851,6 +993,10 @@ struct UserRowView: View {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.yellow).font(.caption).transition(.symbolEffect(.appear))
                     }
                     
+                    if user.isRecording() {
+                        Image(systemName: "record.circle").foregroundColor(.red).font(.caption).transition(.symbolEffect(.appear))
+                    }
+                    
                     if user.isPrioritySpeaker() {
                         Image(systemName: "star.fill").foregroundColor(.yellow).font(.caption).transition(.symbolEffect(.appear))
                     }
@@ -885,6 +1031,7 @@ struct UserRowView: View {
                         Divider()
                     }
                     Button { onInfoTap?(user) } label: { Label("User Info", systemImage: "person.circle") }
+                    Button { onStatsTap?(user) } label: { Label("User Statistics", systemImage: "chart.bar") }
                     if !isMyself {
                         Button { onPMTap?(user) } label: { Label("Private Message", systemImage: "envelope.fill") }
                         if hasMovePermission {
@@ -917,6 +1064,35 @@ struct UserRowView: View {
                                     Label("Server Deafen", systemImage: "speaker.slash.fill")
                                 }
                             }
+                            Button {
+                                serverManager.setPrioritySpeaker(!user.isPrioritySpeaker(), for: user)
+                            } label: {
+                                if user.isPrioritySpeaker() {
+                                    Label("Remove Priority Speaker", systemImage: "star.slash")
+                                } else {
+                                    Label("Priority Speaker", systemImage: "star.fill")
+                                }
+                            }
+                            Button(role: .destructive) {
+                                serverManager.resetUserComment(for: user)
+                            } label: {
+                                Label("Reset Comment", systemImage: "text.badge.minus")
+                            }
+                        }
+                        if hasKickPermission {
+                            Divider()
+                            Button(role: .destructive) {
+                                serverManager.kickUser(user)
+                            } label: {
+                                Label("Kick", systemImage: "xmark.circle")
+                            }
+                        }
+                        if hasBanPermission {
+                            Button(role: .destructive) {
+                                serverManager.banUser(user)
+                            } label: {
+                                Label("Ban", systemImage: "nosign")
+                            }
                         }
                     }
                 }
@@ -924,11 +1100,9 @@ struct UserRowView: View {
             #if os(iOS)
             HStack(spacing: 0) {
                 let level = dynamicLevel
-                // 避开前面的缩进区域，确保点击的是内容部分
                 Spacer().frame(width: CGFloat(level) * kIndentUnit)
                 
                 Menu {
-                    // Menu Header
                     Text(user.userName() ?? NSLocalizedString("User", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -936,7 +1110,6 @@ struct UserRowView: View {
                     Divider()
                     
                     if !isMyself {
-                        // Action 1: 本地静音/取消静音
                         Button {
                             serverManager.toggleLocalUserMute(session: user.session())
                         } label: {
@@ -947,7 +1120,6 @@ struct UserRowView: View {
                             }
                         }
                         
-                        // Action 2: 打开详细音频设置
                         Button {
                             onTap()
                         } label: {
@@ -957,14 +1129,18 @@ struct UserRowView: View {
                         Divider()
                     }
                     
-                    // Action 3: 用户信息
                     Button {
                         onInfoTap?(user)
                     } label: {
                         Label("User Info", systemImage: "person.circle")
                     }
                     
-                    // Action 4: 私聊
+                    Button {
+                        onStatsTap?(user)
+                    } label: {
+                        Label("User Statistics", systemImage: "chart.bar")
+                    }
+
                     if !isMyself {
                         Button {
                             onPMTap?(user)
@@ -975,7 +1151,6 @@ struct UserRowView: View {
                         if hasMovePermission {
                             Divider()
                             
-                            // Action 5: 移动到频道
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     serverManager.movingUser = user
@@ -988,7 +1163,6 @@ struct UserRowView: View {
                         if hasAdminPermission {
                             Divider()
                             
-                            // Action 6: 服务器端静音
                             Button {
                                 serverManager.setServerMuted(!user.isMuted(), for: user)
                             } label: {
@@ -1006,6 +1180,35 @@ struct UserRowView: View {
                                 } else {
                                     Label("Server Deafen", systemImage: "speaker.slash.fill")
                                 }
+                            }
+                            Button {
+                                serverManager.setPrioritySpeaker(!user.isPrioritySpeaker(), for: user)
+                            } label: {
+                                if user.isPrioritySpeaker() {
+                                    Label("Remove Priority Speaker", systemImage: "star.slash")
+                                } else {
+                                    Label("Priority Speaker", systemImage: "star.fill")
+                                }
+                            }
+                            Button(role: .destructive) {
+                                serverManager.resetUserComment(for: user)
+                            } label: {
+                                Label("Reset Comment", systemImage: "text.badge.minus")
+                            }
+                        }
+                        if hasKickPermission {
+                            Divider()
+                            Button(role: .destructive) {
+                                serverManager.kickUser(user)
+                            } label: {
+                                Label("Kick", systemImage: "xmark.circle")
+                            }
+                        }
+                        if hasBanPermission {
+                            Button(role: .destructive) {
+                                serverManager.banUser(user)
+                            } label: {
+                                Label("Ban", systemImage: "nosign")
                             }
                         }
                     }
