@@ -15,6 +15,9 @@
 #import "Mumble-Swift.h"  // 这是 Xcode 自动生成的 Swift 桥接头文件
 #import <MumbleKit/MKAudio.h>
 #import <MumbleKit/MKVersion.h>
+#import <MumbleKit/MKConnection.h>
+#import <MumbleKit/MKServerModel.h>
+#import <MumbleKit/MKChannel.h>
 #import <UserNotifications/UserNotifications.h>
 
 @interface MUApplicationDelegate () <UIApplicationDelegate,
@@ -23,10 +26,13 @@
     UINavigationController    *_navigationController;
     BOOL                      _connectionActive;
     NSString                  *_lastAudioRestartSignature;
-
+    NSArray<NSString *>       *_pendingDeepLinkChannelPath;
 }
 - (void) setupAudio;
 - (void) forceKeyboardLoad;
+- (BOOL) handleMumbleURL:(NSURL *)url;
+- (NSArray<NSString *> *) decodedChannelPathFromURL:(NSURL *)url;
+- (BOOL) joinChannelPathComponents:(NSArray<NSString *> *)pathComponents onServerModel:(MKServerModel *)serverModel;
 @end
 
 @implementation MUApplicationDelegate
@@ -147,42 +153,118 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     [_window makeKeyAndVisible];*/
 
     NSURL *url = [launchOptions objectForKey:UIApplicationLaunchOptionsURLKey];
-    if ([[url scheme] isEqualToString:@"mumble"]) {
-        MUConnectionController *connController = [MUConnectionController sharedController];
-        NSString *hostname = [url host];
-        NSNumber *port = [url port];
-        NSString *username = [url user];
-        NSString *password = [url password];
-        [connController connectToHostname:hostname
-                                    port:port ? [port integerValue] : 64738
-                            withUsername:username
-                             andPassword:password
-                          certificateRef:nil
-                             displayName:nil];
-        return YES;
+    if (url != nil) {
+        [self handleMumbleURL:url];
     }
     return YES;
 }
 
 - (BOOL) application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
-    if ([[url scheme] isEqualToString:@"mumble"]) {
-        MUConnectionController *connController = [MUConnectionController sharedController];
-        if ([connController isConnected]) {
-            return NO;
+    return [self handleMumbleURL:url];
+}
+
+- (BOOL) handleMumbleURL:(NSURL *)url {
+    NSString *scheme = [[url scheme] lowercaseString];
+    if (![scheme isEqualToString:@"mumble"] && ![scheme isEqualToString:@"neomumble"]) {
+        return NO;
+    }
+
+    NSString *hostname = [url host];
+    if (hostname.length == 0) {
+        return NO;
+    }
+
+    NSInteger port = [url port] ? [[url port] integerValue] : 64738;
+    NSString *username = [url user];
+    NSString *password = [url password];
+    NSArray<NSString *> *pathComponents = [self decodedChannelPathFromURL:url];
+
+    MUConnectionController *connController = [MUConnectionController sharedController];
+    MKConnection *activeConnection = [connController connection];
+    BOOL hasActiveOrConnectingConnection = [connController isConnected] || activeConnection != nil;
+
+    if (hasActiveOrConnectingConnection) {
+        NSString *activeHost = [[activeConnection hostname] lowercaseString] ?: @"";
+        NSInteger activePort = [activeConnection port];
+        BOOL sameServer = [activeHost isEqualToString:[hostname lowercaseString]] && activePort == port;
+
+        if (!sameServer) {
+            return YES;
         }
-        NSString *hostname = [url host];
-        NSNumber *port = [url port];
-        NSString *username = [url user];
-        NSString *password = [url password];
-        [connController connectToHostname:hostname
-                                    port:port ? [port integerValue] : 64738
-                            withUsername:username
-                             andPassword:password
-                          certificateRef:nil
-                             displayName:nil];
+
+        if (pathComponents.count > 0 && [connController isConnected]) {
+            if ([self joinChannelPathComponents:pathComponents onServerModel:[connController serverModel]]) {
+                _pendingDeepLinkChannelPath = nil;
+            } else {
+                _pendingDeepLinkChannelPath = [pathComponents copy];
+            }
+        } else {
+            _pendingDeepLinkChannelPath = [pathComponents copy];
+        }
         return YES;
     }
-    return NO;
+
+    [connController connectToHostname:hostname
+                                port:port
+                        withUsername:username
+                         andPassword:password
+                      certificateRef:nil
+                         displayName:nil];
+    _pendingDeepLinkChannelPath = [pathComponents copy];
+    return YES;
+}
+
+- (NSArray<NSString *> *) decodedChannelPathFromURL:(NSURL *)url {
+    NSArray<NSString *> *rawComponents = [url pathComponents];
+    if (rawComponents.count == 0) {
+        return @[];
+    }
+
+    NSMutableArray<NSString *> *decoded = [NSMutableArray arrayWithCapacity:rawComponents.count];
+    for (NSString *component in rawComponents) {
+        if (component.length == 0 || [component isEqualToString:@"/"]) {
+            continue;
+        }
+        NSString *value = [component stringByRemovingPercentEncoding] ?: component;
+        if (value.length > 0) {
+            [decoded addObject:value];
+        }
+    }
+    return decoded;
+}
+
+- (BOOL) joinChannelPathComponents:(NSArray<NSString *> *)pathComponents onServerModel:(MKServerModel *)serverModel {
+    if (pathComponents.count == 0 || serverModel == nil) {
+        return NO;
+    }
+
+    MKChannel *current = [serverModel rootChannel];
+    if (current == nil) {
+        return NO;
+    }
+
+    for (NSString *pathName in pathComponents) {
+        NSArray *subChannels = [current channels];
+        MKChannel *next = nil;
+        for (id obj in subChannels) {
+            if (![obj isKindOfClass:[MKChannel class]]) {
+                continue;
+            }
+            MKChannel *candidate = (MKChannel *)obj;
+            NSString *candidateName = [candidate channelName] ?: @"";
+            if ([candidateName isEqualToString:pathName]) {
+                next = candidate;
+                break;
+            }
+        }
+        if (next == nil) {
+            return NO;
+        }
+        current = next;
+    }
+
+    [serverModel joinChannel:current];
+    return YES;
 }
 
 - (void) applicationWillTerminate:(UIApplication *)application {
@@ -333,10 +415,19 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 
 - (void) connectionOpened:(NSNotification *)notification {
     _connectionActive = YES;
+    if (_pendingDeepLinkChannelPath.count > 0) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            MUConnectionController *connController = [MUConnectionController sharedController];
+            if ([self joinChannelPathComponents:self->_pendingDeepLinkChannelPath onServerModel:[connController serverModel]]) {
+                self->_pendingDeepLinkChannelPath = nil;
+            }
+        });
+    }
 }
 
 - (void) connectionClosed:(NSNotification *)notification {
     _connectionActive = NO;
+    _pendingDeepLinkChannelPath = nil;
 }
 
 - (void) applicationWillResignActive:(UIApplication *)application {

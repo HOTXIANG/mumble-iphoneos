@@ -31,6 +31,7 @@ class ServerModelNotificationManager {
     static let userListReceivedNotification = Notification.Name("ServerModelUserListReceived")
     static let userStatsReceivedNotification = Notification.Name("ServerModelUserStatsReceived")
     static let userRecordingStateChangedNotification = Notification.Name("ServerModelUserRecordingStateChanged")
+    static let userTextureChangedNotification = Notification.Name("ServerModelUserTextureChanged")
     
     // --- 核心修改 2：添加一个发送新通知的方法 ---
     func postUserMoved(user: MKUser, to channel: MKChannel, by mover: MKUser? = nil) {
@@ -131,6 +132,10 @@ class ServerModelNotificationManager {
     func postUserRecordingStateChanged(userSession: UInt) {
         NotificationCenter.default.post(name: Self.userRecordingStateChangedNotification, object: nil, userInfo: ["userSession": userSession])
     }
+
+    func postUserTextureChanged(_ user: MKUser) {
+        NotificationCenter.default.post(name: Self.userTextureChangedNotification, object: nil, userInfo: ["user": user])
+    }
 }
 
 @objc class ServerModelDelegateWrapper: NSObject, MKServerModelDelegate {
@@ -187,10 +192,31 @@ class ServerModelNotificationManager {
     
     // 频道重命名相关的通知
     func serverModel(_ model: MKServerModel, channelRenamed channel: MKChannel) { ServerModelNotificationManager.shared.postChannelRenamed(channelId: channel.channelId(), newName: channel.channelName() ?? "") }
+
+    // 频道链接变化：刷新频道行的链接状态 UI
+    func serverModel(_ model: MKServerModel, linksSet newLinks: [Any], for channel: MKChannel) {
+        ServerModelNotificationManager.shared.postRebuildNotification()
+    }
+
+    func serverModel(_ model: MKServerModel, linksAdded newLinks: [Any], to channel: MKChannel) {
+        ServerModelNotificationManager.shared.postRebuildNotification()
+    }
+
+    func serverModel(_ model: MKServerModel, linksRemoved removedLinks: [Any], from channel: MKChannel) {
+        ServerModelNotificationManager.shared.postRebuildNotification()
+    }
+
+    func serverModel(_ model: MKServerModel, linksChangedFor channel: MKChannel) {
+        ServerModelNotificationManager.shared.postRebuildNotification()
+    }
     
     // 用户评论 / 频道简介变化通知
     func serverModel(_ model: MKServerModel, userCommentChanged user: MKUser) {
         ServerModelNotificationManager.shared.postUserCommentChanged(userSession: user.session())
+    }
+
+    func serverModel(_ model: MKServerModel, userTextureChanged user: MKUser) {
+        ServerModelNotificationManager.shared.postUserTextureChanged(user)
     }
     
     func serverModel(_ model: MKServerModel, channelDescriptionChanged channel: MKChannel) {

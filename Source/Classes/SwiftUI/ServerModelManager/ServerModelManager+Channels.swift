@@ -21,6 +21,11 @@ extension ServerModelManager {
     }
 
     // MARK: - Channel Management
+    
+    /// 移动频道到新的父频道
+    func moveChannel(_ channel: MKChannel, to parent: MKChannel) {
+        serverModel?.move(channel, toParent: parent)
+    }
 
     /// 创建新频道
     func createChannel(name: String, parent: MKChannel, temporary: Bool) {
@@ -159,31 +164,32 @@ extension ServerModelManager {
     /// 开始监听某频道（接收其音频，不加入）
     func startListening(to channel: MKChannel) {
         let channelId = channel.channelId()
-        serverModel?.addListening(channel)
-        listeningChannels.insert(channelId)
-        if let mySession = serverModel?.connectedUser()?.session() {
-            var listeners = channelListeners[channelId] ?? Set()
-            listeners.insert(mySession)
-            channelListeners[channelId] = listeners
-        }
+        let isAlreadyListening = listeningChannels.contains(channelId)
+        let isPendingAdd = pendingListeningAdds.contains(channelId)
+        let isPendingRemove = pendingListeningRemoves.contains(channelId)
+        guard (!isAlreadyListening || isPendingRemove) && !isPendingAdd else { return }
+
+        pendingListeningRemoves.remove(channelId)
+        pendingListeningAdds.insert(channelId)
+
         if isChannelCollapsed(Int(channelId)) {
             toggleChannelCollapse(Int(channelId))
         }
-        rebuildModelArray()
+        serverModel?.addListening(channel)
     }
 
     /// 停止监听某频道
     func stopListening(to channel: MKChannel) {
         let channelId = channel.channelId()
+        let isListening = listeningChannels.contains(channelId)
+        let isPendingAdd = pendingListeningAdds.contains(channelId)
+        let isPendingRemove = pendingListeningRemoves.contains(channelId)
+        guard (isListening || isPendingAdd) && !isPendingRemove else { return }
+
+        pendingListeningAdds.remove(channelId)
+        pendingListeningRemoves.insert(channelId)
+
         serverModel?.removeListening(channel)
-        listeningChannels.remove(channelId)
-        if let mySession = serverModel?.connectedUser()?.session() {
-            channelListeners[channelId]?.remove(mySession)
-            if channelListeners[channelId]?.isEmpty == true {
-                channelListeners.removeValue(forKey: channelId)
-            }
-        }
-        rebuildModelArray()
     }
 
     /// 获取某频道的所有监听者用户对象
@@ -191,6 +197,26 @@ extension ServerModelManager {
         guard let sessions = channelListeners[channel.channelId()] else { return [] }
         return sessions.compactMap { session in
             serverModel?.user(withSession: session)
+        }
+    }
+
+    func addListenerSession(_ session: UInt, to channelId: UInt) {
+        var listeners = channelListeners[channelId] ?? Set()
+        let inserted = listeners.insert(session).inserted
+        if inserted || channelListeners[channelId] == nil {
+            channelListeners[channelId] = listeners
+        }
+    }
+
+    func removeListenerSession(_ session: UInt, from channelId: UInt) {
+        guard var listeners = channelListeners[channelId] else { return }
+        let removed = listeners.remove(session) != nil
+        guard removed else { return }
+
+        if listeners.isEmpty {
+            channelListeners.removeValue(forKey: channelId)
+        } else {
+            channelListeners[channelId] = listeners
         }
     }
 
@@ -299,5 +325,58 @@ extension ServerModelManager {
     /// 移除当前用户的头像
     func removeSelfTexture() {
         serverModel?.setSelfTexture(nil)
+    }
+
+    /// 获取用户头像（已缓存）
+    func avatarImage(for session: UInt?) -> PlatformImage? {
+        guard let session else { return nil }
+        return userAvatars[session]
+    }
+
+    /// 按 session 触发头像加载（如果有 hash 但没有完整头像，会向服务器请求）
+    func ensureAvatarLoaded(for session: UInt) {
+        guard let user = serverModel?.user(withSession: session) else { return }
+        updateAvatarCache(for: user)
+    }
+
+    /// 刷新/缓存用户头像（可安全重复调用）
+    func updateAvatarCache(for user: MKUser) {
+        let session = user.session()
+        let textureData = objcData(from: user.texture())
+
+        if let textureData, !textureData.isEmpty, let image = PlatformImage(data: textureData) {
+            userAvatars[session] = image
+            pendingAvatarFetchSessions.remove(session)
+            return
+        }
+
+        let hasTextureHash = !(objcData(from: user.textureHash())?.isEmpty ?? true)
+        if hasTextureHash {
+            requestUserTextureIfNeeded(for: user)
+        } else {
+            userAvatars.removeValue(forKey: session)
+            pendingAvatarFetchSessions.remove(session)
+        }
+    }
+
+    private func requestUserTextureIfNeeded(for user: MKUser) {
+        let session = user.session()
+        guard !pendingAvatarFetchSessions.contains(session), let model = serverModel else { return }
+        pendingAvatarFetchSessions.insert(session)
+
+        let selector = NSSelectorFromString("requestTextureForUser:")
+        if model.responds(to: selector) {
+            _ = model.perform(selector, with: user)
+        }
+    }
+
+    private func objcData(from raw: Any?) -> Data? {
+        if let data = raw as? Data {
+            return data
+        }
+        if let data = raw as? NSData {
+            return data as Data
+        }
+        return nil
     }
 }

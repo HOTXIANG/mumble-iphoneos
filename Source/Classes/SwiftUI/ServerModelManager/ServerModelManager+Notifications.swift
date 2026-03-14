@@ -75,6 +75,14 @@ extension ServerModelManager {
             Task { @MainActor in self?.updateUserBySession(userSession) }
         })
 
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userTextureChangedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let user = notification.userInfo?["user"] as? MKUser else { return }
+            let userTransfer = UnsafeTransfer(value: user)
+            Task { @MainActor [weak self] in
+                self?.updateAvatarCache(for: userTransfer.value)
+            }
+        })
+
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userTalkStateChangedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let userSession = userInfo["userSession"] as? UInt, let talkState = userInfo["talkState"] as? MKTalkState else { return }
             Task { @MainActor in self?.updateUserTalkingState(userSession: userSession, talkState: talkState) }
@@ -169,6 +177,7 @@ extension ServerModelManager {
                 guard let self = self else { return }
                 let safeUser = userTransfer.value
                 self.applySavedUserPreferences(user: safeUser)
+                self.updateAvatarCache(for: safeUser)
                 let userName = safeUser.userName() ?? NSLocalizedString("Unknown User", comment: "")
                 if let channelId = safeUser.channel()?.channelId() {
                     self.lastKnownChannelIdByUserSession[safeUser.session()] = channelId
@@ -202,6 +211,8 @@ extension ServerModelManager {
                     category: category
                 )
                 self.lastKnownChannelIdByUserSession.removeValue(forKey: session)
+                self.userAvatars.removeValue(forKey: session)
+                self.pendingAvatarFetchSessions.remove(session)
                 // 清除离开用户的监听状态
                 for (channelId, var listeners) in self.channelListeners {
                     listeners.remove(session)
@@ -224,9 +235,17 @@ extension ServerModelManager {
             let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
             let senderSession = user.session()
+            let userHash = user.userHash()
+            let userTransfer = UnsafeTransfer(value: user)
 
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                
+                if let hash = userHash, IgnoreManager.shared.isIgnored(userHash: hash) {
+                    return
+                }
+                self.updateAvatarCache(for: userTransfer.value)
+                
                 let connectedUserSession = self.serverModel?.connectedUser()?.session()
 
                 if senderSession == connectedUserSession {
@@ -270,9 +289,17 @@ extension ServerModelManager {
             let plainText = (message.plainTextString() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let imageData = message.embeddedImages().compactMap { self?.dataFromDataURLString($0 as? String ?? "") }
             let senderSession = user.session()
+            let userHash = user.userHash()
+            let userTransfer = UnsafeTransfer(value: user)
 
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                
+                if let hash = userHash, IgnoreManager.shared.isIgnored(userHash: hash) {
+                    return
+                }
+                self.updateAvatarCache(for: userTransfer.value)
+                
                 let connectedUserSession = self.serverModel?.connectedUser()?.session()
 
                 // 忽略自己发给自己的回显
@@ -289,6 +316,7 @@ extension ServerModelManager {
                     images: images,
                     timestamp: Date(),
                     isSentBySelf: false,
+                    senderSession: senderSession,
                     privatePeerName: senderName
                 )
                 self.messages.append(pmMessage)
@@ -305,6 +333,12 @@ extension ServerModelManager {
                         title: String(format: NSLocalizedString("PM from %@", comment: ""), senderName),
                         body: bodyText
                     )
+                }
+
+                if self.shouldSpeakTTS(for: .privateMessages) {
+                    let bodyText = plainText.isEmpty ? NSLocalizedString("[Image]", comment: "") : plainText
+                    let notificationBody = "\(senderName) sent a private message: \(bodyText)"
+                    TTSManager.shared.speak(notificationBody)
                 }
 
                 #if os(macOS)
@@ -334,11 +368,17 @@ extension ServerModelManager {
 
                 // 检测是否为 Enter 权限被拒绝
                 let isEnterDenied = permRaw.map { ($0 & MKPermissionEnter.rawValue) != 0 } ?? false
+                let isListenDenied = permRaw.map { ($0 & MKPermissionListen.rawValue) != 0 } ?? false
                 let deniedChannelId = channelTransfer?.value.channelId()
                 let isUserInitiated = deniedChannelId != nil && deniedChannelId == self.userInitiatedJoinChannelId
 
                 // ACL 扫描期间抑制后台扫描的 permission denied（但不抑制用户主动加入的）
                 if self.isScanningACLs && !isUserInitiated { return }
+
+                if isListenDenied, let channelId = deniedChannelId {
+                    self.pendingListeningAdds.remove(channelId)
+                    self.pendingListeningRemoves.remove(channelId)
+                }
 
                 if isEnterDenied, let ct = channelTransfer {
                     let ch = ct.value
@@ -446,16 +486,16 @@ extension ServerModelManager {
                 for channelIdNum in addChannels {
                     let channelId = channelIdNum.uintValue
 
-                    // 如果是自己，且 listeningChannels 中没有此频道（说明我们已经 stopListening 了），
-                    // 跳过服务器的延迟回传，防止竞态条件导致监听行重新出现
-                    if isMyself && !self.listeningChannels.contains(channelId) {
-                        // 服务器确认添加监听 → 同步到 listeningChannels
+                    if isMyself {
+                        // 竞态：本地已发送 stopListening，忽略过期 add 回包
+                        if self.pendingListeningRemoves.contains(channelId) {
+                            continue
+                        }
+                        self.pendingListeningAdds.remove(channelId)
                         self.listeningChannels.insert(channelId)
                     }
 
-                    var listeners = self.channelListeners[channelId] ?? Set()
-                    listeners.insert(session)
-                    self.channelListeners[channelId] = listeners
+                    self.addListenerSession(session, to: channelId)
                 }
                 // 检查是否有人开始监听我所在的频道 → 通知
                 if let myChannel = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel(),
@@ -470,7 +510,6 @@ extension ServerModelManager {
                         }
                     }
                 }
-                self.rebuildModelArray()
             }
         })
 
@@ -487,14 +526,16 @@ extension ServerModelManager {
 
                 for channelIdNum in removeChannels {
                     let channelId = channelIdNum.uintValue
-                    self.channelListeners[channelId]?.remove(session)
-                    if self.channelListeners[channelId]?.isEmpty == true {
-                        self.channelListeners.removeValue(forKey: channelId)
-                    }
-                    // 如果是自己被服务器移除监听（管理员操作或频道删除），同步更新 listeningChannels
+
                     if isMyself {
+                        // 竞态：本地已发送 startListening，忽略过期 remove 回包
+                        if self.pendingListeningAdds.contains(channelId) {
+                            continue
+                        }
+                        self.pendingListeningRemoves.remove(channelId)
                         self.listeningChannels.remove(channelId)
                     }
+                    self.removeListenerSession(session, from: channelId)
                 }
                 // 检查是否有人停止监听我所在的频道 → 通知
                 if let myChannel = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel(),
@@ -509,7 +550,6 @@ extension ServerModelManager {
                         }
                     }
                 }
-                self.rebuildModelArray()
             }
         })
 
@@ -602,6 +642,61 @@ extension ServerModelManager {
         }
     }
 
+    enum TTSNotifyCategory: String {
+        case normalUserMessages = "TTSNotifyNormalUserMessages"
+        case privateMessages = "TTSNotifyPrivateMessages"
+        case userJoinedSameChannel = "TTSNotifyUserJoinedSameChannel"
+        case userLeftSameChannel = "TTSNotifyUserLeftSameChannel"
+        case userJoinedOtherChannels = "TTSNotifyUserJoinedOtherChannels"
+        case userLeftOtherChannels = "TTSNotifyUserLeftOtherChannels"
+        case userMoved = "TTSNotifyUserMoved"
+        case muteDeafen = "TTSNotifyMuteDeafen"
+        case movedByAdmin = "TTSNotifyMovedByAdmin"
+        case channelListening = "TTSNotifyChannelListening"
+        case genericSystemEvents = "TTSNotifyGenericSystemEvents"
+
+        var defaultEnabled: Bool {
+            switch self {
+            case .normalUserMessages, .privateMessages, .userJoinedSameChannel, .userLeftSameChannel, .userMoved, .movedByAdmin, .channelListening, .genericSystemEvents:
+                return true
+            case .userJoinedOtherChannels, .userLeftOtherChannels, .muteDeafen:
+                return false
+            }
+        }
+    }
+
+    func shouldSpeakTTS(for category: TTSNotifyCategory) -> Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "EnableTTS") else {
+            return false
+        }
+        return defaults.object(forKey: category.rawValue) as? Bool ?? category.defaultEnabled
+    }
+
+    func shouldSpeakTTS(forSystemCategory category: SystemNotifyCategory?) -> Bool {
+        guard let category else {
+            return shouldSpeakTTS(for: .genericSystemEvents)
+        }
+        switch category {
+        case .userJoinedSameChannel:
+            return shouldSpeakTTS(for: .userJoinedSameChannel)
+        case .userLeftSameChannel:
+            return shouldSpeakTTS(for: .userLeftSameChannel)
+        case .userJoinedOtherChannels:
+            return shouldSpeakTTS(for: .userJoinedOtherChannels)
+        case .userLeftOtherChannels:
+            return shouldSpeakTTS(for: .userLeftOtherChannels)
+        case .userMoved:
+            return shouldSpeakTTS(for: .userMoved)
+        case .muteDeafen:
+            return shouldSpeakTTS(for: .muteDeafen)
+        case .movedByAdmin:
+            return shouldSpeakTTS(for: .movedByAdmin)
+        case .channelListening:
+            return shouldSpeakTTS(for: .channelListening)
+        }
+    }
+
     /// 添加系统消息到聊天区域，并根据分类开关决定是否发送系统推送通知
     /// - Parameters:
     ///   - text: 消息文本
@@ -616,8 +711,15 @@ extension ServerModelManager {
         // 如果未指定分类（如 "Connected to server"），不发送推送
         if let category = category {
             let shouldNotify = UserDefaults.standard.object(forKey: category.rawValue) as? Bool ?? category.defaultEnabled
+            if shouldSpeakTTS(forSystemCategory: category) {
+                TTSManager.shared.speak(text)
+            }
             if shouldNotify {
                 sendLocalNotification(title: currentNotificationTitle, body: text)
+            }
+        } else {
+            if shouldSpeakTTS(forSystemCategory: nil) {
+                TTSManager.shared.speak(text)
             }
         }
     }
@@ -675,7 +777,7 @@ extension ServerModelManager {
     }
 
     @discardableResult
-    func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [PlatformImage] = []) -> Bool {
+    func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [PlatformImage] = [], senderSession: UInt? = nil) -> Bool {
         let newMessage = ChatMessage(
             id: UUID(),
             type: .userMessage,
@@ -683,7 +785,8 @@ extension ServerModelManager {
             attributedMessage: attributedString(from: text),
             images: images,
             timestamp: Date(),
-            isSentBySelf: isSentBySelf
+            isSentBySelf: isSentBySelf,
+            senderSession: senderSession
         )
         messages.append(newMessage)
         return true
@@ -718,7 +821,8 @@ extension ServerModelManager {
             senderName: senderName,
             text: plainText,
             isSentBySelf: senderSession == connectedUserSession,
-            images: images
+            images: images,
+            senderSession: senderSession
         )
 
         // 只有当消息真的被添加了 (didAppend == true)，才处理后续通知
@@ -731,10 +835,15 @@ extension ServerModelManager {
             }()
 
             // 只有不是自己发的、且开启了通知，才发通知
-            if !isSentBySelf && notifyEnabled {
+            if !isSentBySelf {
                 let bodyText = plainText.isEmpty ? NSLocalizedString("[Image]", comment: "") : plainText
-                let notificationBody = "\(senderName): \(bodyText)"
-                sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
+                let notificationBody = "\(senderName) said: \(bodyText)"
+                if shouldSpeakTTS(for: .normalUserMessages) {
+                    TTSManager.shared.speak(notificationBody)
+                }
+                if notifyEnabled {
+                    sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
+                }
             }
         }
     }

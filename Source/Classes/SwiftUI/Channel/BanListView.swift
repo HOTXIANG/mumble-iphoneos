@@ -111,7 +111,9 @@ struct BanListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
                         Button { showingAddSheet = true } label: { Image(systemName: "plus") }
-                        Button("Save") { saveBanList() }
+                        Button { saveBanList() } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }
                     }
                 }
             }

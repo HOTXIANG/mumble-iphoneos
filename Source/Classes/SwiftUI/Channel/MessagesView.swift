@@ -1593,6 +1593,7 @@ struct MessagesList: View {
         let type: ChatMessageType
         let displayName: String
         let isSentBySelf: Bool
+        let avatar: PlatformImage?
         let messages: [ChatMessage]
     }
 
@@ -1652,7 +1653,8 @@ struct MessagesList: View {
                                 } header: {
                                     SenderStickyHeaderView(
                                         title: run.displayName,
-                                        isSentBySelf: run.isSentBySelf
+                                        isSentBySelf: run.isSentBySelf,
+                                        avatar: run.avatar
                                     )
                                 }
                             }
@@ -1728,11 +1730,13 @@ struct MessagesList: View {
         func flushPendingRun() {
             guard let identity = pendingRunIdentity, !pendingRunMessages.isEmpty else { return }
             let runID = "run-\(pendingRunMessages[0].id.uuidString)"
+            let senderSession = pendingRunMessages.first?.senderSession
             let run = SenderMessageRun(
                 id: runID,
                 type: pendingRunType,
                 displayName: identity.displayName,
                 isSentBySelf: pendingRunIsSentBySelf,
+                avatar: serverManager.avatarImage(for: senderSession),
                 messages: pendingRunMessages
             )
             blocks.append(RenderBlock(id: runID, kind: .senderRun(run)))
@@ -1768,8 +1772,9 @@ struct MessagesList: View {
         switch message.type {
         case .userMessage:
             let displayName = message.senderName
+            let senderIdentityKey = message.senderSession.map { "session-\($0)" } ?? "name-\(displayName)"
             return SenderIdentity(
-                key: "user|\(message.isSentBySelf)|\(displayName)",
+                key: "user|\(message.isSentBySelf)|\(senderIdentityKey)",
                 displayName: displayName
             )
         case .privateMessage:
@@ -1777,8 +1782,9 @@ struct MessagesList: View {
             let displayName = message.isSentBySelf
                 ? String(format: NSLocalizedString("PM to %@", comment: ""), peerName)
                 : String(format: NSLocalizedString("PM from %@", comment: ""), peerName)
+            let senderIdentityKey = message.senderSession.map { "session-\($0)" } ?? "name-\(peerName)"
             return SenderIdentity(
-                key: "private|\(message.isSentBySelf)|\(peerName)",
+                key: "private|\(message.isSentBySelf)|\(senderIdentityKey)",
                 displayName: displayName
             )
         case .notification:
@@ -2052,7 +2058,9 @@ private struct PlatformMessageTextView: NSViewRepresentable {
 private struct SenderStickyHeaderView: View {
     let title: String
     let isSentBySelf: Bool
+    let avatar: PlatformImage?
     @Environment(\.colorScheme) private var colorScheme
+    private let avatarSize: CGFloat = 24
 
     var body: some View {
         HStack {
@@ -2061,21 +2069,17 @@ private struct SenderStickyHeaderView: View {
             }
 
             if #available(iOS 26.0, macOS 26.0, *) {
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .modifier(StickyHeaderAdaptiveTextModifier())
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                headerContent
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
                     .fixedSize(horizontal: true, vertical: false)
                     .background(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        Capsule()
                             .fill(colorScheme == .dark ? Color.clear : Color.white.opacity(0.15))
                     )
                     .glassEffect(
                         .regular,
-                        in: .rect(cornerRadius: 13)
+                        in: .capsule
                     )
                     .shadow(
                         color: colorScheme == .light ? .black.opacity(0.10) : .black.opacity(0.08),
@@ -2083,17 +2087,13 @@ private struct SenderStickyHeaderView: View {
                         x: 0, y: 1
                     )
             } else {
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .modifier(StickyHeaderAdaptiveTextModifier())
-                    .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                headerContent
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
                     .fixedSize(horizontal: true, vertical: false)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background(.ultraThinMaterial, in: Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        Capsule()
                             .fill(colorScheme == .dark ? Color.black.opacity(0.65) : Color.white.opacity(0.65))
                     )
                     .shadow(
@@ -2109,6 +2109,39 @@ private struct SenderStickyHeaderView: View {
         }
         .padding(.horizontal, 2)
         .padding(.vertical, 1)
+    }
+
+    private var headerContent: some View {
+        HStack(spacing: 2) {
+            if !isSentBySelf {
+                avatarView
+            }
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .fontWeight(.semibold)
+                .modifier(StickyHeaderAdaptiveTextModifier())
+                .lineLimit(1)
+                .padding(.horizontal, 4)
+            if isSentBySelf {
+                avatarView
+            }
+        }
+    }
+
+    private var avatarView: some View {
+        Group {
+            if let avatar {
+                Image(platformImage: avatar)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: avatarSize, height: avatarSize)
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: avatarSize))
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

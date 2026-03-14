@@ -52,7 +52,9 @@ struct AccessTokensView: View {
                         } label: {
                             Image(systemName: "plus")
                         }
-                        Button("Save") { saveTokens() }
+                        Button { saveTokens() } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }
                     }
                 }
             }

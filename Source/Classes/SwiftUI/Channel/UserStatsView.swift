@@ -18,7 +18,7 @@ struct UserStatsView: View {
     @State private var tcpPing: String = "—"
     @State private var udpPing: String = "—"
     @State private var isOpus: Bool = false
-    @State private var strongCert: Bool = false
+    @State private var strongCertText: String = "—"
     
     private let refreshTimer = Timer.publish(every: 6, on: .main, in: .common).autoconnect()
     
@@ -43,7 +43,7 @@ struct UserStatsView: View {
                 
                 Section("Bandwidth") {
                     row("Bandwidth", bandwidth)
-                    row("Strong Certificate", strongCert ? "Yes" : "No")
+                    row("Strong Certificate", strongCertText)
                 }
             }
             .navigationTitle("User Statistics")
@@ -62,6 +62,10 @@ struct UserStatsView: View {
                 serverManager.requestUserStats(for: user)
             }
             .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userStatsReceivedNotification)) { notification in
+                if let receivedUser = notification.userInfo?["user"] as? MKUser,
+                   receivedUser.session() != user.session() {
+                    return
+                }
                 guard let stats = notification.userInfo?["stats"] else { return }
                 parseStats(stats)
             }
@@ -81,10 +85,11 @@ struct UserStatsView: View {
     private func parseStats(_ raw: Any) {
         guard let stats = raw as? NSObject else { return }
         
-        if let sess = stats.value(forKey: "session") as? UInt32, sess != UInt32(user.session()) {
+        if let sess = uint32Value(from: stats.value(forKey: "session")),
+           sess != UInt32(user.session()) {
             return
         }
-        
+
         if let v = stats.value(forKey: "version") as? NSObject {
             let release = (v.value(forKey: "release") as? String) ?? ""
             let osStr = (v.value(forKey: "os") as? String) ?? ""
@@ -92,32 +97,44 @@ struct UserStatsView: View {
             version = release.isEmpty ? "—" : release
             os = osStr.isEmpty ? "—" : "\(osStr) \(osVer)"
         }
-        
-        if let secs = stats.value(forKey: "onlinesecs") as? UInt32 {
+
+        if let secs = uint32Value(from: stats.value(forKey: "onlinesecs")) {
             onlineTime = formatDuration(secs)
         }
-        if let secs = stats.value(forKey: "idlesecs") as? UInt32 {
+        if let secs = uint32Value(from: stats.value(forKey: "idlesecs")) {
             idleTime = formatDuration(secs)
         }
-        if let bw = stats.value(forKey: "bandwidth") as? UInt32 {
-            bandwidth = "\(bw / 1000) kbit/s"
+        let bandwidthValue = uint32Value(from: stats.value(forKey: "bandwidth"))
+        let hasBandwidth = boolValue(from: stats.value(forKey: "hasBandwidth")) ?? (bandwidthValue != nil)
+        if let bw = bandwidthValue, hasBandwidth || bw > 0 {
+            bandwidth = String(format: "%.1f kbit/s", Double(bw) / 125.0)
+        } else {
+            bandwidth = "—"
         }
-        if let p = stats.value(forKey: "tcpPackets") as? UInt32 {
+        if let p = uint32Value(from: stats.value(forKey: "tcpPackets")) {
             tcpPackets = "\(p)"
         }
-        if let p = stats.value(forKey: "udpPackets") as? UInt32 {
+        if let p = uint32Value(from: stats.value(forKey: "udpPackets")) {
             udpPackets = "\(p)"
         }
-        if let avg = stats.value(forKey: "tcpPingAvg") as? Float,
-           let v = stats.value(forKey: "tcpPingVar") as? Float {
+        if let avg = floatValue(from: stats.value(forKey: "tcpPingAvg")),
+           let v = floatValue(from: stats.value(forKey: "tcpPingVar")) {
             tcpPing = String(format: "%.1f ms (±%.1f)", avg, sqrt(v))
         }
-        if let avg = stats.value(forKey: "udpPingAvg") as? Float,
-           let v = stats.value(forKey: "udpPingVar") as? Float {
+        if let avg = floatValue(from: stats.value(forKey: "udpPingAvg")),
+           let v = floatValue(from: stats.value(forKey: "udpPingVar")) {
             udpPing = String(format: "%.1f ms (±%.1f)", avg, sqrt(v))
         }
-        isOpus = (stats.value(forKey: "opus") as? Bool) ?? false
-        strongCert = (stats.value(forKey: "strongCertificate") as? Bool) ?? false
+        if let opus = boolValue(from: stats.value(forKey: "opus")) {
+            isOpus = opus
+        }
+        let strongCertValue = boolValue(from: stats.value(forKey: "strongCertificate"))
+        let hasStrongCert = boolValue(from: stats.value(forKey: "hasStrongCertificate")) ?? (strongCertValue != nil)
+        if hasStrongCert, let strong = strongCertValue {
+            strongCertText = strong ? "Yes" : "No"
+        } else {
+            strongCertText = "—"
+        }
     }
     
     private func formatDuration(_ seconds: UInt32) -> String {
@@ -131,5 +148,25 @@ struct UserStatsView: View {
         } else {
             return "\(s)s"
         }
+    }
+
+    private func uint32Value(from raw: Any?) -> UInt32? {
+        if let value = raw as? UInt32 { return value }
+        if let value = raw as? Int { return UInt32(exactly: value) }
+        if let value = raw as? NSNumber { return value.uint32Value }
+        return nil
+    }
+
+    private func floatValue(from raw: Any?) -> Float? {
+        if let value = raw as? Float { return value }
+        if let value = raw as? Double { return Float(value) }
+        if let value = raw as? NSNumber { return value.floatValue }
+        return nil
+    }
+
+    private func boolValue(from raw: Any?) -> Bool? {
+        if let value = raw as? Bool { return value }
+        if let value = raw as? NSNumber { return value.boolValue }
+        return nil
     }
 }

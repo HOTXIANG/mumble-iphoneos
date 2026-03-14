@@ -39,6 +39,7 @@ struct MumbleApp: App {
     
     /// 处理用户点击系统通知后跳转到聊天界面
     @StateObject private var notificationDelegate = NotificationDelegate()
+    @State private var pendingDeepLinkChannelPath: [String] = []
 
     @SceneBuilder
     private var mainWindowScene: some Scene {
@@ -56,6 +57,9 @@ struct MumbleApp: App {
                 .onAppear {
                     MumbleLogger.general.info("SwiftUI lifecycle started")
                     UNUserNotificationCenter.current().delegate = notificationDelegate
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .muConnectionOpened)) { _ in
+                    joinPendingDeepLinkChannelIfNeeded()
                 }
                 // Handoff 接力：当其他设备的 Mumble 正在连接服务器时，本设备可以接力
                 .onContinueUserActivity(MumbleHandoffActivityType) { userActivity in
@@ -98,21 +102,30 @@ struct MumbleApp: App {
     
     /// 处理 mumble:// URL（来自 Widget 或外部链接）
     private func handleMumbleURL(_ url: URL) {
-        guard url.scheme == "mumble" else { return }
-        
+        let scheme = (url.scheme ?? "").lowercased()
+        guard scheme == "mumble" || scheme == "neomumble" else { return }
+
         let connController = MUConnectionController.shared()
-        guard connController?.isConnected() != true else {
-            MumbleLogger.connection.info("Already connected, ignoring widget URL")
-            return
-        }
-        
         let hostname = url.host ?? ""
         let port = url.port ?? 64738
         let username = url.user ?? ""
         let password = url.password ?? ""
-        
+        let channelPath = decodedChannelPath(from: url)
+
         guard !hostname.isEmpty else { return }
-        
+
+        if connController?.isConnected() == true || connController?.connection != nil {
+            guard isCurrentConnection(hostname: hostname, port: port) else {
+                return
+            }
+            if joinChannel(path: channelPath) {
+                MumbleLogger.connection.info("Deep link jumped to channel path: \(channelPath.joined(separator: "/"))")
+            } else if !channelPath.isEmpty {
+                pendingDeepLinkChannelPath = channelPath
+            }
+            return
+        }
+
         MumbleLogger.connection.info("Opening mumble URL: \(hostname):\(port) as \(username)")
         
         // 从收藏夹中查找匹配的服务器，以获取证书和其他配置
@@ -136,9 +149,60 @@ struct MumbleApp: App {
             certificateRef: matchingFav?.certificateRef,
             displayName: matchingFav?.displayName
         )
+        pendingDeepLinkChannelPath = channelPath
         
         // 最近连接由 MUConnectionController 内部调用 RecentServerManager.addRecent 自动记录
         // Widget 数据也由 RecentServerManager 自动同步
+    }
+
+    private func joinPendingDeepLinkChannelIfNeeded() {
+        guard !pendingDeepLinkChannelPath.isEmpty else { return }
+        // 稍等片刻，确保频道树已经同步完成
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            if self.joinChannel(path: self.pendingDeepLinkChannelPath) {
+                self.pendingDeepLinkChannelPath.removeAll()
+            }
+        }
+    }
+
+    private func decodedChannelPath(from url: URL) -> [String] {
+        url.pathComponents
+            .filter { $0 != "/" }
+            .map { $0.removingPercentEncoding ?? $0 }
+            .filter { !$0.isEmpty }
+    }
+
+    private func isCurrentConnection(hostname: String, port: Int) -> Bool {
+        guard let connection = MUConnectionController.shared()?.connection else { return false }
+        let connectedHost = (connection.hostname() ?? "").lowercased()
+        let targetHost = hostname.lowercased()
+        return connectedHost == targetHost && Int(connection.port()) == port
+    }
+
+    private func joinChannel(path: [String]) -> Bool {
+        guard !path.isEmpty,
+              let model = MUConnectionController.shared()?.serverModel,
+              let root = model.rootChannel() else {
+            return false
+        }
+
+        guard let target = findChannel(path: path, from: root) else { return false }
+        model.join(target)
+        return true
+    }
+
+    private func findChannel(path: [String], from root: MKChannel) -> MKChannel? {
+        var current = root
+        for component in path {
+            guard let subChannels = current.channels() as? [MKChannel] else {
+                return nil
+            }
+            guard let next = subChannels.first(where: { ($0.channelName() ?? "") == component }) else {
+                return nil
+            }
+            current = next
+        }
+        return current
     }
 }
 

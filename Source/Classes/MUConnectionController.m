@@ -254,9 +254,13 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         BOOL isSatisfied = (nw_path_get_status(path) == nw_path_status_satisfied);
         
         if (!strongSelf->_networkWasSatisfied && isSatisfied) {
-            NSLog(@"🌐 Network restored. Triggering reconnect...");
-            // 网络恢复后，如果当前没有连接或连接已断开，则触发重连
-            if (strongSelf->_connection == nil && strongSelf->_hostname != nil && !strongSelf->_isUserInitiatedDisconnect) {
+            NSLog(@"🌐 Network restored.");
+            NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
+            BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
+            
+            // 网络恢复后，如果当前没有连接或连接已断开，并且启用了自动重连，则触发重连
+            if (autoReconnectEnabled && strongSelf->_connection == nil && strongSelf->_hostname != nil && !strongSelf->_isUserInitiatedDisconnect) {
+                NSLog(@"🔄 Triggering reconnect due to network restore...");
                 strongSelf->_retryCount = 0;
                 [strongSelf establishConnection];
                 NSDictionary *info = @{ @"isReconnecting": @(YES) };
@@ -451,6 +455,17 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     }
     
     _retryCount++;
+    
+    NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
+    BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
+    
+    if (!autoReconnectEnabled) {
+        NSLog(@"🚫 Auto Reconnect is disabled. Giving up immediately.");
+        [self postErrorWithTitle:NSLocalizedString(@"Connection Failed", nil)
+                         message:[err localizedDescription] ?: NSLocalizedString(@"The connection was closed.", nil)];
+        return;
+    }
+    
     NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/10)...", (long)_retryCount);
     
     // 通知 UI 显示 "Reconnecting..."

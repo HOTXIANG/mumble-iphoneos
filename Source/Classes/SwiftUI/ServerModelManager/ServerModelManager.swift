@@ -57,6 +57,12 @@ class ServerModelManager: ObservableObject {
     
     @Published public var userVolumes: [UInt: Float] = [:]
     
+    /// User custom nicknames: session -> nickname
+    @Published var localNicknames: [UInt: String] = [:]
+    
+    /// User avatars cache: session -> image
+    @Published var userAvatars: [UInt: PlatformImage] = [:]
+    
     /// 跟踪哪些频道有密码保护（通过 ACL 检测到 deny Enter for @all + grant Enter for #token）
     @Published var channelsWithPassword: Set<UInt> = []
     
@@ -71,6 +77,10 @@ class ServerModelManager: ObservableObject {
     
     /// 跟踪所有用户的监听状态：channelId -> [userSession]
     @Published var channelListeners: [UInt: Set<UInt>] = [:]
+    /// 监听状态同步：本地已发送 addListening，等待服务器确认
+    var pendingListeningAdds: Set<UInt> = []
+    /// 监听状态同步：本地已发送 removeListening，等待服务器确认
+    var pendingListeningRemoves: Set<UInt> = []
 
     /// ACL 页面用的 UserID -> 用户名缓存（包含离线已注册用户）
     @Published var aclUserNamesById: [Int: String] = [:]
@@ -116,6 +126,8 @@ class ServerModelManager: ObservableObject {
     var wasMutedBeforeServerDeafen: [UInt: Bool] = [:]
     /// 用户主动尝试加入的频道 ID（用于在扫描期间仍弹出密码框）
     var userInitiatedJoinChannelId: UInt? = nil
+    /// 避免重复请求同一用户头像
+    var pendingAvatarFetchSessions: Set<UInt> = []
     
     enum ViewMode {
         case server,
@@ -129,6 +141,13 @@ class ServerModelManager: ObservableObject {
     deinit {
         MumbleLogger.model.debug("ServerModelManager deinit")
         NotificationCenter.default.removeObserver(self)
+    }
+
+    func displayName(for user: MKUser) -> String {
+        if let nick = localNicknames[user.session()], !nick.isEmpty {
+            return nick
+        }
+        return user.userName() ?? NSLocalizedString("Unknown", comment: "")
     }
 
     // Split note: manager logic moved into focused extensions:

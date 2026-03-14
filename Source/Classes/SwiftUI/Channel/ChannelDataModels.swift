@@ -95,10 +95,11 @@ struct ChatMessage: Identifiable, Equatable {
     let images: [PlatformImage]
     let timestamp: Date
     let isSentBySelf: Bool
+    let senderSession: UInt?
     /// 私聊对方的名称（收到时为发送者名，发出时为接收者名）
     let privatePeerName: String?
     
-    init(id: UUID = UUID(), type: ChatMessageType, senderName: String, attributedMessage: AttributedString, images: [PlatformImage] = [], timestamp: Date = Date(), isSentBySelf: Bool, privatePeerName: String? = nil) {
+    init(id: UUID = UUID(), type: ChatMessageType, senderName: String, attributedMessage: AttributedString, images: [PlatformImage] = [], timestamp: Date = Date(), isSentBySelf: Bool, senderSession: UInt? = nil, privatePeerName: String? = nil) {
         self.id = id
         self.type = type
         self.senderName = senderName
@@ -106,6 +107,7 @@ struct ChatMessage: Identifiable, Equatable {
         self.images = images
         self.timestamp = timestamp
         self.isSentBySelf = isSentBySelf
+        self.senderSession = senderSession
         self.privatePeerName = privatePeerName
     }
     

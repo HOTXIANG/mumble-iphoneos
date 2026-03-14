@@ -170,6 +170,8 @@ struct ServerChannelView: View {
     @State private var selectedUserForPM: MKUser? = nil
     @State private var selectedChannelForEdit: MKChannel? = nil
     @State private var selectedChannelForCreate: MKChannel? = nil
+    @State private var selectedUserForRename: MKUser? = nil
+    @State private var pendingNicknameInput: String = ""
     
     var body: some View {
         ZStack {
@@ -196,6 +198,10 @@ struct ServerChannelView: View {
                             },
                             onUserStatsTap: { user in
                                 self.selectedUserForStats = user
+                            },
+                            onUserRenameTap: { user in
+                                self.selectedUserForRename = user
+                                self.pendingNicknameInput = serverManager.localNicknames[user.session()] ?? ""
                             },
                             onChannelEditTap: { channel in
                                 self.selectedChannelForEdit = channel
@@ -270,7 +276,7 @@ struct ServerChannelView: View {
         }
         .sheet(item: $selectedUserForInfo) { user in
             let isSelf = user.session() == MUConnectionController.shared()?.serverModel?.connectedUser()?.session()
-            UserInfoView(user: user, isSelf: isSelf)
+            UserInfoView(user: user, isSelf: isSelf, serverManager: serverManager)
         }
         .sheet(item: $selectedUserForStats) { user in
             UserStatsView(user: user, serverManager: serverManager)
@@ -295,6 +301,27 @@ struct ServerChannelView: View {
                 parentChannel: channel,
                 serverManager: serverManager
             )
+        }
+        .alert("Set Nickname", isPresented: Binding(
+            get: { selectedUserForRename != nil },
+            set: { if !$0 { selectedUserForRename = nil } }
+        )) {
+            TextField("Nickname", text: $pendingNicknameInput)
+            Button("Cancel", role: .cancel) {
+                selectedUserForRename = nil
+                pendingNicknameInput = ""
+            }
+            Button("Save") {
+                if let user = selectedUserForRename {
+                    serverManager.setLocalNickname(pendingNicknameInput.trimmingCharacters(in: .whitespacesAndNewlines), for: user)
+                }
+                selectedUserForRename = nil
+                pendingNicknameInput = ""
+            }
+        } message: {
+            if let user = selectedUserForRename {
+                Text("Enter a local nickname for \(user.userName() ?? "this user") (leave blank to reset):")
+            }
         }
         .alert("Channel Password", isPresented: Binding(
             get: { serverManager.passwordPromptChannel != nil },
@@ -332,6 +359,7 @@ struct ChannelTreeRow: View {
     let onChannelInfoTap: (MKChannel) -> Void
     var onUserPMTap: ((MKUser) -> Void)? = nil
     var onUserStatsTap: ((MKUser) -> Void)? = nil
+    var onUserRenameTap: ((MKUser) -> Void)? = nil
     var onChannelEditTap: ((MKChannel) -> Void)? = nil
     var onChannelCreateTap: ((MKChannel) -> Void)? = nil
     
@@ -405,6 +433,29 @@ struct ChannelTreeRow: View {
                                     Label("Edit Channel", systemImage: "pencil.and.outline")
                                 }
                             }
+
+                            if canManageChannelFilter {
+                                Divider()
+                                Button {
+                                    serverManager.toggleChannelPinned(channel)
+                                } label: {
+                                    Label(
+                                        serverManager.isChannelPinned(channel) ? "Unpin Channel" : "Pin Channel",
+                                        systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
+                                    )
+                                }
+
+                                if !isRootChannel {
+                                    Button {
+                                        serverManager.toggleChannelHidden(channel)
+                                    } label: {
+                                        Label(
+                                            serverManager.isChannelHidden(channel) ? "Unhide Channel" : "Hide Channel",
+                                            systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
+                                        )
+                                    }
+                                }
+                            }
                             
                             if canListenToChannel {
                                 Divider()
@@ -429,7 +480,7 @@ struct ChannelTreeRow: View {
                                     Button {
                                         unlinkFromMyChannel()
                                     } label: {
-                                        Label("Unlink Channel", systemImage: "link.badge.minus")
+                                        Label("Unlink Channel", systemImage: "xmark.circle")
                                     }
                                 } else {
                                     Button {
@@ -442,7 +493,7 @@ struct ChannelTreeRow: View {
                                     Button(role: .destructive) {
                                         serverManager.unlinkAllForChannel(channel)
                                     } label: {
-                                        Label("Unlink All", systemImage: "link.badge.minus")
+                                        Label("Unlink All", systemImage: "trash")
                                     }
                                 }
                             }
@@ -491,6 +542,29 @@ struct ChannelTreeRow: View {
                                 Label("Edit Channel", systemImage: "pencil.and.outline")
                             }
                         }
+
+                        if canManageChannelFilter {
+                            Divider()
+                            Button {
+                                serverManager.toggleChannelPinned(channel)
+                            } label: {
+                                Label(
+                                    serverManager.isChannelPinned(channel) ? "Unpin Channel" : "Pin Channel",
+                                    systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
+                                )
+                            }
+
+                            if !isRootChannel {
+                                Button {
+                                    serverManager.toggleChannelHidden(channel)
+                                } label: {
+                                    Label(
+                                        serverManager.isChannelHidden(channel) ? "Unhide Channel" : "Hide Channel",
+                                        systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
+                                    )
+                                }
+                            }
+                        }
                         
                         if canListenToChannel {
                             Divider()
@@ -515,7 +589,7 @@ struct ChannelTreeRow: View {
                                 Button {
                                     unlinkFromMyChannel()
                                 } label: {
-                                    Label("Unlink Channel", systemImage: "link.badge.minus")
+                                    Label("Unlink Channel", systemImage: "xmark.circle")
                                 }
                             } else {
                                 Button {
@@ -528,7 +602,7 @@ struct ChannelTreeRow: View {
                                 Button(role: .destructive) {
                                     serverManager.unlinkAllForChannel(channel)
                                 } label: {
-                                    Label("Unlink All", systemImage: "link.badge.minus")
+                                    Label("Unlink All", systemImage: "trash")
                                 }
                             }
                         }
@@ -547,6 +621,9 @@ struct ChannelTreeRow: View {
                     #endif
                 }
                 } // end else (not move mode)
+            }
+            .onDrag {
+                NSItemProvider(object: "channel:\(channel.channelId())" as NSString)
             }
             // 拖拽用户到此频道的 drop target
             .onDrop(of: [UTType.plainText], isTargeted: $isDropTargeted) { providers in
@@ -574,7 +651,8 @@ struct ChannelTreeRow: View {
                         onTap: { onUserTap(user) },
                         onInfoTap: { u in onUserInfoTap(u) },
                         onPMTap: onUserPMTap,
-                        onStatsTap: onUserStatsTap
+                        onStatsTap: onUserStatsTap,
+                        onRenameTap: onUserRenameTap
                     )
                     .opacity(isInMoveMode ? 0.3 : 1.0)
                     .allowsHitTesting(!isInMoveMode)
@@ -611,6 +689,7 @@ struct ChannelTreeRow: View {
                         onChannelInfoTap: onChannelInfoTap,
                         onUserPMTap: onUserPMTap,
                         onUserStatsTap: onUserStatsTap,
+                        onUserRenameTap: onUserRenameTap,
                         onChannelEditTap: onChannelEditTap,
                         onChannelCreateTap: onChannelCreateTap
                     )
@@ -667,14 +746,28 @@ struct ChannelTreeRow: View {
         return serverManager.hasPermission(MKPermissionWrite, forChannelId: chId) ||
                serverManager.hasPermission(MKPermissionMakeChannel, forChannelId: chId)
     }
+
+    private var isRootChannel: Bool {
+        channel.parent() == nil
+    }
+
+    private var canManageChannelFilter: Bool {
+        serverManager.serverModel != nil
+    }
     
-    /// 是否可以监听此频道（不是自己当前所在的频道 + 有 Whisper 权限）
+    /// 是否可以监听此频道（不是自己当前所在的频道 + 有 Listen 权限）
     private var canListenToChannel: Bool {
         guard let connectedUser = MUConnectionController.shared()?.serverModel?.connectedUser() else {
             return false
         }
         if connectedUser.channel()?.channelId() == channel.channelId() { return false }
-        return connectedUser.isAuthenticated()
+        let channelId = channel.channelId()
+        if serverManager.hasPermission(MKPermissionListen, forChannelId: channelId) ||
+            serverManager.hasRootPermission(MKPermissionListen) {
+            return true
+        }
+        // 权限尚未同步完成时允许显示入口，避免“功能有效但菜单入口消失”
+        return serverManager.channelPermissions[channelId] == nil
     }
     
     /// 是否有频道链接权限
@@ -738,15 +831,22 @@ struct ChannelTreeRow: View {
         #endif
     }
     
-    /// 处理拖拽用户到频道的 drop 操作
+    /// 处理拖拽用户/频道到频道的 drop 操作
     private func handleUserDrop(providers: [NSItemProvider]) -> Bool {
         for provider in providers {
             if provider.canLoadObject(ofClass: NSString.self) {
                 provider.loadObject(ofClass: NSString.self) { item, _ in
-                    guard let sessionString = item as? String,
-                          let session = UInt(sessionString) else { return }
+                    guard let itemString = item as? String else { return }
                     DispatchQueue.main.async {
-                        serverManager.moveUser(session: session, toChannelId: channel.channelId())
+                        if itemString.hasPrefix("channel:") {
+                            let idPart = itemString.dropFirst(8)
+                            if let chanId = UInt(idPart),
+                               let draggedChan = serverManager.serverModel?.channel(withId: chanId) {
+                                serverManager.moveChannel(draggedChan, to: channel)
+                            }
+                        } else if let session = UInt(itemString) {
+                            serverManager.moveUser(session: session, toChannelId: channel.channelId())
+                        }
                     }
                 }
                 return true
@@ -825,6 +925,29 @@ struct ChannelRowView: View {
                 }
                 
                 // 频道限制标记（最右侧）
+                if isPinnedChannel {
+                    HStack(spacing: 3) {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 5)
+                    .background(Color.orange.opacity(0.18), in: Circle())
+                }
+                let linkedCount = (channel.linkedChannels() as? [MKChannel])?.count ?? 0
+                if linkedCount > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "link")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("\(linkedCount)")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundColor(.cyan)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 5)
+                    .background(Color.cyan.opacity(0.18), in: Capsule())
+                }
                 if let lockColor = channelLockColor {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 10))
@@ -856,6 +979,10 @@ struct ChannelRowView: View {
     private var userCount: Int {
         return serverManager.getSortedUsers(for: channel).count
     }
+
+    private var isPinnedChannel: Bool {
+        serverManager.isChannelPinned(channel)
+    }
     
     /// 频道锁图标颜色：绿色=受限但你可进入，橙色=密码频道，红色=无法进入
     private var channelLockColor: Color? {
@@ -879,11 +1006,15 @@ struct ChannelRowView: View {
 struct UserRowView: View {
     let user: MKUser
     @ObservedObject var serverManager: ServerModelManager
+    @ObservedObject var friendsManager = FriendsManager.shared
+    @ObservedObject var ignoreManager = IgnoreManager.shared
+    @State private var userStateRevision: Int = 0
     
     let onTap: () -> Void
     var onInfoTap: ((MKUser) -> Void)? = nil
     var onPMTap: ((MKUser) -> Void)? = nil
     var onStatsTap: ((MKUser) -> Void)? = nil
+    var onRenameTap: ((MKUser) -> Void)? = nil
 
     private var currentVolume: Float {
         if let vol = serverManager.userVolumes[user.session()] {
@@ -902,6 +1033,10 @@ struct UserRowView: View {
             current = parent
         }
         return depth
+    }
+    
+    private var isFriend: Bool {
+        friendsManager.isFriend(userHash: user.userHash())
     }
     
     /// 检查当前用户是否有权限移动其他用户（需要目标用户所在频道的 Move 权限）
@@ -931,6 +1066,7 @@ struct UserRowView: View {
     }
     
     var body: some View {
+        let _ = userStateRevision
         ZStack(alignment: .leading) {
             HStack(spacing: kHSpacing) {
                 let level = dynamicLevel
@@ -939,13 +1075,16 @@ struct UserRowView: View {
                 Spacer().frame(width: indentWidth)
                 
                 // Avatar
-                AvatarView(talkingState: isTalking ? .talking : .silent)
+                TalkingAvatarView(
+                    user: user,
+                    avatar: serverManager.avatarImage(for: user.session())
+                )
                 
                 // 用户名
-                Text(user.userName() ?? NSLocalizedString("Unknown", comment: ""))
+                Text(serverManager.displayName(for: user))
                     .font(.system(size: kFontSize, weight: .medium))
-                    .foregroundColor(isMyself ? .cyan : .primary)
-                    .shadow(radius: isMyself ? 1 : 0)
+                    .foregroundColor(isMyself ? .cyan : (isFriend ? .green : .primary))
+                    .shadow(radius: isMyself || isFriend ? 1 : 0)
                     .lineLimit(1)
                 
                 if abs(currentVolume - 1.0) > 0.01 {
@@ -1032,7 +1171,31 @@ struct UserRowView: View {
                     }
                     Button { onInfoTap?(user) } label: { Label("User Info", systemImage: "person.circle") }
                     Button { onStatsTap?(user) } label: { Label("User Statistics", systemImage: "chart.bar") }
+                    Button { onRenameTap?(user) } label: { Label("Set Nickname", systemImage: "pencil") }
+                    
                     if !isMyself {
+                        if let hash = user.userHash() {
+                            Button {
+                                friendsManager.toggleFriend(userHash: hash)
+                            } label: {
+                                if friendsManager.isFriend(userHash: hash) {
+                                    Label("Remove Friend", systemImage: "person.badge.minus")
+                                } else {
+                                    Label("Add Friend", systemImage: "person.badge.plus")
+                                }
+                            }
+                            
+                            Button {
+                                ignoreManager.toggleIgnore(userHash: hash)
+                            } label: {
+                                if ignoreManager.isIgnored(userHash: hash) {
+                                    Label("Unignore Messages", systemImage: "message.badge.minus")
+                                } else {
+                                    Label("Ignore Messages", systemImage: "message.badge.minus")
+                                }
+                            }
+                        }
+                        
                         Button { onPMTap?(user) } label: { Label("Private Message", systemImage: "envelope.fill") }
                         if hasMovePermission {
                             Divider()
@@ -1230,29 +1393,75 @@ struct UserRowView: View {
             return NSItemProvider(object: sessionString as NSString)
         }
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userStateUpdatedNotification)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let changedSession = userInfo["userSession"] as? UInt,
+                  changedSession == user.session() else { return }
+            userStateRevision &+= 1
+        }
     }
     
     private var isMyself: Bool {
         return user == MUConnectionController.shared()?.serverModel?.connectedUser()
     }
     
-    private var isTalking: Bool {
-        return user.talkState() == MKTalkStateTalking
-    }
 }
 
 // MARK: - 6. Helper Components
 
-private struct AvatarView: View {
-    enum TalkingState { case talking, silent }
-    let talkingState: TalkingState
-    
+private struct TalkingAvatarView: View {
+    let user: MKUser
+    let avatar: PlatformImage?
+    @State private var talkStateRawValue: UInt32
+    private var avatarDiameter: CGFloat { kIconSize + 2 }
+
+    init(user: MKUser, avatar: PlatformImage?) {
+        self.user = user
+        self.avatar = avatar
+        _talkStateRawValue = State(initialValue: user.talkState().rawValue)
+    }
+
     var body: some View {
-        Image(systemName: "person.fill")
-            .font(.system(size: kIconSize))
-            .foregroundColor(talkingState == .talking ? .green : .gray)
-            .frame(width: kContentHeight, height: kContentHeight)
-            .shadow(radius: talkingState == .talking ? 4 : 0)
+        Group {
+            if let avatar {
+                Image(platformImage: avatar)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: avatarDiameter, height: avatarDiameter)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(isTalking ? Color.green.opacity(0.95) : .clear, lineWidth: 2)
+                    )
+                    .shadow(color: isTalking ? Color.green.opacity(0.78) : .clear, radius: isTalking ? 6 : 0)
+            } else {
+                Image(systemName: "person.fill")
+                    .font(.system(size: kIconSize))
+                    .foregroundColor(isTalking ? .green : .gray)
+                    .shadow(color: isTalking ? Color.green.opacity(0.78) : .clear, radius: isTalking ? 6 : 0)
+            }
+        }
+            .frame(width: kContentHeight, height: kContentHeight, alignment: .center)
+            .animation(.easeInOut(duration: 0.18), value: isTalking)
+            .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userTalkStateChangedNotification)) { notification in
+                guard let userInfo = notification.userInfo,
+                      let changedSession = userInfo["userSession"] as? UInt,
+                      changedSession == user.session(),
+                      let talkState = userInfo["talkState"] as? MKTalkState else { return }
+                let newRaw = talkState.rawValue
+                if newRaw != talkStateRawValue {
+                    talkStateRawValue = newRaw
+                }
+            }
+    }
+
+    private var isTalking: Bool {
+        switch talkStateRawValue {
+        case 1, 2, 3:
+            return true
+        default:
+            return false
+        }
     }
 }
 
@@ -1414,13 +1623,10 @@ struct ListenerRow: View {
     let channel: MKChannel
     let level: Int
     @ObservedObject var serverManager: ServerModelManager
+    @State private var hasSpeaker: Bool = false
     
     private var isMyself: Bool {
         return listener == MUConnectionController.shared()?.serverModel?.connectedUser()
-    }
-    
-    private var hasSpeaker: Bool {
-        return serverManager.getSortedUsers(for: channel).contains { $0.talkState() == MKTalkStateTalking }
     }
     
     var body: some View {
@@ -1465,5 +1671,34 @@ struct ListenerRow: View {
         .padding(.vertical, kRowPaddingV)
         // 自己=indigo（与自己用户行一致），别人=普通无色
         .modifier(TintedGlassRowModifier(isHighlighted: isMyself, highlightColor: .indigo))
+        .onAppear {
+            refreshSpeakerState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userTalkStateChangedNotification)) { _ in
+            refreshSpeakerState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userMovedNotification)) { _ in
+            refreshSpeakerState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userJoinedNotification)) { _ in
+            refreshSpeakerState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userLeftNotification)) { _ in
+            refreshSpeakerState()
+        }
+    }
+
+    private func refreshSpeakerState() {
+        let newValue = serverManager.getSortedUsers(for: channel).contains { user in
+            switch user.talkState().rawValue {
+            case 1, 2, 3:
+                return true
+            default:
+                return false
+            }
+        }
+        if newValue != hasSpeaker {
+            hasSpeaker = newValue
+        }
     }
 }

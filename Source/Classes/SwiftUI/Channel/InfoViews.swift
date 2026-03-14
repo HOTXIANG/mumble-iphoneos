@@ -211,6 +211,7 @@ typealias PlatformViewRepresentable = UIViewRepresentable
 struct UserInfoView: View {
     let user: MKUser
     let isSelf: Bool
+    @ObservedObject var serverManager: ServerModelManager
     
     @State private var comment: String = ""
     @State private var isEditing: Bool = false
@@ -218,6 +219,7 @@ struct UserInfoView: View {
     @State private var isLoading: Bool = true
     @State private var contentHeight: CGFloat = 60
     @State private var showingAvatarPicker = false
+    @State private var avatarImage: PlatformImage? = nil
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
@@ -261,7 +263,7 @@ struct UserInfoView: View {
                                 showingAvatarPicker = true
                             }
                             Button("Remove Avatar", role: .destructive) {
-                                MUConnectionController.shared()?.serverModel?.setSelfTexture(nil)
+                                serverManager.removeSelfTexture()
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -277,7 +279,10 @@ struct UserInfoView: View {
                     Task {
                         if let data = try? await item.loadTransferable(type: Data.self) {
                             await MainActor.run {
-                                MUConnectionController.shared()?.serverModel?.setSelfTexture(data)
+                                serverManager.setSelfTexture(data)
+                                if let image = PlatformImage(data: data) {
+                                    avatarImage = image
+                                }
                             }
                         }
                     }
@@ -287,6 +292,8 @@ struct UserInfoView: View {
         }
         .onAppear {
             loadComment()
+            avatarImage = serverManager.avatarImage(for: user.session())
+            serverManager.updateAvatarCache(for: user)
         }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userCommentChangedNotification)) { notification in
             if let session = notification.userInfo?["userSession"] as? UInt,
@@ -297,6 +304,12 @@ struct UserInfoView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userTextureChangedNotification)) { notification in
+            guard let updatedUser = notification.userInfo?["user"] as? MKUser,
+                  updatedUser.session() == user.session() else { return }
+            serverManager.updateAvatarCache(for: updatedUser)
+            avatarImage = serverManager.avatarImage(for: user.session())
+        }
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 360)
         #endif
@@ -306,9 +319,17 @@ struct UserInfoView: View {
     
     private var userHeader: some View {
         HStack(spacing: 12) {
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 40))
-                .foregroundColor(.accentColor)
+            if let avatarImage {
+                Image(platformImage: avatarImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.accentColor)
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(user.userName() ?? NSLocalizedString("Unknown", comment: ""))

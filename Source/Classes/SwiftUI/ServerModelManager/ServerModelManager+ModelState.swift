@@ -30,15 +30,16 @@ extension ServerModelManager {
             }()
 
             if isSelf || isInSameChannel {
-                let displayName = isSelf
+                let nameStr = displayName(for: user)
+                let displayStr = isSelf
                     ? NSLocalizedString("You", comment: "")
-                    : (user.userName() ?? NSLocalizedString("Unknown", comment: ""))
+                    : nameStr
 
                 if prev.isSelfDeafened != currentDeafened {
                     // 不听状态变化（优先级高于闭麦，因为 deafen 隐含 mute）
                     let key = currentDeafened ? "%@ deafened" : "%@ undeafened"
                     addSystemNotification(
-                        String(format: NSLocalizedString(key, comment: ""), displayName),
+                        String(format: NSLocalizedString(key, comment: ""), displayStr),
                         category: .muteDeafen,
                         suppressPush: isSelf
                     )
@@ -46,7 +47,7 @@ extension ServerModelManager {
                     // 闭麦状态变化
                     let key = currentMuted ? "%@ muted" : "%@ unmuted"
                     addSystemNotification(
-                        String(format: NSLocalizedString(key, comment: ""), displayName),
+                        String(format: NSLocalizedString(key, comment: ""), displayStr),
                         category: .muteDeafen,
                         suppressPush: isSelf
                     )
@@ -61,8 +62,8 @@ extension ServerModelManager {
             user: user
         )
 
-        // 手动发送通知，告诉所有观察者（比如 ChannelListView）：“我变了，快刷新！”
-        objectWillChange.send()
+        // 不再触发全局 objectWillChange，避免频道树整体重绘导致菜单滚动位置丢失。
+        // 用户行通过 userStateUpdatedNotification 做行级刷新。
     }
 
     func updateUserTalkingState(userSession: UInt, talkState: MKTalkState) {
@@ -87,7 +88,6 @@ extension ServerModelManager {
                 item.talkingState = .passive
             }
         }
-        objectWillChange.send()
         updateLiveActivity()
     }
 
@@ -155,7 +155,28 @@ extension ServerModelManager {
 
         if viewMode == .server {
             if let rootChannel = serverModel.rootChannel() {
-                addChannelTreeToModel(channel: rootChannel, indentLevel: 0)
+                let serverHost = serverModel.hostname() ?? ""
+                
+                // First, add pinned channels at the top level
+                let pinnedIds = ChannelFilterManager.shared.getPinnedChannels(serverHost: serverHost)
+                for pinnedId in pinnedIds.sorted() {
+                    guard let pinnedChan = serverModel.channel(withId: UInt(pinnedId)),
+                          pinnedChan.channelId() != rootChannel.channelId() else { continue }
+
+                    // 如果其父频道也被置顶，则由父频道递归展示，避免重复
+                    if let parent = pinnedChan.parent(),
+                       pinnedIds.contains(parent.channelId()) {
+                        continue
+                    }
+
+                    if !ChannelFilterManager.shared.isHidden(id: pinnedChan.channelId(), serverHost: serverHost) ||
+                        UserDefaults.standard.bool(forKey: "ShowHiddenChannels") {
+                        addChannelTreeToModel(channel: pinnedChan, indentLevel: 0, isTraversingPinnedTree: true)
+                    }
+                }
+                
+                // Then, add the normal tree
+                addChannelTreeToModel(channel: rootChannel, indentLevel: 0, isTraversingPinnedTree: false)
             }
         } else if let connectedUser = serverModel.connectedUser(),
                   let currentChannel = connectedUser.channel(),
@@ -163,8 +184,9 @@ extension ServerModelManager {
                   let users = usersArray as? [MKUser] {
             for (index, user) in users.enumerated() {
                 applySavedUserPreferences(user: user)
+                updateAvatarCache(for: user)
 
-                let userName = user.userName() ?? NSLocalizedString("Unknown User", comment: "")
+                let userName = displayName(for: user)
                 let channelName = currentChannel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
                 let item = ChannelNavigationItem(
                     title: userName,
@@ -183,7 +205,22 @@ extension ServerModelManager {
         updateLiveActivity()
     }
 
-    private func addChannelTreeToModel(channel: MKChannel, indentLevel: Int) {
+    private func addChannelTreeToModel(channel: MKChannel, indentLevel: Int, isTraversingPinnedTree: Bool = false) {
+        let serverHost = serverModel?.hostname() ?? ""
+        let channelId = channel.channelId()
+        
+        // Skip hidden channels
+        let showHidden = UserDefaults.standard.bool(forKey: "ShowHiddenChannels")
+        if !showHidden && ChannelFilterManager.shared.isHidden(id: channelId, serverHost: serverHost) {
+            return
+        }
+        
+        // Skip pinned channels during normal traversal (to avoid duplicating them),
+        // except when explicitly traversing the pinned tree itself.
+        if !isTraversingPinnedTree && channel.parent() != nil && ChannelFilterManager.shared.isPinned(id: channelId, serverHost: serverHost) {
+            return
+        }
+
         let channelName = channel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
         let channelDescription = channel.channelDescription()
         let channelItem = ChannelNavigationItem(
@@ -209,8 +246,9 @@ extension ServerModelManager {
             for user in rawUsers {
                 // 顺便确保配置被应用 (之前的修复)
                 applySavedUserPreferences(user: user)
+                updateAvatarCache(for: user)
 
-                let userName = user.userName() ?? NSLocalizedString("Unknown User", comment: "")
+                let userName = displayName(for: user)
                 let userItem = ChannelNavigationItem(
                     title: userName,
                     subtitle: String(format: NSLocalizedString("in %@", comment: ""), channelName),
@@ -233,7 +271,7 @@ extension ServerModelManager {
         if let channelsArray = channel.channels(),
            let subChannels = channelsArray as? [MKChannel] {
             for subChannel in subChannels {
-                addChannelTreeToModel(channel: subChannel, indentLevel: indentLevel + 1)
+                addChannelTreeToModel(channel: subChannel, indentLevel: indentLevel + 1, isTraversingPinnedTree: isTraversingPinnedTree)
             }
         }
     }
@@ -264,7 +302,19 @@ extension ServerModelManager {
     // 辅助方法：获取排序后的子频道
     func getSortedSubChannels(for channel: MKChannel) -> [MKChannel] {
         guard let subChannels = channel.channels() as? [MKChannel] else { return [] }
-        return subChannels.sorted { c1, c2 in
+        let serverHost = serverModel?.hostname() ?? ""
+        let showHidden = UserDefaults.standard.bool(forKey: "ShowHiddenChannels")
+
+        let visibleChannels = subChannels.filter { subChannel in
+            showHidden || !ChannelFilterManager.shared.isHidden(id: subChannel.channelId(), serverHost: serverHost)
+        }
+
+        return visibleChannels.sorted { c1, c2 in
+            let isPinned1 = ChannelFilterManager.shared.isPinned(id: c1.channelId(), serverHost: serverHost)
+            let isPinned2 = ChannelFilterManager.shared.isPinned(id: c2.channelId(), serverHost: serverHost)
+            if isPinned1 != isPinned2 {
+                return isPinned1 && !isPinned2
+            }
             if c1.position() != c2.position() {
                 return c1.position() < c2.position()
             }
@@ -281,7 +331,7 @@ extension ServerModelManager {
         }
 
         return validatedUsers.sorted { u1, u2 in
-            (u1.userName() ?? "") < (u2.userName() ?? "")
+            self.displayName(for: u1) < self.displayName(for: u2)
         }
     }
 }

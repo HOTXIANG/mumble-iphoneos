@@ -251,5 +251,66 @@ extension ServerModelManager {
             connection.audioOutput?.setVolume(prefs.volume, forSession: user.session())
             connection.audioOutput?.setMuted(prefs.isLocalMuted, forSession: user.session())
         }
+        
+        let nickname = LocalUserPreferences.shared.loadNickname(for: user.userHash(), userName: name, on: serverHost)
+        if let nick = nickname, !nick.isEmpty {
+            localNicknames[user.session()] = nick
+        } else {
+            localNicknames.removeValue(forKey: user.session())
+        }
+    }
+
+    func setLocalNickname(_ nickname: String?, for user: MKUser) {
+        guard let serverHost = serverModel?.hostname() else { return }
+        LocalUserPreferences.shared.saveNickname(
+            nickname,
+            for: user.userHash(),
+            userName: user.userName() ?? "",
+            on: serverHost
+        )
+        if let nick = nickname, !nick.isEmpty {
+            localNicknames[user.session()] = nick
+        } else {
+            localNicknames.removeValue(forKey: user.session())
+        }
+        
+        if let index = userIndexMap[user.session()], index < modelItems.count {
+            let item = modelItems[index]
+            let newItem = ChannelNavigationItem(
+                title: displayName(for: user),
+                subtitle: item.subtitle,
+                type: item.type,
+                indentLevel: item.indentLevel,
+                object: item.object
+            )
+            newItem.state = item.state
+            newItem.isConnectedUser = item.isConnectedUser
+            modelItems[index] = newItem
+        }
+        objectWillChange.send()
+    }
+
+    // MARK: - Channel Visibility / Pin
+
+    func isChannelHidden(_ channel: MKChannel) -> Bool {
+        guard let serverHost = serverModel?.hostname() else { return false }
+        return ChannelFilterManager.shared.isHidden(id: channel.channelId(), serverHost: serverHost)
+    }
+
+    func isChannelPinned(_ channel: MKChannel) -> Bool {
+        guard let serverHost = serverModel?.hostname() else { return false }
+        return ChannelFilterManager.shared.isPinned(id: channel.channelId(), serverHost: serverHost)
+    }
+
+    func toggleChannelHidden(_ channel: MKChannel) {
+        guard let serverHost = serverModel?.hostname() else { return }
+        ChannelFilterManager.shared.toggleHidden(id: channel.channelId(), serverHost: serverHost)
+        rebuildModelArray()
+    }
+
+    func toggleChannelPinned(_ channel: MKChannel) {
+        guard let serverHost = serverModel?.hostname() else { return }
+        ChannelFilterManager.shared.togglePinned(id: channel.channelId(), serverHost: serverHost)
+        rebuildModelArray()
     }
 }

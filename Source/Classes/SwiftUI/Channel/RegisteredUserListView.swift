@@ -15,6 +15,7 @@ struct RegisteredUserListView: View {
     
     @State private var users: [RegisteredUserEntry] = []
     @State private var searchText = ""
+    @State private var hasReceivedUserList = false
     
     private var filteredUsers: [RegisteredUserEntry] {
         if searchText.isEmpty { return users }
@@ -25,7 +26,11 @@ struct RegisteredUserListView: View {
         NavigationStack {
             List {
                 if users.isEmpty {
-                    ContentUnavailableView("Loading...", systemImage: "person.2", description: Text("Requesting registered user list from server"))
+                    if hasReceivedUserList {
+                        ContentUnavailableView("No Registered Users", systemImage: "person.2", description: Text("The server returned an empty registered user list"))
+                    } else {
+                        ContentUnavailableView("Loading...", systemImage: "person.2", description: Text("Requesting registered user list from server"))
+                    }
                 } else {
                     ForEach(filteredUsers) { user in
                         HStack {
@@ -54,6 +59,7 @@ struct RegisteredUserListView: View {
                 }
             }
             .onAppear {
+                hasReceivedUserList = false
                 serverManager.requestRegisteredUserList()
             }
             .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userListReceivedNotification)) { notification in
@@ -69,23 +75,33 @@ struct RegisteredUserListView: View {
     }
     
     private func parseUserList(_ raw: Any) {
-        guard let list = raw as? NSObject else { return }
-        let sel = NSSelectorFromString("users")
-        guard list.responds(to: sel),
-              let usersArray = list.perform(sel)?.takeUnretainedValue() as? NSArray else { return }
-        
+        hasReceivedUserList = true
         var parsed: [RegisteredUserEntry] = []
-        for item in usersArray {
-            guard let entry = item as? NSObject else { continue }
-            let userIdSel = NSSelectorFromString("userId")
-            let nameSel = NSSelectorFromString("name")
-            
-            guard entry.responds(to: userIdSel) else { continue }
-            let userId = (entry.value(forKey: "userId") as? NSNumber)?.uint32Value ?? 0
-            let name = (entry.value(forKey: "name") as? String) ?? "User #\(userId)"
-            
-            parsed.append(RegisteredUserEntry(id: userId, name: name))
+
+        if let entries = raw as? [[String: Any]] {
+            for entry in entries {
+                let userId = uint32Value(from: entry["userId"]) ?? 0
+                let name = (entry["name"] as? String) ?? "User #\(userId)"
+                parsed.append(RegisteredUserEntry(id: userId, name: name))
+            }
+        } else if let entries = raw as? [NSDictionary] {
+            for entry in entries {
+                let userId = uint32Value(from: entry["userId"]) ?? 0
+                let name = (entry["name"] as? String) ?? "User #\(userId)"
+                parsed.append(RegisteredUserEntry(id: userId, name: name))
+            }
+        } else {
+            users = []
+            return
         }
+
         users = parsed.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func uint32Value(from any: Any?) -> UInt32? {
+        if let val = any as? UInt32 { return val }
+        if let val = any as? Int { return UInt32(exactly: val) }
+        if let val = any as? NSNumber { return val.uint32Value }
+        return nil
     }
 }

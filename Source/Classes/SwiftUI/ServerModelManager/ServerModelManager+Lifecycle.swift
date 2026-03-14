@@ -75,6 +75,10 @@ extension ServerModelManager {
             addSystemNotification("Connected to \(hostDisplayName)")
         }
 
+        if let connectedUser = newModel.connectedUser() {
+            updateAvatarCache(for: connectedUser)
+        }
+
         rebuildModelArray()
         startLiveActivity()
 
@@ -108,6 +112,8 @@ extension ServerModelManager {
         channelPermissions.removeAll()
         aclUserNamesById.removeAll()
         pendingACLUserNameQueries.removeAll()
+        userAvatars.removeAll()
+        pendingAvatarFetchSessions.removeAll()
         // 保存当前监听频道以便重连后恢复
         if !listeningChannels.isEmpty {
             self.savedListeningChannelIds = listeningChannels
@@ -115,6 +121,8 @@ extension ServerModelManager {
         }
         listeningChannels.removeAll()
         channelListeners.removeAll()
+        pendingListeningAdds.removeAll()
+        pendingListeningRemoves.removeAll()
         movingUser = nil
         passwordPromptChannel = nil
         pendingPasswordInput = ""

@@ -48,7 +48,8 @@ extension ServerModelManager {
             attributedMessage: attributedString(from: trimmedText),
             images: [],
             timestamp: Date(),
-            isSentBySelf: true
+            isSentBySelf: true,
+            senderSession: serverModel.connectedUser()?.session()
         )
         DispatchQueue.main.async {
             self.messages.append(selfMessage)
@@ -75,7 +76,8 @@ extension ServerModelManager {
             attributedMessage: attributedString(from: trimmed),
             images: [],
             timestamp: Date(),
-            isSentBySelf: true
+            isSentBySelf: true,
+            senderSession: serverModel.connectedUser()?.session()
         )
         DispatchQueue.main.async {
             self.messages.append(selfMessage)
@@ -101,6 +103,7 @@ extension ServerModelManager {
             attributedMessage: attributedString(from: trimmedText),
             timestamp: Date(),
             isSentBySelf: true,
+            senderSession: serverModel.connectedUser()?.session(),
             privatePeerName: targetName
         )
         DispatchQueue.main.async {
@@ -186,6 +189,7 @@ extension ServerModelManager {
                     images: [image],
                     timestamp: Date(),
                     isSentBySelf: true,
+                    senderSession: self.serverModel?.connectedUser()?.session(),
                     privatePeerName: targetName
                 )
             } else {
@@ -196,7 +200,8 @@ extension ServerModelManager {
                     attributedMessage: AttributedString(""),
                     images: [image],
                     timestamp: Date(),
-                    isSentBySelf: true
+                    isSentBySelf: true,
+                    senderSession: self.serverModel?.connectedUser()?.session()
                 )
             }
             self.messages.append(localMessage)

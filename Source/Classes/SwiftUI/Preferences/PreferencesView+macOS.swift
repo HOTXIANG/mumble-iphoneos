@@ -311,11 +311,14 @@ extension AdvancedAudioSettingsView {
             .labelsHidden()
             .pickerStyle(.menu)
         }
-        LabeledContent("Force TCP Mode:") {
-            Toggle("", isOn: $forceTCP)
-                .labelsHidden()
+        LabeledContent("Network:") {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Auto Reconnect", isOn: $autoReconnect)
+                Toggle("Enable QoS", isOn: $enableQoS)
+                Toggle("Force TCP Mode", isOn: $forceTCP)
+            }
         }
-        Text("Requires reconnection to take effect.")
+        Text("Network changes require reconnection to take effect.")
             .font(.caption)
             .foregroundColor(.secondary)
     }
@@ -501,6 +504,17 @@ private struct MacGeneralSettingsTabView: View {
                 .pickerStyle(.menu)
             }
             
+            LabeledContent("Channels:") {
+                let showHidden = Binding(
+                    get: { UserDefaults.standard.bool(forKey: "ShowHiddenChannels") },
+                    set: {
+                        UserDefaults.standard.set($0, forKey: "ShowHiddenChannels")
+                        NotificationCenter.default.post(name: ServerModelNotificationManager.rebuildModelNotification, object: nil)
+                    }
+                )
+                Toggle("Show Hidden Channels", isOn: showHidden)
+            }
+            
             LabeledContent("About:") {
                 Button("Open About Mumble") {
                     showingAboutSheet = true
@@ -552,6 +566,7 @@ struct MacSettingsRootView: View {
         case input
         case output
         case notifications
+        case tts
         case handoff
         case certificates
         case advanced
@@ -566,6 +581,8 @@ struct MacSettingsRootView: View {
                 return NSSize(width: 550, height: 220)
             case .notifications:
                 return NSSize(width: 550, height: 360)
+            case .tts:
+                return NSSize(width: 550, height: 460)
             case .handoff:
                 return NSSize(width: 550, height: 220)
             case .certificates:
@@ -614,6 +631,13 @@ struct MacSettingsRootView: View {
                     Label("Notifications", systemImage: "bell.badge")
                 }
                 .tag(MacSettingsTab.notifications)
+
+            TTSSettingsView()
+                .macSettingsCenteredPageStyle()
+                .tabItem {
+                    Label("Text-to-Speech", systemImage: "waveform")
+                }
+                .tag(MacSettingsTab.tts)
             
             MacHandoffSettingsTabView()
                 .macSettingsCenteredPageStyle()

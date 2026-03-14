@@ -32,10 +32,7 @@
 		28F79CA9147AB62B0003B8BA /* MUNotificationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F79CA8147AB6280003B8BA /* MUNotificationController.m */; };
 		28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */; };
 		44E53C4DB0AD4B088D21543C /* ChannelACLView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887CCAF0AFAE458197F53930 /* ChannelACLView.swift */; };
-		487C45A59D5135DF946B8FFB /* UserStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF64934909A8082804D6BBC /* UserStatsView.swift */; };
-		78094BC6859362D7EA9854EB /* RegisteredUserListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FB44BFADE5C80A0B70511D /* RegisteredUserListView.swift */; };
 		8A6AB2D5876A40B1BA1F9378 /* MUMacApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */; };
-		983C46298C9629FBE379324A /* AccessTokensView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803F4F108CE0874978A2BE58 /* AccessTokensView.swift */; };
 		A1B2C3D42F90100100ABC001 /* RichTextEditorShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D42F90100100ABC002 /* RichTextEditorShell.swift */; };
 		A1B2C3D52F90100100ABC001 /* RichTextEditorImageCompression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D52F90100100ABC002 /* RichTextEditorImageCompression.swift */; };
 		AA000002BBBB000000000001 /* PlatformTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002BBBB000000000002 /* PlatformTypes.swift */; };
@@ -44,7 +41,6 @@
 		B1C2D3E42F90200100ABC001 /* ServerModelManager+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E42F90200100ABC002 /* ServerModelManager+Controls.swift */; };
 		B1C2D3E52F90200100ABC001 /* ServerModelManager+Channels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E52F90200100ABC002 /* ServerModelManager+Channels.swift */; };
 		C1D2E3F42F90300100ABC001 /* ChannelInteropTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F42F90300100ABC002 /* ChannelInteropTypes.swift */; };
-		C96B4F96B9E21D00CBF36130 /* BanListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63644AF383CF5E35BD96204F /* BanListView.swift */; };
 		D1E2F3A42F90400100ABC001 /* HandoffProfilePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */; };
 		D1E2F3A52F90400100ABC001 /* AudioBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A52F90400100ABC002 /* AudioBarView.swift */; };
 		E1F2A3B42F90500100ABC001 /* ServerModelManager+Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B42F90500100ABC002 /* ServerModelManager+Notifications.swift */; };
@@ -104,6 +100,19 @@
 		F2CBB04F2F090CE200D88E21 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F2CBB04E2F090CE200D88E21 /* SwiftUI.framework */; };
 		F2CBB0602F090CE300D88E21 /* MumbleWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F2CBB04B2F090CE200D88E21 /* MumbleWidgetExtension.appex */; platformFilters = (ios, macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F2DF4AA02E1FB2AD00A0C166 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF4A962E1FB2A800A0C166 /* AppState.swift */; };
+		F2DF9A382F656319009D5C87 /* BanListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A372F656319009D5C87 /* BanListView.swift */; };
+		F2DF9A412F656321009D5C87 /* AccessTokensView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A402F656321009D5C87 /* AccessTokensView.swift */; };
+		F2DF9A432F65632C009D5C87 /* RegisteredUserListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A422F65632C009D5C87 /* RegisteredUserListView.swift */; };
+		F2DF9A452F656336009D5C87 /* UserStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A442F656336009D5C87 /* UserStatsView.swift */; };
+		F2DF9A472F656350009D5C87 /* FriendsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A462F656350009D5C87 /* FriendsManager.swift */; };
+		F2DF9A492F656357009D5C87 /* ChannelFilterManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A482F656357009D5C87 /* ChannelFilterManager.swift */; };
+		F2DF9A4B2F65636F009D5C87 /* IgnoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A4A2F65636F009D5C87 /* IgnoreManager.swift */; };
+		F2DF9A4D2F656374009D5C87 /* TTSManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A4C2F656374009D5C87 /* TTSManager.swift */; };
+		F2E100112F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100012F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift */; };
+		F2E100122F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100022F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift */; };
+		F2E100132F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100032F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift */; };
+		F2E100142F70000100AAA001 /* MumbleWidget/MumbleActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100042F70000100AAA001 /* MumbleWidget/MumbleActivityAttributes.swift */; };
+		F2E100152F70000100AAA001 /* MumbleWidget/WidgetSharedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100052F70000100AAA001 /* MumbleWidget/WidgetSharedData.swift */; };
 		F2E9CBEB2F06ECFE00464F79 /* CertificateModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CBE92F06ECF400464F79 /* CertificateModel.swift */; };
 		F2E9CBEE2F06ED3100464F79 /* CertificatePreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CBED2F06ED1600464F79 /* CertificatePreferencesView.swift */; };
 		F2E9CC042F06FB7800464F79 /* MUFavouriteServer.m in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC032F06FB7800464F79 /* MUFavouriteServer.m */; };
@@ -301,12 +310,9 @@
 		28F9E1BD15EBDF2400D52001 /* MURemoteControlServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MURemoteControlServer.h; sourceTree = "<group>"; };
 		28F9E1BE15EBDF2400D52001 /* MURemoteControlServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MURemoteControlServer.m; sourceTree = "<group>"; };
 		32CA4F630368D1EE00C91783 /* Mumble.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Mumble.pch; path = Source/Mumble.pch; sourceTree = "<group>"; };
-		63644AF383CF5E35BD96204F /* BanListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BanListView.swift; path = Source/Classes/SwiftUI/Channel/BanListView.swift; sourceTree = SOURCE_ROOT; };
 		7176F3B54CC74E79BC7D5A94 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
-		803F4F108CE0874978A2BE58 /* AccessTokensView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccessTokensView.swift; path = Source/Classes/SwiftUI/Channel/AccessTokensView.swift; sourceTree = SOURCE_ROOT; };
 		887CCAF0AFAE458197F53930 /* ChannelACLView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelACLView.swift; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Source/Info.plist; plistStructureDefinitionIdentifier = "com.apple.xcode.plist.structure-definition.iphone.info-plist"; sourceTree = "<group>"; };
-		99FB44BFADE5C80A0B70511D /* RegisteredUserListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RegisteredUserListView.swift; path = Source/Classes/SwiftUI/Channel/RegisteredUserListView.swift; sourceTree = SOURCE_ROOT; };
 		A1B2C3D42F90100100ABC002 /* RichTextEditorShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditorShell.swift; sourceTree = "<group>"; };
 		A1B2C3D52F90100100ABC002 /* RichTextEditorImageCompression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditorImageCompression.swift; sourceTree = "<group>"; };
 		AA000002BBBB000000000002 /* PlatformTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformTypes.swift; sourceTree = "<group>"; };
@@ -377,6 +383,19 @@
 		F2CBB04E2F090CE200D88E21 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		F2DBFD1B2E0E2216004EFA06 /* Mumble-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Mumble-Bridging-Header.h"; sourceTree = "<group>"; };
 		F2DF4A962E1FB2A800A0C166 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		F2DF9A372F656319009D5C87 /* BanListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BanListView.swift; sourceTree = "<group>"; };
+		F2DF9A402F656321009D5C87 /* AccessTokensView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessTokensView.swift; sourceTree = "<group>"; };
+		F2DF9A422F65632C009D5C87 /* RegisteredUserListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisteredUserListView.swift; sourceTree = "<group>"; };
+		F2DF9A442F656336009D5C87 /* UserStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserStatsView.swift; sourceTree = "<group>"; };
+		F2DF9A462F656350009D5C87 /* FriendsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsManager.swift; sourceTree = "<group>"; };
+		F2DF9A482F656357009D5C87 /* ChannelFilterManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelFilterManager.swift; sourceTree = "<group>"; };
+		F2DF9A4A2F65636F009D5C87 /* IgnoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IgnoreManager.swift; sourceTree = "<group>"; };
+		F2DF9A4C2F656374009D5C87 /* TTSManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSManager.swift; sourceTree = "<group>"; };
+		F2E100012F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleWidgetBundle.swift; sourceTree = SOURCE_ROOT; };
+		F2E100022F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleServerWidget.swift; sourceTree = SOURCE_ROOT; };
+		F2E100032F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleLiveActivity.swift; sourceTree = SOURCE_ROOT; };
+		F2E100042F70000100AAA001 /* MumbleWidget/MumbleActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
+		F2E100052F70000100AAA001 /* MumbleWidget/WidgetSharedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/WidgetSharedData.swift; sourceTree = SOURCE_ROOT; };
 		F2E9CBE92F06ECF400464F79 /* CertificateModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateModel.swift; sourceTree = "<group>"; };
 		F2E9CBED2F06ED1600464F79 /* CertificatePreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePreferencesView.swift; sourceTree = "<group>"; };
 		F2E9CC022F06FB7800464F79 /* MUFavouriteServer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUFavouriteServer.h; sourceTree = "<group>"; };
@@ -402,18 +421,22 @@
 		F4D1A0B32FA1000100AABBCC /* PreferencesView+iOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+iOS.swift"; sourceTree = "<group>"; };
 		F4D1A0B42FA1000100AABBCC /* PreferencesView+macOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+macOS.swift"; sourceTree = "<group>"; };
 		F4D1A0B62FA1000100AABBCC /* PreferencesView+SharedViews+iOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+SharedViews+iOS.swift"; sourceTree = "<group>"; };
-		FFF64934909A8082804D6BBC /* UserStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = UserStatsView.swift; path = Source/Classes/SwiftUI/Channel/UserStatsView.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		F2CBB0612F090CE300D88E21 = {
+		F2CBB0612F090CE300D88E21 /* Exceptions for "MumbleWidget" folder in "MumbleWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				MumbleActivityAttributes.swift,
+				MumbleLiveActivity.swift,
+				MumbleServerWidget.swift,
+				MumbleWidgetBundle.swift,
+				WidgetSharedData.swift,
 			);
 			target = F2CBB04A2F090CE200D88E21 /* MumbleWidgetExtension */;
 		};
-		F2CBB06B2F090FD700D88E21 = {
+		F2CBB06B2F090FD700D88E21 /* Exceptions for "MumbleWidget" folder in "Mumble" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				MumbleActivityAttributes.swift,
@@ -424,7 +447,15 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		F2CBB0502F090CE200D88E21 /* MumbleWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (F2CBB06B2F090FD700D88E21, F2CBB0612F090CE300D88E21, ); path = MumbleWidget; sourceTree = "<group>"; };
+		F2CBB0502F090CE200D88E21 /* MumbleWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F2CBB06B2F090FD700D88E21 /* Exceptions for "MumbleWidget" folder in "Mumble" target */,
+				F2CBB0612F090CE300D88E21 /* Exceptions for "MumbleWidget" folder in "MumbleWidgetExtension" target */,
+			);
+			path = MumbleWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -610,10 +641,7 @@
 				29B97323FDCFA39411CA2CEA /* Frameworks */,
 				19C28FACFE9D520D11CA2CBB /* Products */,
 				285E2A5F150D7287008AE185 /* Build Configuration */,
-				63644AF383CF5E35BD96204F /* BanListView.swift */,
-				803F4F108CE0874978A2BE58 /* AccessTokensView.swift */,
-				99FB44BFADE5C80A0B70511D /* RegisteredUserListView.swift */,
-				FFF64934909A8082804D6BBC /* UserStatsView.swift */,
+				F2DF9B842F657490009D5C87 /* Recovered References */,
 			);
 			name = CustomTemplate;
 			sourceTree = "<group>";
@@ -695,6 +723,10 @@
 				F28C6B352EE87C5C00DE9CD2 /* RecentServerManager.swift */,
 				F28C6B312EE87C3C00DE9CD2 /* LanDiscoveryModel.swift */,
 				F28C6B212EE871E600DE9CD2 /* ServerPingModel.swift */,
+				F2DF9A462F656350009D5C87 /* FriendsManager.swift */,
+				F2DF9A482F656357009D5C87 /* ChannelFilterManager.swift */,
+				F2DF9A4A2F65636F009D5C87 /* IgnoreManager.swift */,
+				F2DF9A4C2F656374009D5C87 /* TTSManager.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -769,6 +801,18 @@
 			path = SwiftUI;
 			sourceTree = "<group>";
 		};
+		F2DF9B842F657490009D5C87 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				F2E100012F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift */,
+				F2E100022F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift */,
+				F2E100032F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift */,
+				F2E100042F70000100AAA001 /* MumbleWidget/MumbleActivityAttributes.swift */,
+				F2E100052F70000100AAA001 /* MumbleWidget/WidgetSharedData.swift */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		F2FF56772E0F711A00D76B49 /* Channel */ = {
 			isa = PBXGroup;
 			children = (
@@ -788,6 +832,10 @@
 				F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */,
 				F2FF56712E0F711A00D76B49 /* ChannelView.swift */,
 				F2FF56722E0F711A00D76B49 /* MessagesView.swift */,
+				F2DF9A402F656321009D5C87 /* AccessTokensView.swift */,
+				F2DF9A372F656319009D5C87 /* BanListView.swift */,
+				F2DF9A422F65632C009D5C87 /* RegisteredUserListView.swift */,
+				F2DF9A442F656336009D5C87 /* UserStatsView.swift */,
 			);
 			path = Channel;
 			sourceTree = "<group>";
@@ -823,7 +871,9 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = F2CBB0622F090CE300D88E21 /* Build configuration list for PBXNativeTarget "MumbleWidgetExtension" */;
 			buildPhases = (
+				F2CBB0472F090CE200D88E21 /* Sources */,
 				F2CBB0482F090CE200D88E21 /* Frameworks */,
+				F2CBB0492F090CE200D88E21 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -985,6 +1035,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F2CBB0492F090CE200D88E21 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
@@ -1013,6 +1070,7 @@
 				2861C276116BE905002B8514 /* MUApplicationDelegate.m in Sources */,
 				287BA29011B96C960010E031 /* MUDatabase.m in Sources */,
 				F2E9CBEB2F06ECFE00464F79 /* CertificateModel.swift in Sources */,
+				F2DF9A4D2F656374009D5C87 /* TTSManager.swift in Sources */,
 				F2AD3A762E0E40BD00FC7006 /* FavouriteServerEditView.swift in Sources */,
 				F28C6B372EE87C6300DE9CD2 /* RecentServerManager.swift in Sources */,
 				28942D7C12456F9200C63A07 /* MUCertificateCreationView.m in Sources */,
@@ -1024,6 +1082,7 @@
 				F2E9CC042F06FB7800464F79 /* MUFavouriteServer.m in Sources */,
 				F220ECD12F30FB1A0017CCCC /* SystemMuteManager.swift in Sources */,
 				F24EB7D02F3F5A0000904644 /* MUStatusBarController.swift in Sources */,
+				F2DF9A412F656321009D5C87 /* AccessTokensView.swift in Sources */,
 				F2E9CC072F07A40300464F79 /* ServerCertificateDetailView.swift in Sources */,
 				F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */,
 				8A6AB2D5876A40B1BA1F9378 /* MUMacApplicationDelegate.swift in Sources */,
@@ -1044,6 +1103,7 @@
 				F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */,
 				F2A1B0012F5F4A0000AABB01 /* InfoViews.swift in Sources */,
 				AA7C0F5B498141C7BCD5D9FB /* ChannelEditView.swift in Sources */,
+				F2DF9A452F656336009D5C87 /* UserStatsView.swift in Sources */,
 				44E53C4DB0AD4B088D21543C /* ChannelACLView.swift in Sources */,
 				F4A5B6C42F90900100ABC001 /* ChannelACLModels.swift in Sources */,
 				F4A5B6C52F90900100ABC001 /* ChannelACLRows.swift in Sources */,
@@ -1085,8 +1145,12 @@
 				F2A6585B2F589059009AF31D /* DatabaseAsync.swift in Sources */,
 				F2A6585C2F589059009AF31D /* StringConstants.swift in Sources */,
 				F2A6585D2F589059009AF31D /* MumbleError+Localized.swift in Sources */,
+				F2DF9A382F656319009D5C87 /* BanListView.swift in Sources */,
+				F2DF9A472F656350009D5C87 /* FriendsManager.swift in Sources */,
+				F2DF9A492F656357009D5C87 /* ChannelFilterManager.swift in Sources */,
 				F2A6585E2F589059009AF31D /* MumbleLogger.m in Sources */,
 				F2A6585F2F589059009AF31D /* UIConstants.swift in Sources */,
+				F2DF9A432F65632C009D5C87 /* RegisteredUserListView.swift in Sources */,
 				F2A658602F589059009AF31D /* MumbleError.swift in Sources */,
 				F2A658612F589059009AF31D /* CertificateAsync.swift in Sources */,
 				F2A658622F589059009AF31D /* ConnectionAsync.swift in Sources */,
@@ -1094,14 +1158,23 @@
 				F2A658642F589059009AF31D /* NotificationConstants.swift in Sources */,
 				2836767D1525053A0015958E /* MUCertificateChainBuilder.m in Sources */,
 				F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */,
+				F2DF9A4B2F65636F009D5C87 /* IgnoreManager.swift in Sources */,
 				28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */,
 				F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */,
 				F28C6AFB2EE7010300DE9CD2 /* PTTButton.swift in Sources */,
 				F28C6AF42EE6F74500DE9CD2 /* AudioMeterModel.swift in Sources */,
-				C96B4F96B9E21D00CBF36130 /* BanListView.swift in Sources */,
-				983C46298C9629FBE379324A /* AccessTokensView.swift in Sources */,
-				78094BC6859362D7EA9854EB /* RegisteredUserListView.swift in Sources */,
-				487C45A59D5135DF946B8FFB /* UserStatsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2CBB0472F090CE200D88E21 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F2E100112F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift in Sources */,
+				F2E100122F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift in Sources */,
+				F2E100132F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift in Sources */,
+				F2E100142F70000100AAA001 /* MumbleWidget/MumbleActivityAttributes.swift in Sources */,
+				F2E100152F70000100AAA001 /* MumbleWidget/WidgetSharedData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1158,7 +1231,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
@@ -1188,7 +1261,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1225,7 +1298,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1255,7 +1328,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1304,7 +1377,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1334,7 +1407,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1383,7 +1456,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1413,7 +1486,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1506,7 +1579,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1544,7 +1617,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1603,7 +1676,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1635,7 +1708,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1693,7 +1766,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1725,7 +1798,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;
@@ -1783,7 +1856,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400200000;
+				CURRENT_PROJECT_VERSION = 400300000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1815,7 +1888,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.2.0;
+				MARKETING_VERSION = 4.3.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble.MumbleWidget;

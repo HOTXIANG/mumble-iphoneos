@@ -169,8 +169,10 @@ extension AdvancedAudioSettingsView {
         }
         
         Section(header: Text("Network")) {
+            Toggle("Auto Reconnect", isOn: $autoReconnect)
+            Toggle("Enable QoS", isOn: $enableQoS)
             Toggle("Force TCP Mode", isOn: $forceTCP)
-            Text("Requires reconnection to take effect.")
+            Text("Network changes require reconnection to take effect.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }

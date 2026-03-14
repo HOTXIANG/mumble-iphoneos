@@ -24,7 +24,7 @@ final class LocalUserPreferences {
         ]
         defaults.set(data, forKey: k)
         defaults.synchronize() // 强制写入，防止意外丢失
-        print("💾 Saved Prefs for [\(userName)]: Vol=\(volume), Mute=\(isLocalMuted)")
+        MumbleLogger.model.debug("Saved local audio prefs for \(userName)")
     }
     
     func load(for userName: String, on serverHost: String) -> (volume: Float, isLocalMuted: Bool) {
@@ -32,9 +32,32 @@ final class LocalUserPreferences {
         if let data = defaults.dictionary(forKey: k) {
             let volume = data["volume"] as? Float ?? 1.0
             let muted = data["isLocalMuted"] as? Bool ?? false
-            print("📖 Loaded Prefs for [\(userName)]: Vol=\(volume)")
+            MumbleLogger.model.debug("Loaded local audio prefs for \(userName)")
             return (volume, muted)
         }
         return (1.0, false)
+    }
+    
+    // MARK: - Local Nickname
+
+    private func nicknameKey(for userHash: String?, userName: String, on serverHost: String) -> String {
+        let identifier = userHash ?? userName
+        return "user_nickname_\(serverHost)_\(identifier)"
+    }
+    
+    func saveNickname(_ nickname: String?, for userHash: String?, userName: String, on serverHost: String) {
+        let k = nicknameKey(for: userHash, userName: userName, on: serverHost)
+        if let nickname = nickname, !nickname.isEmpty {
+            defaults.set(nickname, forKey: k)
+        } else {
+            defaults.removeObject(forKey: k)
+        }
+        defaults.synchronize()
+        MumbleLogger.model.debug("Saved local nickname for \(userName)")
+    }
+    
+    func loadNickname(for userHash: String?, userName: String, on serverHost: String) -> String? {
+        let k = nicknameKey(for: userHash, userName: userName, on: serverHost)
+        return defaults.string(forKey: k)
     }
 }

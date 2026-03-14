@@ -49,8 +49,17 @@ struct PreferencesView: View {
                 }
             }
             .pickerStyle(.menu)
+            
+            let showHidden = Binding(
+                get: { UserDefaults.standard.bool(forKey: "ShowHiddenChannels") },
+                set: {
+                    UserDefaults.standard.set($0, forKey: "ShowHiddenChannels")
+                    NotificationCenter.default.post(name: ServerModelNotificationManager.rebuildModelNotification, object: nil)
+                }
+            )
+            Toggle("Show Hidden Channels", isOn: showHidden)
         }
-
+        
         Section(header: Text("Audio")) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -87,6 +96,9 @@ struct PreferencesView: View {
         Section(header: Text("Notifications")) {
             NavigationLink(destination: NotificationSettingsView()) {
                 Label("Push Notifications", systemImage: "bell.badge")
+            }
+            NavigationLink(destination: TTSSettingsView()) {
+                Label("Text-to-Speech", systemImage: "waveform")
             }
         }
 

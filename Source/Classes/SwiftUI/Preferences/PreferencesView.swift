@@ -259,6 +259,52 @@ struct NotificationSettingsView: View {
     }
 }
 
+struct TTSSettingsView: View {
+    @AppStorage("EnableTTS") var enableTTS: Bool = false
+
+    @AppStorage("TTSNotifyNormalUserMessages") var ttsNormalUserMessages: Bool = true
+    @AppStorage("TTSNotifyPrivateMessages") var ttsPrivateMessages: Bool = true
+    @AppStorage("TTSNotifyUserJoinedSameChannel") var ttsUserJoinedSameChannel: Bool = true
+    @AppStorage("TTSNotifyUserLeftSameChannel") var ttsUserLeftSameChannel: Bool = true
+    @AppStorage("TTSNotifyUserJoinedOtherChannels") var ttsUserJoinedOtherChannels: Bool = false
+    @AppStorage("TTSNotifyUserLeftOtherChannels") var ttsUserLeftOtherChannels: Bool = false
+    @AppStorage("TTSNotifyUserMoved") var ttsUserMoved: Bool = true
+    @AppStorage("TTSNotifyMuteDeafen") var ttsMuteDeafen: Bool = false
+    @AppStorage("TTSNotifyMovedByAdmin") var ttsMovedByAdmin: Bool = true
+    @AppStorage("TTSNotifyChannelListening") var ttsChannelListening: Bool = true
+    @AppStorage("TTSNotifyGenericSystemEvents") var ttsGenericSystemEvents: Bool = true
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Enable Text-to-Speech", isOn: $enableTTS)
+            } footer: {
+                Text("When enabled, selected notification types will be spoken. During TTS playback, speaking may be temporarily unavailable.")
+            }
+
+            Section(header: Text("User Messages")) {
+                Toggle("User Messages", isOn: $ttsNormalUserMessages)
+                Toggle("Private Messages", isOn: $ttsPrivateMessages)
+            }
+            .disabled(!enableTTS)
+
+            Section(header: Text("System Events")) {
+                Toggle("User Joined (Same Channel)", isOn: $ttsUserJoinedSameChannel)
+                Toggle("User Left (Same Channel)", isOn: $ttsUserLeftSameChannel)
+                Toggle("User Joined (Other Channels)", isOn: $ttsUserJoinedOtherChannels)
+                Toggle("User Left (Other Channels)", isOn: $ttsUserLeftOtherChannels)
+                Toggle("User Moved Channel", isOn: $ttsUserMoved)
+                Toggle("Mute / Deafen", isOn: $ttsMuteDeafen)
+                Toggle("Moved by Admin", isOn: $ttsMovedByAdmin)
+                Toggle("Channel Listening", isOn: $ttsChannelListening)
+                Toggle("Other System Messages", isOn: $ttsGenericSystemEvents)
+            }
+            .disabled(!enableTTS)
+        }
+        .navigationTitle("Text-to-Speech")
+    }
+}
+
 private struct TransmissionMethodPickerRow: View {
     let title: String
     @Binding var transmitMethod: String
@@ -406,6 +452,8 @@ struct AdvancedAudioSettingsView: View {
     @AppStorage("AudioSidetoneVolume") var sidetoneVolume: Double = 0.2
     @AppStorage("AudioSpeakerPhoneMode") var speakerPhoneMode: Bool = true
     @AppStorage("NetworkForceTCP") var forceTCP: Bool = false
+    @AppStorage("NetworkAutoReconnect") var autoReconnect: Bool = true
+    @AppStorage("NetworkQoS") var enableQoS: Bool = true
     
     init(includeOutputSection: Bool = true) {
         self.includeOutputSection = includeOutputSection
@@ -422,4 +470,3 @@ struct AdvancedAudioSettingsView: View {
         .onChange(of: qualityKind) { PreferencesModel.shared.notifySettingsChanged() }
     }
 }
-
