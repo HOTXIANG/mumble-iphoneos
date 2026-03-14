@@ -5,20 +5,11 @@
 
 import SwiftUI
 
-private final class MessageSendFailureBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var failed = false
+private final class PlatformImageBox: @unchecked Sendable {
+    let image: PlatformImage
 
-    func markFailed() {
-        lock.lock()
-        failed = true
-        lock.unlock()
-    }
-
-    var didFail: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return failed
+    init(_ image: PlatformImage) {
+        self.image = image
     }
 }
 
@@ -111,50 +102,23 @@ extension ServerModelManager {
         }
     }
 
-    func sendImageMessage(image: PlatformImage, isHighQuality: Bool) async {
-        await sendImageMessageInternal(image: image, isHighQuality: isHighQuality, targetUser: nil)
+    func sendImageMessage(image: PlatformImage) async {
+        await sendImageMessageInternal(image: image, targetUser: nil)
     }
 
-    func sendPrivateImageMessage(image: PlatformImage, isHighQuality: Bool, to user: MKUser) async {
-        await sendImageMessageInternal(image: image, isHighQuality: isHighQuality, targetUser: user)
+    func sendPrivateImageMessage(image: PlatformImage, to user: MKUser) async {
+        await sendImageMessageInternal(image: image, targetUser: user)
     }
 
-    private func sendImageMessageInternal(image: PlatformImage, isHighQuality: Bool, targetUser: MKUser?) async {
-        if isHighQuality {
-            // 高画质模式：从 1MB 开始，失败后缓慢降级
-            await attemptSendImage(image: image, targetSize: 1024 * 1024, decayRate: 0.9, targetUser: targetUser)
-        } else {
-            // 兼容模式：目标 90KB（考虑 Base64 开销）
-            await attemptSendImage(image: image, targetSize: 90 * 1024, decayRate: 0.9, targetUser: targetUser)
-        }
-    }
-
-    private func attemptSendImage(
-        image: PlatformImage,
-        targetSize: Int,
-        decayRate: Double,
-        targetUser: MKUser?
-    ) async {
-        // 保底 20KB，再小没意义了
-        guard targetSize > 20 * 1024 else {
-            print("❌ Image too small to compress further. Give up.")
+    private func sendImageMessageInternal(image: PlatformImage, targetUser: MKUser?) async {
+        let htmlLimit = effectiveImageHTMLLimit()
+        guard let data = await compressImageForHTMLLimitOffMain(image: image, htmlLimit: htmlLimit) else {
             return
         }
 
-        print("🚀 [High Quality] Attempting size: \(targetSize / 1024) KB")
-
-        guard let data = await smartCompress(image: image, to: targetSize) else { return }
-
-        let base64Str = data.base64EncodedString()
+        let base64Str = data.base64EncodedString(options: [])
         let htmlBody = "<img src=\"data:image/jpeg;base64,\(base64Str)\" />"
         let msg = MKTextMessage(plainText: htmlBody)
-
-        let failName = Notification.Name("MUMessageSendFailed")
-
-        let failureBox = MessageSendFailureBox()
-        let observer = NotificationCenter.default.addObserver(forName: failName, object: nil, queue: .main) { _ in
-            failureBox.markFailed()
-        }
 
         if let targetUser {
             self.serverModel?.send(msg, to: targetUser)
@@ -162,17 +126,7 @@ extension ServerModelManager {
             self.serverModel?.send(msg, to: channel)
         }
 
-        try? await Task.sleep(nanoseconds: 800 * 1_000_000)
-        NotificationCenter.default.removeObserver(observer)
-
-        if failureBox.didFail {
-            print("⚠️ Send failed. Reducing size by 10%...")
-            let newTarget = Int(Double(targetSize) * decayRate)
-            await attemptSendImage(image: image, targetSize: newTarget, decayRate: decayRate, targetUser: targetUser)
-        } else {
-            print("✅ Send success!")
-            await appendLocalMessage(image: image, targetUser: targetUser)
-        }
+        await appendLocalMessage(image: image, targetUser: targetUser)
     }
 
     private func appendLocalMessage(image: PlatformImage, targetUser: MKUser?) async {
@@ -208,8 +162,29 @@ extension ServerModelManager {
         }
     }
 
-    // 智能压缩算法：先降分辨率再降质量，优先保画质
-    private func smartCompress(image: PlatformImage, to maxBytes: Int) async -> Data? {
+    private func effectiveImageHTMLLimit() -> Int {
+        // Same baseline as desktop Mumble's default uiImageLength.
+        let fallback = 128 * 1024
+        return max(16 * 1024, serverImageMessageLengthBytes ?? fallback)
+    }
+
+    private func compressImageForHTMLLimitOffMain(image: PlatformImage, htmlLimit: Int) async -> Data? {
+        let imageBox = PlatformImageBox(image)
+        return await Task.detached(priority: .userInitiated) {
+            Self.compressImageForHTMLLimit(image: imageBox.image, htmlLimit: htmlLimit)
+        }.value
+    }
+
+    nonisolated private static func compressImageForHTMLLimit(image: PlatformImage, htmlLimit: Int) -> Data? {
+        let wrapperLen = "<img src=\"data:image/jpeg;base64,\" />".utf8.count
+        let payloadBudget = max(4 * 1024, htmlLimit - wrapperLen)
+        let binaryBudget = max(3 * 1024, (payloadBudget * 3) / 4)
+
+        return smartCompress(image: image, to: binaryBudget)
+    }
+
+    // 沿用现有流程：先降分辨率，再用二分搜索 JPEG 质量。
+    nonisolated private static func smartCompress(image: PlatformImage, to maxBytes: Int) -> Data? {
         if let data = image.jpegData(compressionQuality: 1.0), data.count <= maxBytes {
             return data
         }
@@ -229,56 +204,50 @@ extension ServerModelManager {
         } else {
             resolutionTiers.append(maxDim)
         }
-        for dim in [1536, 1024, 768, 512] as [CGFloat] {
+        for dim in [
+            1920, 1792, 1664, 1536, 1408, 1280,
+            1152, 1024, 896, 832, 768, 704, 640, 576, 512
+        ] as [CGFloat] {
             if dim < resolutionTiers.last! {
                 resolutionTiers.append(dim)
             }
         }
 
         for tier in resolutionTiers {
-            let workingImage: PlatformImage
-            if tier < maxDim {
-                workingImage = resizeImage(image: image, maxDimension: tier)
-            } else {
-                workingImage = image
-            }
+            let workingImage = tier < maxDim ? resizeImage(image: image, maxDimension: tier) : image
 
             var lo: CGFloat = 0.05
             var hi: CGFloat = 1.0
-            var bestData: Data? = nil
+            var bestData: Data?
             var bestQuality: CGFloat = 0
 
-            for _ in 0..<8 {
+            // Fewer quality probes per tier so we downscale earlier.
+            for _ in 0..<4 {
                 let mid = (lo + hi) / 2
-                if let data = workingImage.jpegData(compressionQuality: mid) {
-                    if data.count <= maxBytes {
-                        bestData = data
-                        bestQuality = mid
-                        lo = mid
-                    } else {
-                        hi = mid
-                    }
+                guard let data = workingImage.jpegData(compressionQuality: mid) else { continue }
+                if data.count <= maxBytes {
+                    bestData = data
+                    bestQuality = mid
+                    lo = mid
+                } else {
+                    hi = mid
                 }
             }
 
             if let data = bestData {
-                if bestQuality >= 0.3 || tier <= 512 {
-                    let tierStr = tier < maxDim ? "resized to \(Int(tier))px" : "original"
-                    print("📸 Compressed: \(tierStr), quality=\(String(format: "%.2f", bestQuality)), size=\(data.count/1024)KB")
+                if bestQuality >= 0.5 || tier <= 640 {
                     return data
                 }
-                print("📸 Quality \(String(format: "%.2f", bestQuality)) too low at \(Int(tier))px, trying smaller resolution...")
                 continue
             }
         }
 
-        print("⚠️ Fallback: minimum resolution + minimum quality")
         let smallest = resizeImage(image: image, maxDimension: 512)
         return smallest.jpegData(compressionQuality: 0.2)
     }
 
     /// 保持比例缩放图片（指定长边最大像素数），修复白色边线问题
-    private func resizeImage(image: PlatformImage, maxDimension: CGFloat) -> PlatformImage {
+    nonisolated private static func resizeImage(image: PlatformImage, maxDimension: CGFloat) -> PlatformImage {
         #if os(iOS)
         let pixelW = image.size.width * image.scale
         let pixelH = image.size.height * image.scale

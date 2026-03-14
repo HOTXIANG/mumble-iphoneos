@@ -18,7 +18,24 @@ struct AccessTokensView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            VStack(spacing: 0) {
+                #if os(macOS)
+                HStack {
+                    Spacer()
+                    Button {
+                        withAnimation {
+                            tokens.append(TokenItem(value: ""))
+                        }
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+                #endif
+
+                Group {
                 if isLoading {
                     ProgressView("Loading tokens…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -32,6 +49,7 @@ struct AccessTokensView: View {
                     tokenList
                 }
             }
+            }
             #if os(macOS)
             .frame(minWidth: 400, minHeight: 300)
             #endif
@@ -43,18 +61,23 @@ struct AccessTokensView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+                #if os(iOS)
                 ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 12) {
-                        Button {
-                            withAnimation {
-                                tokens.append(TokenItem(value: ""))
-                            }
-                        } label: {
-                            Image(systemName: "plus")
+                    Button {
+                        withAnimation {
+                            tokens.append(TokenItem(value: ""))
                         }
-                        Button { saveTokens() } label: {
-                            Image(systemName: "square.and.arrow.down")
-                        }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+                #endif
+                if #available(iOS 26.0, macOS 26.0, *) {
+                    ToolbarSpacer(.fixed)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveTokens()
                     }
                 }
             }
@@ -74,6 +97,15 @@ struct AccessTokensView: View {
                         #if os(macOS)
                         .textFieldStyle(.roundedBorder)
                         #endif
+
+                    #if os(macOS)
+                    Button(role: .destructive) {
+                        removeToken(token.id)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    #endif
                 }
             }
             .onDelete { offsets in
@@ -127,6 +159,12 @@ struct AccessTokensView: View {
         }
 
         dismiss()
+    }
+
+    private func removeToken(_ id: UUID) {
+        withAnimation {
+            tokens.removeAll { $0.id == id }
+        }
     }
 }
 

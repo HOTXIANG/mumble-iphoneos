@@ -128,6 +128,8 @@ class ServerModelManager: ObservableObject {
     var userInitiatedJoinChannelId: UInt? = nil
     /// 避免重复请求同一用户头像
     var pendingAvatarFetchSessions: Set<UInt> = []
+    /// 服务器下发的 image message 上限（字节），用于头像上传大小控制
+    var serverImageMessageLengthBytes: Int? = nil
     
     enum ViewMode {
         case server,

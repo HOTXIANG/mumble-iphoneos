@@ -8,6 +8,7 @@
 import SwiftUI
 import WebKit
 import PhotosUI
+import UniformTypeIdentifiers
 
 // MARK: - HTML WebView (WKWebView wrapper for full HTML rendering)
 
@@ -219,6 +220,7 @@ struct UserInfoView: View {
     @State private var isLoading: Bool = true
     @State private var contentHeight: CGFloat = 60
     @State private var showingAvatarPicker = false
+    @State private var showingAvatarFileImporter = false
     @State private var avatarImage: PlatformImage? = nil
     @Environment(\.dismiss) var dismiss
     
@@ -254,16 +256,26 @@ struct UserInfoView: View {
                 if isSelf && !isEditing {
                     ToolbarItem(placement: .automatic) {
                         Menu {
-                            Button("Edit Comment") {
+                            Button {
                                 editText = comment
                                 isEditing = true
+                            } label: {
+                                Label(comment.isEmpty ? "Add Note" : "Edit Note", systemImage: "square.and.pencil")
                             }
                             Divider()
-                            Button("Change Avatar") {
+                            Button {
+                                #if os(macOS)
+                                showingAvatarFileImporter = true
+                                #else
                                 showingAvatarPicker = true
+                                #endif
+                            } label: {
+                                Label("Change Avatar", systemImage: "photo")
                             }
-                            Button("Remove Avatar", role: .destructive) {
+                            Button(role: .destructive) {
                                 serverManager.removeSelfTexture()
+                            } label: {
+                                Label("Remove Avatar", systemImage: "trash")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -288,6 +300,35 @@ struct UserInfoView: View {
                     }
                 }
             ))
+            #elseif os(macOS)
+            .fileImporter(
+                isPresented: $showingAvatarFileImporter,
+                allowedContentTypes: [.image],
+                allowsMultipleSelection: false
+            ) { result in
+                guard case .success(let urls) = result,
+                      let fileURL = urls.first else {
+                    return
+                }
+
+                let didAccess = fileURL.startAccessingSecurityScopedResource()
+                defer {
+                    if didAccess {
+                        fileURL.stopAccessingSecurityScopedResource()
+                    }
+                }
+
+                guard let data = try? Data(contentsOf: fileURL) else {
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    serverManager.setSelfTexture(data)
+                    if let image = PlatformImage(data: data) {
+                        avatarImage = image
+                    }
+                }
+            }
             #endif
         }
         .onAppear {
@@ -361,7 +402,7 @@ struct UserInfoView: View {
     @ViewBuilder
     private var displaySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Comment")
+            Text("Note")
                 .font(.headline)
                 .foregroundColor(.secondary)
             
@@ -374,7 +415,7 @@ struct UserInfoView: View {
                 }
                 .padding(.vertical, 8)
             } else if comment.isEmpty {
-                Text("No comment set.")
+                Text("No note set.")
                     .foregroundColor(.secondary)
                     .italic()
                     .padding(.vertical, 8)
@@ -391,7 +432,7 @@ struct UserInfoView: View {
     @ViewBuilder
     private var editingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Edit Comment")
+            Text(comment.isEmpty ? "Add Note" : "Edit Note")
                 .font(.headline)
                 .foregroundColor(.secondary)
             

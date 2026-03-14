@@ -311,9 +311,17 @@ struct ServerChannelView: View {
                 selectedUserForRename = nil
                 pendingNicknameInput = ""
             }
+            Button("Reset", role: .destructive) {
+                if let user = selectedUserForRename {
+                    serverManager.setLocalNickname(nil, for: user)
+                }
+                selectedUserForRename = nil
+                pendingNicknameInput = ""
+            }
             Button("Save") {
                 if let user = selectedUserForRename {
-                    serverManager.setLocalNickname(pendingNicknameInput.trimmingCharacters(in: .whitespacesAndNewlines), for: user)
+                    let normalizedNickname = pendingNicknameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    serverManager.setLocalNickname(normalizedNickname.isEmpty ? nil : normalizedNickname, for: user)
                 }
                 selectedUserForRename = nil
                 pendingNicknameInput = ""
@@ -417,84 +425,99 @@ struct ChannelTreeRow: View {
                             } label: {
                                 Label("Channel Info", systemImage: "info.circle")
                             }
-                            
-                            if hasChannelEditPermission {
-                                Divider()
-                                
-                                Button {
-                                    onChannelCreateTap?(channel)
+
+                            if hasChannelEditPermission || canManageChannelFilter {
+                                Menu {
+                                    if hasChannelEditPermission {
+                                        Button {
+                                            onChannelCreateTap?(channel)
+                                        } label: {
+                                            Label("Create Sub-Channel", systemImage: "plus.rectangle")
+                                        }
+
+                                        Button {
+                                            onChannelEditTap?(channel)
+                                        } label: {
+                                            Label("Edit Channel", systemImage: "pencil.and.outline")
+                                        }
+                                    }
+
+                                    if canManageChannelFilter {
+                                        if hasChannelEditPermission {
+                                            Divider()
+                                        }
+
+                                        Button {
+                                            serverManager.toggleChannelPinned(channel)
+                                        } label: {
+                                            Label(
+                                                pinToggleTitle,
+                                                systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
+                                            )
+                                        }
+
+                                        if !isRootChannel {
+                                            Button {
+                                                serverManager.toggleChannelHidden(channel)
+                                            } label: {
+                                                Label(
+                                                    hideToggleTitle,
+                                                    systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
+                                                )
+                                            }
+                                        }
+                                    }
                                 } label: {
-                                    Label("Create Sub-Channel", systemImage: "plus.rectangle")
-                                }
-                                
-                                Button {
-                                    onChannelEditTap?(channel)
-                                } label: {
-                                    Label("Edit Channel", systemImage: "pencil.and.outline")
+                                    Label("Channel Management", systemImage: "slider.horizontal.3")
                                 }
                             }
 
-                            if canManageChannelFilter {
-                                Divider()
-                                Button {
-                                    serverManager.toggleChannelPinned(channel)
-                                } label: {
-                                    Label(
-                                        serverManager.isChannelPinned(channel) ? "Unpin Channel" : "Pin Channel",
-                                        systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
-                                    )
-                                }
+                            if canListenToChannel || hasLinkPermission {
+                                Menu {
+                                    if canListenToChannel {
+                                        if serverManager.listeningChannels.contains(channel.channelId()) {
+                                            Button {
+                                                serverManager.stopListening(to: channel)
+                                            } label: {
+                                                Label("Stop Listening", systemImage: "ear.fill")
+                                            }
+                                        } else {
+                                            Button {
+                                                serverManager.startListening(to: channel)
+                                            } label: {
+                                                Label("Listen to Channel", systemImage: "ear")
+                                            }
+                                        }
+                                    }
 
-                                if !isRootChannel {
-                                    Button {
-                                        serverManager.toggleChannelHidden(channel)
-                                    } label: {
-                                        Label(
-                                            serverManager.isChannelHidden(channel) ? "Unhide Channel" : "Hide Channel",
-                                            systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
-                                        )
+                                    if hasLinkPermission {
+                                        if canListenToChannel {
+                                            Divider()
+                                        }
+
+                                        if isLinkedToMyChannel {
+                                            Button {
+                                                unlinkFromMyChannel()
+                                            } label: {
+                                                Label("Unlink Channel", systemImage: "xmark.circle")
+                                            }
+                                        } else {
+                                            Button {
+                                                linkToMyChannel()
+                                            } label: {
+                                                Label("Link Channel", systemImage: "link.badge.plus")
+                                            }
+                                        }
+                                        if hasLinkedChannels {
+                                            Button(role: .destructive) {
+                                                serverManager.unlinkAllForChannel(channel)
+                                            } label: {
+                                                Label("Unlink All", systemImage: "trash")
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                            
-                            if canListenToChannel {
-                                Divider()
-                                if serverManager.listeningChannels.contains(channel.channelId()) {
-                                    Button {
-                                        serverManager.stopListening(to: channel)
-                                    } label: {
-                                        Label("Stop Listening", systemImage: "ear.fill")
-                                    }
-                                } else {
-                                    Button {
-                                        serverManager.startListening(to: channel)
-                                    } label: {
-                                        Label("Listen to Channel", systemImage: "ear")
-                                    }
-                                }
-                            }
-                            
-                            if hasLinkPermission {
-                                Divider()
-                                if isLinkedToMyChannel {
-                                    Button {
-                                        unlinkFromMyChannel()
-                                    } label: {
-                                        Label("Unlink Channel", systemImage: "xmark.circle")
-                                    }
-                                } else {
-                                    Button {
-                                        linkToMyChannel()
-                                    } label: {
-                                        Label("Link Channel", systemImage: "link.badge.plus")
-                                    }
-                                }
-                                if hasLinkedChannels {
-                                    Button(role: .destructive) {
-                                        serverManager.unlinkAllForChannel(channel)
-                                    } label: {
-                                        Label("Unlink All", systemImage: "trash")
-                                    }
+                                } label: {
+                                    Label("Audio & Links", systemImage: "ear.and.waveform")
                                 }
                             }
                             
@@ -526,84 +549,99 @@ struct ChannelTreeRow: View {
                         } label: {
                             Label("Channel Info", systemImage: "info.circle")
                         }
-                        
-                        if hasChannelEditPermission {
-                            Divider()
-                            
-                            Button {
-                                onChannelCreateTap?(channel)
+
+                        if hasChannelEditPermission || canManageChannelFilter {
+                            Menu {
+                                if hasChannelEditPermission {
+                                    Button {
+                                        onChannelCreateTap?(channel)
+                                    } label: {
+                                        Label("Create Sub-Channel", systemImage: "plus.rectangle")
+                                    }
+
+                                    Button {
+                                        onChannelEditTap?(channel)
+                                    } label: {
+                                        Label("Edit Channel", systemImage: "pencil.and.outline")
+                                    }
+                                }
+
+                                if canManageChannelFilter {
+                                    if hasChannelEditPermission {
+                                        Divider()
+                                    }
+
+                                    Button {
+                                        serverManager.toggleChannelPinned(channel)
+                                    } label: {
+                                        Label(
+                                            pinToggleTitle,
+                                            systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
+                                        )
+                                    }
+
+                                    if !isRootChannel {
+                                        Button {
+                                            serverManager.toggleChannelHidden(channel)
+                                        } label: {
+                                            Label(
+                                                hideToggleTitle,
+                                                systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
+                                            )
+                                        }
+                                    }
+                                }
                             } label: {
-                                Label("Create Sub-Channel", systemImage: "plus.rectangle")
-                            }
-                            
-                            Button {
-                                onChannelEditTap?(channel)
-                            } label: {
-                                Label("Edit Channel", systemImage: "pencil.and.outline")
+                                Label("Channel Management", systemImage: "slider.horizontal.3")
                             }
                         }
 
-                        if canManageChannelFilter {
-                            Divider()
-                            Button {
-                                serverManager.toggleChannelPinned(channel)
-                            } label: {
-                                Label(
-                                    serverManager.isChannelPinned(channel) ? "Unpin Channel" : "Pin Channel",
-                                    systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
-                                )
-                            }
+                        if canListenToChannel || hasLinkPermission {
+                            Menu {
+                                if canListenToChannel {
+                                    if serverManager.listeningChannels.contains(channel.channelId()) {
+                                        Button {
+                                            serverManager.stopListening(to: channel)
+                                        } label: {
+                                            Label("Stop Listening", systemImage: "ear.fill")
+                                        }
+                                    } else {
+                                        Button {
+                                            serverManager.startListening(to: channel)
+                                        } label: {
+                                            Label("Listen to Channel", systemImage: "ear")
+                                        }
+                                    }
+                                }
 
-                            if !isRootChannel {
-                                Button {
-                                    serverManager.toggleChannelHidden(channel)
-                                } label: {
-                                    Label(
-                                        serverManager.isChannelHidden(channel) ? "Unhide Channel" : "Hide Channel",
-                                        systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
-                                    )
+                                if hasLinkPermission {
+                                    if canListenToChannel {
+                                        Divider()
+                                    }
+
+                                    if isLinkedToMyChannel {
+                                        Button {
+                                            unlinkFromMyChannel()
+                                        } label: {
+                                            Label("Unlink Channel", systemImage: "xmark.circle")
+                                        }
+                                    } else {
+                                        Button {
+                                            linkToMyChannel()
+                                        } label: {
+                                            Label("Link Channel", systemImage: "link.badge.plus")
+                                        }
+                                    }
+                                    if hasLinkedChannels {
+                                        Button(role: .destructive) {
+                                            serverManager.unlinkAllForChannel(channel)
+                                        } label: {
+                                            Label("Unlink All", systemImage: "trash")
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                        
-                        if canListenToChannel {
-                            Divider()
-                            if serverManager.listeningChannels.contains(channel.channelId()) {
-                                Button {
-                                    serverManager.stopListening(to: channel)
-                                } label: {
-                                    Label("Stop Listening", systemImage: "ear.fill")
-                                }
-                            } else {
-                                Button {
-                                    serverManager.startListening(to: channel)
-                                } label: {
-                                    Label("Listen to Channel", systemImage: "ear")
-                                }
-                            }
-                        }
-                        
-                        if hasLinkPermission {
-                            Divider()
-                            if isLinkedToMyChannel {
-                                Button {
-                                    unlinkFromMyChannel()
-                                } label: {
-                                    Label("Unlink Channel", systemImage: "xmark.circle")
-                                }
-                            } else {
-                                Button {
-                                    linkToMyChannel()
-                                } label: {
-                                    Label("Link Channel", systemImage: "link.badge.plus")
-                                }
-                            }
-                            if hasLinkedChannels {
-                                Button(role: .destructive) {
-                                    serverManager.unlinkAllForChannel(channel)
-                                } label: {
-                                    Label("Unlink All", systemImage: "trash")
-                                }
+                            } label: {
+                                Label("Audio & Links", systemImage: "ear.and.waveform")
                             }
                         }
                         
@@ -753,6 +791,31 @@ struct ChannelTreeRow: View {
 
     private var canManageChannelFilter: Bool {
         serverManager.serverModel != nil
+    }
+
+    private var pinToggleTitle: String {
+        let key = serverManager.isChannelPinned(channel) ? "Unpin Channel" : "Pin Channel"
+        let zhFallback = serverManager.isChannelPinned(channel) ? "取消置顶频道" : "置顶频道"
+        return localizedChannelActionTitle(key: key, zhHansFallback: zhFallback)
+    }
+
+    private var hideToggleTitle: String {
+        let key = serverManager.isChannelHidden(channel) ? "Unhide Channel" : "Hide Channel"
+        let zhFallback = serverManager.isChannelHidden(channel) ? "取消隐藏频道" : "隐藏频道"
+        return localizedChannelActionTitle(key: key, zhHansFallback: zhFallback)
+    }
+
+    private func localizedChannelActionTitle(key: String, zhHansFallback: String) -> String {
+        let localized = NSLocalizedString(key, comment: "")
+        if localized != key {
+            return localized
+        }
+
+        let preferredLanguages = Locale.preferredLanguages
+        let isZhHans = preferredLanguages.contains { lang in
+            lang.hasPrefix("zh-Hans") || lang.hasPrefix("zh-CN") || lang.hasPrefix("zh")
+        }
+        return isZhHans ? zhHansFallback : localized
     }
     
     /// 是否可以监听此频道（不是自己当前所在的频道 + 有 Listen 权限）
@@ -1171,10 +1234,15 @@ struct UserRowView: View {
                     }
                     Button { onInfoTap?(user) } label: { Label("User Info", systemImage: "person.circle") }
                     Button { onStatsTap?(user) } label: { Label("User Statistics", systemImage: "chart.bar") }
-                    Button { onRenameTap?(user) } label: { Label("Set Nickname", systemImage: "pencil") }
                     
                     if !isMyself {
-                        if let hash = user.userHash() {
+                        Button { onPMTap?(user) } label: { Label("Private Message", systemImage: "envelope.fill") }
+                    }
+
+                    Menu {
+                        Button { onRenameTap?(user) } label: { Label("Set Nickname", systemImage: "pencil") }
+
+                        if !isMyself, let hash = user.userHash() {
                             Button {
                                 friendsManager.toggleFriend(userHash: hash)
                             } label: {
@@ -1189,16 +1257,21 @@ struct UserRowView: View {
                                 ignoreManager.toggleIgnore(userHash: hash)
                             } label: {
                                 if ignoreManager.isIgnored(userHash: hash) {
-                                    Label("Unignore Messages", systemImage: "message.badge.minus")
+                                    Label("Unignore Messages", systemImage: "message")
                                 } else {
-                                    Label("Ignore Messages", systemImage: "message.badge.minus")
+                                    Label("Ignore Messages", systemImage: "nosign")
                                 }
                             }
                         }
-                        
-                        Button { onPMTap?(user) } label: { Label("Private Message", systemImage: "envelope.fill") }
+
+                    } label: {
+                        Label("Social", systemImage: "person.2")
+                    }
+
+                    if !isMyself,
+                       (hasMovePermission || hasAdminPermission || hasKickPermission || hasBanPermission) {
+                        Menu {
                         if hasMovePermission {
-                            Divider()
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     serverManager.movingUser = user
@@ -1207,8 +1280,11 @@ struct UserRowView: View {
                                 Label("Move to...", systemImage: "arrow.right.arrow.left")
                             }
                         }
+
                         if hasAdminPermission {
-                            Divider()
+                            if hasMovePermission {
+                                Divider()
+                            }
                             Button {
                                 serverManager.setServerMuted(!user.isMuted(), for: user)
                             } label: {
@@ -1242,8 +1318,13 @@ struct UserRowView: View {
                                 Label("Reset Comment", systemImage: "text.badge.minus")
                             }
                         }
+
+                        if hasKickPermission || hasBanPermission {
+                            if hasMovePermission || hasAdminPermission {
+                                Divider()
+                            }
+                        }
                         if hasKickPermission {
-                            Divider()
                             Button(role: .destructive) {
                                 serverManager.kickUser(user)
                             } label: {
@@ -1256,6 +1337,10 @@ struct UserRowView: View {
                             } label: {
                                 Label("Ban", systemImage: "nosign")
                             }
+                        }
+
+                        } label: {
+                            Label("Moderation", systemImage: "shield.lefthalf.filled")
                         }
                     }
                 }
@@ -1310,10 +1395,45 @@ struct UserRowView: View {
                         } label: {
                             Label("Private Message", systemImage: "envelope.fill")
                         }
+                    }
+
+                    Menu {
+                        Button {
+                            onRenameTap?(user)
+                        } label: {
+                            Label("Set Nickname", systemImage: "pencil")
+                        }
+
+                        if !isMyself, let hash = user.userHash() {
+                            Button {
+                                friendsManager.toggleFriend(userHash: hash)
+                            } label: {
+                                if friendsManager.isFriend(userHash: hash) {
+                                    Label("Remove Friend", systemImage: "person.badge.minus")
+                                } else {
+                                    Label("Add Friend", systemImage: "person.badge.plus")
+                                }
+                            }
+
+                            Button {
+                                ignoreManager.toggleIgnore(userHash: hash)
+                            } label: {
+                                if ignoreManager.isIgnored(userHash: hash) {
+                                    Label("Unignore Messages", systemImage: "message")
+                                } else {
+                                    Label("Ignore Messages", systemImage: "nosign")
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Social", systemImage: "person.2")
+                    }
+
+                    if !isMyself,
+                       (hasMovePermission || hasAdminPermission || hasKickPermission || hasBanPermission) {
+                        Menu {
                         
                         if hasMovePermission {
-                            Divider()
-                            
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     serverManager.movingUser = user
@@ -1324,7 +1444,9 @@ struct UserRowView: View {
                         }
                         
                         if hasAdminPermission {
-                            Divider()
+                            if hasMovePermission {
+                                Divider()
+                            }
                             
                             Button {
                                 serverManager.setServerMuted(!user.isMuted(), for: user)
@@ -1359,8 +1481,13 @@ struct UserRowView: View {
                                 Label("Reset Comment", systemImage: "text.badge.minus")
                             }
                         }
+
+                        if hasKickPermission || hasBanPermission {
+                            if hasMovePermission || hasAdminPermission {
+                                Divider()
+                            }
+                        }
                         if hasKickPermission {
-                            Divider()
                             Button(role: .destructive) {
                                 serverManager.kickUser(user)
                             } label: {
@@ -1373,6 +1500,10 @@ struct UserRowView: View {
                             } label: {
                                 Label("Ban", systemImage: "nosign")
                             }
+                        }
+
+                        } label: {
+                            Label("Moderation", systemImage: "shield.lefthalf.filled")
                         }
                     }
                     
@@ -1594,12 +1725,8 @@ struct PrivateMessageInputView: View {
             ImageConfirmationView(
                 image: pending.image,
                 onCancel: { pendingPrivateImage = nil },
-                onSend: { image, isHighQuality in
-                    await serverManager.sendPrivateImageMessage(
-                        image: image,
-                        isHighQuality: isHighQuality,
-                        to: targetUser
-                    )
+                onSend: { image in
+                    await serverManager.sendPrivateImageMessage(image: image, to: targetUser)
                     await MainActor.run {
                         pendingPrivateImage = nil
                         dismiss()

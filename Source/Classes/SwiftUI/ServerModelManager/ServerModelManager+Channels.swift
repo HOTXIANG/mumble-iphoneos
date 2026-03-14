@@ -319,7 +319,15 @@ extension ServerModelManager {
 
     /// 设置当前用户的头像
     func setSelfTexture(_ data: Data?) {
-        serverModel?.setSelfTexture(data)
+        guard let data else {
+            serverModel?.setSelfTexture(nil)
+            return
+        }
+
+        // Server can reject oversized texture payloads. Normalize to JPEG and
+        // keep payload bounded for broad server compatibility.
+        let normalized = normalizedTexturePayload(from: data) ?? data
+        serverModel?.setSelfTexture(normalized)
     }
 
     /// 移除当前用户的头像
@@ -378,5 +386,110 @@ extension ServerModelManager {
             return data as Data
         }
         return nil
+    }
+
+    private func normalizedTexturePayload(from data: Data) -> Data? {
+        guard let image = PlatformImage(data: data) else {
+            return nil
+        }
+
+        let maxBytes = effectiveTextureUploadLimitBytes()
+        if let direct = image.jpegData(compressionQuality: 0.92), direct.count <= maxBytes {
+            return direct
+        }
+
+        #if os(iOS)
+        let pixelWidth = image.size.width * image.scale
+        let pixelHeight = image.size.height * image.scale
+        #else
+        let pixelWidth = image.size.width
+        let pixelHeight = image.size.height
+        #endif
+        let maxDim = max(pixelWidth, pixelHeight)
+
+        var tiers: [CGFloat] = [maxDim]
+        for dim in [1024, 768, 512, 384, 256] as [CGFloat] where dim < maxDim {
+            tiers.append(dim)
+        }
+
+        for tier in tiers {
+            let working = tier < maxDim ? resizeTextureImage(image: image, maxDimension: tier) : image
+
+            var low: CGFloat = 0.2
+            var high: CGFloat = 0.92
+            var bestData: Data?
+
+            for _ in 0..<8 {
+                let quality = (low + high) / 2
+                guard let encoded = working.jpegData(compressionQuality: quality) else {
+                    break
+                }
+                if encoded.count <= maxBytes {
+                    bestData = encoded
+                    low = quality
+                } else {
+                    high = quality
+                }
+            }
+
+            if let bestData {
+                return bestData
+            }
+        }
+
+        let fallback = resizeTextureImage(image: image, maxDimension: 256)
+        return fallback.jpegData(compressionQuality: 0.25)
+    }
+
+    private func effectiveTextureUploadLimitBytes() -> Int {
+        // Use a conservative fallback when server config is not available.
+        let fallback = 64 * 1024
+        guard let serverLimit = serverImageMessageLengthBytes, serverLimit > 0 else {
+            return fallback
+        }
+
+        // Keep margin for protobuf framing and metadata, while preserving a floor.
+        let withMargin = max(12 * 1024, serverLimit - 4 * 1024)
+        return min(withMargin, 512 * 1024)
+    }
+
+    private func resizeTextureImage(image: PlatformImage, maxDimension: CGFloat) -> PlatformImage {
+        #if os(iOS)
+        let pixelW = image.size.width * image.scale
+        let pixelH = image.size.height * image.scale
+        #else
+        let pixelW = image.size.width
+        let pixelH = image.size.height
+        #endif
+
+        let currentMax = max(pixelW, pixelH)
+        guard currentMax > maxDimension else { return image }
+
+        let ratio = maxDimension / currentMax
+        let newSize = CGSize(width: floor(pixelW * ratio), height: floor(pixelH * ratio))
+
+        #if os(iOS)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: newSize))
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        #else
+        let newImage = NSImage(size: newSize)
+        newImage.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: newSize).fill()
+        image.draw(in: NSRect(origin: .zero, size: newSize),
+                   from: NSRect(origin: .zero, size: image.size),
+                   operation: .sourceOver,
+                   fraction: 1.0)
+        newImage.unlockFocus()
+        return newImage
+        #endif
     }
 }

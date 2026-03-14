@@ -24,6 +24,23 @@ NSString *MUConnectionErrorNotification = @"MUConnectionErrorNotification";
 NSString *MUCertificateTrustFailureNotification = @"MUCertificateTrustFailureNotification";
 
 NSString *MUAppShowMessageNotification = @"MUAppShowMessageNotification";
+NSString *MUConnectionUDPTransportStatusNotification = @"MUConnectionUDPTransportStatusNotification";
+
+static NSString *MUUDPTransportStateName(NSInteger state) {
+    switch (state) {
+        case 1:
+            return @"unavailable";
+        case 2:
+            return @"available";
+        case 3:
+            return @"stalled";
+        case 4:
+            return @"recovering";
+        case 0:
+        default:
+            return @"unknown";
+    }
+}
 
 static BOOL MUCertChainHasIdentity(NSArray *chain) {
     if (!chain || [chain count] == 0) return NO;
@@ -93,6 +110,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 }
 - (void) establishConnection;
 - (void) teardownConnection;
+- (void) applyNetworkForceTCPSetting;
 - (void) showConnectingView;
 - (void) hideConnectingView;
 - (void) hideConnectingViewWithCompletion:(void(^)(void))completion;
@@ -117,8 +135,17 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     if ((self = [super init])) {
         _retryCount = 0;
         [[MKAudio sharedAudio] stop];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(defaultsDidChange:)
+                                                     name:NSUserDefaultsDidChangeNotification
+                                                   object:nil];
     }
     return self;
+}
+
+- (void) defaultsDidChange:(NSNotification *)notification {
+    (void)notification;
+    [self applyNetworkForceTCPSetting];
 }
 
 - (MKServerModel *)serverModel {
@@ -290,7 +317,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 
     _connection = [[MKConnection alloc] init];
     [_connection setDelegate:self];
-    [_connection setForceTCP:[[NSUserDefaults standardUserDefaults] boolForKey:@"NetworkForceTCP"]];
+    [self applyNetworkForceTCPSetting];
     [_connection setIgnoreSSLVerification:NO];
     
     _serverModel = [[MKServerModel alloc] initWithConnection:_connection];
@@ -339,6 +366,13 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     [[MKAudio sharedAudio] restart];
     
     [_connection connectToHost:_hostname port:_port];
+}
+
+- (void) applyNetworkForceTCPSetting {
+    BOOL shouldForceTCP = [[NSUserDefaults standardUserDefaults] boolForKey:@"NetworkForceTCP"];
+    if (_connection) {
+        [_connection setForceTCP:shouldForceTCP];
+    }
 }
 
 - (void) teardownConnection {
@@ -495,6 +529,21 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         msg = NSLocalizedString(@"The TLS connection was closed due to an error.", nil);
     }
     [self postErrorWithTitle:NSLocalizedString(@"Unable to connect", nil) message:msg];
+}
+
+- (void) connection:(MKConnection *)conn udpTransportStateChanged:(NSInteger)state {
+    (void)conn;
+
+    NSDictionary *info = @{
+        @"state": @(state),
+        @"stateName": MUUDPTransportStateName(state)
+    };
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionUDPTransportStatusNotification
+                                                            object:nil
+                                                          userInfo:info];
+    });
 }
 
 // ... (Rest of methods: trustFailure, rejected, serverModel delegates... ALL UNCHANGED) ...

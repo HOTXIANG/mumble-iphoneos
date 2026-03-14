@@ -70,7 +70,7 @@ extension WYSIWYGEditorView.Coordinator {
         return Data(base64Encoded: base64String, options: .ignoreUnknownCharacters)
     }
 
-    // 与发送图片同策略：先降分辨率，避免过早把 JPEG 质量压得太低。
+    // 与发送图片同策略：先降分辨率，再用二分搜索 JPEG 质量。
     nonisolated static func smartCompress(image: PlatformImage, to maxBytes: Int) -> Data? {
         if let data = image.jpegData(compressionQuality: 1.0), data.count <= maxBytes {
             return data
@@ -91,34 +91,38 @@ extension WYSIWYGEditorView.Coordinator {
         } else {
             resolutionTiers.append(maxDim)
         }
-        if maxDim > 1536 { resolutionTiers.append(1536) }
-        if maxDim > 1024 { resolutionTiers.append(1024) }
-        if maxDim > 768  { resolutionTiers.append(768) }
-        if maxDim > 512  { resolutionTiers.append(512) }
+        for dim in [
+            1920, 1792, 1664, 1536, 1408, 1280,
+            1152, 1024, 896, 832, 768, 704, 640, 576, 512
+        ] as [CGFloat] {
+            if dim < resolutionTiers.last! {
+                resolutionTiers.append(dim)
+            }
+        }
 
         for tier in resolutionTiers {
             let workingImage: PlatformImage = tier < maxDim ? Self.resizeImage(image: image, maxDimension: tier) : image
 
             var lo: CGFloat = 0.05
             var hi: CGFloat = 1.0
-            var bestData: Data? = nil
+            var bestData: Data?
             var bestQuality: CGFloat = 0
 
-            for _ in 0..<8 {
+            // Fewer quality probes per tier so we downscale earlier.
+            for _ in 0..<4 {
                 let mid = (lo + hi) / 2
-                if let data = workingImage.jpegData(compressionQuality: mid) {
-                    if data.count <= maxBytes {
-                        bestData = data
-                        bestQuality = mid
-                        lo = mid
-                    } else {
-                        hi = mid
-                    }
+                guard let data = workingImage.jpegData(compressionQuality: mid) else { continue }
+                if data.count <= maxBytes {
+                    bestData = data
+                    bestQuality = mid
+                    lo = mid
+                } else {
+                    hi = mid
                 }
             }
 
             if let data = bestData {
-                if bestQuality >= 0.3 || tier <= 512 {
+                if bestQuality >= 0.5 || tier <= 640 {
                     return data
                 }
                 continue

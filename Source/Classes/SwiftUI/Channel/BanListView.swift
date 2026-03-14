@@ -63,7 +63,23 @@ struct BanListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            VStack(spacing: 0) {
+                #if os(macOS)
+                HStack(spacing: 10) {
+                    TextField("Search bans", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        showingAddSheet = true
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+                #endif
+
+                Group {
                 if isLoading {
                     ProgressView("Loading ban list…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -88,6 +104,18 @@ struct BanListView: View {
                                 if !entry.reason.isEmpty {
                                     Label(entry.reason, systemImage: "text.quote").font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                                 }
+
+                                #if os(macOS)
+                                HStack {
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        removeBanEntry(id: entry.id)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                                #endif
                             }
                             .padding(.vertical, 2)
                         }
@@ -99,21 +127,27 @@ struct BanListView: View {
                     }
                 }
             }
+            }
             .navigationTitle("Ban List")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .searchable(text: $searchText, prompt: "Search bans")
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+                #if os(iOS)
                 ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 12) {
-                        Button { showingAddSheet = true } label: { Image(systemName: "plus") }
-                        Button { saveBanList() } label: {
-                            Image(systemName: "square.and.arrow.down")
-                        }
+                    Button { showingAddSheet = true } label: { Image(systemName: "plus") }
+                }
+                #endif
+                if #available(iOS 26.0, macOS 26.0, *) {
+                    ToolbarSpacer(.fixed)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveBanList()
                     }
                 }
             }
@@ -164,6 +198,10 @@ struct BanListView: View {
         serverManager.sendBanList(entries.map { $0 as Any })
         dismiss()
     }
+
+    private func removeBanEntry(id: UUID) {
+        entries.removeAll { $0.id == id }
+    }
 }
 
 // MARK: - Add Ban View
@@ -179,30 +217,85 @@ private struct AddBanView: View {
     @State private var reason = ""
     @State private var duration: UInt32 = 0
 
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Address") {
-                    TextField("IP Address (e.g. 192.168.1.1)", text: $ipAddress)
-                    HStack {
-                        Text("Mask")
-                        Spacer()
-                        TextField("", value: $mask, format: .number).frame(width: 80).multilineTextAlignment(.trailing)
+    @ViewBuilder
+    private var addBanContent: some View {
+        #if os(macOS)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                GroupBox("Address") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        TextField("IP Address (e.g. 192.168.1.1)", text: $ipAddress)
+                            .textFieldStyle(.roundedBorder)
+
+                        HStack(spacing: 10) {
+                            Text("Mask")
+                                .frame(width: 90, alignment: .leading)
+                            TextField("", value: $mask, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 120)
+                                .multilineTextAlignment(.trailing)
+                        }
                     }
+                    .padding(8)
                 }
-                Section("Details") {
-                    TextField("Username", text: $username)
-                    TextField("Certificate Hash", text: $certHash)
-                    TextField("Reason", text: $reason)
+
+                GroupBox("Details") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        TextField("Username", text: $username)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Certificate Hash", text: $certHash)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Reason", text: $reason)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    .padding(8)
                 }
-                Section("Duration") {
-                    HStack {
+
+                GroupBox("Duration") {
+                    HStack(spacing: 10) {
                         Text("Seconds (0 = permanent)")
-                        Spacer()
-                        TextField("", value: $duration, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
+                            .frame(width: 180, alignment: .leading)
+                        TextField("", value: $duration, format: .number)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 140)
+                            .multilineTextAlignment(.trailing)
                     }
+                    .padding(8)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+        }
+        .frame(minWidth: 520, idealWidth: 560, minHeight: 430)
+        #else
+        Form {
+            Section("Address") {
+                TextField("IP Address (e.g. 192.168.1.1)", text: $ipAddress)
+                HStack {
+                    Text("Mask")
+                    Spacer()
+                    TextField("", value: $mask, format: .number).frame(width: 80).multilineTextAlignment(.trailing)
+                }
+            }
+            Section("Details") {
+                TextField("Username", text: $username)
+                TextField("Certificate Hash", text: $certHash)
+                TextField("Reason", text: $reason)
+            }
+            Section("Duration") {
+                HStack {
+                    Text("Seconds (0 = permanent)")
+                    Spacer()
+                    TextField("", value: $duration, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
+                }
+            }
+        }
+        #endif
+    }
+
+    var body: some View {
+        NavigationStack {
+            addBanContent
             .navigationTitle("Add Ban")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -574,7 +574,7 @@ struct MacSettingsRootView: View {
         var preferredContentSize: NSSize {
             switch self {
             case .general:
-                return NSSize(width: 550, height: 200)
+                return NSSize(width: 550, height: 220)
             case .input:
                 return NSSize(width: 550, height: 520)
             case .output:
@@ -582,13 +582,13 @@ struct MacSettingsRootView: View {
             case .notifications:
                 return NSSize(width: 550, height: 360)
             case .tts:
-                return NSSize(width: 550, height: 460)
+                return NSSize(width: 550, height: 450)
             case .handoff:
                 return NSSize(width: 550, height: 220)
             case .certificates:
                 return NSSize(width: 550, height: 600)
             case .advanced:
-                return NSSize(width: 550, height: 200)
+                return NSSize(width: 550, height: 220)
             }
         }
     }
@@ -638,7 +638,6 @@ struct MacSettingsRootView: View {
                     Label("Text-to-Speech", systemImage: "waveform")
                 }
                 .tag(MacSettingsTab.tts)
-            
             MacHandoffSettingsTabView()
                 .macSettingsCenteredPageStyle()
                 .tabItem {

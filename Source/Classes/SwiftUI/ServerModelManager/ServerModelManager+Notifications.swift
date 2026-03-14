@@ -398,6 +398,31 @@ extension ServerModelManager {
             }
         })
 
+        // ServerConfig: capture server-side image size limit for avatar upload compression.
+        tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.serverConfigReceivedNotification, object: nil, queue: nil) { [weak self] notification in
+            guard let object = notification.userInfo?["config"] as? NSObject else { return }
+
+            let hasLimit: Bool
+            if object.responds(to: NSSelectorFromString("hasImageMessageLength")) {
+                hasLimit = (object.value(forKey: "hasImageMessageLength") as? Bool) ?? false
+            } else {
+                hasLimit = true
+            }
+
+            let parsedLimit: Int?
+            if hasLimit {
+                let number = object.value(forKey: "imageMessageLength") as? NSNumber
+                let value = number?.intValue ?? 0
+                parsedLimit = value > 0 ? value : nil
+            } else {
+                parsedLimit = nil
+            }
+
+            Task { @MainActor [weak self] in
+                self?.serverImageMessageLengthBytes = parsedLimit
+            }
+        })
+
         // ACL 接收通知 - 检测频道是否有密码保护
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.aclReceivedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo,
@@ -837,7 +862,7 @@ extension ServerModelManager {
             // 只有不是自己发的、且开启了通知，才发通知
             if !isSentBySelf {
                 let bodyText = plainText.isEmpty ? NSLocalizedString("[Image]", comment: "") : plainText
-                let notificationBody = "\(senderName) said: \(bodyText)"
+                let notificationBody = "\(senderName): \(bodyText)"
                 if shouldSpeakTTS(for: .normalUserMessages) {
                     TTSManager.shared.speak(notificationBody)
                 }

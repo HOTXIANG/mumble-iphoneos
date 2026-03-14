@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -7,6 +8,7 @@ EN_PATH = ROOT / "Resources/en.lproj/Localizable.strings"
 ZH_DIR = ROOT / "Resources/zh-Hans.lproj"
 ZH_PATH = ZH_DIR / "Localizable.strings"
 SWIFT_ROOT = ROOT / "Source/Classes/SwiftUI"
+GLOSSARY_PATH = ROOT / "Scripts/zh_terminology_glossary.json"
 
 KEY_VALUE_RE = re.compile(r"\"((?:\\.|[^\"\\])*)\"\s*=\s*\"((?:\\.|[^\"\\])*)\"\s*;")
 LITERAL_RE = re.compile(
@@ -24,17 +26,26 @@ PLACEHOLDER_RE = re.compile(
 PH_TOKEN_RE = re.compile(r"__\s*PH(\d+)\s*__")
 ESC_TOKEN_RE = re.compile(r"__\s*NL\s*__")
 
+DEFAULT_TERM_STANDARDIZATION = [
+    (r"文本转语音", "文字转语音"),
+    (r"推送通知", "通知"),
+    (r"私人消息", "私聊消息"),
+    (r"私人信息", "私聊消息"),
+    (r"频道列表", "频道"),
+    (r"用户统计信息", "用户统计"),
+]
+
 # 这里放关键 UI 文案的人工翻译（优先级最高）
 MANUAL_TRANSLATIONS = {
     "%@ connected": "%@ 已连接",
     "%@ deafened": "%@ 已自我闭听",
     "%@ disconnected": "%@ 已断开连接",
     "%@ moved to %@": "%@ 移动到了 %@",
-    "%@ muted": "%@ 关闭了麦克风",
+    "%@ muted": "%@ 已静音",
     "%@ started listening to your channel": "%@ 开始监听你的频道",
     "%@ stopped listening to your channel": "%@ 停止监听你的频道",
     "%@ undeafened": "%@ 已取消自我闭听",
-    "%@ unmuted": "%@ 开启了麦克风",
+    "%@ unmuted": "%@ 已取消静音",
     "Acknowledgements": "致谢",
     "Add to Widget": "添加到小组件",
     "Added to Widget": "已添加到小组件",
@@ -112,7 +123,7 @@ MANUAL_TRANSLATIONS = {
     "Deafen": "闭听",
     "Undeafen": "取消闭听",
     "Mute Self": "关闭麦克风",
-    "Unmute Self": "开启麦克风",
+    "Unmute Self": "取消自我静音",
     "Deafen Self": "自我闭听",
     "Undeafen Self": "取消自我闭听",
     "Mute and deafen": "静音并闭听",
@@ -360,6 +371,7 @@ MANUAL_TRANSLATIONS = {
     "Temporary": "临时",
     "Trust": "信任",
     "Untrusted Certificate": "不受信任的证书",
+    "Not permitted in temporary channel": "临时频道中不允许",
     "Valid": "有效",
     "Save Changes": "保存修改",
     "Delete Channel": "删除频道",
@@ -399,6 +411,60 @@ MANUAL_TRANSLATIONS = {
     "To calibrate the voice activity correctly, adjust the sliders so that:\\n\\n1. The first few utterances you make are inside the green area.\\n2. While talking, the bar should stay inside the yellow area.\\n3. When not speaking, the bar should stay inside the red area.": "要正确校准语音激活，请调整滑块使：\\n\\n1. 开始说话时，音量条进入绿色区域。\\n2. 说话过程中，音量条保持在黄色区域。\\n3. 不说话时，音量条保持在红色区域。",
     "To import your own certificate into\\nMumble, please transfer them to your\\ndevice using iTunes File Transfer.": "若要将你自己的证书导入\\nMumble，请通过 iTunes 文件传输\\n将证书复制到你的设备。",
     "You are about to register yourself on this server. This cannot be undone, and your username cannot be changed once this is done. You will forever be known as '%@' on this server.\\n\\nAre you sure you want to register yourself?": "你将要在此服务器上注册自己。此操作不可撤销，完成后用户名也无法修改。你在该服务器上将永久使用“%@”这个名称。\\n\\n确定要注册吗？",
+    "Enable Text-to-Speech": "启用文字转语音",
+    "Text-to-Speech": "文字转语音",
+    "Text-to-Speech:": "文字转语音：",
+    "When enabled, selected notification types will be spoken. During TTS playback, speaking may be temporarily unavailable.": "启用后，将朗读所选通知类型。在 TTS 播放期间，发言可能会暂时不可用。",
+    "Add access tokens to enter password-protected channels.": "添加访问令牌以进入受密码保护的频道。",
+    "Channel Management": "频道管理",
+    "Channels:": "频道：",
+    "Link Channel": "链接频道",
+    "Unlink Channel": "取消链接频道",
+    "Show Hidden Channels": "显示隐藏频道",
+    "Moving %@ - tap a channel": "移动 %@ - 点击频道",
+    "Registered Users": "已注册用户",
+    "Requesting registered user list from server": "正在向服务器请求已注册用户列表",
+    "The server returned an empty registered user list": "服务器返回的已注册用户列表为空",
+    "User Messages:": "用户消息：",
+    "User Statistics": "用户统计",
+    "Certificate Hash": "证书哈希",
+    "Self-Deafen": "自我闭听",
+    "Add": "添加",
+    "Add Ban": "添加封禁",
+    "Add Friend": "添加好友",
+    "Audio & Links": "音频与链接",
+    "Auto Reconnect": "自动重连",
+    "Ban": "封禁",
+    "Ban List": "封禁列表",
+    "Change Avatar": "更换头像",
+    "Copy URL": "复制 URL",
+    "Enable QoS": "启用 QoS",
+    "IP Address (e.g. 192.168.1.1)": "IP 地址（例如 192.168.1.1）",
+    "Ignore Messages": "忽略消息",
+    "Kick": "踢出",
+    "Loading ban list…": "正在加载封禁列表…",
+    "Loading tokens…": "正在加载令牌…",
+    "Mask": "掩码",
+    "Moderation": "管理",
+    "Mumble iOS v%@": "Mumble iOS 版 v%@",
+    "Mumble macOS v%@": "Mumble macOS 版 v%@",
+    "Network changes require reconnection to take effect.": "网络设置变更需要重连后生效。",
+    "Network:": "网络：",
+    "Nickname": "昵称",
+    "Other System Messages": "其他系统消息",
+    "Priority Speaker": "优先发言者",
+    "Reason": "原因",
+    "Remove Avatar": "移除头像",
+    "Remove Friend": "移除好友",
+    "Remove Priority Speaker": "移除优先发言者",
+    "Reset Comment": "重置备注",
+    "Seconds (0 = permanent)": "秒数（0 = 永久）",
+    "Set Nickname": "设置昵称",
+    "Social": "社交",
+    "The server ban list is empty.": "服务器封禁列表为空。",
+    "Token": "令牌",
+    "Unignore Messages": "取消忽略消息",
+    "Unlink All": "取消全部链接",
     # Plural-like placeholders
     "%lu\\nppl": "%lu\\n人",
     "%u\\nppl": "%u\\n人",
@@ -449,6 +515,69 @@ def parse_strings(path: Path) -> dict[str, str]:
     }
 
 
+def load_glossary() -> tuple[list[tuple[str, str]], dict[str, list[str]]]:
+    """
+    返回：
+    1) 术语标准化规则 (pattern, replacement)
+    2) 英文术语到中文术语的白名单映射（用于一致性检查）
+    """
+    if not GLOSSARY_PATH.exists():
+        return DEFAULT_TERM_STANDARDIZATION, {}
+
+    raw = json.loads(GLOSSARY_PATH.read_text(encoding="utf-8"))
+
+    rules: list[tuple[str, str]] = []
+    whitelist: dict[str, list[str]] = {}
+
+    # 新结构：按模块分类
+    if isinstance(raw.get("modules"), dict):
+        for _, module_conf in raw["modules"].items():
+            if not isinstance(module_conf, dict):
+                continue
+
+            for item in module_conf.get("normalizationRules", []):
+                pattern = str(item.get("pattern", "")).strip()
+                replacement = str(item.get("replacement", "")).strip()
+                if pattern and replacement:
+                    rules.append((pattern, replacement))
+
+            for k, v in module_conf.get("termWhitelist", {}).items():
+                ks = str(k).strip()
+                if not ks:
+                    continue
+                if isinstance(v, list):
+                    values = [str(x).strip() for x in v if str(x).strip()]
+                else:
+                    vs = str(v).strip()
+                    values = [vs] if vs else []
+                if values:
+                    whitelist[ks] = values
+
+    # 兼容旧结构
+    for item in raw.get("normalizationRules", []):
+        pattern = str(item.get("pattern", "")).strip()
+        replacement = str(item.get("replacement", "")).strip()
+        if pattern and replacement:
+            rules.append((pattern, replacement))
+
+    for k, v in raw.get("termWhitelist", {}).items():
+        ks = str(k).strip()
+        if not ks:
+            continue
+        if isinstance(v, list):
+            values = [str(x).strip() for x in v if str(x).strip()]
+        else:
+            vs = str(v).strip()
+            values = [vs] if vs else []
+        if values:
+            whitelist[ks] = values
+
+    if not rules:
+        rules = list(DEFAULT_TERM_STANDARDIZATION)
+
+    return rules, whitelist
+
+
 def parse_en_keys() -> list[str]:
     return list(parse_strings(EN_PATH).keys())
 
@@ -486,7 +615,7 @@ def restore_placeholder_tokens(value: str, key: str) -> str:
     return value
 
 
-def normalize_value(value: str) -> str:
+def normalize_value(value: str, term_rules: list[tuple[str, str]]) -> str:
     # 保证 Mumble 始终作为产品名不翻译
     value = value.replace("曼布尔", "Mumble").replace("芒布尔", "Mumble")
     value = value.replace("mumble", "Mumble")
@@ -495,11 +624,16 @@ def normalize_value(value: str) -> str:
 
     # 清理历史错误 token
     value = value.replace("zzSO", "(空正文)").replace("(zz)", "(空)")
+
+    # 统一术语，减少同义词混用
+    for pattern, replacement in term_rules:
+        value = re.sub(pattern, replacement, value)
+
     value = value.replace("  ", " ").strip()
     return value
 
 
-def get_translation(key: str, seed_map: dict[str, str]) -> str:
+def get_translation(key: str, seed_map: dict[str, str], term_rules: list[tuple[str, str]]) -> str:
     if key == "%lu\\nppl":
         return "%lu\\n人"
     if key == "%u\\nppl":
@@ -508,25 +642,50 @@ def get_translation(key: str, seed_map: dict[str, str]) -> str:
         return "静音阈值：低于此值会被视为静音。\\n语音阈值：高于此值会被视为语音。\\n静音保持：当输入持续低于静音阈值达到该时长后，才会切换为静音。"
 
     if key in MANUAL_TRANSLATIONS:
-        return strings_unescape(MANUAL_TRANSLATIONS[key])
+        return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[key]), term_rules)
     escaped_key = strings_escape(key)
     if escaped_key in MANUAL_TRANSLATIONS:
-        return strings_unescape(MANUAL_TRANSLATIONS[escaped_key])
+        return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[escaped_key]), term_rules)
     if key in VALUE_FIXUPS:
-        return strings_unescape(VALUE_FIXUPS[key])
+        return normalize_value(strings_unescape(VALUE_FIXUPS[key]), term_rules)
 
     seed = seed_map.get(key)
     if seed:
         seed = restore_placeholder_tokens(seed, key)
-        seed = normalize_value(seed)
+        seed = normalize_value(seed, term_rules)
         return seed
 
     # 无翻译时 fallback 原文，避免生成空值
-    return key
+    return normalize_value(key, term_rules)
+
+
+def report_term_consistency(all_keys: list[str], output_map: dict[str, str], term_whitelist: dict[str, list[str]]) -> None:
+    inconsistent: list[str] = []
+    for en_term, zh_terms in term_whitelist.items():
+        pattern = re.compile(rf"\b{re.escape(en_term)}\b", re.IGNORECASE)
+        related = [
+            (k, output_map.get(k, ""))
+            for k in all_keys
+            if pattern.search(k)
+        ]
+        for key, value in related:
+            if not any(zh_term in value for zh_term in zh_terms):
+                expected = " / ".join(zh_terms)
+                inconsistent.append(f"- {key} => {value} (expected term: {expected})")
+
+    if inconsistent:
+        print("\n[Term Consistency Warning] The following entries may violate glossary whitelist:")
+        for line in inconsistent[:80]:
+            print(line)
+        if len(inconsistent) > 80:
+            print(f"... and {len(inconsistent) - 80} more")
+    else:
+        print("\n[Term Consistency] PASS")
 
 
 def main():
     seed_map = parse_strings(ZH_PATH)
+    term_rules, term_whitelist = load_glossary()
 
     format_keys = {
         "Follow System Default (%@)",
@@ -582,8 +741,10 @@ def main():
     print(f"Total keys: {len(all_keys)}")
 
     lines = ["/* Simplified Chinese localization (offline/manual) */"]
+    output_map: dict[str, str] = {}
     for key in all_keys:
-        value = get_translation(key, seed_map)
+        value = get_translation(key, seed_map, term_rules)
+        output_map[key] = value
         lines.append(f"\"{strings_escape(key)}\" = \"{strings_escape(value)}\";")
 
     ZH_DIR.mkdir(parents=True, exist_ok=True)
@@ -592,6 +753,7 @@ def main():
     ZH_PATH.write_bytes(output.encode("utf-16"))
     print(f"Wrote: {ZH_PATH}")
     print(f"Total entries: {len(all_keys)}")
+    report_term_consistency(all_keys, output_map, term_whitelist)
 
 
 if __name__ == "__main__":

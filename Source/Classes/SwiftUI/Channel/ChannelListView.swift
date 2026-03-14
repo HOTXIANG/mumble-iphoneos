@@ -22,6 +22,9 @@ struct ChannelListView: View {
     private let registerUserPublisher = NotificationCenter.default.publisher(for: .mumbleRegisterUser)
     private let toggleMutePublisher = NotificationCenter.default.publisher(for: .mumbleToggleMute)
     private let toggleDeafenPublisher = NotificationCenter.default.publisher(for: .mumbleToggleDeafen)
+    private let showAccessTokensPublisher = NotificationCenter.default.publisher(for: .mumbleShowAccessTokens)
+    private let showBanListPublisher = NotificationCenter.default.publisher(for: .mumbleShowBanList)
+    private let showRegisteredUsersPublisher = NotificationCenter.default.publisher(for: .mumbleShowRegisteredUsers)
     #endif
     
     // --- 核心修改 1：注入 NavigationManager ---
@@ -76,7 +79,9 @@ struct ChannelListView: View {
         .toolbarBackground(.clear, for: .windowToolbar)
         .toolbarBackground(.hidden, for: .windowToolbar)
         #endif
+        #if os(iOS)
         .searchable(text: $channelSearchText, prompt: "Search channels and users")
+        #endif
         .toolbar {
             leadingToolbarItems
             trailingToolbarItems
@@ -115,6 +120,20 @@ struct ChannelListView: View {
         .onReceive(toggleDeafenPublisher) { _ in
             guard appState.isConnected else { return }
             serverManager.toggleSelfDeafen()
+        }
+        .onReceive(showAccessTokensPublisher) { _ in
+            guard appState.isConnected else { return }
+            showingTokens = true
+        }
+        .onReceive(showBanListPublisher) { _ in
+            guard appState.isConnected else { return }
+            guard serverManager.hasRootPermission(MKPermissionBan) else { return }
+            showingBanList = true
+        }
+        .onReceive(showRegisteredUsersPublisher) { _ in
+            guard appState.isConnected else { return }
+            guard serverManager.hasRootPermission(MKPermissionRegister) else { return }
+            showingUserList = true
         }
         #endif
     }

@@ -23,6 +23,7 @@ extension Notification.Name {
     static let muConnectionClosed     = Notification.Name("MUConnectionClosedNotification")
     static let muConnectionConnecting = Notification.Name("MUConnectionConnectingNotification")
     static let muConnectionError      = Notification.Name("MUConnectionErrorNotification")
+    static let muConnectionUDPTransportStatus = Notification.Name("MUConnectionUDPTransportStatusNotification")
     static let muAppShowMessage       = Notification.Name("MUAppShowMessageNotification")
     static let muConnectionReady      = Notification.Name("MUConnectionReadyForSwiftUI")
     static let muMessageSendFailed    = Notification.Name("MUMessageSendFailed")
@@ -143,6 +144,7 @@ class AppState: ObservableObject {
     #endif
     
     private var cancellables = Set<AnyCancellable>()
+    private var lastUDPTransportStateName: String = "unknown"
     
     static let shared = AppState()
     private init() {
@@ -228,6 +230,7 @@ class AppState: ObservableObject {
                 self.isReconnecting = false
                 self.isConnected = false
                 self.isUserAuthenticated = false
+                self.lastUDPTransportStateName = "unknown"
                 self.serverDisplayName = nil
                 self.unreadMessageCount = 0
             }
@@ -274,6 +277,31 @@ class AppState: ObservableObject {
         
         // Certificate trust failure is now handled directly via CertTrustBridge.handleTrustFailure(_:)
 
+        center.publisher(for: .muConnectionUDPTransportStatus)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                guard let self = self else { return }
+                let stateName = (notification.userInfo?["stateName"] as? String) ?? "unknown"
+                guard stateName != self.lastUDPTransportStateName else { return }
+                self.lastUDPTransportStateName = stateName
+
+                MumbleLogger.connection.info("UDP transport state changed: \(stateName)")
+
+                switch stateName {
+                case "stalled":
+                    self.showToast(message: NSLocalizedString("UDP stalled, recovering audio channel...", comment: "UDP stalled status toast"), type: .error)
+                case "recovering":
+                    self.showToast(message: NSLocalizedString("Re-establishing UDP channel...", comment: "UDP recovering status toast"), type: .info)
+                case "available":
+                    self.showToast(message: NSLocalizedString("UDP channel restored", comment: "UDP available status toast"), type: .success)
+                case "unavailable":
+                    self.showToast(message: NSLocalizedString("UDP unavailable, using TCP tunnel", comment: "UDP unavailable status toast"), type: .info)
+                default:
+                    break
+                }
+            }
+            .store(in: &cancellables)
+
         center.publisher(for: .muAppShowMessage)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
@@ -310,5 +338,21 @@ class AppState: ObservableObject {
         self.isReconnecting = false
         self.pendingRegistration = false
     }
+
+    private func showToast(message: String, type: AppToast.ToastType) {
+        withAnimation(.spring()) {
+            activeToast = AppToast(message: message, type: type)
+        }
+
+        toastWorkItem?.cancel()
+        let task = DispatchWorkItem { [weak self] in
+            withAnimation(.easeOut) {
+                self?.activeToast = nil
+            }
+        }
+        toastWorkItem = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: task)
+    }
+
     private var toastWorkItem: DispatchWorkItem?
 }

@@ -982,8 +982,8 @@ struct MessagesView: View {
                     ImageConfirmationView(
                         image: item.image,
                         onCancel: { selectedImageForSend = nil },
-                        onSend: { imageToSend, isHighQuality in
-                            await serverManager.sendImageMessage(image: imageToSend, isHighQuality: isHighQuality)
+                        onSend: { imageToSend in
+                            await serverManager.sendImageMessage(image: imageToSend)
                             selectedImageForSend = nil
                         }
                     )
@@ -2060,7 +2060,17 @@ private struct SenderStickyHeaderView: View {
     let isSentBySelf: Bool
     let avatar: PlatformImage?
     @Environment(\.colorScheme) private var colorScheme
+    #if os(macOS)
+    private let avatarSize: CGFloat = 20
+    private let headerHorizontalPadding: CGFloat = 6
+    private let headerVerticalPadding: CGFloat = 6
+    private let titleFontSize: CGFloat = 12
+    #else
     private let avatarSize: CGFloat = 24
+    private let headerHorizontalPadding: CGFloat = 8
+    private let headerVerticalPadding: CGFloat = 8
+    private let titleFontSize: CGFloat = 13
+    #endif
 
     var body: some View {
         HStack {
@@ -2070,8 +2080,8 @@ private struct SenderStickyHeaderView: View {
 
             if #available(iOS 26.0, macOS 26.0, *) {
                 headerContent
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, headerHorizontalPadding)
+                    .padding(.vertical, headerVerticalPadding)
                     .fixedSize(horizontal: true, vertical: false)
                     .background(
                         Capsule()
@@ -2088,8 +2098,8 @@ private struct SenderStickyHeaderView: View {
                     )
             } else {
                 headerContent
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, headerHorizontalPadding)
+                    .padding(.vertical, headerVerticalPadding)
                     .fixedSize(horizontal: true, vertical: false)
                     .background(.ultraThinMaterial, in: Capsule())
                     .overlay(
@@ -2117,11 +2127,11 @@ private struct SenderStickyHeaderView: View {
                 avatarView
             }
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: titleFontSize, weight: .semibold))
                 .fontWeight(.semibold)
                 .modifier(StickyHeaderAdaptiveTextModifier())
                 .lineLimit(1)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 3)
             if isSentBySelf {
                 avatarView
             }
@@ -2392,9 +2402,8 @@ private struct PrivateMessageBubbleView: View {
 struct ImageConfirmationView: View {
     let image: PlatformImage
     let onCancel: () -> Void
-    let onSend: (PlatformImage, Bool) async -> Void
+    let onSend: (PlatformImage) async -> Void
     @State private var isSending = false
-    @State private var isHighQuality = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -2417,23 +2426,6 @@ struct ImageConfirmationView: View {
                     .cornerRadius(12)
                     .padding(.horizontal)
                 
-                Toggle(isOn: $isHighQuality) {
-                    VStack(alignment: .leading) {
-                        Text("High Quality Mode")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("Less Compressed")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(Color.secondarySystemBackground)
-                .cornerRadius(12)
-                .padding(.horizontal)
-                
                 HStack(spacing: 20) {
                     Button("Cancel", role: .cancel, action: onCancel)
                         .buttonStyle(.bordered).controlSize(.large)
@@ -2441,7 +2433,7 @@ struct ImageConfirmationView: View {
                     Button("Send") {
                         guard !isSending else { return }
                         isSending = true
-                        Task { await onSend(image, isHighQuality) }
+                        Task { await onSend(image) }
                     }
                     .disabled(isSending)
                     .buttonStyle(.borderedProminent).controlSize(.large)

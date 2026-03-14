@@ -12,6 +12,7 @@ extern NSString *MUConnectionOpenedNotification;  // 连接成功 (已有)
 extern NSString *MUConnectionClosedNotification;  // 连接关闭 (已有)
 extern NSString *MUConnectionConnectingNotification; // 正在连接 (新增)
 extern NSString *MUAppShowMessageNotification;
+extern NSString *MUConnectionUDPTransportStatusNotification;
 
 // 错误处理通知 (新增)
 // userInfo key: @"title", @"message"

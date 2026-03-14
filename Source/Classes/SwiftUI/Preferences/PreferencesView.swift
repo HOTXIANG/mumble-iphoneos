@@ -276,12 +276,54 @@ struct TTSSettingsView: View {
 
     var body: some View {
         Form {
+            #if os(macOS)
+            Section {
+                LabeledContent("Text-to-Speech:") {
+                    Toggle("", isOn: $enableTTS)
+                        .labelsHidden()
+                }
+
+                Text("When enabled, selected notification types will be spoken. During TTS playback, speaking may be temporarily unavailable.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 220, alignment: .leading)
+                    .padding(.bottom, 2)
+            }
+            #else
             Section {
                 Toggle("Enable Text-to-Speech", isOn: $enableTTS)
             } footer: {
                 Text("When enabled, selected notification types will be spoken. During TTS playback, speaking may be temporarily unavailable.")
             }
+            #endif
 
+            #if os(macOS)
+            Section {
+                LabeledContent("User Messages:") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("User Messages", isOn: $ttsNormalUserMessages)
+                        Toggle("Private Messages", isOn: $ttsPrivateMessages)
+                    }
+                    .padding(.bottom, 4)
+                }
+
+                LabeledContent("System Events:") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("User Joined (Same Channel)", isOn: $ttsUserJoinedSameChannel)
+                        Toggle("User Left (Same Channel)", isOn: $ttsUserLeftSameChannel)
+                        Toggle("User Joined (Other Channels)", isOn: $ttsUserJoinedOtherChannels)
+                        Toggle("User Left (Other Channels)", isOn: $ttsUserLeftOtherChannels)
+                        Toggle("User Moved Channel", isOn: $ttsUserMoved)
+                        Toggle("Mute / Deafen", isOn: $ttsMuteDeafen)
+                        Toggle("Moved by Admin", isOn: $ttsMovedByAdmin)
+                        Toggle("Channel Listening", isOn: $ttsChannelListening)
+                        Toggle("Other System Messages", isOn: $ttsGenericSystemEvents)
+                    }
+                }
+            }
+            .disabled(!enableTTS)
+            #else
             Section(header: Text("User Messages")) {
                 Toggle("User Messages", isOn: $ttsNormalUserMessages)
                 Toggle("Private Messages", isOn: $ttsPrivateMessages)
@@ -300,6 +342,7 @@ struct TTSSettingsView: View {
                 Toggle("Other System Messages", isOn: $ttsGenericSystemEvents)
             }
             .disabled(!enableTTS)
+            #endif
         }
         .navigationTitle("Text-to-Speech")
     }

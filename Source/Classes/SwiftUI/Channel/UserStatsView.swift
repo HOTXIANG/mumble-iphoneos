@@ -46,6 +46,13 @@ struct UserStatsView: View {
                     row("Strong Certificate", strongCertText)
                 }
             }
+            #if os(macOS)
+            .listStyle(.inset(alternatesRowBackgrounds: true))
+            .scrollContentBackground(.hidden)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity, alignment: .center)
+            #endif
             .navigationTitle("User Statistics")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -70,9 +77,24 @@ struct UserStatsView: View {
                 parseStats(stats)
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 440, idealWidth: 500, minHeight: 420)
+        #endif
     }
     
     private func row(_ label: String, _ value: String) -> some View {
+        #if os(macOS)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label)
+                .foregroundColor(.secondary)
+                .frame(width: 140, alignment: .leading)
+            Text(value)
+                .font(.body.monospacedDigit())
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 0)
+        }
+        #else
         HStack {
             Text(label)
                 .foregroundColor(.secondary)
@@ -80,6 +102,7 @@ struct UserStatsView: View {
             Text(value)
                 .font(.body.monospacedDigit())
         }
+        #endif
     }
     
     private func parseStats(_ raw: Any) {

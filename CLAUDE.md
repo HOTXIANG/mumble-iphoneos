@@ -343,6 +343,10 @@ chore: 构建/工具变动
 6. **TabView 背景**: iOS TabView 有系统默认不透明背景，需要 `configureTabBarAppearance()` 清除并将渐变叠加在内容之上
 7. **iPad 侧边栏**: 连接服务器后窄窗口应隐藏侧边栏，宽窗口允许用户手动打开
 8. **循环引用**: 闭包中使用 `[weak self]`，Notification observer 通过 token holder 管理生命周期
+9. **跨层数据规范化**: ObjC/MumbleKit 回调给 SwiftUI 前，优先转换为 `NSArray/NSDictionary/NSNumber/String/Data` 等 Foundation 安全类型，避免 Swift 侧反射解析 protobuf 内部对象
+10. **禁止不安全 Selector 反射**: Swift 中禁止用 `perform(_:)`/`toOpaque()` 读取标量返回值（如 `count`）或调用标量参数方法（如 `objectAtIndex:`），这会导致未定义行为和越界崩溃
+11. **protobuf 集合解析位置**: `PBArray/PBAppendableArray` 的遍历与字段提取优先放在 ObjC 层（类型已知处）完成，Swift 侧只做展示与轻量映射
+12. **工具栏保存按钮规范**: Access Tokens、Ban List 等管理页的保存操作使用图标按钮（推荐 `square.and.arrow.down`），与新增按钮风格保持一致
 
 ---
 
@@ -392,5 +396,5 @@ chore: 构建/工具变动
 1. **计划与待办**：功能补齐以 `.cursor/plans/` 下计划文件为准；待办在 Cursor 内维护，不修改计划文件本身。
 2. **实现顺序**：按计划中的批次（第一批上下文菜单 → 第二批 ServerConfig → 第三批新视图 → 第四批连接/欢迎 → 第五批用户增强 → 第六批设置）逐项实现；新增 Swift 文件需加入 Xcode 工程 Mumble target（如用 `pbxproj`：`project.add_file(path, target_name='Mumble')`）。
 3. **验证**：每批或每项完成后执行 `xcodebuild -scheme Mumble -destination 'generic/platform=iOS' build` 与 `platform=macOS` 构建，确保双平台通过。
-4. **MumbleKit**：仅读、不改；应用层通过 `MUConnectionController.shared()?.serverModel` 调用，新协议能力已在 MumbleKit 中实现。
+4. **MumbleKit**：默认优先应用层修改；若涉及协议兼容、消息解析、崩溃修复，可修改 MumbleKit（遵守 MRC 规范），并补充双平台构建验证。
 5. **权限**：新菜单/入口用 `serverManager.hasPermission(_:forChannelId:)` 或 `hasRootPermission(_:)` 控制可见性，与现有 Kick/Ban、Link、Ban List、Registered Users 一致。

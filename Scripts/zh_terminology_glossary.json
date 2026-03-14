@@ -1,0 +1,106 @@
+{
+  "modules": {
+    "core": {
+      "termWhitelist": {
+        "Settings": "设置",
+        "General": "通用",
+        "Language": "语言",
+        "Appearance": "外观",
+        "Advanced": "高级"
+      },
+      "normalizationRules": [
+        { "pattern": "系统设置", "replacement": "设置" }
+      ]
+    },
+    "channel": {
+      "termWhitelist": {
+        "Channel": "频道",
+        "Channel List": "频道列表",
+        "Channel Info": "频道信息",
+        "Join Channel": "加入频道",
+        "Link Channel": "链接频道",
+        "Unlink Channel": "取消链接频道",
+        "Ban List": "封禁列表"
+      },
+      "normalizationRules": [
+        { "pattern": "通道", "replacement": "频道" },
+        { "pattern": "频道列表", "replacement": "频道" }
+      ]
+    },
+    "user": {
+      "termWhitelist": {
+        "User": "用户",
+        "User Info": "用户信息",
+        "User Statistics": "用户统计",
+        "Nickname": "昵称",
+        "Friend": "好友"
+      },
+      "normalizationRules": [
+        { "pattern": "用户统计信息", "replacement": "用户统计" }
+      ]
+    },
+    "audio": {
+      "termWhitelist": {
+        "Audio": "音频",
+        "Microphone": "麦克风",
+        "Mute": "静音",
+        "Unmute": ["取消静音", "取消自我静音"],
+        "Deafen": "闭听",
+        "Push-to-Talk": ["按键说话", "说话按键"],
+        "Voice Activity": "语音激活",
+        "Text-to-Speech": "文字转语音"
+      },
+      "normalizationRules": [
+        { "pattern": "文本转语音", "replacement": "文字转语音" },
+        { "pattern": "一键通", "replacement": "按键说话" },
+        { "pattern": "语音活动", "replacement": "语音激活" }
+      ]
+    },
+    "notification": {
+      "termWhitelist": {
+        "Notification": "通知",
+        "Private Message": "私聊消息",
+        "User Messages": "用户消息",
+        "System Events": "系统事件"
+      },
+      "normalizationRules": [
+        { "pattern": "推送通知", "replacement": "通知" },
+        { "pattern": "私人消息", "replacement": "私聊消息" },
+        { "pattern": "私人信息", "replacement": "私聊消息" }
+      ]
+    },
+    "security": {
+      "termWhitelist": {
+        "Certificate": "证书",
+        "Certificate Hash": "证书哈希",
+        "Authentication": "认证",
+        "Access Token": "访问令牌"
+      },
+      "normalizationRules": [
+        { "pattern": "身份验证", "replacement": "认证" }
+      ]
+    },
+    "network": {
+      "termWhitelist": {
+        "Network": "网络",
+        "Auto Reconnect": "自动重连",
+        "QoS": "QoS",
+        "Force TCP Mode": "强制 TCP 模式",
+        "IP Address": "IP 地址"
+      },
+      "normalizationRules": [
+        { "pattern": "局域网", "replacement": "本地网络" }
+      ]
+    },
+    "handoff": {
+      "termWhitelist": {
+        "Handoff": "接力",
+        "Profile": "配置",
+        "Sync": "同步"
+      },
+      "normalizationRules": [
+        { "pattern": "接力设置", "replacement": "接力配置" }
+      ]
+    }
+  }
+}

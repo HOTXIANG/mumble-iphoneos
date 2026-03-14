@@ -252,6 +252,29 @@ struct MumbleMenuCommands: Commands {
                 Label("View Certificate", systemImage: "checkmark.shield")
             }
             .disabled(!appState.isConnected || !appState.isUserAuthenticated)
+
+            Divider()
+
+            Button {
+                NotificationCenter.default.post(name: .mumbleShowAccessTokens, object: nil)
+            } label: {
+                Label("Access Tokens", systemImage: "key")
+            }
+            .disabled(!appState.isConnected)
+
+            Button {
+                NotificationCenter.default.post(name: .mumbleShowBanList, object: nil)
+            } label: {
+                Label("Ban List", systemImage: "nosign")
+            }
+            .disabled(!appState.isConnected)
+
+            Button {
+                NotificationCenter.default.post(name: .mumbleShowRegisteredUsers, object: nil)
+            } label: {
+                Label("Registered Users", systemImage: "person.2")
+            }
+            .disabled(!appState.isConnected)
             
             Divider()
             
@@ -274,6 +297,9 @@ extension Notification.Name {
     static let mumbleRegisterUser = Notification.Name("MumbleRegisterUserNotification")
     static let mumbleToggleMute = Notification.Name("MumbleToggleMuteNotification")
     static let mumbleToggleDeafen = Notification.Name("MumbleToggleDeafenNotification")
+    static let mumbleShowAccessTokens = Notification.Name("MumbleShowAccessTokensNotification")
+    static let mumbleShowBanList = Notification.Name("MumbleShowBanListNotification")
+    static let mumbleShowRegisteredUsers = Notification.Name("MumbleShowRegisteredUsersNotification")
 }
 
 /// 通过 NSViewRepresentable 直接设置 NSWindow.minSize，确保窗口无法缩小到指定尺寸以下
