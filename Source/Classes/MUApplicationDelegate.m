@@ -40,7 +40,7 @@
     NSTimeInterval _lastAudioRestartTime;
 
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
-    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%f|%d|%d|%d",
+    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%f|%d|%d|%d|%d|%f|%d|%f",
             [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
             [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
             [defaults doubleForKey:@"AudioVADBelow"],
@@ -54,7 +54,11 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
             [defaults doubleForKey:@"AudioSidetoneVolume"],
             [defaults boolForKey:@"AudioSpeakerPhoneMode"],
             [defaults boolForKey:@"AudioOpusCodecForceCELTMode"],
-            [defaults boolForKey:@"AudioMixerDebug"]];
+            [defaults boolForKey:@"AudioMixerDebug"],
+            [defaults boolForKey:@"AudioPluginInputTrackEnabled"],
+            [defaults doubleForKey:@"AudioPluginInputTrackGain"],
+            [defaults boolForKey:@"AudioPluginRemoteBusEnabled"],
+            [defaults doubleForKey:@"AudioPluginRemoteBusGain"]];
 }
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
@@ -99,6 +103,10 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
                                                                 [NSNumber numberWithInt:49],       @"PTTHotkeyCode",
                                                                 [NSNumber numberWithBool:YES],     @"AudioSpeakerPhoneMode",
                                                                 [NSNumber numberWithBool:YES],     @"AudioOpusCodecForceCELTMode",
+                                                                [NSNumber numberWithBool:NO],      @"AudioPluginInputTrackEnabled",
+                                                                [NSNumber numberWithFloat:1.0f],   @"AudioPluginInputTrackGain",
+                                                                [NSNumber numberWithBool:NO],      @"AudioPluginRemoteBusEnabled",
+                                                                [NSNumber numberWithFloat:1.0f],   @"AudioPluginRemoteBusGain",
                                                                 // Network
                                                                 [NSNumber numberWithBool:NO],      @"NetworkForceTCP",
                                                                 @"MumbleUser",                     @"DefaultUserName",
@@ -379,6 +387,10 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
         && _lastAudioRestartSignature != nil
         && ![_lastAudioRestartSignature isEqualToString:restartSignature];
     [audio updateAudioSettings:&settings];
+    [audio setInputTrackPreviewGain:[defaults floatForKey:@"AudioPluginInputTrackGain"]
+                            enabled:[defaults boolForKey:@"AudioPluginInputTrackEnabled"]];
+    [audio setRemoteBusPreviewGain:[defaults floatForKey:@"AudioPluginRemoteBusGain"]
+                           enabled:[defaults boolForKey:@"AudioPluginRemoteBusEnabled"]];
     if (shouldRestart) {
         MULogInfo(audio, "Settings changed while active. Restarting audio engine.");
         [audio restart];

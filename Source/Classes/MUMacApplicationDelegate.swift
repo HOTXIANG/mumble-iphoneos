@@ -52,6 +52,10 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioFollowSystemInputDevice": true,
             "AudioPreferredInputDeviceUID": "",
             "AudioOpusCodecForceCELTMode": true,
+            "AudioPluginInputTrackEnabled": false,
+            "AudioPluginInputTrackGain": 1.0,
+            "AudioPluginRemoteBusEnabled": false,
+            "AudioPluginRemoteBusGain": 1.0,
             // Network
             "NetworkForceTCP": false,
             "DefaultUserName": "MumbleUser",
@@ -228,6 +232,14 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             && (lastAudioRestartSignature != nil)
             && (lastAudioRestartSignature != restartSignature)
         audio?.update(&settings)
+        audio?.setInputTrackPreviewGain(
+            defaults.float(forKey: "AudioPluginInputTrackGain"),
+            enabled: defaults.bool(forKey: "AudioPluginInputTrackEnabled")
+        )
+        audio?.setRemoteBusPreviewGain(
+            defaults.float(forKey: "AudioPluginRemoteBusGain"),
+            enabled: defaults.bool(forKey: "AudioPluginRemoteBusEnabled")
+        )
         if shouldRestart {
             audio?.restart()
         }
@@ -251,7 +263,11 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             String(defaults.bool(forKey: "AudioOpusCodecForceCELTMode")),
             String(defaults.bool(forKey: "AudioMixerDebug")),
             String(defaults.bool(forKey: "AudioFollowSystemInputDevice")),
-            defaults.string(forKey: "AudioPreferredInputDeviceUID") ?? ""
+            defaults.string(forKey: "AudioPreferredInputDeviceUID") ?? "",
+            String(defaults.bool(forKey: "AudioPluginInputTrackEnabled")),
+            String(defaults.double(forKey: "AudioPluginInputTrackGain")),
+            String(defaults.bool(forKey: "AudioPluginRemoteBusEnabled")),
+            String(defaults.double(forKey: "AudioPluginRemoteBusGain"))
         ].joined(separator: "|")
     }
 

@@ -347,6 +347,11 @@ chore: 构建/工具变动
 10. **禁止不安全 Selector 反射**: Swift 中禁止用 `perform(_:)`/`toOpaque()` 读取标量返回值（如 `count`）或调用标量参数方法（如 `objectAtIndex:`），这会导致未定义行为和越界崩溃
 11. **protobuf 集合解析位置**: `PBArray/PBAppendableArray` 的遍历与字段提取优先放在 ObjC 层（类型已知处）完成，Swift 侧只做展示与轻量映射
 12. **工具栏保存按钮规范**: Access Tokens、Ban List 等管理页的保存操作使用图标按钮（推荐 `square.and.arrow.down`），与新增按钮风格保持一致
+13. **AU 链并发安全**: 音频回调线程与 UI/状态线程共享 AU 链时，必须使用锁+快照（如 `os_unfair_lock` + retain 快照）避免 `AUHostingService` invalidated
+14. **实时线程约束**: 回调路径禁止不受控对象生命周期变更；链更新在控制线程完成，回调只读取快照并执行 DSP
+15. **AU 输入拉取规范**: `AURenderPullInputBlock` 需同时兼容 non-interleaved / interleaved 缓冲，`mData == NULL` 时必须提供有效输入指针
+16. **参数状态展示规范**: 插件刚加载未扫描参数时显示“params pending”，不要误标成“0 参数”
+17. **AU 故障可观测性**: AU render 非 `noErr` 必须记录 status，便于定位“已加载但无效果”场景
 
 ---
 
@@ -376,6 +381,13 @@ chore: 构建/工具变动
 | 搜索 | ChannelListView `.searchable`，`channelSearchText` |
 | Reset Comment | 用户菜单管理员「Reset Comment」 |
 | ServerConfig | Delegate 桥接 + 通知，可扩展消息长度校验等 |
+| DAW Mixer 独立入口 | Advanced Audio 可打开独立 Mixer 页（macOS 独立窗口 / iOS 独立页面） |
+| 轨道化插件链 | Input / Remote Bus / Remote Session 固定插槽，支持添加、替换、移除、旁路、顺序调整 |
+| 插件浏览与分类 | 先类别后插件（Dynamics/EQ/Reverb/Utility），支持 AU 扫描与 macOS 文件系统扫描 |
+| 插件 UI 热切换 | 已加载 AU 可打开自定义界面，支持锁定槽位与切换时同步 UI |
+| 插件链持久化 | 按轨道保存链路、旁路、增益、自动加载与参数值 |
+| AU 稳定性修复 | 自动加载串行化、重入保护、列表去重、参数懒加载、链更新并发保护 |
+| AU DSP 接入（进行中） | Input / Remote Bus 已接入真实 AU render 路径，Remote Session AU DSP 待接入 |
 
 **明确不实现**：Public Server List（公网服务器列表）。
 
@@ -388,8 +400,22 @@ chore: 构建/工具变动
 5. **TTS**：设置页 TTS 开关，消息/用户事件时 `AVSpeechSynthesizer`
 6. **Channel Hide/Pin**：频道菜单 Hide/Pin，`rebuildModelArray` 过滤 + UserDefaults 持久化（按服务器 digest）
 7. **Network Settings**：PreferencesView 增加 Network 区块（如自动重连、QoS）
+8. **Remote Session AU DSP**：将每用户轨（`remoteSession:*`）接入真实 AU 处理链，而不仅是 preview gain
+9. **实时线程优化**：把 AU 路径中的临时分配迁移到预分配缓冲，进一步降低抖动与宿主失效风险
+10. **DSP 可观测性面板**：增加链路输入/输出电平与 AUStatus 可视化，便于“已加载无效果”快速定位
 
 **暂缓**：Audio Wizard、Global Shortcuts、Advanced Log Config、ContextAction、Voice Recording。
+
+### DAW / AU 插件专项说明（当前阶段）
+
+1. **当前可用链路**：Input 与 Remote Bus 已走真实 AU DSP；Remote Session 仍是 preview gain 路径。
+2. **Mixer 打开后崩溃修复**：已通过链状态加锁快照修复 `AUHostingServiceClient connection invalidated` 高频场景。
+3. **“已加载但无效果”排查优先级**：
+    - 先看插件是否处于 bypass / manual 未加载；
+    - 再看 AU render status 日志是否非 `noErr`；
+    - 再核对输入缓冲布局（interleaved / non-interleaved）是否与 AU 期望一致。
+4. **参数显示约定**：未主动刷新参数树前显示 `Loaded (params pending)`，刷新后才显示参数数量。
+5. **变更验证要求**：涉及 MKAudio DSP 链改动时，至少执行 `MumbleKit (Mac)` scheme 构建通过；涉及 UI 状态机改动时补充主工程双平台构建检查。
 
 ### 工作流程
 

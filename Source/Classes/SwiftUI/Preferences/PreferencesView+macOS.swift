@@ -351,7 +351,15 @@ extension AdvancedAudioSettingsView {
                 .frame(width: 50, alignment: .trailing)
             }
         }
+        LabeledContent("Audio Plugin Mixer:") {
+            Button("Open Mixer") {
+                openPluginMixer()
+            }
+        }
         Text("Network changes require reconnection to take effect.")
+            .font(.caption)
+            .foregroundColor(.secondary)
+        Text("Open a dedicated mixer page for track and plugin management.")
             .font(.caption)
             .foregroundColor(.secondary)
     }
@@ -621,7 +629,7 @@ struct MacSettingsRootView: View {
             case .certificates:
                 return NSSize(width: 550, height: 600)
             case .advanced:
-                return NSSize(width: 550, height: 280)
+                return NSSize(width: 550, height: 340)
             }
         }
     }

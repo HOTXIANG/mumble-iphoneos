@@ -199,6 +199,15 @@ extension AdvancedAudioSettingsView {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
+
+        Section(header: Text("Plugin")) {
+            Button("Open Mixer") {
+                openPluginMixer()
+            }
+            Text("Open a dedicated mixer page for track and plugin management.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
     }
 }
 
