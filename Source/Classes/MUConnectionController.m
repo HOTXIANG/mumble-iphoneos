@@ -15,6 +15,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <UserNotifications/UserNotifications.h>
 #import <Network/Network.h>
+#import <QuartzCore/QuartzCore.h>
 #if TARGET_OS_IOS
 #import <UIKit/UIKit.h>
 #endif
@@ -81,6 +82,10 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     return nil;
 }
 
+static CFTimeInterval MUMonotonicNow(void) {
+    return CACurrentMediaTime();
+}
+
 @interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate> {
     MKConnection               *_connection;
     MKServerModel              *_serverModel;
@@ -109,6 +114,10 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     NSInteger       _retryCount; // 重试计数器
     NSDictionary    *_pendingReconnectFailureInfo;
     BOOL            _suppressReconnectForDisconnect;
+    CFTimeInterval  _connectFlowStartedAt;
+    CFTimeInterval  _socketConnectedAt;
+    BOOL            _connectFlowIsReconnect;
+    NSInteger       _connectFlowAttempt;
 
 #if TARGET_OS_IOS
     UIBackgroundTaskIdentifier _reconnectBackgroundTask;
@@ -126,6 +135,8 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 - (void) scheduleReconnectAfterDelay:(NSTimeInterval)delay;
 - (NSInteger) configuredReconnectMaxAttempts;
 - (NSTimeInterval) configuredReconnectInterval;
+- (void) beginPerformanceConnectFlowIsReconnect:(BOOL)isReconnect attempt:(NSInteger)attempt reason:(NSString *)reason;
+- (void) logPerformanceConnectFailureWithTitle:(NSString *)title message:(NSString *)message;
 #if TARGET_OS_IOS
 - (void) beginReconnectBackgroundTask;
 - (void) endReconnectBackgroundTask;
@@ -152,6 +163,10 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         _retryCount = 0;
         _pendingReconnectFailureInfo = nil;
         _suppressReconnectForDisconnect = NO;
+        _connectFlowStartedAt = 0;
+        _socketConnectedAt = 0;
+        _connectFlowIsReconnect = NO;
+        _connectFlowAttempt = 0;
     #if TARGET_OS_IOS
         _reconnectBackgroundTask = UIBackgroundTaskInvalid;
     #endif
@@ -201,6 +216,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     _retryCount = 0;
     _pendingReconnectFailureInfo = nil;
     _suppressReconnectForDisconnect = NO;
+    [self beginPerformanceConnectFlowIsReconnect:NO attempt:0 reason:@"manual-connect"];
     
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
     
@@ -458,6 +474,8 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 }
 
 - (void) postErrorWithTitle:(NSString *)title message:(NSString *)message {
+    [self logPerformanceConnectFailureWithTitle:title message:message];
+
     NSDictionary *userInfo = @{ @"title": title, @"message": message };
     dispatch_async(dispatch_get_main_queue(), ^{
         [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionErrorNotification object:nil userInfo:userInfo];
@@ -489,6 +507,17 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     [self endReconnectBackgroundTask];
 #endif
     
+    _socketConnectedAt = MUMonotonicNow();
+    if (_connectFlowStartedAt > 0) {
+        CFTimeInterval handshakeMs = (_socketConnectedAt - _connectFlowStartedAt) * 1000.0;
+        NSLog(@"📈 PERF connect_opened reconnect=%@ attempt=%ld handshake_ms=%.2f host=%@:%lu",
+              _connectFlowIsReconnect ? @"yes" : @"no",
+              (long)_connectFlowAttempt,
+              handshakeMs,
+              _hostname ?: @"",
+              (unsigned long)_port);
+    }
+
     NSArray *tokens = [MUDatabase accessTokensForServerWithHostname:[conn hostname] port:[conn port]];
     [conn authenticateWithUsername:_username password:_password accessTokens:tokens];
     
@@ -552,6 +581,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     NSInteger currentAttempt = _retryCount;
 
     NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/%ld)...", (long)currentAttempt, (long)maxAttempts);
+    [self beginPerformanceConnectFlowIsReconnect:YES attempt:currentAttempt reason:message];
     
     // 通知 UI 显示 "Reconnecting..."
     NSDictionary *info = @{
@@ -611,6 +641,35 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     if (interval < 0.5) interval = 0.5;
     if (interval > 10.0) interval = 10.0;
     return interval;
+}
+
+- (void) beginPerformanceConnectFlowIsReconnect:(BOOL)isReconnect attempt:(NSInteger)attempt reason:(NSString *)reason {
+    _connectFlowStartedAt = MUMonotonicNow();
+    _socketConnectedAt = 0;
+    _connectFlowIsReconnect = isReconnect;
+    _connectFlowAttempt = attempt;
+
+    NSLog(@"📈 PERF connect_begin reconnect=%@ attempt=%ld reason=%@ host=%@:%lu",
+          isReconnect ? @"yes" : @"no",
+          (long)attempt,
+          reason ?: @"",
+          _hostname ?: @"",
+          (unsigned long)_port);
+}
+
+- (void) logPerformanceConnectFailureWithTitle:(NSString *)title message:(NSString *)message {
+    if (_connectFlowStartedAt <= 0) {
+        return;
+    }
+
+    CFTimeInterval now = MUMonotonicNow();
+    CFTimeInterval totalMs = (now - _connectFlowStartedAt) * 1000.0;
+    NSLog(@"📈 PERF connect_failed reconnect=%@ attempt=%ld total_ms=%.2f title=%@ message=%@",
+          _connectFlowIsReconnect ? @"yes" : @"no",
+          (long)_connectFlowAttempt,
+          totalMs,
+          title ?: @"",
+          message ?: @"");
 }
 
 #if TARGET_OS_IOS
@@ -752,6 +811,19 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 }
 
 - (void) serverModel:(MKServerModel *)model joinedServerAsUser:(MKUser *)user withWelcomeMessage:(MKTextMessage *)welcomeMessage {
+    if (_connectFlowStartedAt > 0) {
+        CFTimeInterval now = MUMonotonicNow();
+        CFTimeInterval totalMs = (now - _connectFlowStartedAt) * 1000.0;
+        CFTimeInterval authJoinMs = (_socketConnectedAt > 0) ? ((now - _socketConnectedAt) * 1000.0) : -1;
+        NSLog(@"📈 PERF connect_ready reconnect=%@ attempt=%ld total_ms=%.2f auth_join_ms=%.2f host=%@:%lu",
+              _connectFlowIsReconnect ? @"yes" : @"no",
+              (long)_connectFlowAttempt,
+              totalMs,
+              authJoinMs,
+              _hostname ?: @"",
+              (unsigned long)_port);
+    }
+
     // 1. 存储用户名
     [MUDatabase storeUsername:[user userName] forServerWithHostname:[model hostname] port:[model port]];
     

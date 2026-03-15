@@ -67,7 +67,7 @@ extension ServerModelManager {
 
         // 2. 注册并保存令牌
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.rebuildModelNotification, object: nil, queue: nil) { [weak self] _ in
-            Task { @MainActor in self?.rebuildModelArray() }
+            Task { @MainActor in self?.requestModelRebuild(reason: "notification.rebuildModel", debounce: 0.05) }
         })
 
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userStateUpdatedNotification, object: nil, queue: nil) { [weak self] notification in
@@ -166,7 +166,7 @@ extension ServerModelManager {
                     }
                 }
                 try? await Task.sleep(nanoseconds: 150_000_000)
-                self.rebuildModelArray()
+                self.requestModelRebuild(reason: "notification.userMoved", debounce: 0.05)
             }
         })
 
@@ -187,7 +187,7 @@ extension ServerModelManager {
                     String(format: NSLocalizedString("%@ connected", comment: ""), userName),
                     category: category
                 )
-                self.rebuildModelArray()
+                self.requestModelRebuild(reason: "notification.userJoined", debounce: 0.05)
             }
         })
 
@@ -467,7 +467,7 @@ extension ServerModelManager {
                 } else {
                     self.channelsUserCanEnter.remove(channelId)
                 }
-                self.rebuildModelArray()
+                self.requestModelRebuild(reason: "permission_query_result")
             }
         })
 

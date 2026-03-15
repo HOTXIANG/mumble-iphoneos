@@ -4,8 +4,22 @@
 //
 
 import SwiftUI
+import QuartzCore
 
 extension ServerModelManager {
+    func requestModelRebuild(reason: String, debounce: TimeInterval = 0.08) {
+        pendingModelRebuildWorkItem?.cancel()
+        pendingModelRebuildReason = reason
+
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.rebuildModelArray(reason: self.pendingModelRebuildReason)
+            self.pendingModelRebuildWorkItem = nil
+        }
+        pendingModelRebuildWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + debounce, execute: work)
+    }
+
     func updateUserBySession(_ session: UInt) {
         guard let index = userIndexMap[session],
               index < modelItems.count,
@@ -144,7 +158,8 @@ extension ServerModelManager {
         updateLiveActivity()
     }
 
-    func rebuildModelArray() {
+    func rebuildModelArray(reason: String = "direct") {
+        let startedAt = CACurrentMediaTime()
         guard let serverModel = serverModel else {
             return
         }
@@ -203,6 +218,9 @@ extension ServerModelManager {
         }
 
         updateLiveActivity()
+
+        let elapsedMs = (CACurrentMediaTime() - startedAt) * 1000.0
+        MumbleLogger.model.debug("PERF rebuild_model_array reason=\(reason, privacy: .public) items=\(self.modelItems.count) elapsed_ms=\(elapsedMs, format: .fixed(precision: 2))")
     }
 
     private func addChannelTreeToModel(channel: MKChannel, indentLevel: Int, isTraversingPinnedTree: Bool = false) {

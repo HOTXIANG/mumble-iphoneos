@@ -27,7 +27,7 @@ extension ServerModelManager {
         if self.serverModel === newModel {
             MumbleLogger.connection.debug("ServerModel identity match. Skipping setup to prevent duplicates.")
             // 兜底：如果界面是空的，强制刷新一下
-            if self.modelItems.isEmpty { rebuildModelArray() }
+            if self.modelItems.isEmpty { requestModelRebuild(reason: "setup_same_model_empty", debounce: false) }
             return
         }
 
@@ -79,7 +79,7 @@ extension ServerModelManager {
             updateAvatarCache(for: connectedUser)
         }
 
-        rebuildModelArray()
+        requestModelRebuild(reason: "setup_server_model_bound", debounce: false)
         startLiveActivity()
 
         // 发布 Handoff Activity，让其他设备可以接力

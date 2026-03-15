@@ -342,12 +342,12 @@ extension ServerModelManager {
     func toggleChannelHidden(_ channel: MKChannel) {
         guard let serverHost = serverModel?.hostname() else { return }
         ChannelFilterManager.shared.toggleHidden(id: channel.channelId(), serverHost: serverHost)
-        rebuildModelArray()
+        requestModelRebuild(reason: "toggle_channel_hidden", debounce: false)
     }
 
     func toggleChannelPinned(_ channel: MKChannel) {
         guard let serverHost = serverModel?.hostname() else { return }
         ChannelFilterManager.shared.togglePinned(id: channel.channelId(), serverHost: serverHost)
-        rebuildModelArray()
+        requestModelRebuild(reason: "toggle_channel_pinned", debounce: false)
     }
 }

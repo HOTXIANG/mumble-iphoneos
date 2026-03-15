@@ -134,6 +134,10 @@ class ServerModelManager: ObservableObject {
     var pendingAvatarFetchSessions: Set<UInt> = []
     /// 服务器下发的 image message 上限（字节），用于头像上传大小控制
     var serverImageMessageLengthBytes: Int? = nil
+    /// 合并高频 rebuild 请求，降低主线程抖动
+    var pendingModelRebuildWorkItem: DispatchWorkItem?
+    /// 最近一次重建请求来源（用于性能日志）
+    var pendingModelRebuildReason: String = "unknown"
     
     enum ViewMode {
         case server,
