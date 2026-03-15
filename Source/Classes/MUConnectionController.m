@@ -135,6 +135,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 - (void) scheduleReconnectAfterDelay:(NSTimeInterval)delay;
 - (NSInteger) configuredReconnectMaxAttempts;
 - (NSTimeInterval) configuredReconnectInterval;
+- (NSTimeInterval) calculatedReconnectDelayForAttempt:(NSInteger)attempt baseInterval:(NSTimeInterval)baseInterval;
 - (void) beginPerformanceConnectFlowIsReconnect:(BOOL)isReconnect attempt:(NSInteger)attempt reason:(NSString *)reason;
 - (void) logPerformanceConnectFailureWithTitle:(NSString *)title message:(NSString *)message;
 #if TARGET_OS_IOS
@@ -579,6 +580,8 @@ static CFTimeInterval MUMonotonicNow(void) {
     
     _retryCount++;
     NSInteger currentAttempt = _retryCount;
+    NSTimeInterval reconnectDelay = [self calculatedReconnectDelayForAttempt:currentAttempt
+                                                                baseInterval:[self configuredReconnectInterval]];
 
     NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/%ld)...", (long)currentAttempt, (long)maxAttempts);
     [self beginPerformanceConnectFlowIsReconnect:YES attempt:currentAttempt reason:message];
@@ -588,6 +591,7 @@ static CFTimeInterval MUMonotonicNow(void) {
         @"isReconnecting": @(YES),
         @"reconnectAttempt": @(currentAttempt),
         @"reconnectMaxAttempts": @(maxAttempts),
+        @"reconnectDelay": @(reconnectDelay),
         @"reconnectReason": message
     };
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil userInfo:info];
@@ -598,7 +602,8 @@ static CFTimeInterval MUMonotonicNow(void) {
     [_connection disconnect];
     _connection = nil;
 
-    [self scheduleReconnectAfterDelay:[self configuredReconnectInterval]];
+    NSLog(@"⏱️ Reconnect scheduled after %.2fs (attempt %ld/%ld).", reconnectDelay, (long)currentAttempt, (long)maxAttempts);
+    [self scheduleReconnectAfterDelay:reconnectDelay];
 }
 
 - (void) performReconnect {
@@ -641,6 +646,26 @@ static CFTimeInterval MUMonotonicNow(void) {
     if (interval < 0.5) interval = 0.5;
     if (interval > 10.0) interval = 10.0;
     return interval;
+}
+
+- (NSTimeInterval) calculatedReconnectDelayForAttempt:(NSInteger)attempt baseInterval:(NSTimeInterval)baseInterval {
+    // 轻量退避：前几次快速恢复，后续逐步拉长，降低抖动网络下的重连风暴。
+    double growthFactor = 1.0 + (0.25 * (double)MAX(attempt - 1, 0));
+    if (growthFactor > 3.0) {
+        growthFactor = 3.0;
+    }
+
+    NSTimeInterval delayed = baseInterval * growthFactor;
+    double jitter = ((double)arc4random_uniform(31) - 15.0) / 100.0; // [-15%, +15%]
+    delayed = delayed * (1.0 + jitter);
+
+    if (delayed < 0.5) {
+        delayed = 0.5;
+    }
+    if (delayed > 20.0) {
+        delayed = 20.0;
+    }
+    return delayed;
 }
 
 - (void) beginPerformanceConnectFlowIsReconnect:(BOOL)isReconnect attempt:(NSInteger)attempt reason:(NSString *)reason {
@@ -698,7 +723,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 }
 #endif
 
-- (void) connection:(MKConnection *)conn udpTransportStateChanged:(NSInteger)state {
+- (void) connection:(MKConnection *)conn udpTransportStateChanged:(MKUDPTransportState)state {
     (void)conn;
 
     NSDictionary *info = @{

@@ -2,6 +2,7 @@
 
 import SwiftUI
 import PhotosUI
+import QuartzCore
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -1580,6 +1581,8 @@ struct MessagesList: View {
     @State private var newMessage = ""
     @FocusState private var isTextFieldFocused: Bool
     @State private var isDragTargeted = false
+    @State private var cachedRenderBlocks: [RenderBlock] = []
+    @State private var pendingAutoScrollWorkItem: DispatchWorkItem?
     
     private let bottomID = "bottomOfMessages"
 
@@ -1619,7 +1622,7 @@ struct MessagesList: View {
                         return CGFloat(16)
                         #endif
                     }(), pinnedViews: [.sectionHeaders]) {
-                        ForEach(renderBlocks) { block in
+                        ForEach(cachedRenderBlocks) { block in
                             switch block.kind {
                             case .notification(let message):
                                 NotificationMessageView(message: message)
@@ -1682,7 +1685,10 @@ struct MessagesList: View {
                     .background(.clear)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .onChange(of: serverManager.messages) { scrollToBottom(proxy: proxy) }
+                .onChange(of: serverManager.messages) { _, _ in
+                    rebuildRenderBlocks(reason: "messages_changed")
+                    scheduleAutoScrollToBottom(proxy: proxy)
+                }
                 .onChange(of: isTextFieldFocused) { _, focused in
                     if focused {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
@@ -1690,7 +1696,14 @@ struct MessagesList: View {
                         }
                     }
                 }
-                .onAppear { scrollToBottom(proxy: proxy, animated: false) }
+                .onAppear {
+                    rebuildRenderBlocks(reason: "list_appear")
+                    scrollToBottom(proxy: proxy, animated: false)
+                }
+                .onDisappear {
+                    pendingAutoScrollWorkItem?.cancel()
+                    pendingAutoScrollWorkItem = nil
+                }
             }
         }
         #if os(iOS)
@@ -1720,7 +1733,7 @@ struct MessagesList: View {
     }
     
     // MARK: - Logic Helpers
-    private var renderBlocks: [RenderBlock] {
+    private func buildRenderBlocks(from messages: [ChatMessage]) -> [RenderBlock] {
         var blocks: [RenderBlock] = []
         var pendingRunMessages: [ChatMessage] = []
         var pendingRunType: ChatMessageType = .userMessage
@@ -1744,7 +1757,7 @@ struct MessagesList: View {
             pendingRunIdentity = nil
         }
 
-        for message in serverManager.messages {
+        for message in messages {
             switch message.type {
             case .notification:
                 flushPendingRun()
@@ -1766,6 +1779,30 @@ struct MessagesList: View {
 
         flushPendingRun()
         return blocks
+    }
+
+    private func rebuildRenderBlocks(reason: String) {
+        let start = CACurrentMediaTime()
+        let blocks = buildRenderBlocks(from: serverManager.messages)
+        cachedRenderBlocks = blocks
+
+        let elapsedMs = (CACurrentMediaTime() - start) * 1000.0
+        if elapsedMs >= 1.0 || serverManager.messages.count >= 80 {
+            MumbleLogger.ui.debug(
+                "PERF message_render_blocks reason=\(reason, privacy: .public) messages=\(serverManager.messages.count) blocks=\(blocks.count) elapsed_ms=\(elapsedMs, format: .fixed(precision: 2))"
+            )
+        }
+    }
+
+    private func scheduleAutoScrollToBottom(proxy: ScrollViewProxy) {
+        pendingAutoScrollWorkItem?.cancel()
+
+        let work = DispatchWorkItem {
+            scrollToBottom(proxy: proxy)
+        }
+
+        pendingAutoScrollWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
     }
 
     private func senderIdentity(for message: ChatMessage) -> SenderIdentity {

@@ -22,16 +22,16 @@
 ### Phase 1: Baseline Instrumentation (in progress)
 
 - [x] Add connection/reconnect performance markers in `MUConnectionController`.
-- [ ] Add audio callback timing markers in MumbleKit audio path.
-- [ ] Add model rebuild timing in `ServerModelManager+ModelState`.
-- [ ] Add message render timing in `MessagesView`.
+- [x] Add audio callback timing markers in MumbleKit audio path.
+- [x] Add model rebuild timing in `ServerModelManager+ModelState`.
+- [x] Add message render timing in `MessagesView`.
 
 ### Phase 2: Hot Path Fixes
 
 - [ ] Eliminate allocations on real-time audio callback path.
-- [ ] Coalesce high-frequency notifications to reduce main-thread churn.
-- [ ] Reduce full channel tree rebuild frequency (incremental updates).
-- [ ] Tune reconnect strategy for jittery network transitions.
+- [x] Coalesce high-frequency notifications to reduce main-thread churn.
+- [x] Reduce full channel tree rebuild frequency (incremental updates).
+- [x] Tune reconnect strategy for jittery network transitions.
 
 ### Phase 3: Validation and Rollout
 
@@ -48,8 +48,37 @@
   - `PERF connect_failed`
 - These logs include reconnect flag, attempt number, and key durations in milliseconds.
 
-## Immediate Next Tasks
+## Progress Update (2026-03-15, Round 2)
 
-1. Instrument audio callback timing in MumbleKit.
-2. Instrument channel tree rebuild timing.
-3. Produce first baseline report from real devices.
+- Completed model rebuild optimization in `ServerModelManager`:
+  - Added `requestModelRebuild(reason:debounce:)` to coalesce high-frequency refresh triggers.
+  - Moved remaining direct `rebuildModelArray()` call sites to scheduler-based entry.
+  - Added `PERF rebuild_model_array` timing log.
+- Completed audio callback instrumentation in MumbleKit:
+  - Added lightweight sampled stats helper: `MumbleKit/src/MKAudioPerfStats.h`.
+  - Instrumented callback timing in:
+    - `MKiOSAudioDevice` (RemoteIO)
+    - `MKVoiceProcessingDevice` (VPIO)
+    - `MKMacAudioDevice` (HAL)
+  - Added teardown summary logs:
+    - `PERF audio_callback ... avg_us p95_us p99_us max_us`
+  - Sampling strategy is 1/8 callbacks to keep runtime overhead low.
+
+## Progress Update (2026-03-15, Round 3)
+
+- Completed message rendering instrumentation and burst smoothing in `MessagesView`:
+  - Added `PERF message_render_blocks` timing log with message/block counts.
+  - Switched message render block computation to message-change driven caching to avoid redundant recomputation on unrelated UI state updates.
+  - Added short coalescing window for auto-scroll-to-bottom during message bursts to reduce main-thread animation churn.
+- Completed reconnect strategy tuning in `MUConnectionController`:
+  - Added bounded retry backoff with jitter based on reconnect attempt.
+  - Added reconnect delay to UI notification payload (`reconnectDelay`) and reconnect scheduling logs.
+- Validation:
+  - `xcodebuild -scheme Mumble -destination 'platform=macOS,arch=arm64' build` succeeded.
+  - `xcodebuild -scheme Mumble -destination 'generic/platform=iOS' build` succeeded.
+
+## Immediate Next Tasks (Updated)
+
+1. Run real-device baseline capture and export before/after metrics for connect/reconnect, model rebuild, audio callbacks, and message rendering.
+2. Use callback/message p95-p99 data to remove remaining hot-path allocations (audio callback + attributed text/image heavy message rows).
+3. Validate weak-network and background-reconnect scenarios with tuned backoff settings.
