@@ -25,15 +25,15 @@ struct RegisteredUserListView: View {
     var body: some View {
         NavigationStack {
             content
-        }
-        .navigationTitle("Registered Users")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Done") { dismiss() }
-            }
+                .navigationTitle("Registered Users")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
         }
         .onAppear {
             users = []

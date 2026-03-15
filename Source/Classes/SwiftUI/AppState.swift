@@ -114,6 +114,9 @@ class AppState: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var isConnecting: Bool = false
     @Published var isReconnecting: Bool = false
+    @Published var reconnectAttempt: Int = 0
+    @Published var reconnectMaxAttempts: Int = 0
+    @Published var reconnectReason: String? = nil
     @Published var isUserAuthenticated: Bool = false
     @Published var activeError: AppError?
     @Published var activeToast: AppToast?
@@ -228,6 +231,9 @@ class AppState: ObservableObject {
                 MumbleLogger.connection.info("Connection closed")
                 self.isConnecting = false
                 self.isReconnecting = false
+                self.reconnectAttempt = 0
+                self.reconnectMaxAttempts = 0
+                self.reconnectReason = nil
                 self.isConnected = false
                 self.isUserAuthenticated = false
                 self.lastUDPTransportStateName = "unknown"
@@ -245,11 +251,23 @@ class AppState: ObservableObject {
                 if self.isRegistering { return }
                 
                 let isReconnecting = (notification.userInfo?["isReconnecting"] as? Bool) ?? false
+                let reconnectAttempt =
+                    (notification.userInfo?["reconnectAttempt"] as? NSNumber)?.intValue
+                    ?? (notification.userInfo?["reconnectAttempt"] as? Int)
+                    ?? 0
+                let reconnectMaxAttempts =
+                    (notification.userInfo?["reconnectMaxAttempts"] as? NSNumber)?.intValue
+                    ?? (notification.userInfo?["reconnectMaxAttempts"] as? Int)
+                    ?? 0
+                let reconnectReason = notification.userInfo?["reconnectReason"] as? String
                 
                 MumbleLogger.connection.info("Connecting (reconnecting: \(isReconnecting))")
                 withAnimation {
                     self.isConnecting = true
                     self.isReconnecting = isReconnecting
+                    self.reconnectAttempt = isReconnecting ? reconnectAttempt : 0
+                    self.reconnectMaxAttempts = isReconnecting ? reconnectMaxAttempts : 0
+                    self.reconnectReason = isReconnecting ? reconnectReason : nil
                 }
             }
             .store(in: &cancellables)
@@ -262,6 +280,9 @@ class AppState: ObservableObject {
                 
                 self.isConnecting = false
                 self.isReconnecting = false
+                self.reconnectAttempt = 0
+                self.reconnectMaxAttempts = 0
+                self.reconnectReason = nil
                 self.isConnected = false
                 self.isUserAuthenticated = false
                 self.pendingRegistration = false

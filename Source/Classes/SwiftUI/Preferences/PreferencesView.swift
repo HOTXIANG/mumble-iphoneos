@@ -497,6 +497,8 @@ struct AdvancedAudioSettingsView: View {
     @AppStorage("NetworkForceTCP") var forceTCP: Bool = false
     @AppStorage("NetworkAutoReconnect") var autoReconnect: Bool = true
     @AppStorage("NetworkQoS") var enableQoS: Bool = true
+    @AppStorage("NetworkReconnectMaxAttempts") var reconnectMaxAttempts: Int = 10
+    @AppStorage("NetworkReconnectInterval") var reconnectInterval: Double = 1.0
     
     init(includeOutputSection: Bool = true) {
         self.includeOutputSection = includeOutputSection
@@ -511,5 +513,7 @@ struct AdvancedAudioSettingsView: View {
         .onChange(of: enableSidetone) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: speakerPhoneMode) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: qualityKind) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: reconnectMaxAttempts) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: reconnectInterval) { PreferencesModel.shared.notifySettingsChanged() }
     }
 }

@@ -15,6 +15,9 @@
 #import <AVFoundation/AVFoundation.h>
 #import <UserNotifications/UserNotifications.h>
 #import <Network/Network.h>
+#if TARGET_OS_IOS
+#import <UIKit/UIKit.h>
+#endif
 @import Security;
 
 NSString *MUConnectionOpenedNotification = @"MUConnectionOpenedNotification";
@@ -104,6 +107,12 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     BOOL            _waitingForCertDecision;
     NSTimer         *_reconnectTimer;
     NSInteger       _retryCount; // 重试计数器
+    NSDictionary    *_pendingReconnectFailureInfo;
+    BOOL            _suppressReconnectForDisconnect;
+
+#if TARGET_OS_IOS
+    UIBackgroundTaskIdentifier _reconnectBackgroundTask;
+#endif
     
     nw_path_monitor_t _pathMonitor;
     BOOL              _networkWasSatisfied;
@@ -114,6 +123,13 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 - (void) showConnectingView;
 - (void) hideConnectingView;
 - (void) hideConnectingViewWithCompletion:(void(^)(void))completion;
+- (void) scheduleReconnectAfterDelay:(NSTimeInterval)delay;
+- (NSInteger) configuredReconnectMaxAttempts;
+- (NSTimeInterval) configuredReconnectInterval;
+#if TARGET_OS_IOS
+- (void) beginReconnectBackgroundTask;
+- (void) endReconnectBackgroundTask;
+#endif
 @property (nonatomic, strong, readwrite) NSString *lastWelcomeMessage;
 @end
 
@@ -134,6 +150,11 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 - (id) init {
     if ((self = [super init])) {
         _retryCount = 0;
+        _pendingReconnectFailureInfo = nil;
+        _suppressReconnectForDisconnect = NO;
+    #if TARGET_OS_IOS
+        _reconnectBackgroundTask = UIBackgroundTaskInvalid;
+    #endif
         [[MKAudio sharedAudio] stop];
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(defaultsDidChange:)
@@ -178,6 +199,8 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     
     // 重置重试计数
     _retryCount = 0;
+    _pendingReconnectFailureInfo = nil;
+    _suppressReconnectForDisconnect = NO;
     
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
     
@@ -197,6 +220,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 - (void) disconnectFromServer {
     NSLog(@"🛑 User initiated disconnect/cancel.");
     _isUserInitiatedDisconnect = YES;
+    _suppressReconnectForDisconnect = NO;
     if ([_reconnectTimer isValid]) {
         [_reconnectTimer invalidate];
     }
@@ -290,7 +314,12 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
                 NSLog(@"🔄 Triggering reconnect due to network restore...");
                 strongSelf->_retryCount = 0;
                 [strongSelf establishConnection];
-                NSDictionary *info = @{ @"isReconnecting": @(YES) };
+                NSDictionary *info = @{
+                    @"isReconnecting": @(YES),
+                    @"reconnectAttempt": @(1),
+                    @"reconnectMaxAttempts": @([strongSelf configuredReconnectMaxAttempts]),
+                    @"reconnectReason": NSLocalizedString(@"Network changed or temporarily unavailable", nil)
+                };
                 [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil userInfo:info];
             }
         }
@@ -377,6 +406,16 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 
 - (void) teardownConnection {
     [self stopNetworkMonitor];
+
+    if ([_reconnectTimer isValid]) {
+        [_reconnectTimer invalidate];
+    }
+    _reconnectTimer = nil;
+    _pendingReconnectFailureInfo = nil;
+
+#if TARGET_OS_IOS
+    [self endReconnectBackgroundTask];
+#endif
     
     if (_serverModel) {
         [_serverModel removeDelegate:self];
@@ -445,6 +484,10 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 - (void) connectionOpened:(MKConnection *)conn {
     // 连接成功，重置重试计数
     _retryCount = 0;
+    _pendingReconnectFailureInfo = nil;
+#if TARGET_OS_IOS
+    [self endReconnectBackgroundTask];
+#endif
     
     NSArray *tokens = [MUDatabase accessTokensForServerWithHostname:[conn hostname] port:[conn port]];
     [conn authenticateWithUsername:_username password:_password accessTokens:tokens];
@@ -470,40 +513,53 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
         NSLog(@"🔐 Ignoring closedWithError while waiting for certificate trust decision.");
         return;
     }
-    
-    // If the error is a codec incompatibility, don't retry — it will always fail
-    if ([[err domain] isEqualToString:@"MKConnection"]) {
-        NSLog(@"❌ Connection closed due to unrecoverable error: %@", [err localizedFailureReason] ?: [err localizedDescription]);
-        [self postErrorWithTitle:[err localizedDescription] ?: NSLocalizedString(@"Connection Failed", nil)
-                         message:[err localizedFailureReason] ?: NSLocalizedString(@"The connection was closed due to an error.", nil)];
+
+    if (_suppressReconnectForDisconnect) {
+        NSLog(@"⛔ Reconnect suppressed for terminal disconnect reason (kick/ban).");
+        _suppressReconnectForDisconnect = NO;
+        [self teardownConnection];
+        return;
+    }
+
+    NSString *fallbackTitle = NSLocalizedString(@"Connection Failed", nil);
+    NSString *fallbackMessage = NSLocalizedString(@"The connection was closed.", nil);
+    NSString *title = [err localizedDescription] ?: fallbackTitle;
+    NSString *message = [err localizedFailureReason] ?: [err localizedDescription] ?: fallbackMessage;
+    _pendingReconnectFailureInfo = @{ @"title": title, @"message": message };
+
+    NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
+    BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
+
+    if (!autoReconnectEnabled) {
+        NSLog(@"🚫 Auto Reconnect is disabled. Showing error immediately.");
+        [self postErrorWithTitle:title message:message];
         return;
     }
     
-    // --- 核心修复：重试逻辑 ---
-    // 如果重试超过 10 次，就放弃并报错
-    if (_retryCount >= 10) {
+    // 连续失败达到上限后，再展示最后一次错误类型
+    NSInteger maxAttempts = [self configuredReconnectMaxAttempts];
+
+    if (_retryCount >= maxAttempts) {
         NSLog(@"❌ Max retries reached (%ld). Giving up.", (long)_retryCount);
-        [self postErrorWithTitle:NSLocalizedString(@"Connection Failed", nil)
-                         message:NSLocalizedString(@"Unable to reconnect to server after multiple attempts.", nil)];
+        NSDictionary *failureInfo = _pendingReconnectFailureInfo;
+        NSString *finalTitle = failureInfo[@"title"] ?: fallbackTitle;
+        NSString *finalMessage = failureInfo[@"message"] ?: fallbackMessage;
+        [self postErrorWithTitle:finalTitle message:finalMessage];
         return; // postError 会调用 teardown
     }
     
     _retryCount++;
-    
-    NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
-    BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
-    
-    if (!autoReconnectEnabled) {
-        NSLog(@"🚫 Auto Reconnect is disabled. Giving up immediately.");
-        [self postErrorWithTitle:NSLocalizedString(@"Connection Failed", nil)
-                         message:[err localizedDescription] ?: NSLocalizedString(@"The connection was closed.", nil)];
-        return;
-    }
-    
-    NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/10)...", (long)_retryCount);
+    NSInteger currentAttempt = _retryCount;
+
+    NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/%ld)...", (long)currentAttempt, (long)maxAttempts);
     
     // 通知 UI 显示 "Reconnecting..."
-    NSDictionary *info = @{ @"isReconnecting": @(YES) };
+    NSDictionary *info = @{
+        @"isReconnecting": @(YES),
+        @"reconnectAttempt": @(currentAttempt),
+        @"reconnectMaxAttempts": @(maxAttempts),
+        @"reconnectReason": message
+    };
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil userInfo:info];
     
     [_serverModel removeDelegate:self];
@@ -511,9 +567,8 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     [_connection setDelegate:nil];
     [_connection disconnect];
     _connection = nil;
-    
-    [_reconnectTimer invalidate];
-    _reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(performReconnect) userInfo:nil repeats:NO];
+
+    [self scheduleReconnectAfterDelay:[self configuredReconnectInterval]];
 }
 
 - (void) performReconnect {
@@ -523,13 +578,66 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 
 - (void) connection:(MKConnection*)conn unableToConnectWithError:(NSError *)err {
     if (_waitingForCertDecision) return;
-    
-    NSString *msg = [err localizedDescription];
-    if ([[err domain] isEqualToString:NSOSStatusErrorDomain] && [err code] == -9806) {
-        msg = NSLocalizedString(@"The TLS connection was closed due to an error.", nil);
-    }
-    [self postErrorWithTitle:NSLocalizedString(@"Unable to connect", nil) message:msg];
+
+    NSLog(@"⚠️ unableToConnectWithError received. Routing into reconnect policy.");
+    [self connection:conn closedWithError:err];
 }
+
+- (void) scheduleReconnectAfterDelay:(NSTimeInterval)delay {
+    [_reconnectTimer invalidate];
+
+#if TARGET_OS_IOS
+    [self beginReconnectBackgroundTask];
+#endif
+
+    _reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:delay
+                                                        target:self
+                                                      selector:@selector(performReconnect)
+                                                      userInfo:nil
+                                                       repeats:NO];
+}
+
+- (NSInteger) configuredReconnectMaxAttempts {
+    id value = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkReconnectMaxAttempts"];
+    NSInteger attempts = value ? [value integerValue] : 10;
+    if (attempts < 1) attempts = 1;
+    if (attempts > 30) attempts = 30;
+    return attempts;
+}
+
+- (NSTimeInterval) configuredReconnectInterval {
+    id value = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkReconnectInterval"];
+    NSTimeInterval interval = value ? [value doubleValue] : 1.0;
+    if (interval < 0.5) interval = 0.5;
+    if (interval > 10.0) interval = 10.0;
+    return interval;
+}
+
+#if TARGET_OS_IOS
+- (void) beginReconnectBackgroundTask {
+    if (_reconnectBackgroundTask != UIBackgroundTaskInvalid) {
+        return;
+    }
+
+    __weak typeof(self) weakSelf = self;
+    _reconnectBackgroundTask = [[UIApplication sharedApplication] beginBackgroundTaskWithName:@"mumble-reconnect"
+                                                                             expirationHandler:^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        NSLog(@"⏳ Reconnect background task expired.");
+        [strongSelf endReconnectBackgroundTask];
+    }];
+}
+
+- (void) endReconnectBackgroundTask {
+    if (_reconnectBackgroundTask == UIBackgroundTaskInvalid) {
+        return;
+    }
+
+    [[UIApplication sharedApplication] endBackgroundTask:_reconnectBackgroundTask];
+    _reconnectBackgroundTask = UIBackgroundTaskInvalid;
+}
+#endif
 
 - (void) connection:(MKConnection *)conn udpTransportStateChanged:(NSInteger)state {
     (void)conn;
@@ -626,24 +734,14 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     }
     
     if (reason == MKRejectReasonUsernameInUse) {
-        // 检查：如果当前没有使用证书 (未注册/匿名)
-        if (self.currentCertificateRef == nil) {
-            NSLog(@"⚠️ Username in use (Unregistered). Aborting retry and showing guidance.");
-            
-            // 构建引导注册的提示信息
-            title = NSLocalizedString(@"Username Already in Use", nil);
-            msg = NSLocalizedString(@"Your username is still active from a previous session.\nSince you are not registered, you cannot disconnect the old session immediately.\n\nTip: If you are seeing this from reconnecting, register your user on the server to allow instant reconnection in the future.", nil);
-            
-            // 直接报错显示弹窗，不进行自动重连
-            [self postErrorWithTitle:title message:msg];
-            return;
-        } else {
-            // 如果已注册 (有证书)，继续尝试自动重连 (等待 Ghost Session 被顶掉)
-            NSLog(@"⚠️ Username in use (Registered). Waiting for server to kick old session... Retrying.");
-            NSError *err = [NSError errorWithDomain:@"Mumble" code:reason userInfo:@{NSLocalizedDescriptionKey: @"Username already in use (Ghost Session)"}];
-            [self connection:conn closedWithError:err];
-            return;
-        }
+        title = NSLocalizedString(@"Username Already in Use", nil);
+        msg = NSLocalizedString(@"Your username is still active from a previous session.\nSince you are not registered, you cannot disconnect the old session immediately.\n\nTip: If you are seeing this from reconnecting, register your user on the server to allow instant reconnection in the future.", nil);
+
+        NSLog(@"⚠️ Username in use. Showing registration guidance and skipping reconnect.");
+        _pendingReconnectFailureInfo = nil;
+        _retryCount = 0;
+        [self postErrorWithTitle:title message:msg];
+        return;
     }
     
     if (explanation && explanation.length > 0 && ![explanation isEqualToString:msg]) {
@@ -729,12 +827,14 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 }
 - (void) serverModel:(MKServerModel *)model userKicked:(MKUser *)user byUser:(MKUser *)actor forReason:(NSString *)reason {
     if (user == [model connectedUser]) {
+        _suppressReconnectForDisconnect = YES;
         NSString *msg = [NSString stringWithFormat:NSLocalizedString(@"Kicked by %@: %@", nil), [actor userName], reason ?: @""];
         [self postErrorWithTitle:NSLocalizedString(@"You were kicked", nil) message:msg];
     }
 }
 - (void) serverModel:(MKServerModel *)model userBanned:(MKUser *)user byUser:(MKUser *)actor forReason:(NSString *)reason {
     if (user == [model connectedUser]) {
+        _suppressReconnectForDisconnect = YES;
         NSString *msg = [NSString stringWithFormat:NSLocalizedString(@"Banned by %@: %@", nil), [actor userName], reason ?: @""];
         [self postErrorWithTitle:NSLocalizedString(@"You were banned", nil) message:msg];
     }

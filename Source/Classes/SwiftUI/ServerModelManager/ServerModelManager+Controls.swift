@@ -13,8 +13,28 @@ extension ServerModelManager {
 
     /// 进入设置界面时调用：临时开启麦克风
     func startAudioTest() {
-        // 如果当前已经连接了服务器，说明麦克风本来就开着，不需要做任何事
-        if self.isConnected || isLocalAudioTestRunning {
+        if isLocalAudioTestRunning {
+            return
+        }
+
+        #if os(iOS)
+        // iOS: 连接中且 self-muted 时，进入 Input Setting 需要临时打开系统层麦克风，
+        // 仅用于电平/输入测试，不改变服务器 self-mute 状态。
+        if self.isConnected,
+           let user = self.serverModel?.connectedUser(),
+           user.isSelfMuted(),
+           !isInputSettingsPreviewOverrideActive {
+            isInputSettingsPreviewOverrideActive = true
+            inputSettingsRestoreSystemMute = true
+            isRestoringMuteState = true
+            systemMuteManager.setSystemMute(false)
+            print("🎤 Input settings preview: temporarily unmuted system input while staying self-muted on server.")
+            return
+        }
+        #endif
+
+        // 连接中但无需临时覆盖时，不启动本地测试引擎
+        if self.isConnected {
             return
         }
 
@@ -45,6 +65,23 @@ extension ServerModelManager {
 
     /// 退出设置界面时调用：关闭麦克风
     func stopAudioTest() {
+        #if os(iOS)
+        if isInputSettingsPreviewOverrideActive {
+            let shouldRestoreMute = inputSettingsRestoreSystemMute ?? true
+            isRestoringMuteState = true
+            systemMuteManager.setSystemMute(shouldRestoreMute)
+            isInputSettingsPreviewOverrideActive = false
+            inputSettingsRestoreSystemMute = nil
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                self?.isRestoringMuteState = false
+            }
+
+            print("🎤 Input settings preview ended: restored system input mute=\(shouldRestoreMute).")
+            return
+        }
+        #endif
+
         let connectionController = MUConnectionController.shared()
         let connectionInProgressOrActive = connectionController?.isConnected() ?? false
         

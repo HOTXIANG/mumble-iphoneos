@@ -14,9 +14,14 @@ extension ServerModelManager {
         systemMuteManager.onSystemMuteChanged = { [weak self] isSystemMuted in
             guard let self = self, let user = self.serverModel?.connectedUser() else { return }
 
-            // 如果正在恢复状态（路由切换中），忽略系统的"自动开麦"通知
+            // 如果正在恢复状态（路由切换中）或输入设置临时预览中，忽略系统回调
             if self.isRestoringMuteState {
                 MumbleLogger.audio.debug("Route changing: Ignoring system mute notification (\(isSystemMuted)) to preserve App state.")
+                return
+            }
+
+            if self.isInputSettingsPreviewOverrideActive {
+                MumbleLogger.audio.debug("Input settings preview override active: ignoring system mute notification (\(isSystemMuted)).")
                 return
             }
 

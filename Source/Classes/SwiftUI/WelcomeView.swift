@@ -930,6 +930,33 @@ struct AppRootView: View {
                         )
                             .font(.headline)
                             .foregroundColor(.primary)
+                        if appState.isReconnecting {
+                            if appState.reconnectAttempt > 0 && appState.reconnectMaxAttempts > 0 {
+                                Text(
+                                    String(
+                                        format: NSLocalizedString("Reconnect attempt %d/%d", comment: ""),
+                                        appState.reconnectAttempt,
+                                        appState.reconnectMaxAttempts
+                                    )
+                                )
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            }
+
+                            if let reason = appState.reconnectReason,
+                               !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text(
+                                    String(
+                                        format: NSLocalizedString("Disconnected reason: %@", comment: ""),
+                                        reason
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(3)
+                            }
+                        }
                         Button(action: { appState.cancelConnection() }) {
                             Text("Cancel")
                                 .font(.subheadline).fontWeight(.semibold).foregroundColor(.white)

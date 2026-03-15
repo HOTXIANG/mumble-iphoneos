@@ -44,6 +44,7 @@ private let kChannelIconWidth: CGFloat = 20.0
 struct ChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
     @StateObject private var appState = AppState.shared
+    @StateObject private var languageManager = AppLanguageManager.shared
     @Environment(\.colorScheme) private var colorScheme
     
     @State private var userPreferredChatWidth: CGFloat = -1
@@ -116,8 +117,15 @@ struct ChannelView: View {
             }
         }
         .coordinateSpace(name: "ChannelViewSpace")
+        .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
+        .id(languageManager.localeIdentifier)
         .onAppear { serverManager.activate() }
-        .onDisappear { serverManager.cleanup() }
+        .onDisappear {
+            let shouldCleanup = !appState.isConnected && !appState.isConnecting && !appState.isReconnecting
+            if shouldCleanup {
+                serverManager.cleanup()
+            }
+        }
     }
     
     private var globalGradient: some View {
@@ -451,7 +459,7 @@ struct ChannelTreeRow: View {
                                             serverManager.toggleChannelPinned(channel)
                                         } label: {
                                             Label(
-                                                pinToggleTitle,
+                                                    pinToggleKey,
                                                 systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
                                             )
                                         }
@@ -461,7 +469,7 @@ struct ChannelTreeRow: View {
                                                 serverManager.toggleChannelHidden(channel)
                                             } label: {
                                                 Label(
-                                                    hideToggleTitle,
+                                                    hideToggleKey,
                                                     systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
                                                 )
                                             }
@@ -575,7 +583,7 @@ struct ChannelTreeRow: View {
                                         serverManager.toggleChannelPinned(channel)
                                     } label: {
                                         Label(
-                                            pinToggleTitle,
+                                            pinToggleKey,
                                             systemImage: serverManager.isChannelPinned(channel) ? "pin.slash" : "pin"
                                         )
                                     }
@@ -585,7 +593,7 @@ struct ChannelTreeRow: View {
                                             serverManager.toggleChannelHidden(channel)
                                         } label: {
                                             Label(
-                                                hideToggleTitle,
+                                                hideToggleKey,
                                                 systemImage: serverManager.isChannelHidden(channel) ? "eye" : "eye.slash"
                                             )
                                         }
@@ -793,29 +801,12 @@ struct ChannelTreeRow: View {
         serverManager.serverModel != nil
     }
 
-    private var pinToggleTitle: String {
-        let key = serverManager.isChannelPinned(channel) ? "Unpin Channel" : "Pin Channel"
-        let zhFallback = serverManager.isChannelPinned(channel) ? "取消置顶频道" : "置顶频道"
-        return localizedChannelActionTitle(key: key, zhHansFallback: zhFallback)
+    private var pinToggleKey: LocalizedStringKey {
+        serverManager.isChannelPinned(channel) ? "Unpin Channel" : "Pin Channel"
     }
 
-    private var hideToggleTitle: String {
-        let key = serverManager.isChannelHidden(channel) ? "Unhide Channel" : "Hide Channel"
-        let zhFallback = serverManager.isChannelHidden(channel) ? "取消隐藏频道" : "隐藏频道"
-        return localizedChannelActionTitle(key: key, zhHansFallback: zhFallback)
-    }
-
-    private func localizedChannelActionTitle(key: String, zhHansFallback: String) -> String {
-        let localized = NSLocalizedString(key, comment: "")
-        if localized != key {
-            return localized
-        }
-
-        let preferredLanguages = Locale.preferredLanguages
-        let isZhHans = preferredLanguages.contains { lang in
-            lang.hasPrefix("zh-Hans") || lang.hasPrefix("zh-CN") || lang.hasPrefix("zh")
-        }
-        return isZhHans ? zhHansFallback : localized
+    private var hideToggleKey: LocalizedStringKey {
+        serverManager.isChannelHidden(channel) ? "Unhide Channel" : "Hide Channel"
     }
     
     /// 是否可以监听此频道（不是自己当前所在的频道 + 有 Listen 权限）

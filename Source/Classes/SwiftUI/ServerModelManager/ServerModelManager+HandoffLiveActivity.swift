@@ -9,6 +9,17 @@ import ActivityKit
 #endif
 
 extension ServerModelManager {
+    #if os(iOS)
+    private func restartLiveActivityKeepAliveTimer() {
+        self.keepAliveTimer?.invalidate()
+        self.keepAliveTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateLiveActivity()
+            }
+        }
+    }
+    #endif
+
     // MARK: - Handoff User Preferences Restore
 
     @objc func handleHandoffRestoreUserPreferences() {
@@ -78,7 +89,26 @@ extension ServerModelManager {
         #if os(iOS)
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
-        LiveActivityCleanup.forceEndAllActivitiesBlocking()
+        if liveActivity != nil {
+            updateLiveActivity()
+            return
+        }
+
+        let targetServerName = (serverName ?? "Mumble").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 重连或后台恢复时优先复用系统已存在的活动，避免强制结束导致灵动岛闪断/丢失。
+        // 当系统中存在多个活动时，优先匹配当前 serverName，避免串到旧会话。
+        let allActivities = Activity<MumbleActivityAttributes>.activities
+        let matchedByServer = allActivities.first {
+            $0.attributes.serverName.caseInsensitiveCompare(targetServerName) == .orderedSame
+        }
+
+        if let existing = matchedByServer ?? allActivities.first {
+            self.liveActivity = existing
+            restartLiveActivityKeepAliveTimer()
+            updateLiveActivity()
+            return
+        }
 
         let initialContentState = MumbleActivityAttributes.ContentState(
             speakers: [],
@@ -88,7 +118,7 @@ extension ServerModelManager {
             isSelfDeafened: false
         )
 
-        let attributes = MumbleActivityAttributes(serverName: serverName ?? "Mumble")
+        let attributes = MumbleActivityAttributes(serverName: targetServerName)
 
         do {
             let activity = try Activity.request(
@@ -99,12 +129,7 @@ extension ServerModelManager {
             self.liveActivity = activity
             print("🏝️ Live Activity Started")
 
-            self.keepAliveTimer?.invalidate()
-            self.keepAliveTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    self?.updateLiveActivity()
-                }
-            }
+            restartLiveActivityKeepAliveTimer()
             // 立即更新一次准确数据
             updateLiveActivity()
         } catch {

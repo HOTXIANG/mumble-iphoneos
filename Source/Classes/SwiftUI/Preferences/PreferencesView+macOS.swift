@@ -316,6 +316,26 @@ extension AdvancedAudioSettingsView {
                 Toggle("Auto Reconnect", isOn: $autoReconnect)
                 Toggle("Enable QoS", isOn: $enableQoS)
                 Toggle("Force TCP Mode", isOn: $forceTCP)
+
+                Stepper(value: $reconnectMaxAttempts, in: 1...30) {
+                    Text(
+                        String(
+                            format: NSLocalizedString("Reconnect Attempts: %d", comment: ""),
+                            reconnectMaxAttempts
+                        )
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    Text(
+                        String(
+                            format: NSLocalizedString("Reconnect Interval: %.1f s", comment: ""),
+                            reconnectInterval
+                        )
+                    )
+                    Slider(value: $reconnectInterval, in: 0.5...10.0, step: 0.5)
+                        .frame(maxWidth: 180)
+                }
             }
         }
         Text("Network changes require reconnection to take effect.")

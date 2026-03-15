@@ -33,7 +33,7 @@ extension ServerModelManager {
 
         if self.serverModel != nil {
             MumbleLogger.connection.info("Switching Server Model. Performing cleanup...")
-            self.cleanup()
+            self.cleanup(preserveSessionActivities: true)
         }
 
         MumbleLogger.connection.info("Binding new ServerModel...")
@@ -100,7 +100,7 @@ extension ServerModelManager {
         )
     }
 
-    func cleanup() {
+    func cleanup(preserveSessionActivities: Bool = false) {
         MumbleLogger.connection.info("ServerModelManager: CLEANUP (Data Only)")
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
@@ -141,9 +141,13 @@ extension ServerModelManager {
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
         #endif
         NotificationCenter.default.removeObserver(self, name: MumbleHandoffRestoreUserPreferencesNotification, object: nil)
-        endLiveActivity()
+        if preserveSessionActivities {
+            MumbleLogger.connection.debug("Preserving Live Activity/Handoff during reconnect cleanup")
+        } else {
+            endLiveActivity()
 
-        // 停止广播 Handoff Activity
-        HandoffManager.shared.invalidateActivity()
+            // 停止广播 Handoff Activity
+            HandoffManager.shared.invalidateActivity()
+        }
     }
 }
