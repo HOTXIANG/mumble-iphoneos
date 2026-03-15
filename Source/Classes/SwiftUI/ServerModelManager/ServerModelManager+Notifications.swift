@@ -16,6 +16,67 @@ import UIKit
 #endif
 
 extension ServerModelManager {
+    private var inAppMessageBannerEnabled: Bool {
+        UserDefaults.standard.object(forKey: "NotificationEnableInAppMessageBanners") as? Bool ?? true
+    }
+
+    private func shouldShowInAppMessageBanner() -> Bool {
+        guard inAppMessageBannerEnabled else { return false }
+
+        let state = AppState.shared
+        guard state.isInChannelView else { return false }
+        guard !state.isChannelSplitLayout else { return false }
+        guard state.currentTab != .messages else { return false }
+
+        #if os(iOS)
+        guard UIApplication.shared.applicationState == .active else { return false }
+        #elseif os(macOS)
+        guard NSApplication.shared.isActive else { return false }
+        #endif
+
+        return true
+    }
+
+    private func postInAppChatMessageBanner(senderName: String, body: String, senderSession: UInt?, isPrivateMessage: Bool = false) {
+        guard shouldShowInAppMessageBanner() else { return }
+
+        let displaySenderName = isPrivateMessage
+            ? String(format: NSLocalizedString("PM %@", comment: "In-app private message sender prefix"), senderName)
+            : senderName
+
+        let combinedMessage = "\(displaySenderName): \(body)"
+        let avatarImage: PlatformImage? = senderSession.flatMap { userAvatars[$0] }
+
+        NotificationCenter.default.post(
+            name: .muAppShowMessage,
+            object: nil,
+            userInfo: [
+                "message": combinedMessage,
+                "type": "info",
+                "jumpToMessages": true,
+                "inAppBannerType": "chatMessage",
+                "senderName": displaySenderName,
+                "body": body,
+                "avatarImage": avatarImage as Any
+            ]
+        )
+    }
+
+    private func postInAppSystemMessageBanner(_ message: String) {
+        guard shouldShowInAppMessageBanner() else { return }
+
+        NotificationCenter.default.post(
+            name: .muAppShowMessage,
+            object: nil,
+            userInfo: [
+                "message": message,
+                "type": "info",
+                "jumpToMessages": true,
+                "inAppBannerType": "systemMessage"
+            ]
+        )
+    }
+
     func requestNotificationAccess() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if granted {
@@ -333,6 +394,7 @@ extension ServerModelManager {
                         title: String(format: NSLocalizedString("PM from %@", comment: ""), senderName),
                         body: bodyText
                     )
+                    self.postInAppChatMessageBanner(senderName: senderName, body: bodyText, senderSession: senderSession, isPrivateMessage: true)
                 }
 
                 if self.shouldSpeakTTS(for: .privateMessages) {
@@ -741,6 +803,7 @@ extension ServerModelManager {
             }
             if shouldNotify {
                 sendLocalNotification(title: currentNotificationTitle, body: text)
+                postInAppSystemMessageBanner(text)
             }
         } else {
             if shouldSpeakTTS(forSystemCategory: nil) {
@@ -868,6 +931,7 @@ extension ServerModelManager {
                 }
                 if notifyEnabled {
                     sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
+                    postInAppChatMessageBanner(senderName: senderName, body: bodyText, senderSession: senderSession)
                 }
             }
         }

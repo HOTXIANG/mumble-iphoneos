@@ -115,12 +115,23 @@ struct ChannelView: View {
                 globalGradient
                     .allowsHitTesting(false)
             }
+            .onAppear {
+                updateChannelLayoutState(for: geo.size.width)
+            }
+            .onChange(of: geo.size.width) { _, newWidth in
+                updateChannelLayoutState(for: newWidth)
+            }
         }
         .coordinateSpace(name: "ChannelViewSpace")
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .id(languageManager.localeIdentifier)
-        .onAppear { serverManager.activate() }
+        .onAppear {
+            serverManager.activate()
+            appState.isInChannelView = true
+        }
         .onDisappear {
+            appState.isInChannelView = false
+            appState.isChannelSplitLayout = false
             let shouldCleanup = !appState.isConnected && !appState.isConnecting && !appState.isReconnecting
             if shouldCleanup {
                 serverManager.cleanup()
@@ -162,6 +173,12 @@ struct ChannelView: View {
             UITabBar.appearance().scrollEdgeAppearance = appearance
         }
         #endif
+    }
+
+    private func updateChannelLayoutState(for width: CGFloat) {
+        if width > 0 {
+            appState.isChannelSplitLayout = width > splitThreshold
+        }
     }
 }
 

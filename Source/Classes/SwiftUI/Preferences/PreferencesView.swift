@@ -206,6 +206,7 @@ final class AppLanguageManager: ObservableObject {
 struct NotificationSettingsView: View {
     @AppStorage("NotificationNotifyNormalUserMessages") var notifyNormalUserMessages: Bool = true
     @AppStorage("NotificationNotifyPrivateMessages") var notifyPrivateMessages: Bool = true
+    @AppStorage("NotificationEnableInAppMessageBanners") var enableInAppMessageBanners: Bool = true
     
     // 系统通知分类开关
     @AppStorage("NotifyUserJoinedSameChannel") var notifyUserJoinedSameChannel: Bool = true

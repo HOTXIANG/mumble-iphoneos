@@ -31,6 +31,13 @@ extension NotificationSettingsView {
     var notificationSettingsContent: some View {
         LabeledContent("Notifications:") {
             VStack(alignment: .leading, spacing: 8) {
+                Toggle("In-App Message Banners", isOn: $enableInAppMessageBanners)
+            }
+            .padding(.bottom, 4)
+        }
+
+        LabeledContent("User Messages:") {
+            VStack(alignment: .leading, spacing: 8) {
                 Toggle("User Messages", isOn: $notifyNormalUserMessages)
                 Toggle("Private Messages", isOn: $notifyPrivateMessages)
             }
@@ -244,7 +251,7 @@ extension AudioTransmissionSettingsView {
         if let current = devices.first(where: { $0.uid == systemDefaultUID }) {
             return current.name
         }
-        return "Unknown"
+        return NSLocalizedString("Unknown", comment: "")
     }
     
     func refreshDevices() {
@@ -311,31 +318,37 @@ extension AdvancedAudioSettingsView {
             .labelsHidden()
             .pickerStyle(.menu)
         }
-        LabeledContent("Network:") {
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("Auto Reconnect", isOn: $autoReconnect)
-                Toggle("Enable QoS", isOn: $enableQoS)
-                Toggle("Force TCP Mode", isOn: $forceTCP)
-
-                Stepper(value: $reconnectMaxAttempts, in: 1...30) {
-                    Text(
-                        String(
-                            format: NSLocalizedString("Reconnect Attempts: %d", comment: ""),
-                            reconnectMaxAttempts
-                        )
+        LabeledContent("Auto Reconnect:") {
+            Toggle("", isOn: $autoReconnect)
+                .labelsHidden()
+        }
+        LabeledContent("Enable QoS:") {
+            Toggle("", isOn: $enableQoS)
+                .labelsHidden()
+        }
+        LabeledContent("Force TCP Mode:") {
+            Toggle("", isOn: $forceTCP)
+                .labelsHidden()
+        }
+        LabeledContent("Reconnect Attempts:") {
+            Stepper(value: $reconnectMaxAttempts, in: 1...30) {
+                Text("\(reconnectMaxAttempts)")
+                    .font(.system(.body, design: .monospaced))
+                    .frame(width: 42, alignment: .trailing)
+            }
+        }
+        LabeledContent("Reconnect Interval:") {
+            HStack(spacing: 10) {
+                Slider(value: $reconnectInterval, in: 0.5...10.0, step: 0.5)
+                    .frame(maxWidth: 180)
+                Text(
+                    String(
+                        format: NSLocalizedString("%.1f s", comment: "Reconnect interval unit suffix"),
+                        reconnectInterval
                     )
-                }
-
-                HStack(spacing: 10) {
-                    Text(
-                        String(
-                            format: NSLocalizedString("Reconnect Interval: %.1f s", comment: ""),
-                            reconnectInterval
-                        )
-                    )
-                    Slider(value: $reconnectInterval, in: 0.5...10.0, step: 0.5)
-                        .frame(maxWidth: 180)
-                }
+                )
+                .font(.system(.body, design: .monospaced))
+                .frame(width: 50, alignment: .trailing)
             }
         }
         Text("Network changes require reconnection to take effect.")
@@ -557,7 +570,7 @@ private struct MacGeneralSettingsTabView: View {
         .alert(NSLocalizedString("Language Changed", comment: ""), isPresented: $showingLanguageChangedAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text(NSLocalizedString("Some texts will fully update after restarting the app.", comment: ""))
+            Text(NSLocalizedString("Language changes are applied immediately.", comment: ""))
         }
     }
 }
@@ -600,7 +613,7 @@ struct MacSettingsRootView: View {
             case .output:
                 return NSSize(width: 550, height: 220)
             case .notifications:
-                return NSSize(width: 550, height: 360)
+                return NSSize(width: 550, height: 380)
             case .tts:
                 return NSSize(width: 550, height: 450)
             case .handoff:
@@ -608,7 +621,7 @@ struct MacSettingsRootView: View {
             case .certificates:
                 return NSSize(width: 550, height: 600)
             case .advanced:
-                return NSSize(width: 550, height: 220)
+                return NSSize(width: 550, height: 280)
             }
         }
     }
@@ -681,6 +694,7 @@ struct MacSettingsRootView: View {
         }
         .background(MacSettingsWindowSizeAdaptor(targetSize: selectedTab.preferredContentSize))
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
+        .id(languageManager.localeIdentifier)
         .modifier(SettingsColorSchemeOverrideModifier(option: selectedAppColorScheme))
         .toggleStyle(.checkbox)
         .onAppear {

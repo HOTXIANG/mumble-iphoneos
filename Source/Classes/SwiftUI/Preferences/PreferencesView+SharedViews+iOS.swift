@@ -6,6 +6,9 @@ import UserNotifications
 extension NotificationSettingsView {
     @ViewBuilder
     var notificationSettingsContent: some View {
+        Section(header: Text("Notifications")) {
+            Toggle("In-App Message Banners", isOn: $enableInAppMessageBanners)
+        }
         Section(header: Text("User Messages"), footer: Text("Notifications will be sent when the app is in the background.")) {
             Toggle("User Messages", isOn: $notifyNormalUserMessages)
             Toggle("Private Messages", isOn: $notifyPrivateMessages)

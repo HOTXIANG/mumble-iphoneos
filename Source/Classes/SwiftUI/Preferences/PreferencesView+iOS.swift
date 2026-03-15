@@ -136,6 +136,7 @@ struct PreferencesView: View {
             preferencesContent
         }
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
+        .id(languageManager.localeIdentifier)
         .modifier(SettingsColorSchemeOverrideModifier(option: selectedAppColorScheme))
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -149,7 +150,7 @@ struct PreferencesView: View {
         .alert(NSLocalizedString("Language Changed", comment: ""), isPresented: $showingLanguageChangedAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text(NSLocalizedString("Some texts will fully update after restarting the app.", comment: ""))
+            Text(NSLocalizedString("Language changes are applied immediately.", comment: ""))
         }
         .onAppear {
             languageManager.reapplyCurrentLanguage()

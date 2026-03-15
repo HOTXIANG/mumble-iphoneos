@@ -44,10 +44,37 @@ extension Notification.Name {
 
 // MARK: - Toast / Error types
 
-struct AppToast: Identifiable, Equatable {
+struct AppToast: Identifiable {
     let id = UUID()
     let message: String
     let type: ToastType
+    let jumpToMessagesOnTap: Bool
+    let senderName: String?
+    let bodyText: String?
+    let avatarImage: PlatformImage?
+    let isSystemMessageBanner: Bool
+
+    init(
+        message: String,
+        type: ToastType,
+        jumpToMessagesOnTap: Bool = false,
+        senderName: String? = nil,
+        bodyText: String? = nil,
+        avatarImage: PlatformImage? = nil,
+        isSystemMessageBanner: Bool = false
+    ) {
+        self.message = message
+        self.type = type
+        self.jumpToMessagesOnTap = jumpToMessagesOnTap
+        self.senderName = senderName
+        self.bodyText = bodyText
+        self.avatarImage = avatarImage
+        self.isSystemMessageBanner = isSystemMessageBanner
+    }
+
+    var isChatMessageBanner: Bool {
+        senderName != nil && bodyText != nil && !isSystemMessageBanner
+    }
     
     enum ToastType {
         case info
@@ -133,6 +160,8 @@ class AppState: ObservableObject {
     
     // --- 核心修改 2：添加一个属性来跟踪当前显示的 Tab ---
     @Published var currentTab: Tab = .channels // 默认是频道列表
+    @Published var isInChannelView: Bool = false
+    @Published var isChannelSplitLayout: Bool = false
     
     #if os(iOS)
     @Published var isImmersiveStatusBarHidden: Bool = false
@@ -148,6 +177,7 @@ class AppState: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private var lastUDPTransportStateName: String = "unknown"
+    private var suppressNextUDPAvailableToast: Bool = false
     
     static let shared = AppState()
     private init() {
@@ -180,6 +210,7 @@ class AppState: ObservableObject {
                 guard let self = self else { return }
                 
                 MumbleLogger.connection.info("Connection opened")
+                     self.suppressNextUDPAvailableToast = true
                 if let userInfo = notification.userInfo,
                    let displayName = userInfo["displayName"] as? String {
                     self.serverDisplayName = displayName
@@ -237,6 +268,7 @@ class AppState: ObservableObject {
                 self.isConnected = false
                 self.isUserAuthenticated = false
                 self.lastUDPTransportStateName = "unknown"
+                self.suppressNextUDPAvailableToast = false
                 self.serverDisplayName = nil
                 self.unreadMessageCount = 0
             }
@@ -310,12 +342,19 @@ class AppState: ObservableObject {
 
                 switch stateName {
                 case "stalled":
+                    self.suppressNextUDPAvailableToast = false
                     self.showToast(message: NSLocalizedString("UDP stalled, recovering audio channel...", comment: "UDP stalled status toast"), type: .error)
                 case "recovering":
+                    self.suppressNextUDPAvailableToast = false
                     self.showToast(message: NSLocalizedString("Re-establishing UDP channel...", comment: "UDP recovering status toast"), type: .info)
                 case "available":
+                    if self.suppressNextUDPAvailableToast {
+                        self.suppressNextUDPAvailableToast = false
+                        break
+                    }
                     self.showToast(message: NSLocalizedString("UDP channel restored", comment: "UDP available status toast"), type: .success)
                 case "unavailable":
+                    self.suppressNextUDPAvailableToast = false
                     self.showToast(message: NSLocalizedString("UDP unavailable, using TCP tunnel", comment: "UDP unavailable status toast"), type: .info)
                 default:
                     break
@@ -331,22 +370,47 @@ class AppState: ObservableObject {
                     
                     let typeString = userInfo["type"] as? String ?? "info"
                     let type: AppToast.ToastType = (typeString == "error") ? .error : .info
+                    let jumpToMessages = userInfo["jumpToMessages"] as? Bool ?? false
+                    let bannerType = userInfo["inAppBannerType"] as? String
+                    let senderName = userInfo["senderName"] as? String
+                    let bodyText = userInfo["body"] as? String
+                    let avatarImage = userInfo["avatarImage"] as? PlatformImage
                     
                     // 显示 Toast
                     withAnimation(.spring()) {
-                        self?.activeToast = AppToast(message: message, type: type)
+                        if bannerType == "chatMessage",
+                           let senderName,
+                           let bodyText {
+                            self?.activeToast = AppToast(
+                                message: message,
+                                type: type,
+                                jumpToMessagesOnTap: jumpToMessages,
+                                senderName: senderName,
+                                bodyText: bodyText,
+                                avatarImage: avatarImage,
+                                isSystemMessageBanner: false
+                            )
+                        } else {
+                            self?.activeToast = AppToast(
+                                message: message,
+                                type: type,
+                                jumpToMessagesOnTap: jumpToMessages,
+                                isSystemMessageBanner: bannerType == "systemMessage"
+                            )
+                        }
                     }
                     
                     // 3秒后自动消失
                     // 取消之前的自动消失任务（如果有），防止闪烁
                     self?.toastWorkItem?.cancel()
+                    let dismissDelay: TimeInterval = (bannerType == "chatMessage") ? 6.0 : 3.0
                     let task = DispatchWorkItem { [weak self] in
                         withAnimation(.easeOut) {
                             self?.activeToast = nil
                         }
                     }
                     self?.toastWorkItem = task
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: task)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + dismissDelay, execute: task)
                 }
             }
             .store(in: &cancellables)

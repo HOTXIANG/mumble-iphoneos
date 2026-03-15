@@ -897,7 +897,26 @@ struct AppRootView: View {
                 ToastView(toast: toast)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .zIndex(2000)
-                    .onTapGesture { withAnimation { appState.activeToast = nil } }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation {
+                            if toast.jumpToMessagesOnTap {
+                                appState.currentTab = .messages
+                                appState.unreadMessageCount = 0
+                            }
+                            appState.activeToast = nil
+                        }
+                    }
+                    .highPriorityGesture(
+                        DragGesture(minimumDistance: 12)
+                            .onEnded { value in
+                                if value.translation.height < -24 {
+                                    withAnimation(.easeOut) {
+                                        appState.activeToast = nil
+                                    }
+                                }
+                            }
+                    )
             }
         }
         .overlay(alignment: .bottom) {
