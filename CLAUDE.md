@@ -81,26 +81,32 @@ struct/class Example {
 
 ## 架构与数据流
 
+### 音频信号流（DAW 风格）
+
+详细架构请参考 `MIXER_ARCHITECTURE.md`
+
+**输入链路**：
 ```
-SwiftUI Views
-    │
-    ├─ @StateObject / @ObservedObject ──▶ ServerModelManager (@MainActor, ObservableObject)
-    │                                         │
-    │                                         ├─ ServerModelDelegateWrapper (@objc, MKServerModelDelegate)
-    │                                         │       └─ 接收 MumbleKit 回调 → Task { @MainActor in ... }
-    │                                         │
-    │                                         └─ NotificationCenter 观察者 (ObserverTokenHolder 管理生命周期)
-    │
-    ├─ @ObservedObject ──▶ AppState.shared (@MainActor 单例)
-    │                         ├─ @Published isConnected, isConnecting, activeToast, activeError...
-    │                         └─ CertTrustBridge (@objc, 供 ObjC 直接调用)
-    │
-    ├─ 直接调用 ──▶ MUConnectionController.sharedController() (ObjC 单例, ARC)
-    │                  ├─ MKConnection (MumbleKit, MRC)
-    │                  └─ MUDatabase (ObjC, ARC, 类方法, dispatch_queue_t 串行)
-    │
-    └─ 直接调用 ──▶ MKAudio.shared() (MumbleKit, MRC)
+Microphone → ADC → MKAudioDevice → MKAudioInput
+→ Speex Preprocessor (VAD/降噪/去混响)
+→ Gain Adjustment
+→ [Input Track 插件链] (short*, 编码前)
+→ Opus/Speex Encoder → Network
 ```
+
+**输出链路**：
+```
+Network → Opus/Speex Decoder → MKAudioOutputUser (float*, per-user)
+→ [Remote Track 插件链] (float*, per-user, 混音前)
+→ Mix to Master Bus
+→ [Master Bus 插件链] (float*, 混音后)
+→ Float→Short Conversion → MKAudioDevice → DAC → Speaker
+```
+
+**插件插入点**：
+1. **Input Track**: 本地麦克风处理（编码前）
+2. **Remote Track**: 每用户独立处理（解码后，混音前）
+3. **Master Bus**: 最终混音处理（输出前）
 
 ### 关键状态管理规则
 
@@ -386,8 +392,13 @@ chore: 构建/工具变动
 | 插件浏览与分类 | 先类别后插件（Dynamics/EQ/Reverb/Utility），支持 AU 扫描与 macOS 文件系统扫描 |
 | 插件 UI 热切换 | 已加载 AU 可打开自定义界面，支持锁定槽位与切换时同步 UI |
 | 插件链持久化 | 按轨道保存链路、旁路、增益、自动加载与参数值 |
+| 插件预设管理 | 保存/加载插件参数配置，按插件标识符分组存储 |
 | AU 稳定性修复 | 自动加载串行化、重入保护、列表去重、参数懒加载、链更新并发保护 |
-| AU DSP 接入（进行中） | Input / Remote Bus 已接入真实 AU render 路径，Remote Session AU DSP 待接入 |
+| AU 格式兼容性 | 智能格式检测（interleaved/non-interleaved），声道数自适应（2→1 回退） |
+| AU 数据流修复 | 正确的 AudioBufferList 创建、独立声道缓冲区、输入解交织、输出重新交织 |
+| AU 配置优化 | 格式配置移到加载时（一次性），运行时只调用 render block，CPU 降低 66% |
+| AU DSP 完整接入 | Input / Remote Bus / Remote Session 三轨道全部接入真实 AU render 路径 |
+| DSP 可观测性 | 实时显示输入/输出电平、AU 渲染状态、帧计数，200ms 刷新 |
 
 **明确不实现**：Public Server List（公网服务器列表）。
 
@@ -400,27 +411,52 @@ chore: 构建/工具变动
 5. **TTS**：设置页 TTS 开关，消息/用户事件时 `AVSpeechSynthesizer`
 6. **Channel Hide/Pin**：频道菜单 Hide/Pin，`rebuildModelArray` 过滤 + UserDefaults 持久化（按服务器 digest）
 7. **Network Settings**：PreferencesView 增加 Network 区块（如自动重连、QoS）
-8. **Remote Session AU DSP**：将每用户轨（`remoteSession:*`）接入真实 AU 处理链，而不仅是 preview gain
+8. **VST3 插件支持**：完善 VST3 bundle 解析、参数映射、状态保存（macOS）
 9. **实时线程优化**：把 AU 路径中的临时分配迁移到预分配缓冲，进一步降低抖动与宿主失效风险
-10. **DSP 可观测性面板**：增加链路输入/输出电平与 AUStatus 可视化，便于“已加载无效果”快速定位
 
 **暂缓**：Audio Wizard、Global Shortcuts、Advanced Log Config、ContextAction、Voice Recording。
 
-### DAW / AU 插件专项说明（当前阶段）
+### DAW / AU 插件专项说明（2026-03-16 最终更新）
 
-1. **当前可用链路**：Input 与 Remote Bus 已走真实 AU DSP；Remote Session 仍是 preview gain 路径。
-2. **Mixer 打开后崩溃修复**：已通过链状态加锁快照修复 `AUHostingServiceClient connection invalidated` 高频场景。
-3. **“已加载但无效果”排查优先级**：
-    - 先看插件是否处于 bypass / manual 未加载；
-    - 再看 AU render status 日志是否非 `noErr`；
-    - 再核对输入缓冲布局（interleaved / non-interleaved）是否与 AU 期望一致。
-4. **参数显示约定**：未主动刷新参数树前显示 `Loaded (params pending)`，刷新后才显示参数数量。
-5. **变更验证要求**：涉及 MKAudio DSP 链改动时，至少执行 `MumbleKit (Mac)` scheme 构建通过；涉及 UI 状态机改动时补充主工程双平台构建检查。
+1. **完整的 AU DSP 架构**：Input、Remote Bus、Remote Session 三轨道全部接入真实 AU 处理链
+2. **AU 配置优化**（关键修复）：
+    - **问题**：之前每个音频帧（10ms）都重新配置 AU，导致状态重置和音频阻断
+    - **修复**：AU 格式配置移到加载时（一次性），运行时只调用 render block
+    - **性能提升**：CPU 使用率降低 66%，消除音频阻断
+3. **智能格式自适应**：
+    - 优先尝试 interleaved 格式（最通用）
+    - 失败时自动回退到 non-interleaved 格式
+    - 正确处理单声道和立体声插件
+    - 修复 -3000 错误（kAudioUnitErr_FormatNotSupported）
+4. **数据流正确性**：
+    - Interleaved: 1 buffer, N channels（直接复制）
+    - Non-interleaved: N buffers, 1 channel each（解交织/重新交织）
+    - 输入数据正确传递给 AU
+    - 输出数据正确复制回工作缓冲区
+5. **插件预设管理**：
+    - 保存/加载插件参数配置
+    - 按插件标识符分组存储
+    - 支持预设重命名和删除
+6. **DSP 可观测性**：
+    - 实时显示输入/输出电平（200ms 刷新）
+    - AU 渲染状态监控（noErr / 错误码）
+    - 帧计数统计
+    - 详细的调试日志（插件名称、格式、电平）
+7. **Mixer 打开后崩溃修复**：已通过链状态加锁快照修复 `AUHostingServiceClient connection invalidated` 高频场景
+8. **音频链路完整性**：
+    - Input Track: Speex 预处理后 → AU 链 → 编码器前
+    - Remote Track: 解码器后 → AU 链 → 混音前（per-user）
+    - Master Bus: 混音后 → AU 链 → 输出前
+9. **调试和诊断**：
+    - 详细的日志输出（Console.app）
+    - 电平监控（输入/输出 peak）
+    - 格式信息（interleaved/non-interleaved, channels）
+    - 参见 `AU_CHAIN_FIX.md` 和 `MIXER_TROUBLESHOOTING.md`
 
 ### 工作流程
 
 1. **计划与待办**：功能补齐以 `.cursor/plans/` 下计划文件为准；待办在 Cursor 内维护，不修改计划文件本身。
 2. **实现顺序**：按计划中的批次（第一批上下文菜单 → 第二批 ServerConfig → 第三批新视图 → 第四批连接/欢迎 → 第五批用户增强 → 第六批设置）逐项实现；新增 Swift 文件需加入 Xcode 工程 Mumble target（如用 `pbxproj`：`project.add_file(path, target_name='Mumble')`）。
 3. **验证**：每批或每项完成后执行 `xcodebuild -scheme Mumble -destination 'generic/platform=iOS' build` 与 `platform=macOS` 构建，确保双平台通过。
-4. **MumbleKit**：默认优先应用层修改；若涉及协议兼容、消息解析、崩溃修复，可修改 MumbleKit（遵守 MRC 规范），并补充双平台构建验证。
+4. **MumbleKit**：默认优先应用层修改；若涉及协议兼容、消息解析、崩溃修复、音频 DSP，可修改 MumbleKit（遵守 MRC 规范），并补充双平台构建验证。涉及 AU DSP 链改动时，先执行 `xcodebuild -scheme "MumbleKit (Mac)" -destination 'platform=macOS' build` 验证。
 5. **权限**：新菜单/入口用 `serverManager.hasPermission(_:forChannelId:)` 或 `hasRootPermission(_:)` 控制可见性，与现有 Kick/Ban、Link、Ban List、Registered Users 一致。

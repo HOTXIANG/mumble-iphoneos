@@ -108,6 +108,7 @@
 		F2DF9A492F656357009D5C87 /* ChannelFilterManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A482F656357009D5C87 /* ChannelFilterManager.swift */; };
 		F2DF9A4B2F65636F009D5C87 /* IgnoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A4A2F65636F009D5C87 /* IgnoreManager.swift */; };
 		F2DF9A4D2F656374009D5C87 /* TTSManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A4C2F656374009D5C87 /* TTSManager.swift */; };
+		F2DF9D692F672C15009D5C87 /* AudioPluginMixerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9D682F672C15009D5C87 /* AudioPluginMixerView.swift */; };
 		F2E100112F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100012F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift */; };
 		F2E100122F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100022F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift */; };
 		F2E100132F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100032F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift */; };
@@ -391,6 +392,7 @@
 		F2DF9A482F656357009D5C87 /* ChannelFilterManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelFilterManager.swift; sourceTree = "<group>"; };
 		F2DF9A4A2F65636F009D5C87 /* IgnoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IgnoreManager.swift; sourceTree = "<group>"; };
 		F2DF9A4C2F656374009D5C87 /* TTSManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSManager.swift; sourceTree = "<group>"; };
+		F2DF9D682F672C15009D5C87 /* AudioPluginMixerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPluginMixerView.swift; sourceTree = "<group>"; };
 		F2E100012F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleWidgetBundle.swift; sourceTree = SOURCE_ROOT; };
 		F2E100022F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleServerWidget.swift; sourceTree = SOURCE_ROOT; };
 		F2E100032F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleLiveActivity.swift; sourceTree = SOURCE_ROOT; };
@@ -697,6 +699,7 @@
 				F2E9CBE92F06ECF400464F79 /* CertificateModel.swift */,
 				F28C6AF22EE6F73E00DE9CD2 /* AudioMeterModel.swift */,
 				D1E2F3A52F90400100ABC002 /* AudioBarView.swift */,
+				F2DF9D682F672C15009D5C87 /* AudioPluginMixerView.swift */,
 				D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */,
 				F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */,
 				F4D1A0B32FA1000100AABBCC /* PreferencesView+iOS.swift */,
@@ -1160,6 +1163,7 @@
 				F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */,
 				F2DF9A4B2F65636F009D5C87 /* IgnoreManager.swift in Sources */,
 				28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */,
+				F2DF9D692F672C15009D5C87 /* AudioPluginMixerView.swift in Sources */,
 				F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */,
 				F28C6AFB2EE7010300DE9CD2 /* PTTButton.swift in Sources */,
 				F28C6AF42EE6F74500DE9CD2 /* AudioMeterModel.swift in Sources */,

@@ -56,6 +56,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioPluginInputTrackGain": 1.0,
             "AudioPluginRemoteBusEnabled": false,
             "AudioPluginRemoteBusGain": 1.0,
+            "AudioPluginHostBufferFrames": 256,
             // Network
             "NetworkForceTCP": false,
             "DefaultUserName": "MumbleUser",
@@ -232,6 +233,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             && (lastAudioRestartSignature != nil)
             && (lastAudioRestartSignature != restartSignature)
         audio?.update(&settings)
+        audio?.setPluginHostBufferFrames(UInt(defaults.integer(forKey: "AudioPluginHostBufferFrames")))
         audio?.setInputTrackPreviewGain(
             defaults.float(forKey: "AudioPluginInputTrackGain"),
             enabled: defaults.bool(forKey: "AudioPluginInputTrackEnabled")

@@ -107,6 +107,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
                                                                 [NSNumber numberWithFloat:1.0f],   @"AudioPluginInputTrackGain",
                                                                 [NSNumber numberWithBool:NO],      @"AudioPluginRemoteBusEnabled",
                                                                 [NSNumber numberWithFloat:1.0f],   @"AudioPluginRemoteBusGain",
+                                                                [NSNumber numberWithInt:256],      @"AudioPluginHostBufferFrames",
                                                                 // Network
                                                                 [NSNumber numberWithBool:NO],      @"NetworkForceTCP",
                                                                 @"MumbleUser",                     @"DefaultUserName",
@@ -387,6 +388,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
         && _lastAudioRestartSignature != nil
         && ![_lastAudioRestartSignature isEqualToString:restartSignature];
     [audio updateAudioSettings:&settings];
+    [audio setPluginHostBufferFrames:(NSUInteger)MAX(64, [defaults integerForKey:@"AudioPluginHostBufferFrames"])];
     [audio setInputTrackPreviewGain:[defaults floatForKey:@"AudioPluginInputTrackGain"]
                             enabled:[defaults boolForKey:@"AudioPluginInputTrackEnabled"]];
     [audio setRemoteBusPreviewGain:[defaults floatForKey:@"AudioPluginRemoteBusGain"]
