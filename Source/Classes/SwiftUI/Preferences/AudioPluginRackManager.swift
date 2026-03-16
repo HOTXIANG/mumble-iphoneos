@@ -24,6 +24,9 @@ final class AudioPluginRackManager: ObservableObject {
 
     private init() {
         loadPluginChainState()
+        #if os(macOS)
+        clearVST3PluginsIfSandboxRestricted()
+        #endif
     }
 
     // MARK: - Public API
@@ -258,5 +261,38 @@ final class AudioPluginRackManager: ObservableObject {
     private func parseRemoteSessionID(from key: String) -> Int? {
         guard key.hasPrefix("remoteSession:") else { return nil }
         return Int(key.dropFirst("remoteSession:".count))
+    }
+
+    // MARK: - App Sandbox Migration
+
+    /// Clears VST3 plugins from persistence if running in a sandbox-restricted environment.
+    /// This prevents crashes on startup when VST3 bundles cannot be loaded due to Sandbox.
+    private func clearVST3PluginsIfSandboxRestricted() {
+        // Check if we have VST3 plugins persisted
+        let hasVST3Plugins = pluginChainByTrack.values.flatMap { $0 }.contains { $0.source == .filesystem }
+
+        guard hasVST3Plugins else {
+            return
+        }
+
+        // For TestFlight/App Store builds with Sandbox, clear VST3 plugins to prevent crashes
+        // The Sandbox prevents loading third-party bundles from /Library/Audio/Plug-Ins/
+        NSLog("AudioPluginRackManager: Detected VST3 plugins in sandbox-restricted environment, clearing VST3 entries")
+
+        // Remove VST3 plugins from the chain but keep AU plugins
+        var modified = false
+        for (trackKey, chain) in pluginChainByTrack {
+            let filteredChain = chain.filter { $0.source != .filesystem }
+            if filteredChain.count != chain.count {
+                pluginChainByTrack[trackKey] = filteredChain
+                modified = true
+                NSLog("AudioPluginRackManager: Removed \(chain.count - filteredChain.count) VST3 plugin(s) from track '\(trackKey)'")
+            }
+        }
+
+        if modified {
+            savePluginChainState()
+            NSLog("AudioPluginRackManager: Saved cleaned plugin chain (VST3 plugins removed)")
+        }
     }
 }
