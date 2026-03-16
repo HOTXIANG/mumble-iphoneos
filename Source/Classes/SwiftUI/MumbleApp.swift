@@ -57,6 +57,11 @@ struct MumbleApp: App {
                 .onAppear {
                     MumbleLogger.general.info("SwiftUI lifecycle started")
                     UNUserNotificationCenter.current().delegate = notificationDelegate
+
+                    // Initialize audio plugin rack on startup
+                    Task {
+                        await AudioPluginRackManager.shared.initializeOnStartup()
+                    }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .muConnectionOpened)) { _ in
                     joinPendingDeepLinkChannelIfNeeded()

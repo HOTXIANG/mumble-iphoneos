@@ -15,6 +15,23 @@ import AppKit
 import CoreAudioKit
 #endif
 
+private struct PluginEditorParameterSnapshot: Identifiable, Hashable {
+    let id: UInt64
+    let name: String
+    let minValue: Float
+    let maxValue: Float
+    var value: Float
+}
+
+private struct PluginEditorSnapshot {
+    let name: String
+    let subtitle: String
+    let isLoading: Bool
+    let isLoaded: Bool
+    let errorDescription: String?
+    let parameters: [PluginEditorParameterSnapshot]
+}
+
 #if os(macOS)
 @MainActor
 final class AudioPluginMixerWindowController: NSObject {
@@ -41,8 +58,8 @@ final class AudioPluginMixerWindowController: NSObject {
         let window = NSWindow(contentViewController: hostingController)
         window.title = NSLocalizedString("Audio Plugin Mixer", comment: "")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 1220, height: 860))
-        window.minSize = NSSize(width: 980, height: 680)
+        window.setContentSize(NSSize(width: 960, height: 640))
+        window.minSize = NSSize(width: 780, height: 520)
         window.center()
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)
@@ -64,6 +81,72 @@ final class AudioPluginMixerWindowController: NSObject {
     }
 }
 #endif
+
+// MARK: - Shared Types
+
+enum PluginSource: String, Codable {
+    case audioUnit
+    case filesystem
+}
+
+struct TrackPlugin: Identifiable, Codable, Hashable {
+    let id: String
+    var name: String
+    var subtitle: String
+    var source: PluginSource
+    var identifier: String
+    var bypassed: Bool
+    var stageGain: Float
+    var autoLoad: Bool
+    var savedParameterValues: [String: Float]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case subtitle
+        case source
+        case identifier
+        case bypassed
+        case stageGain
+        case autoLoad
+        case savedParameterValues
+    }
+
+    init(
+        id: String,
+        name: String,
+        subtitle: String,
+        source: PluginSource,
+        identifier: String,
+        bypassed: Bool = false,
+        stageGain: Float = 1.0,
+        autoLoad: Bool = true,
+        savedParameterValues: [String: Float] = [:]
+    ) {
+        self.id = id
+        self.name = name
+        self.subtitle = subtitle
+        self.source = source
+        self.identifier = identifier
+        self.bypassed = bypassed
+        self.stageGain = stageGain
+        self.autoLoad = autoLoad
+        self.savedParameterValues = savedParameterValues
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        subtitle = try container.decode(String.self, forKey: .subtitle)
+        source = try container.decode(PluginSource.self, forKey: .source)
+        identifier = try container.decode(String.self, forKey: .identifier)
+        bypassed = try container.decodeIfPresent(Bool.self, forKey: .bypassed) ?? false
+        stageGain = try container.decodeIfPresent(Float.self, forKey: .stageGain) ?? 1.0
+        autoLoad = try container.decodeIfPresent(Bool.self, forKey: .autoLoad) ?? true
+        savedParameterValues = try container.decodeIfPresent([String: Float].self, forKey: .savedParameterValues) ?? [:]
+    }
+}
 
 struct AudioPluginMixerView: View {
     private let maxInsertSlots: Int = 8
@@ -107,96 +190,12 @@ struct AudioPluginMixerView: View {
         }
     }
 
-    private enum PluginSource: String, Codable {
-        case audioUnit
-        case filesystem
-    }
-
-    private enum PluginCategory: String, CaseIterable, Hashable {
-        case dynamics
-        case eq
-        case reverb
-        case utility
-
-        var title: String {
-            switch self {
-            case .dynamics:
-                return NSLocalizedString("Dynamics", comment: "")
-            case .eq:
-                return NSLocalizedString("EQ", comment: "")
-            case .reverb:
-                return NSLocalizedString("Reverb", comment: "")
-            case .utility:
-                return NSLocalizedString("Utility", comment: "")
-            }
-        }
-    }
-
     private struct DiscoveredPlugin: Identifiable, Hashable {
         let id: String
         let name: String
         let subtitle: String
         let source: PluginSource
-        let categoryHint: PluginCategory?
-    }
-
-    private struct TrackPlugin: Identifiable, Codable, Hashable {
-        let id: String
-        var name: String
-        var subtitle: String
-        var source: PluginSource
-        var identifier: String
-        var bypassed: Bool
-        var stageGain: Float
-        var autoLoad: Bool
-        var savedParameterValues: [String: Float]
-
-        enum CodingKeys: String, CodingKey {
-            case id
-            case name
-            case subtitle
-            case source
-            case identifier
-            case bypassed
-            case stageGain
-            case autoLoad
-            case savedParameterValues
-        }
-
-        init(
-            id: String,
-            name: String,
-            subtitle: String,
-            source: PluginSource,
-            identifier: String,
-            bypassed: Bool,
-            stageGain: Float,
-            autoLoad: Bool,
-            savedParameterValues: [String: Float]
-        ) {
-            self.id = id
-            self.name = name
-            self.subtitle = subtitle
-            self.source = source
-            self.identifier = identifier
-            self.bypassed = bypassed
-            self.stageGain = stageGain
-            self.autoLoad = autoLoad
-            self.savedParameterValues = savedParameterValues
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            id = try container.decode(String.self, forKey: .id)
-            name = try container.decode(String.self, forKey: .name)
-            subtitle = try container.decode(String.self, forKey: .subtitle)
-            source = try container.decode(PluginSource.self, forKey: .source)
-            identifier = try container.decode(String.self, forKey: .identifier)
-            bypassed = try container.decodeIfPresent(Bool.self, forKey: .bypassed) ?? false
-            stageGain = try container.decodeIfPresent(Float.self, forKey: .stageGain) ?? 1.0
-            autoLoad = try container.decodeIfPresent(Bool.self, forKey: .autoLoad) ?? true
-            savedParameterValues = try container.decodeIfPresent([String: Float].self, forKey: .savedParameterValues) ?? [:]
-        }
+        let categorySeedText: String
     }
 
     private struct RuntimeParameter: Identifiable {
@@ -245,17 +244,15 @@ struct AudioPluginMixerView: View {
         let nodes: [ProcessorNodeSnapshot]
     }
 
-    @AppStorage("AudioPluginInputTrackEnabled") private var pluginInputTrackEnabled: Bool = false
     @AppStorage("AudioPluginInputTrackGain") private var pluginInputTrackGain: Double = 1.0
-    @AppStorage("AudioPluginRemoteBusEnabled") private var pluginRemoteBusEnabled: Bool = false
     @AppStorage("AudioPluginRemoteBusGain") private var pluginRemoteBusGain: Double = 1.0
     @AppStorage("AudioPluginCustomScanPaths") private var pluginCustomScanPaths: String = ""
     @AppStorage("AudioPluginTrackChainsV1") private var pluginTrackChainsData: String = ""
-    @AppStorage("AudioPluginChainLivePreviewEnabled") private var pluginChainLivePreviewEnabled: Bool = true
     @AppStorage("AudioPluginPresetsV1") private var pluginPresetsData: String = ""
     @AppStorage("AudioPluginHostBufferFrames") private var pluginHostBufferFrames: Int = 256
+    @AppStorage("AudioPluginCategoryOverridesV1") private var pluginCategoryOverridesData: String = ""
+    @AppStorage("AudioPluginCustomCategoriesV1") private var pluginCustomCategoriesData: String = ""
 
-    @State private var pluginRemoteTrackEnabled: Bool = false
     @State private var pluginRemoteTrackGain: Double = 1.0
     @State private var remoteTrackSettings: [Int: (enabled: Bool, gain: Double)] = [:]
     @State private var remoteSessionOrder: [Int] = []
@@ -268,6 +265,7 @@ struct AudioPluginMixerView: View {
     @State private var selectedPluginID: String? = nil
     @State private var loadingPluginIDs: Set<String> = []
     @State private var loadedAudioUnits: [String: AVAudioUnit] = [:]  // Key: "\(trackKey):\(pluginID)"
+    @State private var loadedVST3Hosts: [String: MKVST3PluginHost] = [:]  // Key: "\(trackKey):\(pluginID)"
     @State private var parameterStateByPlugin: [String: [RuntimeParameter]] = [:]
     @State private var lastLoadErrorByPlugin: [String: String] = [:]
     @State private var processorStateByTrack: [String: TrackProcessorState] = [:]
@@ -283,6 +281,9 @@ struct AudioPluginMixerView: View {
     @State private var showingPresetSaveDialog: Bool = false
     @State private var presetNameInput: String = ""
     @State private var selectedPresetID: String? = nil
+    @State private var pluginCategoryOverrides: [String: String] = [:]
+    @State private var customPluginCategories: [String] = []
+    @State private var customCategoryInput: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -311,6 +312,7 @@ struct AudioPluginMixerView: View {
         }
         .onAppear {
             loadPluginChainState()
+            loadPluginCategoryConfiguration()
             let remoteBusChainCount = pluginChainByTrack["remoteBus"]?.count ?? 0
             NSLog("MKAudioProbe: Mixer onAppear remoteBusChain=\(remoteBusChainCount) selectedTrack=\(String(describing: selectedTrack))")
             loadPluginPresets()
@@ -333,20 +335,16 @@ struct AudioPluginMixerView: View {
             normalizeSelectedPluginSelection()
             rebuildProcessorStateMachine()
         }
-        .onChange(of: pluginInputTrackEnabled) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: pluginInputTrackGain) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: pluginRemoteBusEnabled) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: pluginRemoteBusGain) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: pluginRemoteTrackEnabled) {
-            applyRemoteTrackPreview()
+        .onChange(of: pluginInputTrackGain) {
+            applyLivePreviewForTrackKey("input")
+            PreferencesModel.shared.notifySettingsChanged()
+        }
+        .onChange(of: pluginRemoteBusGain) {
+            applyLivePreviewForTrackKey("remoteBus")
             PreferencesModel.shared.notifySettingsChanged()
         }
         .onChange(of: pluginRemoteTrackGain) {
             applyRemoteTrackPreview()
-            PreferencesModel.shared.notifySettingsChanged()
-        }
-        .onChange(of: pluginChainLivePreviewEnabled) {
-            applyLivePreviewForAllTracks()
             PreferencesModel.shared.notifySettingsChanged()
         }
         .onChange(of: pluginHostBufferFrames) {
@@ -403,22 +401,23 @@ struct AudioPluginMixerView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            Toggle(NSLocalizedString("Chain Live", comment: ""), isOn: $pluginChainLivePreviewEnabled)
-                .toggleStyle(.switch)
-                .labelsHidden()
             Spacer()
             Text(NSLocalizedString("Buffer", comment: ""))
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Picker(NSLocalizedString("Buffer", comment: ""), selection: $pluginHostBufferFrames) {
-                Text("64").tag(64)
-                Text("128").tag(128)
-                Text("256").tag(256)
-                Text("512").tag(512)
-                Text("1024").tag(1024)
-                Text("2048").tag(2048)
+            Menu {
+                ForEach([64, 128, 256, 512, 1024, 2048], id: \.self) { frames in
+                    Button("\(frames)") {
+                        pluginHostBufferFrames = frames
+                    }
+                }
+            } label: {
+                Text("\(pluginHostBufferFrames)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.primary)
+                    .frame(minWidth: 52)
             }
-            .pickerStyle(.menu)
+            .menuStyle(.borderlessButton)
             Button(NSLocalizedString("Refresh Remote Tracks", comment: "")) {
                 refreshRemoteSessionOrder()
             }
@@ -501,88 +500,11 @@ struct AudioPluginMixerView: View {
     private var mixerWorkspace: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                selectedTrackPanel
                 pluginChainPanel
-                pluginInspectorPanel
             }
             .padding(16)
         }
         .background(.thinMaterial)
-    }
-
-    @ViewBuilder
-    private var selectedTrackPanel: some View {
-        switch selectedTrack {
-        case .input:
-            mixerControlCard(
-                title: NSLocalizedString("Input Track Plugin", comment: ""),
-                subtitle: NSLocalizedString("Plugin preview runs after system processing (input) and after remote mix (output bus).", comment: ""),
-                isEnabled: $pluginInputTrackEnabled,
-                gain: $pluginInputTrackGain,
-                gainTitle: NSLocalizedString("Input Track Gain", comment: "")
-            )
-        case .remoteBus:
-            mixerControlCard(
-                title: NSLocalizedString("Remote Bus Plugin", comment: ""),
-                subtitle: NSLocalizedString("Plugin preview runs after system processing (input) and after remote mix (output bus).", comment: ""),
-                isEnabled: $pluginRemoteBusEnabled,
-                gain: $pluginRemoteBusGain,
-                gainTitle: NSLocalizedString("Remote Bus Gain", comment: "")
-            )
-        case .remoteSession:
-            VStack(alignment: .leading, spacing: 12) {
-                mixerControlCard(
-                    title: NSLocalizedString("Remote Track Plugin", comment: ""),
-                    subtitle: NSLocalizedString("Per-user remote audio lane", comment: ""),
-                    isEnabled: $pluginRemoteTrackEnabled,
-                    gain: $pluginRemoteTrackGain,
-                    gainTitle: NSLocalizedString("Remote Track Gain", comment: "")
-                )
-                Button(NSLocalizedString("Apply to Selected Track", comment: "")) {
-                    applyRemoteTrackPreview()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-    }
-
-    private func mixerControlCard(
-        title: String,
-        subtitle: String,
-        isEnabled: Binding<Bool>,
-        gain: Binding<Double>,
-        gainTitle: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .font(.headline)
-                Spacer()
-                Toggle("", isOn: isEnabled)
-                    .labelsHidden()
-            }
-
-            Text(subtitle)
-                .font(.caption)
-                .foregroundColor(.secondary)
-
-            HStack(spacing: 10) {
-                Text(gainTitle)
-                    .font(.subheadline)
-                Spacer()
-                Text(String(format: NSLocalizedString("%.1fx", comment: ""), gain.wrappedValue))
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.secondary)
-            }
-
-            Slider(value: gain, in: 0.1...3.0, step: 0.1)
-                .disabled(!isEnabled.wrappedValue)
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-        )
     }
 
     private var pluginChainPanel: some View {
@@ -607,14 +529,30 @@ struct AudioPluginMixerView: View {
                         if installedAudioUnits.isEmpty && scannedFilesystemPlugins.isEmpty {
                             Text(NSLocalizedString("No plugins available", comment: ""))
                         }
-                        ForEach(PluginCategory.allCases, id: \.self) { category in
-                            let categorized = discoveredPlugins(in: category)
-                            if !categorized.isEmpty {
-                                Menu(category.title) {
-                                    ForEach(categorized, id: \.id) { discovered in
-                                        Button(discovered.name) {
-                                            Task {
-                                                await assignPluginToSlot(discovered, slotIndex: slotIndex)
+                        if !installedAudioUnits.isEmpty {
+                            Menu(NSLocalizedString("Audio Units", comment: "")) {
+                                ForEach(groupedPluginsByCategory(installedAudioUnits), id: \.category) { group in
+                                    Menu(group.category) {
+                                        ForEach(group.plugins, id: \.id) { discovered in
+                                            Button(discovered.name) {
+                                                Task {
+                                                    await assignPluginToSlot(discovered, slotIndex: slotIndex)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if !scannedFilesystemPlugins.isEmpty {
+                            Menu(NSLocalizedString("VST3", comment: "")) {
+                                ForEach(groupedPluginsByCategory(scannedFilesystemPlugins), id: \.category) { group in
+                                    Menu(group.category) {
+                                        ForEach(group.plugins, id: \.id) { discovered in
+                                            Button(discovered.name) {
+                                                Task {
+                                                    await assignPluginToSlot(discovered, slotIndex: slotIndex)
+                                                }
                                             }
                                         }
                                     }
@@ -623,7 +561,7 @@ struct AudioPluginMixerView: View {
                         }
                         if plugin != nil {
                             Divider()
-                            Button(NSLocalizedString("Clear Slot", comment: ""), role: .destructive) {
+                            Button(NSLocalizedString("Remove Plugin", comment: ""), role: .destructive) {
                                 clearPluginSlot(slotIndex: slotIndex)
                             }
                         }
@@ -696,6 +634,7 @@ struct AudioPluginMixerView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
+                .frame(minHeight: 58)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
@@ -726,16 +665,18 @@ struct AudioPluginMixerView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
 
+            pluginCategoryManagementPanel
+
             if installedAudioUnits.isEmpty {
-                Text(NSLocalizedString("No installed AUv3 effects found", comment: ""))
+                Text(NSLocalizedString("No installed Audio Units found", comment: ""))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(NSLocalizedString("Installed Audio Units", comment: ""))
+                    Text(NSLocalizedString("Audio Units", comment: ""))
                         .font(.subheadline.weight(.semibold))
-                    ForEach(installedAudioUnits.prefix(24), id: \.id) { plugin in
-                        pluginBrowserRow(plugin)
+                    ForEach(groupedPluginsByCategory(installedAudioUnits), id: \.category) { group in
+                        pluginBrowserCategorySection(group)
                     }
                 }
             }
@@ -775,15 +716,15 @@ struct AudioPluginMixerView: View {
             }
 
             if scannedFilesystemPlugins.isEmpty {
-                Text(NSLocalizedString("No plugin bundles found in scan paths", comment: ""))
+                Text(NSLocalizedString("No VST3 bundles found in scan paths", comment: ""))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(NSLocalizedString("Scanned Plugin Bundles", comment: ""))
+                    Text(NSLocalizedString("VST3", comment: ""))
                         .font(.subheadline.weight(.semibold))
-                    ForEach(scannedFilesystemPlugins.prefix(60), id: \.id) { plugin in
-                        pluginBrowserRow(plugin)
+                    ForEach(groupedPluginsByCategory(scannedFilesystemPlugins), id: \.category) { group in
+                        pluginBrowserCategorySection(group)
                     }
                 }
             }
@@ -820,135 +761,69 @@ struct AudioPluginMixerView: View {
             }
         }
 #if os(macOS)
-        .frame(minWidth: 920, minHeight: 720)
+        .frame(minWidth: 780, minHeight: 620)
 #endif
     }
 
-    @ViewBuilder
-    private var pluginInspectorPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(NSLocalizedString("Plugin Inspector", comment: ""))
-                .font(.headline)
+    private var pluginCategoryManagementPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(NSLocalizedString("Categories", comment: ""))
+                .font(.subheadline.weight(.semibold))
 
-            if let selectedPlugin {
-                Group {
-                    Text(selectedPlugin.name)
-                        .font(.subheadline.weight(.semibold))
-                    Text(selectedPlugin.subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    if selectedPlugin.source != .audioUnit {
-                        Text(NSLocalizedString("Filesystem plugin hosting is enabled. If loading fails, check the status line for detailed error.", comment: ""))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else if loadingPluginIDs.contains(selectedPlugin.id) {
-                        Text(NSLocalizedString("Loading Audio Unit...", comment: ""))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else if audioUnitLoaded(for: selectedPlugin.id) {
-                        Text(NSLocalizedString("Audio Unit is loaded", comment: ""))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Button(NSLocalizedString("Refresh Parameters", comment: "")) {
-                            refreshParameters(for: selectedPlugin.id)
-                        }
-                        .buttonStyle(.bordered)
-
-                        let parameters = parameterStateByPlugin[selectedPlugin.id] ?? []
-                        if parameters.isEmpty {
-                            Text(NSLocalizedString("No automatable parameters exposed", comment: ""))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            // Preset Management Section
-                            Divider()
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(NSLocalizedString("Presets", comment: ""))
-                                    .font(.caption.weight(.semibold))
-
-                                let presets = pluginPresetsByIdentifier[selectedPlugin.identifier] ?? []
-                                if presets.isEmpty {
-                                    Text(NSLocalizedString("No saved presets", comment: ""))
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    ForEach(presets) { preset in
-                                        HStack(spacing: 8) {
-                                            Button(preset.name) {
-                                                loadPreset(preset, for: selectedPlugin.id)
-                                            }
-                                            .buttonStyle(.borderless)
-                                            .font(.caption)
-
-                                            Spacer()
-
-                                            Button(action: {
-                                                deletePreset(preset, for: selectedPlugin.identifier)
-                                            }) {
-                                                Image(systemName: "trash")
-                                                    .font(.caption)
-                                            }
-                                            .buttonStyle(.borderless)
-                                            .foregroundColor(.red)
-                                        }
-                                    }
-                                }
-
-                                HStack(spacing: 8) {
-                                    TextField(NSLocalizedString("Preset name", comment: ""), text: $presetNameInput)
-                                        .textFieldStyle(.roundedBorder)
-                                        .font(.caption)
-
-                                    Button(NSLocalizedString("Save", comment: "")) {
-                                        saveCurrentAsPreset(for: selectedPlugin)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .font(.caption)
-                                    .disabled(presetNameInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                                }
-                            }
-
-                            Divider()
-
-                            ForEach(parameters.prefix(18)) { parameter in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(parameter.name)
-                                            .font(.caption)
-                                        Spacer()
-                                        Text(String(format: "%.3f", parameter.value))
-                                            .font(.caption.monospacedDigit())
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Slider(
-                                        value: Binding(
-                                            get: { Double(parameterStateValue(pluginID: selectedPlugin.id, parameterID: parameter.id, fallback: parameter.value)) },
-                                            set: { setParameterValue(pluginID: selectedPlugin.id, parameterID: parameter.id, newValue: Float($0)) }
-                                        ),
-                                        in: Double(parameter.minValue)...Double(parameter.maxValue)
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Text(NSLocalizedString("Plugin is still initializing or failed to load. Check the status message for details.", comment: ""))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+            HStack(spacing: 8) {
+                TextField(NSLocalizedString("Add category", comment: ""), text: $customCategoryInput)
+                Button(NSLocalizedString("Add", comment: "")) {
+                    addCustomPluginCategory()
                 }
-            } else {
-                Text(NSLocalizedString("Select a plugin insert to inspect details", comment: ""))
+                .disabled(customCategoryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            if availablePluginCategories.isEmpty {
+                Text(NSLocalizedString("No categories configured", comment: ""))
                     .font(.caption)
                     .foregroundColor(.secondary)
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(availablePluginCategories, id: \.self) { category in
+                        HStack(spacing: 6) {
+                            Text(category)
+                                .font(.caption)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            if isCustomPluginCategory(category) {
+                                Button {
+                                    removeCustomPluginCategory(category)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.caption2)
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.secondary.opacity(0.1))
+                        )
+                    }
+                }
             }
         }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-        )
+    }
+
+    @ViewBuilder
+    private func pluginBrowserCategorySection(_ group: PluginCategoryGroup) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(group.category)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+
+            ForEach(group.plugins, id: \.id) { plugin in
+                pluginBrowserRow(plugin)
+            }
+        }
+        .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -963,7 +838,24 @@ struct AudioPluginMixerView: View {
                     .lineLimit(1)
             }
             Spacer()
-            Text(plugin.source == .audioUnit ? NSLocalizedString("AU", comment: "") : NSLocalizedString("FS", comment: ""))
+            Menu {
+                ForEach(availablePluginCategories, id: \.self) { category in
+                    Button(category) {
+                        setCategory(category, for: plugin)
+                    }
+                }
+                Divider()
+                Button(NSLocalizedString("Use Suggested Category", comment: "")) {
+                    resetCategory(for: plugin)
+                }
+            } label: {
+                Text(categoryForPlugin(plugin))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .frame(minWidth: 88, alignment: .trailing)
+            }
+            .menuStyle(.borderlessButton)
+            Text(plugin.source == .audioUnit ? NSLocalizedString("AU", comment: "") : NSLocalizedString("VST", comment: ""))
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
@@ -974,6 +866,148 @@ struct AudioPluginMixerView: View {
         var tracks: [MixerTrack] = [.input, .remoteBus]
         tracks.append(contentsOf: remoteSessionOrder.map { .remoteSession($0) })
         return tracks
+    }
+
+    private struct PluginCategoryGroup: Identifiable {
+        let category: String
+        let plugins: [DiscoveredPlugin]
+
+        var id: String { category }
+    }
+
+    private var defaultPluginCategories: [String] {
+        [
+            NSLocalizedString("Dynamics", comment: ""),
+            NSLocalizedString("EQ", comment: ""),
+            NSLocalizedString("Space", comment: ""),
+            NSLocalizedString("Distortion", comment: "")
+        ]
+    }
+
+    private var otherPluginCategory: String {
+        NSLocalizedString("Other", comment: "")
+    }
+
+    private var availablePluginCategories: [String] {
+        let merged = defaultPluginCategories + customPluginCategories + Array(pluginCategoryOverrides.values)
+        var ordered: [String] = []
+        for category in merged {
+            let trimmed = category.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !ordered.contains(trimmed) else { continue }
+            ordered.append(trimmed)
+        }
+        if !ordered.contains(otherPluginCategory) {
+            ordered.append(otherPluginCategory)
+        }
+        return ordered
+    }
+
+    private func isCustomPluginCategory(_ category: String) -> Bool {
+        customPluginCategories.contains(category)
+    }
+
+    private func groupedPluginsByCategory(_ plugins: [DiscoveredPlugin]) -> [PluginCategoryGroup] {
+        let grouped = Dictionary(grouping: plugins, by: categoryForPlugin)
+        let orderedCategories = availablePluginCategories.filter { grouped[$0] != nil }
+        let extraCategories = grouped.keys
+            .filter { !orderedCategories.contains($0) }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+
+        return (orderedCategories + extraCategories).map { category in
+            PluginCategoryGroup(
+                category: category,
+                plugins: (grouped[category] ?? [])
+                    .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            )
+        }
+    }
+
+    private func loadPluginCategoryConfiguration() {
+        if let data = pluginCategoryOverridesData.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            pluginCategoryOverrides = decoded
+        } else {
+            pluginCategoryOverrides = [:]
+        }
+
+        if let data = pluginCustomCategoriesData.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([String].self, from: data) {
+            customPluginCategories = decoded
+        } else {
+            customPluginCategories = []
+        }
+    }
+
+    private func savePluginCategoryConfiguration() {
+        if let data = try? JSONEncoder().encode(pluginCategoryOverrides),
+           let encoded = String(data: data, encoding: .utf8) {
+            pluginCategoryOverridesData = encoded
+        }
+
+        if let data = try? JSONEncoder().encode(customPluginCategories),
+           let encoded = String(data: data, encoding: .utf8) {
+            pluginCustomCategoriesData = encoded
+        }
+    }
+
+    private func addCustomPluginCategory() {
+        let candidate = customCategoryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !candidate.isEmpty else { return }
+        if !customPluginCategories.contains(candidate) && !defaultPluginCategories.contains(candidate) {
+            customPluginCategories.append(candidate)
+            customPluginCategories.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+            savePluginCategoryConfiguration()
+        }
+        customCategoryInput = ""
+    }
+
+    private func removeCustomPluginCategory(_ category: String) {
+        customPluginCategories.removeAll { $0 == category }
+        pluginCategoryOverrides = pluginCategoryOverrides.filter { $0.value != category }
+        savePluginCategoryConfiguration()
+    }
+
+    private func setCategory(_ category: String, for plugin: DiscoveredPlugin) {
+        pluginCategoryOverrides[plugin.id] = category
+        savePluginCategoryConfiguration()
+    }
+
+    private func resetCategory(for plugin: DiscoveredPlugin) {
+        pluginCategoryOverrides.removeValue(forKey: plugin.id)
+        savePluginCategoryConfiguration()
+    }
+
+    private func categoryForPlugin(_ plugin: DiscoveredPlugin) -> String {
+        if let override = pluginCategoryOverrides[plugin.id], !override.isEmpty {
+            return override
+        }
+        return inferredCategory(for: plugin)
+    }
+
+    private func inferredCategory(for plugin: DiscoveredPlugin) -> String {
+        let lowered = plugin.categorySeedText.lowercased()
+
+        let dynamicsKeywords = ["compress", "comp", "limiter", "gate", "expander", "de-esser", "deesser", "transient", "dynamics"]
+        if dynamicsKeywords.contains(where: { lowered.contains($0) }) {
+            return defaultPluginCategories[0]
+        }
+
+        let eqKeywords = ["eq", "equalizer", "filter", "shelf", "notch", "bandpass", "highpass", "lowpass", "tone"]
+        if eqKeywords.contains(where: { lowered.contains($0) }) {
+            return defaultPluginCategories[1]
+        }
+
+        let spaceKeywords = ["reverb", "delay", "echo", "room", "hall", "plate", "chamber", "ambience", "space", "stereo", "widener"]
+        if spaceKeywords.contains(where: { lowered.contains($0) }) {
+            return defaultPluginCategories[2]
+        }
+
+        let distortionKeywords = ["distortion", "drive", "satur", "fuzz", "clip", "crusher", "amp", "cab", "overdrive"]
+        if distortionKeywords.contains(where: { lowered.contains($0) }) {
+            return defaultPluginCategories[3]
+        }
+
+        return otherPluginCategory
     }
 
     private var selectedTrackKey: String {
@@ -1009,9 +1043,9 @@ struct AudioPluginMixerView: View {
         selectedPluginID = nil
     }
 
-    private func audioUnitLoaded(for pluginID: String) -> Bool {
+    private func pluginLoaded(for pluginID: String) -> Bool {
         let loadedKey = loadedAudioUnitKey(trackKey: selectedTrackKey, pluginID: pluginID)
-        return loadedAudioUnits[loadedKey] != nil
+        return loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil
     }
 
     private func mutateSelectedTrackChain(_ update: (inout [TrackPlugin]) -> Void) {
@@ -1072,7 +1106,7 @@ struct AudioPluginMixerView: View {
         guard slotIndex >= 0 else { return }
 
         let existing = pluginAtSlot(slotIndex)
-        if let existing, audioUnitLoaded(for: existing.id) {
+        if let existing, pluginLoaded(for: existing.id) {
             unloadAudioUnit(for: existing)
         }
 
@@ -1111,7 +1145,7 @@ struct AudioPluginMixerView: View {
 
     private func clearPluginSlot(slotIndex: Int) {
         guard let existing = pluginAtSlot(slotIndex) else { return }
-        if audioUnitLoaded(for: existing.id) {
+        if pluginLoaded(for: existing.id) {
             unloadAudioUnit(for: existing)
         }
         mutateSelectedTrackChain { chain in
@@ -1171,7 +1205,7 @@ struct AudioPluginMixerView: View {
                         return false
                     }
                     let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
-                    return loadedAudioUnits[loadedKey] == nil
+                    return loadedAudioUnits[loadedKey] == nil && loadedVST3Hosts[loadedKey] == nil
                 }
             }
 
@@ -1204,56 +1238,66 @@ struct AudioPluginMixerView: View {
 
     private func applyLivePreviewForTrackKey(_ key: String) {
         syncAudioUnitDSPChainForTrackKey(key)
-
-        guard pluginChainLivePreviewEnabled else {
-            if key == "input" {
-                MKAudio.shared().setInputTrackPreviewGain(Float(pluginInputTrackGain), enabled: pluginInputTrackEnabled)
-            } else if key == "remoteBus" {
-                MKAudio.shared().setRemoteBusPreviewGain(Float(pluginRemoteBusGain), enabled: pluginRemoteBusEnabled)
-            } else if let session = parseRemoteSessionID(from: key) {
-                MKAudio.shared().setRemoteTrackPreviewGain(Float(pluginRemoteTrackGain), enabled: pluginRemoteTrackEnabled, forSession: UInt(session))
-            }
-            return
-        }
-
         let chain = pluginChainByTrack[key] ?? []
-        let enabled = chain.contains { !$0.bypassed }
-        let gain: Float = 1.0
+        let hasActivePlugins = chain.contains { !$0.bypassed }
 
         if key == "input" {
-            pluginInputTrackEnabled = enabled
-            pluginInputTrackGain = Double(gain)
+            let gain = Float(pluginInputTrackGain)
+            let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
             MKAudio.shared().setInputTrackPreviewGain(gain, enabled: enabled)
             return
         }
         if key == "remoteBus" {
-            pluginRemoteBusEnabled = enabled
-            pluginRemoteBusGain = Double(gain)
+            let gain = Float(pluginRemoteBusGain)
+            let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
             MKAudio.shared().setRemoteBusPreviewGain(gain, enabled: enabled)
             return
         }
         if let session = parseRemoteSessionID(from: key) {
-            if case .remoteSession(let currentSession) = selectedTrack, currentSession == session {
-                pluginRemoteTrackEnabled = enabled
-                pluginRemoteTrackGain = Double(gain)
-            }
+            let gain = Float(pluginRemoteTrackGain)
+            let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
             remoteTrackSettings[session] = (enabled: enabled, gain: Double(gain))
             MKAudio.shared().setRemoteTrackPreviewGain(gain, enabled: enabled, forSession: UInt(session))
         }
     }
 
-    private func activeAudioUnitChain(for key: String) -> [NSDictionary] {
+    private enum LoadedPluginProcessor {
+        case audioUnit(AVAudioUnit)
+        case vst3(MKVST3PluginHost)
+    }
+
+    private func loadedProcessor(for trackKey: String, pluginID: String) -> LoadedPluginProcessor? {
+        let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
+        if let audioUnit = loadedAudioUnits[loadedKey] {
+            return .audioUnit(audioUnit)
+        }
+        if let vst3Host = loadedVST3Hosts[loadedKey] {
+            return .vst3(vst3Host)
+        }
+        return nil
+    }
+
+    private func activeProcessorChain(for key: String) -> [NSDictionary] {
         let chain = pluginChainByTrack[key] ?? []
         return chain
             .filter { !$0.bypassed }
             .compactMap { plugin in
-                guard let audioUnit = loadedAudioUnits[loadedAudioUnitKey(trackKey: key, pluginID: plugin.id)] else {
+                guard let processor = loadedProcessor(for: key, pluginID: plugin.id) else {
                     return nil
                 }
-                return [
-                    "audioUnit": audioUnit,
-                    "mix": NSNumber(value: min(max(plugin.stageGain, 0.0), 1.0))
-                ] as NSDictionary
+                let mix = NSNumber(value: min(max(plugin.stageGain, 0.0), 1.0))
+                switch processor {
+                case .audioUnit(let audioUnit):
+                    return [
+                        "audioUnit": audioUnit,
+                        "mix": mix
+                    ] as NSDictionary
+                case .vst3(let vst3Host):
+                    return [
+                        "vst3Host": vst3Host,
+                        "mix": mix
+                    ] as NSDictionary
+                }
             }
     }
 
@@ -1263,15 +1307,15 @@ struct AudioPluginMixerView: View {
 
     private func syncAudioUnitDSPChainForTrackKey(_ key: String) {
         if key == "input" {
-            MKAudio.shared().setInputTrackAudioUnitChain(activeAudioUnitChain(for: key))
+            MKAudio.shared().setInputTrackAudioUnitChain(activeProcessorChain(for: key))
             return
         }
         if key == "remoteBus" {
-            MKAudio.shared().setRemoteBusAudioUnitChain(activeAudioUnitChain(for: key))
+            MKAudio.shared().setRemoteBusAudioUnitChain(activeProcessorChain(for: key))
             return
         }
         if let session = parseRemoteSessionID(from: key) {
-            MKAudio.shared().setRemoteTrackAudioUnitChain(activeAudioUnitChain(for: key), forSession: UInt(session))
+            MKAudio.shared().setRemoteTrackAudioUnitChain(activeProcessorChain(for: key), forSession: UInt(session))
         }
     }
 
@@ -1305,7 +1349,7 @@ struct AudioPluginMixerView: View {
                 state = .bypassed
             } else if loadingPluginIDs.contains(plugin.id) {
                 state = .loading
-            } else if loadedAudioUnits[loadedKey] != nil {
+            } else if loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil {
                 state = .loaded
             } else if lastLoadErrorByPlugin[plugin.id] != nil {
                 state = .failed
@@ -1328,69 +1372,6 @@ struct AudioPluginMixerView: View {
         processorStateByTrack[key] = snapshot
     }
 
-    private func discoveredPlugins(in category: PluginCategory) -> [DiscoveredPlugin] {
-        let all = installedAudioUnits + scannedFilesystemPlugins
-        var unique: [String: DiscoveredPlugin] = [:]
-        for plugin in all where unique[plugin.id] == nil {
-            unique[plugin.id] = plugin
-        }
-        return Array(unique.values)
-            .filter { pluginCategory(for: $0) == category }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private func pluginCategory(for plugin: DiscoveredPlugin) -> PluginCategory {
-        if let hint = plugin.categoryHint {
-            return hint
-        }
-        let lowered = (plugin.name + " " + plugin.subtitle).lowercased()
-
-        let dynamicsKeywords = ["compress", "comp", "limiter", "gate", "expander", "de-esser", "deesser", "transient"]
-        if dynamicsKeywords.contains(where: { lowered.contains($0) }) {
-            return .dynamics
-        }
-
-        let eqKeywords = ["eq", "equalizer", "filter", "shelf", "notch", "bandpass", "highpass", "lowpass"]
-        if eqKeywords.contains(where: { lowered.contains($0) }) {
-            return .eq
-        }
-
-        let reverbKeywords = ["reverb", "room", "hall", "plate", "chamber", "ambience"]
-        if reverbKeywords.contains(where: { lowered.contains($0) }) {
-            return .reverb
-        }
-
-        return .utility
-    }
-
-    private func auCategoryHint(from component: AVAudioUnitComponent) -> PluginCategory? {
-        let info = ([component.typeName, component.name, component.manufacturerName] + component.allTagNames)
-            .joined(separator: " ")
-            .lowercased()
-
-        let dynamicsKeywords = ["compress", "comp", "limiter", "gate", "expander", "de-esser", "deesser", "transient", "dynamics"]
-        if dynamicsKeywords.contains(where: { info.contains($0) }) {
-            return .dynamics
-        }
-
-        let eqKeywords = ["eq", "equalizer", "filter", "shelf", "notch", "bandpass", "highpass", "lowpass", "tone"]
-        if eqKeywords.contains(where: { info.contains($0) }) {
-            return .eq
-        }
-
-        let reverbKeywords = ["reverb", "room", "hall", "plate", "chamber", "ambience"]
-        if reverbKeywords.contains(where: { info.contains($0) }) {
-            return .reverb
-        }
-
-        let utilityKeywords = ["analyzer", "meter", "gain", "utility", "stereo", "phase", "delay", "pan"]
-        if utilityKeywords.contains(where: { info.contains($0) }) {
-            return .utility
-        }
-
-        return nil
-    }
-
     private func loadAudioUnit(for plugin: TrackPlugin) async -> Bool {
         guard plugin.source == .audioUnit || plugin.source == .filesystem else {
             pluginOperationMessage = NSLocalizedString("Only Audio Unit and filesystem plugins can be loaded", comment: "")
@@ -1410,7 +1391,7 @@ struct AudioPluginMixerView: View {
         if loadingPluginIDs.contains(plugin.id) {
             return false
         }
-        if loadedAudioUnits[loadedKey] != nil {
+        if loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil {
             return true
         }
 
@@ -1450,7 +1431,11 @@ struct AudioPluginMixerView: View {
 
         if errorText == nil {
             lastLoadErrorByPlugin[plugin.id] = nil
-            parameterStateByPlugin[plugin.id] = []
+            if let unit = loadedAudioUnits[loadedKey] {
+                rebuildParameterState(pluginID: plugin.id, unit: unit)
+            } else {
+                parameterStateByPlugin[plugin.id] = []
+            }
             pluginOperationMessage = String(format: NSLocalizedString("Loaded %@", comment: ""), plugin.name)
             applyLivePreviewForTrackKey(trackKey)
             rebuildProcessorStateMachine()
@@ -1471,61 +1456,8 @@ struct AudioPluginMixerView: View {
         sampleRate: Double,
         trackKey: String
     ) async -> Bool {
-        // Extract the VST3 bundle path from the identifier (format: "fs:/path/to/plugin.vst3")
         guard plugin.identifier.hasPrefix("fs:") else {
             let message = NSLocalizedString("Invalid filesystem plugin identifier", comment: "")
-            lastLoadErrorByPlugin[plugin.id] = message
-            pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, message)
-            rebuildProcessorStateMachine()
-            return false
-        }
-
-        let bundlePath = String(plugin.identifier.dropFirst(3))
-        let bundleURL = URL(fileURLWithPath: bundlePath)
-        let canonicalBundlePath = bundleURL.standardizedFileURL.path
-        let bundleName = bundleURL.deletingPathExtension().lastPathComponent.lowercased()
-        let pluginDisplayName = plugin.name.replacingOccurrences(of: ".vst3", with: "", options: [.caseInsensitive]).lowercased()
-
-        // Load the VST3 bundle as an Audio Unit component
-        // macOS exposes VST3 plugins as AU components when they're properly installed
-        // For manually scanned VST3 bundles, we search for matching component by name
-        let manager = AVAudioUnitComponentManager.shared()
-
-        // Search by bundle path first, then fallback to name matching.
-        let componentTypes: [UInt32] = [
-            kAudioUnitType_Effect,
-            kAudioUnitType_MusicEffect,
-            kAudioUnitType_FormatConverter,
-            kAudioUnitType_Generator
-        ]
-        var foundComponent: AVAudioUnitComponent?
-
-        for type in componentTypes {
-            let desc = AudioComponentDescription(
-                componentType: type,
-                componentSubType: 0,
-                componentManufacturer: 0,
-                componentFlags: 0,
-                componentFlagsMask: 0
-            )
-            let components = manager.components(matching: desc)
-            for component in components {
-                let componentName = component.name.lowercased()
-                let manufacturerName = component.manufacturerName.lowercased()
-                if componentName.contains(bundleName)
-                    || componentName.contains(pluginDisplayName)
-                    || manufacturerName.contains(bundleName)
-                    || manufacturerName.contains(pluginDisplayName)
-                    || componentName.localizedStandardContains(canonicalBundlePath) {
-                    foundComponent = component
-                    break
-                }
-            }
-            if foundComponent != nil { break }
-        }
-
-        guard let component = foundComponent else {
-            let message = NSLocalizedString("No matching AU component found for this filesystem plugin", comment: "")
             lastLoadErrorByPlugin[plugin.id] = message
             pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, message)
             rebuildProcessorStateMachine()
@@ -1536,24 +1468,51 @@ struct AudioPluginMixerView: View {
         lastLoadErrorByPlugin[plugin.id] = nil
         rebuildProcessorStateMachine()
 
-        let errorText = await instantiateAudioUnitWithFallback(
-            description: component.audioComponentDescription,
-            requiredChannels: requiredChannels,
-            sampleRate: sampleRate,
-            loadedKey: loadedKey
-        )
-        if let errorText {
+        let bundlePath = String(plugin.identifier.dropFirst(3))
+
+        let host: MKVST3PluginHost
+        do {
+            host = try MKVST3PluginHost(bundlePath: bundlePath, displayName: plugin.name)
+        } catch {
             loadingPluginIDs.remove(plugin.id)
             parameterStateByPlugin[plugin.id] = nil
-            lastLoadErrorByPlugin[plugin.id] = errorText
-            pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, errorText)
+            let message = error.localizedDescription.isEmpty
+                ? NSLocalizedString("Failed to create VST3 host", comment: "")
+                : error.localizedDescription
+            lastLoadErrorByPlugin[plugin.id] = message
+            pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, message)
+            NSLog("MKVST3-Swift: init FAILED for '\(plugin.name)': \(message)")
+            rebuildProcessorStateMachine()
+            return false
+        }
+
+        let effectiveSampleRate = sampleRate > 0 ? sampleRate : 48_000
+        let effectiveFrames = max(pluginHostBufferFrames, 64)
+        do {
+            try host.configure(
+                withInputChannels: UInt(requiredChannels),
+                outputChannels: UInt(requiredChannels),
+                sampleRate: effectiveSampleRate,
+                maximumFramesToRender: UInt(effectiveFrames)
+            )
+        } catch {
+            loadingPluginIDs.remove(plugin.id)
+            parameterStateByPlugin[plugin.id] = nil
+            let message = error.localizedDescription.isEmpty
+                ? NSLocalizedString("Failed to configure VST3 plug-in", comment: "")
+                : error.localizedDescription
+            lastLoadErrorByPlugin[plugin.id] = message
+            pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, message)
+            NSLog("MKVST3-Swift: configure FAILED for '\(plugin.name)': \(message)")
             rebuildProcessorStateMachine()
             return false
         }
 
         loadingPluginIDs.remove(plugin.id)
+        loadedVST3Hosts[loadedKey] = host
+        NSLog("MKVST3-Swift: fully loaded '\(plugin.name)' key=\(loadedKey)")
+        rebuildParameterState(pluginID: plugin.id, vst3Host: host)
         lastLoadErrorByPlugin[plugin.id] = nil
-        parameterStateByPlugin[plugin.id] = []
         pluginOperationMessage = String(format: NSLocalizedString("Loaded %@", comment: ""), plugin.name)
         applyLivePreviewForTrackKey(trackKey)
         rebuildProcessorStateMachine()
@@ -1718,64 +1677,124 @@ struct AudioPluginMixerView: View {
         return true
     }
 
+    private func pluginEditorSnapshot(trackKey: String, pluginID: String) -> PluginEditorSnapshot {
+        let plugin = findPlugin(withID: pluginID, trackKey: trackKey)
+        let parameters = (parameterStateByPlugin[pluginID] ?? []).map {
+            PluginEditorParameterSnapshot(
+                id: $0.id,
+                name: $0.name,
+                minValue: $0.minValue,
+                maxValue: $0.maxValue,
+                value: parameterStateValue(pluginID: pluginID, parameterID: $0.id, fallback: $0.value)
+            )
+        }
+
+        return PluginEditorSnapshot(
+            name: plugin?.name ?? NSLocalizedString("Plugin", comment: ""),
+            subtitle: plugin?.subtitle ?? "",
+            isLoading: loadingPluginIDs.contains(pluginID),
+            isLoaded: loadedProcessor(for: trackKey, pluginID: pluginID) != nil,
+            errorDescription: lastLoadErrorByPlugin[pluginID],
+            parameters: parameters
+        )
+    }
+
     private func openPluginEditor(for plugin: TrackPlugin) {
         selectedPluginID = plugin.id
-
-        guard plugin.source == .audioUnit else {
-            pluginOperationMessage = NSLocalizedString("Plugin UI is unavailable", comment: "")
-            return
-        }
 
         guard let trackKey = self.trackKey(containingPluginID: plugin.id) else {
             pluginOperationMessage = NSLocalizedString("Plugin not found in any track", comment: "")
             return
         }
 
-        let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
-        guard let unit = loadedAudioUnits[loadedKey] else {
-            pluginOperationMessage = NSLocalizedString("Plugin is not ready", comment: "")
-            return
-        }
-
-        let targetPluginID = plugin.id
-        let targetTrackKey = trackKey
-        unit.auAudioUnit.requestViewController { viewController in
-            DispatchQueue.main.async {
-                guard let viewController else {
-                    pluginOperationMessage = NSLocalizedString("Plugin UI is unavailable", comment: "")
-                    return
-                }
+        switch loadedProcessor(for: trackKey, pluginID: plugin.id) {
+        case .audioUnit(let unit):
+            let targetPluginID = plugin.id
+            let targetTrackKey = trackKey
+            unit.auAudioUnit.requestViewController { viewController in
+                DispatchQueue.main.async {
+                    guard let viewController else {
+                        pluginOperationMessage = NSLocalizedString("Plugin UI is unavailable", comment: "")
+                        return
+                    }
 
 #if os(iOS)
-                pluginEditorTitle = plugin.name
-                pluginEditorController = viewController
-                showingPluginEditor = true
+                    pluginEditorTitle = plugin.name
+                    pluginEditorController = viewController
+                    showingPluginEditor = true
 #else
-                PluginEditorWindowController.shared.show(
-                    pluginKey: "\(targetTrackKey):\(targetPluginID)",
-                    controller: viewController,
-                    title: plugin.name
-                ) {
-                    if selectedPluginID == targetPluginID {
-                        selectedPluginID = nil
+                    let pluginKey = "\(targetTrackKey):\(targetPluginID)"
+                    PluginEditorWindowController.shared.show(
+                        pluginKey: pluginKey,
+                        rootView: AnyView(
+                            PluginEditorWindowContentView(
+                                controller: viewController,
+                                snapshotProvider: { pluginEditorSnapshot(trackKey: targetTrackKey, pluginID: targetPluginID) },
+                                refreshAction: { refreshParameters(for: targetPluginID, trackKey: targetTrackKey) },
+                                parameterChangeAction: { parameterID, value in
+                                    setParameterValue(pluginID: targetPluginID, trackKey: targetTrackKey, parameterID: parameterID, newValue: value)
+                                }
+                            )
+                        ),
+                        observedController: viewController,
+                        preferredContentSize: viewController.preferredContentSize,
+                        title: plugin.name
+                    ) {
+                        if selectedPluginID == targetPluginID {
+                            selectedPluginID = nil
+                        }
                     }
-                }
 #endif
+                }
             }
+        case .vst3(let vst3Host):
+#if os(iOS)
+            pluginOperationMessage = NSLocalizedString("Plugin UI is unavailable on iOS", comment: "")
+#else
+            let pluginKey = "\(trackKey):\(plugin.id)"
+            // Try native VST3 editor view first
+            let nativeVC: NSViewController? = try? vst3Host.requestViewController()
+            // Use plugin's preferred size, or fallback to default
+            // Add toolbar height (~49pt) to the plugin's content size
+            let toolbarHeight: CGFloat = 49.0
+            let pluginSize = nativeVC?.preferredContentSize ?? NSSize(width: 600, height: 400)
+            let editorSize = NSSize(width: max(500, pluginSize.width), height: pluginSize.height + toolbarHeight)
+            PluginEditorWindowController.shared.show(
+                pluginKey: pluginKey,
+                rootView: AnyView(
+                    PluginEditorWindowContentView(
+                        controller: nativeVC,
+                        snapshotProvider: { pluginEditorSnapshot(trackKey: trackKey, pluginID: plugin.id) },
+                        refreshAction: { refreshParameters(for: plugin.id, trackKey: trackKey) },
+                        parameterChangeAction: { parameterID, value in
+                            setParameterValue(pluginID: plugin.id, trackKey: trackKey, parameterID: parameterID, newValue: value)
+                        }
+                    )
+                ),
+                observedController: nativeVC,  // Enable size observer for dynamic resize
+                preferredContentSize: editorSize,
+                title: plugin.name
+            ) {
+                if selectedPluginID == plugin.id {
+                    selectedPluginID = nil
+                }
+            }
+#endif
+        case .none:
+            pluginOperationMessage = NSLocalizedString("Plugin is not ready", comment: "")
+            return
         }
     }
 
     private func unloadAudioUnit(for plugin: TrackPlugin) {
-        // Unload from all tracks
         if let trackKey = self.trackKey(containingPluginID: plugin.id) {
 #if os(macOS)
             PluginEditorWindowController.shared.close(pluginKey: "\(trackKey):\(plugin.id)")
 #endif
             let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
             loadedAudioUnits[loadedKey] = nil
+            loadedVST3Hosts[loadedKey] = nil
         }
-        // Also try legacy key
-        loadedAudioUnits[plugin.id] = nil
 
         parameterStateByPlugin[plugin.id] = nil
         lastLoadErrorByPlugin[plugin.id] = nil
@@ -1855,12 +1874,39 @@ struct AudioPluginMixerView: View {
         parameterStateByPlugin[pluginID] = state
     }
 
+    private func rebuildParameterState(pluginID: String, vst3Host: MKVST3PluginHost) {
+        var state = vst3Host.copyParameterSnapshots()
+            .prefix(64)
+            .compactMap { snapshot -> RuntimeParameter? in
+                guard let parameterID = snapshot["id"] as? NSNumber,
+                      let name = snapshot["name"] as? String,
+                      let minValue = snapshot["minValue"] as? NSNumber,
+                      let maxValue = snapshot["maxValue"] as? NSNumber,
+                      let value = snapshot["value"] as? NSNumber else {
+                    return nil
+                }
+
+                return RuntimeParameter(
+                    id: parameterID.uint64Value,
+                    name: name,
+                    minValue: minValue.floatValue,
+                    maxValue: maxValue.floatValue,
+                    value: value.floatValue
+                )
+            }
+        applySavedParameters(pluginID: pluginID, state: &state, vst3Host: vst3Host)
+        parameterStateByPlugin[pluginID] = state
+    }
+
     private func refreshParameters(for pluginID: String, trackKey: String? = nil) {
         let tk = trackKey ?? selectedTrackKey
         let loadedKey = loadedAudioUnitKey(trackKey: tk, pluginID: pluginID)
-        guard let unit = loadedAudioUnits[loadedKey] else { return }
         DispatchQueue.main.async {
-            rebuildParameterState(pluginID: pluginID, unit: unit)
+            if let unit = loadedAudioUnits[loadedKey] {
+                rebuildParameterState(pluginID: pluginID, unit: unit)
+            } else if let vst3Host = loadedVST3Hosts[loadedKey] {
+                rebuildParameterState(pluginID: pluginID, vst3Host: vst3Host)
+            }
         }
     }
 
@@ -1880,15 +1926,40 @@ struct AudioPluginMixerView: View {
         }
     }
 
+    private func applySavedParameters(pluginID: String, state: inout [RuntimeParameter], vst3Host: MKVST3PluginHost) {
+        guard let plugin = findPlugin(withID: pluginID), !plugin.savedParameterValues.isEmpty else {
+            // No saved values - this is normal for newly added plugins, don't log
+            return
+        }
+        var restoredCount = 0
+        for index in state.indices {
+            let key = String(state[index].id)
+            guard let saved = plugin.savedParameterValues[key] else { continue }
+            let normalized = min(max(saved, state[index].minValue), state[index].maxValue)
+            state[index].value = normalized
+            _ = vst3Host.setParameter(withID: state[index].id, normalizedValue: normalized)
+            restoredCount += 1
+        }
+        if restoredCount > 0 {
+            NSLog("MKVST3-Swift: restored \(restoredCount) saved params for \(plugin.name)")
+        }
+    }
+
     private func parameterStateValue(pluginID: String, parameterID: UInt64, fallback: Float) -> Float {
         parameterStateByPlugin[pluginID]?.first(where: { $0.id == parameterID })?.value ?? fallback
     }
 
     private func setParameterValue(pluginID: String, parameterID: UInt64, newValue: Float) {
-        let loadedKey = loadedAudioUnitKey(trackKey: selectedTrackKey, pluginID: pluginID)
+        setParameterValue(pluginID: pluginID, trackKey: selectedTrackKey, parameterID: parameterID, newValue: newValue)
+    }
+
+    private func setParameterValue(pluginID: String, trackKey: String, parameterID: UInt64, newValue: Float) {
+        let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
         if let unit = loadedAudioUnits[loadedKey],
            let parameter = unit.auAudioUnit.parameterTree?.allParameters.first(where: { $0.address == parameterID }) {
             parameter.value = newValue
+        } else if let vst3Host = loadedVST3Hosts[loadedKey] {
+            _ = vst3Host.setParameter(withID: parameterID, normalizedValue: newValue)
         }
 
         guard var list = parameterStateByPlugin[pluginID],
@@ -1916,6 +1987,10 @@ struct AudioPluginMixerView: View {
         return nil
     }
 
+    private func findPlugin(withID pluginID: String, trackKey: String) -> TrackPlugin? {
+        pluginChainByTrack[trackKey]?.first(where: { $0.id == pluginID })
+    }
+
     private func mutatePlugin(withID pluginID: String, mutate: (inout TrackPlugin) -> Void) {
         for key in pluginChainByTrack.keys {
             guard var chain = pluginChainByTrack[key], let index = chain.firstIndex(where: { $0.id == pluginID }) else {
@@ -1935,7 +2010,6 @@ struct AudioPluginMixerView: View {
             return
         }
         let trackState = remoteTrackSettings[session] ?? (enabled: false, gain: 1.0)
-        pluginRemoteTrackEnabled = trackState.enabled
         pluginRemoteTrackGain = trackState.gain
     }
 
@@ -1985,12 +2059,19 @@ struct AudioPluginMixerView: View {
         }
 
         // Apply preset values to runtime parameters
-        if let unit = loadedAudioUnits[loadedAudioUnitKey(trackKey: selectedTrackKey, pluginID: pluginID)] {
+        let loadedKey = loadedAudioUnitKey(trackKey: selectedTrackKey, pluginID: pluginID)
+        if let unit = loadedAudioUnits[loadedKey] {
             let au = unit.auAudioUnit
             for (paramIDString, value) in preset.parameterValues {
                 if let paramID = UInt64(paramIDString),
                    let param = au.parameterTree?.parameter(withAddress: AUParameterAddress(paramID)) {
                     param.value = value
+                }
+            }
+        } else if let vst3Host = loadedVST3Hosts[loadedKey] {
+            for (paramIDString, value) in preset.parameterValues {
+                if let paramID = UInt64(paramIDString) {
+                    _ = vst3Host.setParameter(withID: paramID, normalizedValue: value)
                 }
             }
         }
@@ -2035,8 +2116,12 @@ struct AudioPluginMixerView: View {
 
     private func applyRemoteTrackPreview() {
         guard case .remoteSession(let session) = selectedTrack else { return }
-        remoteTrackSettings[session] = (enabled: pluginRemoteTrackEnabled, gain: pluginRemoteTrackGain)
-        MKAudio.shared().setRemoteTrackPreviewGain(Float(pluginRemoteTrackGain), enabled: pluginRemoteTrackEnabled, forSession: UInt(session))
+        let trackKey = "remoteSession:\(session)"
+        let hasActivePlugins = (pluginChainByTrack[trackKey] ?? []).contains { !$0.bypassed }
+        let gain = Float(pluginRemoteTrackGain)
+        let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
+        remoteTrackSettings[session] = (enabled: enabled, gain: pluginRemoteTrackGain)
+        MKAudio.shared().setRemoteTrackPreviewGain(gain, enabled: enabled, forSession: UInt(session))
     }
 
     private func refreshInstalledAudioUnits() {
@@ -2068,7 +2153,8 @@ struct AudioPluginMixerView: View {
                         name: component.name,
                         subtitle: component.manufacturerName,
                         source: .audioUnit,
-                        categoryHint: auCategoryHint(from: component)
+                        categorySeedText: ([component.typeName, component.name, component.manufacturerName] + component.allTagNames)
+                            .joined(separator: " ")
                     )
                 }
             }
@@ -2105,9 +2191,7 @@ struct AudioPluginMixerView: View {
     private func refreshFilesystemPluginScan() {
 #if os(macOS)
         var scanRoots: [String] = [
-            "/Library/Audio/Plug-Ins/Components",
             "/Library/Audio/Plug-Ins/VST3",
-            NSString(string: "~/Library/Audio/Plug-Ins/Components").expandingTildeInPath,
             NSString(string: "~/Library/Audio/Plug-Ins/VST3").expandingTildeInPath
         ]
         scanRoots.append(contentsOf: customScanPathEntries)
@@ -2121,7 +2205,7 @@ struct AudioPluginMixerView: View {
             }
             let children = (try? fm.contentsOfDirectory(atPath: root)) ?? []
             for item in children {
-                if item.hasSuffix(".vst3") || item.hasSuffix(".component") {
+                if item.hasSuffix(".vst3") {
                     found.append("\(root)/\(item)")
                 }
             }
@@ -2131,10 +2215,10 @@ struct AudioPluginMixerView: View {
             .map { fullPath in
                 DiscoveredPlugin(
                     id: "fs:\(fullPath)",
-                    name: URL(fileURLWithPath: fullPath).lastPathComponent,
+                    name: URL(fileURLWithPath: fullPath).deletingPathExtension().lastPathComponent,
                     subtitle: fullPath,
                     source: .filesystem,
-                    categoryHint: nil
+                    categorySeedText: "\(URL(fileURLWithPath: fullPath).deletingPathExtension().lastPathComponent) \(fullPath)"
                 )
             }
 #endif
@@ -2152,35 +2236,240 @@ private struct PluginEditorHostView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 #elseif os(macOS)
+private struct PluginEditorMacHostView: NSViewControllerRepresentable {
+    let controller: NSViewController
+
+    func makeNSViewController(context: Context) -> NSViewController {
+        let container = PluginEditorMacContainerViewController()
+        container.setEmbeddedController(controller)
+        return container
+    }
+
+    func updateNSViewController(_ nsViewController: NSViewController, context: Context) {
+        (nsViewController as? PluginEditorMacContainerViewController)?.setEmbeddedController(controller)
+    }
+}
+
+private final class PluginEditorMacContainerViewController: NSViewController {
+    private weak var embeddedController: NSViewController?
+
+    override func loadView() {
+        view = NSView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    func setEmbeddedController(_ controller: NSViewController) {
+        guard embeddedController !== controller else { return }
+
+        if let existing = embeddedController {
+            existing.view.removeFromSuperview()
+            existing.removeFromParent()
+        }
+
+        embeddedController = controller
+        addChild(controller)
+        let childView = controller.view
+        childView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(childView)
+        NSLayoutConstraint.activate([
+            childView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            childView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            childView.topAnchor.constraint(equalTo: view.topAnchor),
+            childView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+}
+
+private struct PluginEditorWindowContentView: View {
+    private enum Tab: String, CaseIterable, Identifiable {
+        case pluginUI
+        case parameters
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .pluginUI:
+                return NSLocalizedString("Plugin UI", comment: "")
+            case .parameters:
+                return NSLocalizedString("Parameters", comment: "")
+            }
+        }
+    }
+
+    let controller: NSViewController?
+    let snapshotProvider: () -> PluginEditorSnapshot
+    let refreshAction: () -> Void
+    let parameterChangeAction: (UInt64, Float) -> Void
+
+    @State private var selectedTab: Tab = .pluginUI
+    @State private var snapshot: PluginEditorSnapshot
+
+    init(
+        controller: NSViewController?,
+        snapshotProvider: @escaping () -> PluginEditorSnapshot,
+        refreshAction: @escaping () -> Void,
+        parameterChangeAction: @escaping (UInt64, Float) -> Void
+    ) {
+        self.controller = controller
+        self.snapshotProvider = snapshotProvider
+        self.refreshAction = refreshAction
+        self.parameterChangeAction = parameterChangeAction
+        _snapshot = State(initialValue: snapshotProvider())
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                if controller != nil {
+                    Picker("", selection: $selectedTab) {
+                        ForEach(Tab.allCases) { tab in
+                            Text(tab.title).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                }
+
+                Spacer()
+
+                if selectedTab == .parameters {
+                    Button(NSLocalizedString("Refresh", comment: "")) {
+                        refreshSnapshot()
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(12)
+
+            Divider()
+
+            if selectedTab == .pluginUI, let controller {
+                PluginEditorMacHostView(controller: controller)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(snapshot.name)
+                            .font(.headline)
+                        if !snapshot.subtitle.isEmpty {
+                            Text(snapshot.subtitle)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        if snapshot.isLoading {
+                            Text(NSLocalizedString("Loading Audio Unit...", comment: ""))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else if let errorDescription = snapshot.errorDescription {
+                            Text(errorDescription)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        } else if !snapshot.isLoaded {
+                            Text(NSLocalizedString("Plugin is not ready", comment: ""))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else if snapshot.parameters.isEmpty {
+                            Text(NSLocalizedString("No automatable parameters exposed", comment: ""))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(snapshot.parameters) { parameter in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(parameter.name)
+                                            .font(.caption)
+                                        Spacer()
+                                        Text(String(format: "%.3f", snapshotValue(for: parameter.id, fallback: parameter.value)))
+                                            .font(.caption.monospacedDigit())
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Slider(
+                                        value: Binding(
+                                            get: { Double(snapshotValue(for: parameter.id, fallback: parameter.value)) },
+                                            set: { newValue in
+                                                parameterChangeAction(parameter.id, Float(newValue))
+                                                refreshSnapshot()
+                                            }
+                                        ),
+                                        in: Double(parameter.minValue)...Double(parameter.maxValue)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .frame(minWidth: 640, maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
+        .onAppear {
+            if controller == nil {
+                selectedTab = .parameters
+            }
+            refreshSnapshot()
+        }
+        .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
+            guard selectedTab == .parameters else { return }
+            refreshSnapshot()
+        }
+    }
+
+    private func refreshSnapshot() {
+        refreshAction()
+        snapshot = snapshotProvider()
+    }
+
+    private func snapshotValue(for parameterID: UInt64, fallback: Float) -> Float {
+        snapshot.parameters.first(where: { $0.id == parameterID })?.value ?? fallback
+    }
+}
+
 @MainActor
 final class PluginEditorWindowController: NSObject {
     static let shared = PluginEditorWindowController()
 
     private var windows: [String: NSWindow] = [:]
     private var closeHandlers: [String: () -> Void] = [:]
+    private var sizeObservers: [String: NSKeyValueObservation] = [:]
 
     private override init() {
         super.init()
     }
 
-    func show(pluginKey: String, controller: NSViewController, title: String, onClose: @escaping () -> Void) {
-        let targetSize = normalizedSize(from: controller.preferredContentSize)
+    func show(
+        pluginKey: String,
+        rootView: AnyView,
+        observedController: NSViewController?,
+        preferredContentSize: NSSize,
+        title: String,
+        onClose: @escaping () -> Void
+    ) {
+        let targetSize = normalizedSize(from: preferredContentSize)
+        let hostingController = NSHostingController(rootView: rootView)
 
         if let window = windows[pluginKey] {
             window.title = title
-            window.contentViewController = controller
+            window.contentViewController = hostingController
             resize(window: window, to: targetSize)
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             closeHandlers[pluginKey] = onClose
+            if let observedController {
+                installSizeObserver(for: pluginKey, controller: observedController)
+            } else {
+                sizeObservers.removeValue(forKey: pluginKey)
+            }
             return
         }
 
-        let window = NSWindow(contentViewController: controller)
+        let window = NSWindow(contentViewController: hostingController)
         window.title = title
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.styleMask = [.titled, .closable, .miniaturizable]  // Not resizable
         window.setContentSize(targetSize)
-        window.minSize = NSSize(width: max(480, targetSize.width * 0.8), height: max(320, targetSize.height * 0.8))
+        window.minSize = targetSize
+        window.maxSize = targetSize
         window.center()
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)
@@ -2195,18 +2484,22 @@ final class PluginEditorWindowController: NSObject {
 
         windows[pluginKey] = window
         closeHandlers[pluginKey] = onClose
+        if let observedController {
+            installSizeObserver(for: pluginKey, controller: observedController)
+        }
     }
 
     func close(pluginKey: String) {
         if let window = windows.removeValue(forKey: pluginKey) {
             closeHandlers.removeValue(forKey: pluginKey)
+            sizeObservers.removeValue(forKey: pluginKey)
             window.close()
         }
     }
 
     private func normalizedSize(from preferred: NSSize) -> NSSize {
         let width = preferred.width > 10 ? preferred.width : 960
-        let height = preferred.height > 10 ? preferred.height : 620
+        let height = preferred.height > 10 ? preferred.height + 52 : 620
         return NSSize(width: max(600, width), height: max(420, height))
     }
 
@@ -2223,7 +2516,25 @@ final class PluginEditorWindowController: NSObject {
               let pluginKey = windows.first(where: { $0.value == closing })?.key else { return }
         windows.removeValue(forKey: pluginKey)
         let handler = closeHandlers.removeValue(forKey: pluginKey)
+        sizeObservers.removeValue(forKey: pluginKey)
         handler?()
+    }
+
+    private func installSizeObserver(for pluginKey: String, controller: NSViewController) {
+        sizeObservers[pluginKey] = controller.observe(\.preferredContentSize, options: [.new]) { [weak self] controller, _ in
+            DispatchQueue.main.async {
+                self?.applyPreferredSize(of: controller, for: pluginKey)
+            }
+        }
+    }
+
+    private func applyPreferredSize(of controller: NSViewController, for pluginKey: String) {
+        guard let window = windows[pluginKey] else { return }
+        let normalized = normalizedSize(from: controller.preferredContentSize)
+        // Lock window to plugin size
+        window.minSize = normalized
+        window.maxSize = normalized
+        resize(window: window, to: normalized)
     }
 }
 #endif

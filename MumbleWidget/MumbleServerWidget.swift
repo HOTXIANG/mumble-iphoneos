@@ -301,19 +301,24 @@ struct MumbleServerWidget: Widget {
 
 // MARK: - Preview
 
-#Preview(as: .systemMedium) {
-    MumbleServerWidget()
-} timeline: {
-    ServerWidgetEntry(
-        date: Date(),
-        favouriteServers: [
-            WidgetServerItem(id: "1", displayName: "Gaming Server", hostname: "game.mumble.com", port: 64738, username: "Player1", hasCertificate: true, lastConnected: Date()),
-            WidgetServerItem(id: "2", displayName: "Work Chat", hostname: "work.mumble.com", port: 64738, username: "John", hasCertificate: true, lastConnected: Date().addingTimeInterval(-3600)),
-        ],
-        recentServers: [
-            WidgetServerItem(id: "3", displayName: "Community", hostname: "community.mumble.org", port: 64738, username: "Guest", hasCertificate: false, lastConnected: Date()),
-        ],
-        displayMode: .favourites
-    )
-}
+#if DEBUG
+private let previewEntry = ServerWidgetEntry(
+    date: Date(),
+    favouriteServers: [
+        WidgetServerItem(id: "1", displayName: "Gaming Server", hostname: "game.mumble.com", port: 64738, username: "Player1", hasCertificate: true, lastConnected: Date()),
+        WidgetServerItem(id: "2", displayName: "Work Chat", hostname: "work.mumble.com", port: 64738, username: "John", hasCertificate: true, lastConnected: Date().addingTimeInterval(-3600)),
+    ],
+    recentServers: [
+        WidgetServerItem(id: "3", displayName: "Community", hostname: "community.mumble.org", port: 64738, username: "Guest", hasCertificate: false, lastConnected: Date()),
+    ],
+    displayMode: .favourites
+)
 
+struct MumbleServerWidget_Previews: PreviewProvider {
+    static var previews: some View {
+        MumbleServerWidgetEntryView(entry: previewEntry)
+            .containerBackground(.fill.tertiary, for: .widget)
+            .previewContext(WidgetPreviewContext(family: .systemMedium))
+    }
+}
+#endif

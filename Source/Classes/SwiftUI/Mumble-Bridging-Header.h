@@ -31,6 +31,7 @@
 #import <MumbleKit/MKUser.h>
 #import <MumbleKit/MKTextMessage.h>
 #import <MumbleKit/MKAudio.h>
+#import "../../../MumbleKit/src/MKVST3PluginHost.h"
 #import <MumbleKit/MKVersion.h>
 #import "MKAudioOutput.h"
 #import <MumbleKit/MKServerPinger.h>

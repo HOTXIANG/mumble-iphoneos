@@ -522,10 +522,14 @@ struct FavouriteServerEditView: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        FavouriteServerEditView(server: nil) { server in
-            print("Server saved: \(server.displayName ?? "")")
+#if DEBUG
+struct FavouriteServerEditView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            FavouriteServerEditView(server: nil) { server in
+                print("Server saved: \(server.displayName ?? "")")
+            }
         }
     }
 }
+#endif

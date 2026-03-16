@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 90;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -47,6 +47,7 @@
 		E1F2A3B52F90500100ABC001 /* ServerModelManager+Messaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B52F90500100ABC002 /* ServerModelManager+Messaging.swift */; };
 		F1A2B3C42F90600100ABC001 /* ServerModelManager+ModelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C42F90600100ABC002 /* ServerModelManager+ModelState.swift */; };
 		F1A2B3C52F90600100ABC001 /* ServerModelManager+Registration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C52F90600100ABC002 /* ServerModelManager+Registration.swift */; };
+		F209E8732F6885160015071A /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */; };
 		F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */ = {isa = PBXBuildFile; fileRef = F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */; };
 		F220ECB52F30E6100017CCCC /* MUCertificateCreationProgressView.xib in Resources */ = {isa = PBXBuildFile; fileRef = F220ECB32F30E6100017CCCC /* MUCertificateCreationProgressView.xib */; platformFilter = ios; };
 		F220ECD12F30FB1A0017CCCC /* SystemMuteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */; };
@@ -64,7 +65,6 @@
 		F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */; };
 		F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* Launch Screen.storyboard */; platformFilter = ios; };
 		F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */ = {isa = PBXBuildFile; fileRef = F26689952EE8A46A008FC7EB /* LOGO.psd */; };
-		F26689A12EE8A46A008FC7EB /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F26689962EE8A46A008FC7EB /* NeoMumble.icon */; };
 		F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689A42EE8A472008FC7EB /* TransparentLogo.png */; };
 		F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */; };
 		F28C6AEC2EE6E52F00DE9CD2 /* PreferencesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */; };
@@ -109,6 +109,7 @@
 		F2DF9A4B2F65636F009D5C87 /* IgnoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A4A2F65636F009D5C87 /* IgnoreManager.swift */; };
 		F2DF9A4D2F656374009D5C87 /* TTSManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9A4C2F656374009D5C87 /* TTSManager.swift */; };
 		F2DF9D692F672C15009D5C87 /* AudioPluginMixerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9D682F672C15009D5C87 /* AudioPluginMixerView.swift */; };
+		F2DF9D712F673000009D5C87 /* AudioPluginRackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DF9D702F673000009D5C87 /* AudioPluginRackManager.swift */; };
 		F2E100112F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100012F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift */; };
 		F2E100122F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100022F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift */; };
 		F2E100132F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E100032F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift */; };
@@ -240,27 +241,23 @@
 /* Begin PBXCopyFilesBuildPhase section */
 		F24EB79E2F3E3AB500904644 /* Embed Libraries */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
 			dstPath = "";
-			dstSubfolderSpec = 10;
+			dstSubfolder = Frameworks;
 			files = (
 				0EEEF3C42DF1E5450042C0A8 /* FMDB.framework in Embed Libraries */,
 				F24EB79D2F3E3AB500904644 /* OpenSSL.dylib in Embed Libraries */,
 				F24EB7A02F3E3AB500904644 /* MumbleKit.framework in Embed Libraries */,
 			);
 			name = "Embed Libraries";
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F2CBB0672F090CE300D88E21 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
 			dstPath = "";
-			dstSubfolderSpec = 13;
+			dstSubfolder = PlugIns;
 			files = (
 				F2CBB0602F090CE300D88E21 /* MumbleWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -393,6 +390,7 @@
 		F2DF9A4A2F65636F009D5C87 /* IgnoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IgnoreManager.swift; sourceTree = "<group>"; };
 		F2DF9A4C2F656374009D5C87 /* TTSManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSManager.swift; sourceTree = "<group>"; };
 		F2DF9D682F672C15009D5C87 /* AudioPluginMixerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPluginMixerView.swift; sourceTree = "<group>"; };
+		F2DF9D702F673000009D5C87 /* AudioPluginRackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPluginRackManager.swift; sourceTree = "<group>"; };
 		F2E100012F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleWidgetBundle.swift; sourceTree = SOURCE_ROOT; };
 		F2E100022F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleServerWidget.swift; sourceTree = SOURCE_ROOT; };
 		F2E100032F70000100AAA001 /* MumbleWidget/MumbleLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleWidget/MumbleLiveActivity.swift; sourceTree = SOURCE_ROOT; };
@@ -463,7 +461,6 @@
 /* Begin PBXFrameworksBuildPhase section */
 		1D60588F0D05DD3D006BFB54 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				0EF3A4672DC2573900028454 /* AudioToolbox.framework in Frameworks */,
 				28990AB1132FDA540034B406 /* libMumbleKit.a in Frameworks */,
@@ -471,16 +468,13 @@
 				0EEEF3C12DF1E5450042C0A8 /* FMDB.framework in Frameworks */,
 				F24EB79C2F3E3AB500904644 /* OpenSSL.dylib in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F2CBB0482F090CE200D88E21 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				F2CBB04F2F090CE200D88E21 /* SwiftUI.framework in Frameworks */,
 				F2CBB04D2F090CE200D88E21 /* WidgetKit.framework in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -700,6 +694,7 @@
 				F28C6AF22EE6F73E00DE9CD2 /* AudioMeterModel.swift */,
 				D1E2F3A52F90400100ABC002 /* AudioBarView.swift */,
 				F2DF9D682F672C15009D5C87 /* AudioPluginMixerView.swift */,
+				F2DF9D702F673000009D5C87 /* AudioPluginRackManager.swift */,
 				D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */,
 				F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */,
 				F4D1A0B32FA1000100AABBCC /* PreferencesView+iOS.swift */,
@@ -880,14 +875,10 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				F2CBB0502F090CE200D88E21 /* MumbleWidget */,
 			);
 			name = MumbleWidgetExtension;
-			packageProductDependencies = (
-			);
 			productName = MumbleWidgetExtension;
 			productReference = F2CBB04B2F090CE200D88E21 /* MumbleWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -923,7 +914,7 @@
 				Base,
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* CustomTemplate */;
-			preferredProjectObjectVersion = 77;
+			preferredProjectObjectVersion = 90;
 			projectDirPath = "";
 			projectReferences = (
 				{
@@ -1019,13 +1010,11 @@
 /* Begin PBXResourcesBuildPhase section */
 		1D60588D0D05DD3D006BFB54 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */,
 				F23EEF832F4563E100743254 /* TransparentLogoWhite.png in Resources */,
 				F23EEF812F4563DD00743254 /* TransparentLogoBlack.png in Resources */,
 				F23EEF7D2F45600400743254 /* TransparentLogoBrightGlass.png in Resources */,
-				F26689A12EE8A46A008FC7EB /* NeoMumble.icon in Resources */,
 				F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */,
 				28DC1C7013DE596B0037CDC2 /* Continents.plist in Resources */,
 				F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */,
@@ -1035,15 +1024,13 @@
 				280256381510D70D00178B08 /* Localizable.strings in Resources */,
 				F23EEF7F2F45600900743254 /* TransparentLogoDarkGlass.png in Resources */,
 				F24EB7B12F3E4AB500904644 /* PrivacyInfo.xcprivacy in Resources */,
+				F209E8732F6885160015071A /* NeoMumble.icon in Resources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F2CBB0492F090CE200D88E21 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
@@ -1051,24 +1038,52 @@
 		F24EB7E12F3E3AB500904644 /* Re-sign Nested Dylibs */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
 			name = "Re-sign Nested Dylibs";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Re-sign nested dylibs inside MumbleKit.framework so Team IDs match the app\nif [ \"${CODE_SIGNING_ALLOWED}\" != \"YES\" ]; then\n  echo \"Code signing not allowed for this build; skipping re-sign.\"\n  exit 0\nfi\n\nif [ -z \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then\n  echo \"No signing identity available; skipping re-sign.\"\n  exit 0\nfi\n\n# Strip problematic extended attributes before the final CodeSign step.\nif [ -n \"${CODESIGNING_FOLDER_PATH}\" ] && [ -d \"${CODESIGNING_FOLDER_PATH}\" ]; then\n  echo \"Stripping extended attributes from ${CODESIGNING_FOLDER_PATH}\"\n  /usr/bin/xattr -cr \"${CODESIGNING_FOLDER_PATH}\" || true\nfi\n\nMK_FRAMEWORKS=\"${CODESIGNING_FOLDER_PATH}/Contents/Frameworks/MumbleKit.framework\"\nif [ ! -d \"$MK_FRAMEWORKS\" ] && [ -n \"${FRAMEWORKS_FOLDER_PATH}\" ]; then\n  MK_FRAMEWORKS=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MumbleKit.framework\"\nfi\n\necho \"Looking for nested dylibs in: $MK_FRAMEWORKS\"\nif [ -d \"$MK_FRAMEWORKS\" ]; then\n  for dylib in \"$MK_FRAMEWORKS\"/Versions/A/Frameworks/*.dylib; do\n    if [ -f \"$dylib\" ]; then\n      echo \"Re-signing $dylib\"\n      /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$dylib\"\n    fi\n  done\n  # Re-sign the framework itself to update the seal\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$MK_FRAMEWORKS\"\nelse\n  echo \"MumbleKit.framework not found at $MK_FRAMEWORKS\"\nfi\n";
+			shellScript = (
+				"# Re-sign nested dylibs inside MumbleKit.framework so Team IDs match the app",
+				"if [ \"${CODE_SIGNING_ALLOWED}\" != \"YES\" ]; then",
+				"  echo \"Code signing not allowed for this build; skipping re-sign.\"",
+				"  exit 0",
+				"fi",
+				"",
+				"if [ -z \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then",
+				"  echo \"No signing identity available; skipping re-sign.\"",
+				"  exit 0",
+				"fi",
+				"",
+				"# Strip problematic extended attributes before the final CodeSign step.",
+				"if [ -n \"${CODESIGNING_FOLDER_PATH}\" ] && [ -d \"${CODESIGNING_FOLDER_PATH}\" ]; then",
+				"  echo \"Stripping extended attributes from ${CODESIGNING_FOLDER_PATH}\"",
+				"  /usr/bin/xattr -cr \"${CODESIGNING_FOLDER_PATH}\" || true",
+				"fi",
+				"",
+				"MK_FRAMEWORKS=\"${CODESIGNING_FOLDER_PATH}/Contents/Frameworks/MumbleKit.framework\"",
+				"if [ ! -d \"$MK_FRAMEWORKS\" ] && [ -n \"${FRAMEWORKS_FOLDER_PATH}\" ]; then",
+				"  MK_FRAMEWORKS=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/MumbleKit.framework\"",
+				"fi",
+				"",
+				"echo \"Looking for nested dylibs in: $MK_FRAMEWORKS\"",
+				"if [ -d \"$MK_FRAMEWORKS\" ]; then",
+				"  for dylib in \"$MK_FRAMEWORKS\"/Versions/A/Frameworks/*.dylib; do",
+				"    if [ -f \"$dylib\" ]; then",
+				"      echo \"Re-signing $dylib\"",
+				"      /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$dylib\"",
+				"    fi",
+				"  done",
+				"  # Re-sign the framework itself to update the seal",
+				"  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none --preserve-metadata=identifier,entitlements \"$MK_FRAMEWORKS\"",
+				"else",
+				"  echo \"MumbleKit.framework not found at $MK_FRAMEWORKS\"",
+				"fi",
+				"",
+			);
 		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1D60588E0D05DD3D006BFB54 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				2861C276116BE905002B8514 /* MUApplicationDelegate.m in Sources */,
 				287BA29011B96C960010E031 /* MUDatabase.m in Sources */,
@@ -1164,15 +1179,14 @@
 				F2DF9A4B2F65636F009D5C87 /* IgnoreManager.swift in Sources */,
 				28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */,
 				F2DF9D692F672C15009D5C87 /* AudioPluginMixerView.swift in Sources */,
+				F2DF9D712F673000009D5C87 /* AudioPluginRackManager.swift in Sources */,
 				F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */,
 				F28C6AFB2EE7010300DE9CD2 /* PTTButton.swift in Sources */,
 				F28C6AF42EE6F74500DE9CD2 /* AudioMeterModel.swift in Sources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F2CBB0472F090CE200D88E21 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				F2E100112F70000100AAA001 /* MumbleWidget/MumbleWidgetBundle.swift in Sources */,
 				F2E100122F70000100AAA001 /* MumbleWidget/MumbleServerWidget.swift in Sources */,
@@ -1180,7 +1194,6 @@
 				F2E100142F70000100AAA001 /* MumbleWidget/MumbleActivityAttributes.swift in Sources */,
 				F2E100152F70000100AAA001 /* MumbleWidget/WidgetSharedData.swift in Sources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -1223,7 +1236,7 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		1D6058940D05DD3E006BFB54 /* Debug */ = {
+		1D6058940D05DD3E006BFB54 /* Debug configuration for PBXNativeTarget "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1241,7 +1254,7 @@
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
 				DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT = NO;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_MODULE_VERIFIER = YES;
@@ -1290,7 +1303,7 @@
 			};
 			name = Debug;
 		};
-		1D6058950D05DD3E006BFB54 /* Release */ = {
+		1D6058950D05DD3E006BFB54 /* Release configuration for PBXNativeTarget "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1307,7 +1320,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
@@ -1356,7 +1369,7 @@
 			};
 			name = Release;
 		};
-		2887C8891454C4C2009B3576 /* AppStore */ = {
+		2887C8891454C4C2009B3576 /* AppStore configuration for PBXProject "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 285E2A60150D729B008AE185 /* AppStore.xcconfig */;
 			buildSettings = {
@@ -1369,7 +1382,7 @@
 			};
 			name = AppStore;
 		};
-		2887C88A1454C4C2009B3576 /* AppStore */ = {
+		2887C88A1454C4C2009B3576 /* AppStore configuration for PBXNativeTarget "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1386,7 +1399,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
@@ -1435,7 +1448,7 @@
 			};
 			name = AppStore;
 		};
-		28BC1E7A1227155500C03FCF /* BetaDist */ = {
+		28BC1E7A1227155500C03FCF /* BetaDist configuration for PBXProject "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 285E2A62150D729B008AE185 /* BetaDist.xcconfig */;
 			buildSettings = {
@@ -1448,7 +1461,7 @@
 			};
 			name = BetaDist;
 		};
-		28BC1E7B1227155500C03FCF /* BetaDist */ = {
+		28BC1E7B1227155500C03FCF /* BetaDist configuration for PBXNativeTarget "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1465,7 +1478,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				DEVELOPMENT_TEAM = 5Q255DK223;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
@@ -1514,7 +1527,7 @@
 			};
 			name = BetaDist;
 		};
-		C01FCF4F08A954540054247B /* Debug */ = {
+		C01FCF4F08A954540054247B /* Debug configuration for PBXProject "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 285E2A63150D729B008AE185 /* Debug.xcconfig */;
 			buildSettings = {
@@ -1530,7 +1543,7 @@
 			};
 			name = Debug;
 		};
-		C01FCF5008A954540054247B /* Release */ = {
+		C01FCF5008A954540054247B /* Release configuration for PBXProject "Mumble" */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 285E2A64150D729B008AE185 /* Release.xcconfig */;
 			buildSettings = {
@@ -1544,7 +1557,7 @@
 			};
 			name = Release;
 		};
-		F2CBB0632F090CE300D88E21 /* Debug */ = {
+		F2CBB0632F090CE300D88E21 /* Debug configuration for PBXNativeTarget "MumbleWidgetExtension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1645,7 +1658,7 @@
 			};
 			name = Debug;
 		};
-		F2CBB0642F090CE300D88E21 /* Release */ = {
+		F2CBB0642F090CE300D88E21 /* Release configuration for PBXNativeTarget "MumbleWidgetExtension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1739,7 +1752,7 @@
 			};
 			name = Release;
 		};
-		F2CBB0652F090CE300D88E21 /* AppStore */ = {
+		F2CBB0652F090CE300D88E21 /* AppStore configuration for PBXNativeTarget "MumbleWidgetExtension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1833,7 +1846,7 @@
 			};
 			name = AppStore;
 		};
-		F2CBB0662F090CE300D88E21 /* BetaDist */ = {
+		F2CBB0662F090CE300D88E21 /* BetaDist configuration for PBXNativeTarget "MumbleWidgetExtension" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1933,34 +1946,31 @@
 		1D6058960D05DD3E006BFB54 /* Build configuration list for PBXNativeTarget "Mumble" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				1D6058940D05DD3E006BFB54 /* Debug */,
-				1D6058950D05DD3E006BFB54 /* Release */,
-				2887C88A1454C4C2009B3576 /* AppStore */,
-				28BC1E7B1227155500C03FCF /* BetaDist */,
+				1D6058940D05DD3E006BFB54 /* Debug configuration for PBXNativeTarget "Mumble" */,
+				1D6058950D05DD3E006BFB54 /* Release configuration for PBXNativeTarget "Mumble" */,
+				2887C88A1454C4C2009B3576 /* AppStore configuration for PBXNativeTarget "Mumble" */,
+				28BC1E7B1227155500C03FCF /* BetaDist configuration for PBXNativeTarget "Mumble" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		C01FCF4E08A954540054247B /* Build configuration list for PBXProject "Mumble" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C01FCF4F08A954540054247B /* Debug */,
-				C01FCF5008A954540054247B /* Release */,
-				2887C8891454C4C2009B3576 /* AppStore */,
-				28BC1E7A1227155500C03FCF /* BetaDist */,
+				C01FCF4F08A954540054247B /* Debug configuration for PBXProject "Mumble" */,
+				C01FCF5008A954540054247B /* Release configuration for PBXProject "Mumble" */,
+				2887C8891454C4C2009B3576 /* AppStore configuration for PBXProject "Mumble" */,
+				28BC1E7A1227155500C03FCF /* BetaDist configuration for PBXProject "Mumble" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		F2CBB0622F090CE300D88E21 /* Build configuration list for PBXNativeTarget "MumbleWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				F2CBB0632F090CE300D88E21 /* Debug */,
-				F2CBB0642F090CE300D88E21 /* Release */,
-				F2CBB0652F090CE300D88E21 /* AppStore */,
-				F2CBB0662F090CE300D88E21 /* BetaDist */,
+				F2CBB0632F090CE300D88E21 /* Debug configuration for PBXNativeTarget "MumbleWidgetExtension" */,
+				F2CBB0642F090CE300D88E21 /* Release configuration for PBXNativeTarget "MumbleWidgetExtension" */,
+				F2CBB0652F090CE300D88E21 /* AppStore configuration for PBXNativeTarget "MumbleWidgetExtension" */,
+				F2CBB0662F090CE300D88E21 /* BetaDist configuration for PBXNativeTarget "MumbleWidgetExtension" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
