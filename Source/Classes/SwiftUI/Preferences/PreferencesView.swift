@@ -531,25 +531,18 @@ struct AdvancedAudioSettingsView: View {
         }
         .navigationTitle("Advanced")
 #if os(iOS)
-        .sheet(isPresented: $showPluginMixer) {
+        .fullScreenCover(isPresented: $showPluginMixer) {
             NavigationStack {
                 AudioPluginMixerView()
                     .navigationTitle("Audio Plugin Mixer")
                     .toolbar {
-                        ToolbarItem(placement: .automatic) {
+                        ToolbarItem(placement: .cancellationAction) {
                             Button("Done") {
                                 showPluginMixer = false
                             }
                         }
                     }
-#if os(macOS)
-                    .frame(minWidth: 1080, minHeight: 760)
-#endif
             }
-#if os(iOS)
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-#endif
         }
         #endif
         .onChange(of: enableStereoOutput) { PreferencesModel.shared.notifySettingsChanged() }

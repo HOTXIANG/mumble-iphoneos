@@ -1770,12 +1770,13 @@ struct ListenerRow: View {
             let indentWidth = CGFloat(level) * kIndentUnit + kArrowWidth + 4
             Spacer().frame(width: indentWidth)
             
-            // 耳朵图标（替代用户头像），有人说话时亮绿色
-            Image(systemName: "ear")
+            // 耳朵图标（替代用户头像），有人说话时亮绿色，带淡入淡出动画
+            Image(systemName: "ear.fill")
                 .font(.system(size: kIconSize))
                 .foregroundColor(hasSpeaker ? .green : .gray)
                 .frame(width: kContentHeight, height: kContentHeight)
                 .shadow(color: hasSpeaker ? .green.opacity(0.6) : .clear, radius: hasSpeaker ? 4 : 0)
+                .animation(.easeInOut(duration: 0.25), value: hasSpeaker)
             
             // 监听者用户名：自己=cyan（与自己用户行一致），别人=白色
             Text(listener.userName() ?? NSLocalizedString("Unknown", comment: ""))

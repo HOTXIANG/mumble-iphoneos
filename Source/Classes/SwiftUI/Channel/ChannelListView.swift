@@ -80,7 +80,8 @@ struct ChannelListView: View {
         .toolbarBackground(.hidden, for: .windowToolbar)
         #endif
         #if os(iOS)
-        .searchable(text: $channelSearchText, prompt: "Search channels and users")
+        // iPad 上不显示搜索框，避免占用服务器界面空间
+        .modifier(ChannelSearchModifier(searchText: $channelSearchText))
         #endif
         .toolbar {
             leadingToolbarItems
@@ -337,3 +338,20 @@ struct ChannelListView: View {
         serverManager.registerSelf()
     }
 }
+
+// MARK: - iPad 上隐藏搜索框
+
+#if os(iOS)
+private struct ChannelSearchModifier: ViewModifier {
+    @Binding var searchText: String
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    func body(content: Content) -> some View {
+        if sizeClass == .compact {
+            content.searchable(text: $searchText, prompt: "Search channels and users")
+        } else {
+            content
+        }
+    }
+}
+#endif

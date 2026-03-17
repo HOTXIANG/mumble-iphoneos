@@ -291,20 +291,28 @@ struct AudioPluginMixerView: View {
             Divider()
             GeometryReader { geometry in
                 let isWideLayout = geometry.size.width >= 900
+                let isCompact = geometry.size.width < 500
                 Group {
                     if isWideLayout {
                         HStack(spacing: 0) {
                             mixerTrackSidebar
                                 .frame(width: min(340, max(260, geometry.size.width * 0.33)))
                             Divider()
-                            mixerWorkspace
+                            mixerWorkspace(compact: false)
+                        }
+                    } else if isCompact {
+                        // iPhone 竖屏：紧凑水平轨道选择器 + 全屏工作区
+                        VStack(spacing: 0) {
+                            compactTrackPicker
+                            Divider()
+                            mixerWorkspace(compact: true)
                         }
                     } else {
                         VStack(spacing: 0) {
                             mixerTrackSidebar
                                 .frame(height: 300)
                             Divider()
-                            mixerWorkspace
+                            mixerWorkspace(compact: false)
                         }
                     }
                 }
@@ -329,6 +337,10 @@ struct AudioPluginMixerView: View {
             Task {
                 await loadPersistedAudioUnits()
             }
+        }
+        .onDisappear {
+            // Mixer 关闭时，抓取所有插件的当前参数值并持久化
+            snapshotAllPluginParameters()
         }
         .onChange(of: selectedTrack) {
             loadSelectedTrackState()
@@ -383,6 +395,8 @@ struct AudioPluginMixerView: View {
 #if os(iOS)
         .onChange(of: showingPluginEditor) {
             if !showingPluginEditor {
+                // 插件编辑器关闭时，抓取参数快照（捕获原生 UI 的修改）
+                snapshotAllPluginParameters()
                 pluginEditorController = nil
                 pluginEditorTitle = ""
                 selectedPluginID = nil
@@ -392,43 +406,120 @@ struct AudioPluginMixerView: View {
     }
 
     private var mixerTransportBar: some View {
-        HStack(spacing: 10) {
+        ViewThatFits(in: .horizontal) {
+            // 宽屏：完整显示所有按钮
+            mixerTransportBarContent(compact: false)
+            // 窄屏：收纳到菜单
+            mixerTransportBarContent(compact: true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private func mixerTransportBarContent(compact: Bool) -> some View {
+        HStack(spacing: compact ? 8 : 10) {
             Text(NSLocalizedString("Audio Plugin Mixer", comment: ""))
                 .font(.headline)
+                .lineLimit(1)
             if !pluginOperationMessage.isEmpty {
                 Text(pluginOperationMessage)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            Spacer()
-            Text(NSLocalizedString("Buffer", comment: ""))
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Menu {
-                ForEach([64, 128, 256, 512, 1024, 2048], id: \.self) { frames in
-                    Button("\(frames)") {
-                        pluginHostBufferFrames = frames
+            Spacer(minLength: 4)
+            if compact {
+                // 紧凑模式：Buffer + 更多操作收入菜单
+                Menu {
+                    Menu(NSLocalizedString("Buffer Size", comment: "")) {
+                        ForEach([64, 128, 256, 512, 1024, 2048], id: \.self) { frames in
+                            Button(frames == pluginHostBufferFrames ? "✓ \(frames)" : "\(frames)") {
+                                pluginHostBufferFrames = frames
+                            }
+                        }
                     }
+                    Button {
+                        refreshRemoteSessionOrder()
+                    } label: {
+                        Label(NSLocalizedString("Refresh Remote Tracks", comment: ""), systemImage: "arrow.clockwise")
+                    }
+                    Button {
+                        showingPluginBrowser = true
+                    } label: {
+                        Label(NSLocalizedString("Plugin Browser", comment: ""), systemImage: "square.grid.2x2")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
                 }
-            } label: {
-                Text("\(pluginHostBufferFrames)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.primary)
-                    .frame(minWidth: 52)
+            } else {
+                Text(NSLocalizedString("Buffer", comment: ""))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Menu {
+                    ForEach([64, 128, 256, 512, 1024, 2048], id: \.self) { frames in
+                        Button("\(frames)") {
+                            pluginHostBufferFrames = frames
+                        }
+                    }
+                } label: {
+                    Text("\(pluginHostBufferFrames)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(.primary)
+                        .frame(minWidth: 52)
+                }
+                .menuStyle(.borderlessButton)
+                Button(NSLocalizedString("Refresh Remote Tracks", comment: "")) {
+                    refreshRemoteSessionOrder()
+                }
+                .buttonStyle(.bordered)
+                Button(NSLocalizedString("Plugin Browser", comment: "")) {
+                    showingPluginBrowser = true
+                }
+                .buttonStyle(.bordered)
             }
-            .menuStyle(.borderlessButton)
-            Button(NSLocalizedString("Refresh Remote Tracks", comment: "")) {
-                refreshRemoteSessionOrder()
-            }
-            .buttonStyle(.bordered)
-            Button(NSLocalizedString("Plugin Browser", comment: "")) {
-                showingPluginBrowser = true
-            }
-            .buttonStyle(.bordered)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+    }
+
+    // MARK: - Compact Track Picker (iPhone 竖屏)
+
+    private var compactTrackPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(allTracks, id: \.self) { track in
+                    let isSelected = selectedTrack == track
+                    Button {
+                        selectedTrack = track
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(track.shortLabel)
+                                .font(.caption2.monospaced().weight(.bold))
+                                .foregroundColor(isSelected ? .white : .secondary)
+                                .frame(width: 28, height: 18)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
+                                )
+                            Text(track.title)
+                                .font(.caption.weight(isSelected ? .semibold : .regular))
+                                .foregroundColor(isSelected ? .primary : .secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .background(.regularMaterial)
     }
 
     private var mixerTrackSidebar: some View {
@@ -497,163 +588,274 @@ struct AudioPluginMixerView: View {
         .buttonStyle(.plain)
     }
 
-    private var mixerWorkspace: some View {
+    private func mixerWorkspace(compact: Bool) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                pluginChainPanel
+                pluginChainPanel(compact: compact)
             }
-            .padding(16)
+            .padding(compact ? 10 : 16)
         }
         .background(.thinMaterial)
     }
 
-    private var pluginChainPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func pluginChainPanel(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 8 : 10) {
             Text(NSLocalizedString("Plugin Chain", comment: ""))
                 .font(.headline)
-            Text(NSLocalizedString("Choose a plugin for each insert, enable it when needed, open its editor, and set its mix.", comment: ""))
-                .font(.caption)
-                .foregroundColor(.secondary)
+            if !compact {
+                Text(NSLocalizedString("Choose a plugin for each insert, enable it when needed, open its editor, and set its mix.", comment: ""))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             ForEach(0..<maxInsertSlots, id: \.self) { slotIndex in
                 let plugin = pluginAtSlot(slotIndex)
                 let isSelected = selectedPluginID == plugin?.id
 
-                HStack(spacing: 10) {
-                    Text("\(slotIndex + 1)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundColor(.secondary)
-                        .frame(width: 24)
-
-                    Menu {
-                        if installedAudioUnits.isEmpty && scannedFilesystemPlugins.isEmpty {
-                            Text(NSLocalizedString("No plugins available", comment: ""))
-                        }
-                        if !installedAudioUnits.isEmpty {
-                            Menu(NSLocalizedString("Audio Units", comment: "")) {
-                                ForEach(groupedPluginsByCategory(installedAudioUnits), id: \.category) { group in
-                                    Menu(group.category) {
-                                        ForEach(group.plugins, id: \.id) { discovered in
-                                            Button(discovered.name) {
-                                                Task {
-                                                    await assignPluginToSlot(discovered, slotIndex: slotIndex)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if !scannedFilesystemPlugins.isEmpty {
-                            Menu(NSLocalizedString("VST3", comment: "")) {
-                                ForEach(groupedPluginsByCategory(scannedFilesystemPlugins), id: \.category) { group in
-                                    Menu(group.category) {
-                                        ForEach(group.plugins, id: \.id) { discovered in
-                                            Button(discovered.name) {
-                                                Task {
-                                                    await assignPluginToSlot(discovered, slotIndex: slotIndex)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if plugin != nil {
-                            Divider()
-                            Button(NSLocalizedString("Remove Plugin", comment: ""), role: .destructive) {
-                                clearPluginSlot(slotIndex: slotIndex)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text(plugin?.name ?? NSLocalizedString("Select Plugin", comment: ""))
-                                .lineLimit(1)
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .frame(minWidth: 240, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.secondary.opacity(0.12))
-                        )
-                    }
-                    .menuStyle(.borderlessButton)
-
-                    if let plugin {
-                        Spacer(minLength: 0)
-
-                        HStack(spacing: 10) {
-                            Button(plugin.bypassed ? NSLocalizedString("Off", comment: "") : NSLocalizedString("On", comment: "")) {
-                                toggleBypass(at: slotIndex)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button {
-                                movePluginUp(at: slotIndex)
-                            } label: {
-                                Image(systemName: "chevron.up")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(slotIndex == 0)
-
-                            Button {
-                                movePluginDown(at: slotIndex)
-                            } label: {
-                                Image(systemName: "chevron.down")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(slotIndex >= selectedTrackChain.count - 1)
-
-                            HStack(spacing: 8) {
-                                Text(NSLocalizedString("Mix", comment: ""))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Slider(
-                                    value: Binding(
-                                        get: { Double(plugin.stageGain * 100.0) },
-                                        set: { updateMixLevel(at: slotIndex, newValue: Float($0 / 100.0)) }
-                                    ),
-                                    in: 0...100
-                                )
-                                .frame(width: 140)
-                                Text("\(Int((plugin.stageGain * 100.0).rounded()))%")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 40, alignment: .trailing)
-                            }
-                            .frame(width: 220, alignment: .trailing)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    } else {
-                        Spacer(minLength: 0)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(minHeight: 58)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
-                )
-                .onTapGesture {
-                    guard let plugin else {
-                        selectedPluginID = nil
-                        return
-                    }
-                    selectedPluginID = plugin.id
-                    openPluginEditor(for: plugin)
+                if compact {
+                    compactPluginSlotRow(slotIndex: slotIndex, plugin: plugin, isSelected: isSelected)
+                } else {
+                    widePluginSlotRow(slotIndex: slotIndex, plugin: plugin, isSelected: isSelected)
                 }
             }
         }
-        .padding(14)
+        .padding(compact ? 10 : 14)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.regularMaterial)
         )
+    }
+
+    // MARK: - Wide Plugin Slot (macOS / iPad 横屏)
+
+    @ViewBuilder
+    private func widePluginSlotRow(slotIndex: Int, plugin: TrackPlugin?, isSelected: Bool) -> some View {
+        HStack(spacing: 10) {
+            Text("\(slotIndex + 1)")
+                .font(.caption.monospacedDigit())
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+
+            pluginSelectMenu(slotIndex: slotIndex, plugin: plugin, minWidth: 240)
+
+            if let plugin {
+                Spacer(minLength: 0)
+
+                HStack(spacing: 10) {
+                    Button(plugin.bypassed ? NSLocalizedString("Off", comment: "") : NSLocalizedString("On", comment: "")) {
+                        toggleBypass(at: slotIndex)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        movePluginUp(at: slotIndex)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(slotIndex == 0)
+
+                    Button {
+                        movePluginDown(at: slotIndex)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(slotIndex >= selectedTrackChain.count - 1)
+
+                    HStack(spacing: 8) {
+                        Text(NSLocalizedString("Mix", comment: ""))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Slider(
+                            value: Binding(
+                                get: { Double(plugin.stageGain * 100.0) },
+                                set: { updateMixLevel(at: slotIndex, newValue: Float($0 / 100.0)) }
+                            ),
+                            in: 0...100
+                        )
+                        .frame(width: 140)
+                        Text("\(Int((plugin.stageGain * 100.0).rounded()))%")
+                            .font(.caption.monospacedDigit())
+                            .foregroundColor(.secondary)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .frame(width: 220, alignment: .trailing)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            } else {
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(minHeight: 58)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
+        )
+        .onTapGesture {
+            guard let plugin else {
+                selectedPluginID = nil
+                return
+            }
+            selectedPluginID = plugin.id
+            openPluginEditor(for: plugin)
+        }
+    }
+
+    // MARK: - Compact Plugin Slot (iPhone 竖屏)
+
+    @ViewBuilder
+    private func compactPluginSlotRow(slotIndex: Int, plugin: TrackPlugin?, isSelected: Bool) -> some View {
+        VStack(spacing: 6) {
+            // 第一行：槽位编号 + 插件选择（限宽）+ 打开编辑器按钮
+            HStack(spacing: 8) {
+                Text("\(slotIndex + 1)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+                    .frame(width: 20)
+
+                pluginSelectMenu(slotIndex: slotIndex, plugin: plugin, minWidth: 0, compact: true)
+                    .frame(maxWidth: 200)
+
+                if plugin != nil {
+                    // 打开插件编辑器的按钮
+                    Button {
+                        if let plugin = pluginAtSlot(slotIndex) {
+                            selectedPluginID = plugin.id
+                            openPluginEditor(for: plugin)
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.body)
+                            .foregroundColor(.accentColor)
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Spacer(minLength: 0)
+                }
+            }
+
+            // 第二行：控制按钮和 Mix 滑块（仅在有插件时显示）
+            if let plugin {
+                HStack(spacing: 8) {
+                    Button(plugin.bypassed ? NSLocalizedString("Off", comment: "") : NSLocalizedString("On", comment: "")) {
+                        toggleBypass(at: slotIndex)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button {
+                        movePluginUp(at: slotIndex)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(slotIndex == 0)
+
+                    Button {
+                        movePluginDown(at: slotIndex)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(slotIndex >= selectedTrackChain.count - 1)
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(plugin.stageGain * 100.0) },
+                            set: { updateMixLevel(at: slotIndex, newValue: Float($0 / 100.0)) }
+                        ),
+                        in: 0...100
+                    )
+
+                    Text("\(Int((plugin.stageGain * 100.0).rounded()))%")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(.secondary)
+                        .frame(width: 34, alignment: .trailing)
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
+        )
+    }
+
+    // MARK: - Plugin Select Menu (共用)
+
+    @ViewBuilder
+    private func pluginSelectMenu(slotIndex: Int, plugin: TrackPlugin?, minWidth: CGFloat, compact: Bool = false) -> some View {
+        Menu {
+            if installedAudioUnits.isEmpty && scannedFilesystemPlugins.isEmpty {
+                Text(NSLocalizedString("No plugins available", comment: ""))
+            }
+            if !installedAudioUnits.isEmpty {
+                Menu(NSLocalizedString("Audio Units", comment: "")) {
+                    ForEach(groupedPluginsByCategory(installedAudioUnits), id: \.category) { group in
+                        Menu(group.category) {
+                            ForEach(group.plugins, id: \.id) { discovered in
+                                Button(discovered.name) {
+                                    Task {
+                                        await assignPluginToSlot(discovered, slotIndex: slotIndex)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !scannedFilesystemPlugins.isEmpty {
+                Menu(NSLocalizedString("VST3", comment: "")) {
+                    ForEach(groupedPluginsByCategory(scannedFilesystemPlugins), id: \.category) { group in
+                        Menu(group.category) {
+                            ForEach(group.plugins, id: \.id) { discovered in
+                                Button(discovered.name) {
+                                    Task {
+                                        await assignPluginToSlot(discovered, slotIndex: slotIndex)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if plugin != nil {
+                Divider()
+                Button(NSLocalizedString("Remove Plugin", comment: ""), role: .destructive) {
+                    clearPluginSlot(slotIndex: slotIndex)
+                }
+            }
+        } label: {
+            HStack(spacing: compact ? 4 : 8) {
+                Text(plugin?.name ?? NSLocalizedString("Select Plugin", comment: ""))
+                    .font(compact ? .caption : .body)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, compact ? 8 : 10)
+            .padding(.vertical, compact ? 6 : 8)
+            .frame(minWidth: minWidth > 0 ? minWidth : nil, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.secondary.opacity(0.12))
+            )
+        }
+        .menuStyle(.borderlessButton)
     }
 
     private var pluginBrowserPanel: some View {
@@ -1740,6 +1942,7 @@ struct AudioPluginMixerView: View {
                         preferredContentSize: viewController.preferredContentSize,
                         title: plugin.name
                     ) {
+                        snapshotAllPluginParameters()
                         if selectedPluginID == targetPluginID {
                             selectedPluginID = nil
                         }
@@ -1775,6 +1978,7 @@ struct AudioPluginMixerView: View {
                 preferredContentSize: editorSize,
                 title: plugin.name
             ) {
+                snapshotAllPluginParameters()
                 if selectedPluginID == plugin.id {
                     selectedPluginID = nil
                 }
@@ -1975,6 +2179,42 @@ struct AudioPluginMixerView: View {
     private func updateSavedParameter(pluginID: String, parameterID: UInt64, value: Float) {
         mutatePlugin(withID: pluginID) { plugin in
             plugin.savedParameterValues[String(parameterID)] = value
+        }
+    }
+
+    /// 从所有已加载的 AU/VST3 实例中抓取当前参数值，写入 savedParameterValues 并持久化。
+    /// 用于捕获通过原生插件 UI 修改的参数（这些参数不经过 setParameterValue 回调）。
+    private func snapshotAllPluginParameters() {
+        var didChange = false
+        for (trackKey, chain) in pluginChainByTrack {
+            for plugin in chain {
+                let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
+                var captured: [String: Float] = [:]
+
+                if let unit = loadedAudioUnits[loadedKey] {
+                    for param in unit.auAudioUnit.parameterTree?.allParameters ?? [] {
+                        captured[String(param.address)] = param.value
+                    }
+                } else if let vst3Host = loadedVST3Hosts[loadedKey] {
+                    for snapshot in vst3Host.copyParameterSnapshots() {
+                        guard let parameterID = snapshot["id"] as? NSNumber,
+                              let value = snapshot["value"] as? NSNumber else { continue }
+                        captured[String(parameterID.uint64Value)] = value.floatValue
+                    }
+                }
+
+                if !captured.isEmpty && captured != plugin.savedParameterValues {
+                    if var mutableChain = pluginChainByTrack[trackKey],
+                       let idx = mutableChain.firstIndex(where: { $0.id == plugin.id }) {
+                        mutableChain[idx].savedParameterValues = captured
+                        pluginChainByTrack[trackKey] = mutableChain
+                        didChange = true
+                    }
+                }
+            }
+        }
+        if didChange {
+            savePluginChainState()
         }
     }
 

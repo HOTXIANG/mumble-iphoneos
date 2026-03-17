@@ -1011,6 +1011,8 @@ struct MessagesView: View {
     
     private func handleImageTap(payload: MessageImageTapPayload) {
         #if os(macOS)
+        // 防止快速连续点击导致预览状态错乱
+        guard appState.activeMacImagePreview == nil else { return }
         appState.hiddenMacPreviewSourceID = nil
         let preview = MessageImagePreviewItem(
             id: payload.sourceID,
