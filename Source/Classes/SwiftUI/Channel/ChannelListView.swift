@@ -320,13 +320,13 @@ struct ChannelListView: View {
     @State private var disconnectObserver: Any?
     
     private func initiateDisconnect() {
-        guard disconnectObserver == nil else { print("🟡 Disconnect sequence already in progress."); return }
+        guard disconnectObserver == nil else { MumbleLogger.connection.debug("Disconnect sequence already in progress"); return }
         notificationHaptic.prepare()
         notificationHaptic.notificationOccurred(.warning)
-        print("🟡 Initiating disconnect sequence...")
+        MumbleLogger.connection.info("Initiating disconnect sequence")
         disconnectObserver = NotificationCenter.default.addObserver(forName: .muConnectionClosed, object: nil, queue: .main) { [self] _ in
             Task { @MainActor in
-                print("✅ Disconnection confirmed by notification.")
+                MumbleLogger.connection.info("Disconnection confirmed by notification")
                 withAnimation(.spring()) { AppState.shared.isConnected = false }
                 if let observer = self.disconnectObserver { NotificationCenter.default.removeObserver(observer); self.disconnectObserver = nil }
             }

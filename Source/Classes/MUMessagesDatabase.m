@@ -27,7 +27,7 @@
         [manager removeItemAtPath:dbPath error:nil];
         _db = [[FMDatabase alloc] initWithPath:dbPath];
         if (![_db open]) {
-            NSLog(@"MUMessagesDatabse: Failed to open.");
+            MULogError(Database, @"MUMessagesDatabase: Failed to open.");
         }
         
         [_db executeUpdate:@"CREATE TABLE IF NOT EXISTS `msg` "

@@ -28,7 +28,7 @@ extension ServerModelManager {
             inputSettingsRestoreSystemMute = true
             isRestoringMuteState = true
             systemMuteManager.setSystemMute(false)
-            print("🎤 Input settings preview: temporarily unmuted system input while staying self-muted on server.")
+            MumbleLogger.audio.debug("Input settings preview: temporarily unmuted system input while staying self-muted on server")
             return
         }
         #endif
@@ -54,9 +54,9 @@ extension ServerModelManager {
                 }
             }
         case .denied, .restricted:
-            print("🎤 Microphone permission denied/restricted. Skip local audio test.")
+            MumbleLogger.audio.warning("Microphone permission denied/restricted. Skip local audio test")
         @unknown default:
-            print("🎤 Unknown microphone permission status. Skip local audio test.")
+            MumbleLogger.audio.warning("Unknown microphone permission status. Skip local audio test")
         }
         #else
         startLocalAudioEngineForSettings()
@@ -77,7 +77,7 @@ extension ServerModelManager {
                 self?.isRestoringMuteState = false
             }
 
-            print("🎤 Input settings preview ended: restored system input mute=\(shouldRestoreMute).")
+            MumbleLogger.audio.debug("Input settings preview ended: restored system input mute=\(shouldRestoreMute)")
             return
         }
         #endif
@@ -89,7 +89,7 @@ extension ServerModelManager {
         if self.isConnected || connectionInProgressOrActive {
             // We're leaving local test mode; do not stop engine when server connection is active/starting.
             isLocalAudioTestRunning = false
-            print("🎤 Connection active/in-progress, keeping audio engine running.")
+            MumbleLogger.audio.debug("Connection active/in-progress, keeping audio engine running")
             return
         }
 
@@ -97,7 +97,7 @@ extension ServerModelManager {
             return
         }
 
-        print("🎤 Stopping Local Audio (Settings closed)...")
+        MumbleLogger.audio.info("Stopping Local Audio (Settings closed)")
         isLocalAudioTestRunning = false
         // 关闭引擎并释放 AudioSession
         Task.detached(priority: .userInitiated) {
@@ -112,14 +112,14 @@ extension ServerModelManager {
             do {
                 try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             } catch {
-                print("⚠️ Failed to deactivate session: \(error)")
+                MumbleLogger.audio.warning("Failed to deactivate session: \(error)")
             }
             #endif
         }
     }
 
     private func startLocalAudioEngineForSettings() {
-        print("🎤 Starting Local Audio for Settings/Testing...")
+        MumbleLogger.audio.info("Starting Local Audio for Settings/Testing")
         isLocalAudioTestRunning = true
         Task.detached(priority: .userInitiated) {
             MKAudio.shared().start()
@@ -146,7 +146,7 @@ extension ServerModelManager {
         )
 
         if let connection = MUConnectionController.shared()?.connection {
-            print("🔊 Setting volume for \(session): \(volume) on output: \(String(describing: connection.audioOutput))")
+            MumbleLogger.audio.debug("Setting volume for \(session): \(volume) on output: \(String(describing: connection.audioOutput))")
             connection.audioOutput?.setVolume(volume, forSession: session)
         }
 
@@ -181,7 +181,7 @@ extension ServerModelManager {
     }
 
     func restoreAllUserPreferences() {
-        print("🔄 Restoring preferences for ALL users...")
+        MumbleLogger.model.info("Restoring preferences for ALL users")
         guard let root = serverModel?.rootChannel() else { return }
         Task { @MainActor in
             await recursiveRestore(channel: root)
@@ -205,12 +205,12 @@ extension ServerModelManager {
     /// 使用 PermissionQuery（所有用户可用），而非 ACL 查询（仅管理员可用）
     func scanAllChannelPermissions() {
         guard let root = serverModel?.rootChannel() else {
-            print("🔐 scanAllChannelPermissions: No root channel available")
+            MumbleLogger.model.warning("scanAllChannelPermissions: No root channel available")
             return
         }
         var count = 0
         recursiveRequestPermission(channel: root, count: &count)
-        print("🔐 scanAllChannelPermissions: Requested permissions for \(count) channels")
+        MumbleLogger.model.info("scanAllChannelPermissions: Requested permissions for \(count) channels")
 
         // 只有拥有 Write 权限的用户（管理员）才额外请求 ACL 来区分密码频道和纯权限限制频道
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
@@ -218,9 +218,9 @@ extension ServerModelManager {
             if self.hasRootPermission(MKPermissionWrite) {
                 var aclCount = 0
                 self.recursiveRequestACL(channel: root, count: &aclCount)
-                print("🔐 scanAllChannelPermissions: Also requested ACL for \(aclCount) channels (admin)")
+                MumbleLogger.model.info("scanAllChannelPermissions: Also requested ACL for \(aclCount) channels (admin)")
             } else {
-                print("🔐 scanAllChannelPermissions: Skipping ACL requests (no Write permission)")
+                MumbleLogger.model.debug("scanAllChannelPermissions: Skipping ACL requests (no Write permission)")
             }
         }
 

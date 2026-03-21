@@ -310,7 +310,7 @@ extension ServerModelManager {
                 let connectedUserSession = self.serverModel?.connectedUser()?.session()
 
                 if senderSession == connectedUserSession {
-                    print("🚫 Ignoring echoed message from self to prevent duplicate.")
+                    MumbleLogger.model.debug("Ignoring echoed message from self to prevent duplicate")
                     return
                 }
 
@@ -655,7 +655,7 @@ extension ServerModelManager {
     }
 
     @objc func handleConnectionOpened(_ notification: Notification) {
-        print("✅ Connection Opened - Triggering Restore")
+        MumbleLogger.connection.info("Connection Opened - Triggering Restore")
 
         let userInfo = notification.userInfo
 
@@ -682,12 +682,12 @@ extension ServerModelManager {
 
                 // 回到主线程执行具体的恢复逻辑
                 await MainActor.run {
-                    print("♻️ [Async] Restoring user preferences...")
+                    MumbleLogger.model.info("[Async] Restoring user preferences")
                     self.restoreAllUserPreferences()
 
                     // 初始进入时的状态同步
                     if let user = self.serverModel?.connectedUser(), user.isSelfMuted() {
-                        print("🔒 [Async] Initial Sync: Enforcing System Mute")
+                        MumbleLogger.audio.info("[Async] Initial Sync: Enforcing System Mute")
                         self.systemMuteManager.setSystemMute(true)
                     }
                 }
@@ -695,7 +695,7 @@ extension ServerModelManager {
                 // 延迟 2s 后扫描频道权限（确保频道树已完全构建）
                 try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
                 await MainActor.run {
-                    print("🔐 [Async] Scanning channel permissions...")
+                    MumbleLogger.model.info("[Async] Scanning channel permissions")
                     self.scanAllChannelPermissions()
                 }
 

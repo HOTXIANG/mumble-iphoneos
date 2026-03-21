@@ -19,6 +19,7 @@ extension ServerModelManager {
 
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
+        MumbleLogger.model.debug("Sending text message (\(trimmedText.count) chars) to current channel")
 
         // processedHTMLFromPlainTextMessage 会将纯文本转换为带 <p> 标签的 HTML
         let htmlMessage = MUTextMessageProcessor.processedHTML(
@@ -52,8 +53,13 @@ extension ServerModelManager {
         guard let serverModel = serverModel, !text.isEmpty else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        
-        guard let userChannel = serverModel.connectedUser()?.channel() else { return }
+
+        guard let userChannel = serverModel.connectedUser()?.channel() else {
+            MumbleLogger.model.warning("sendTextMessageToTree: no connected user channel")
+            return
+        }
+        MumbleLogger.model.debug("Sending tree message to channel '\(userChannel.channelName() ?? "")'")
+
         
         let htmlMessage = MUTextMessageProcessor.processedHTML(fromPlainTextMessage: trimmed)
         let msg = MKTextMessage(string: htmlMessage)

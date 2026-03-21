@@ -15,11 +15,14 @@ enum DatabaseAsync {
 
     /// 异步获取所有收藏服务器
     static func fetchAllFavourites() async throws -> [MUFavouriteServer] {
-        try await withCheckedThrowingContinuation { continuation in
+        MumbleLogger.database.debug("Fetching all favourites")
+        return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 if let favourites = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] {
+                    MumbleLogger.database.debug("Fetched \(favourites.count) favourites")
                     continuation.resume(returning: favourites)
                 } else {
+                    MumbleLogger.database.error("fetchAllFavourites: failed to cast results")
                     continuation.resume(throwing: MumbleError.databaseError(operation: "fetchAllFavourites", reason: "Failed to cast results"))
                 }
             }
@@ -41,8 +44,8 @@ enum DatabaseAsync {
 
     /// 异步保存收藏服务器
     static func storeFavourite(_ server: MUFavouriteServer) async {
+        MumbleLogger.database.info("Storing favourite server")
         await withCheckedContinuation { continuation in
-            // 使用 @unchecked Sendable 包装器避免 Sendable 警告
             struct UncheckedSendable<T>: @unchecked Sendable {
                 let value: T
             }
@@ -57,8 +60,8 @@ enum DatabaseAsync {
 
     /// 异步删除收藏服务器
     static func deleteFavourite(_ server: MUFavouriteServer) async {
+        MumbleLogger.database.info("Deleting favourite server")
         await withCheckedContinuation { continuation in
-            // 使用 @unchecked Sendable 包装器避免 Sendable 警告
             struct UncheckedSendable<T>: @unchecked Sendable {
                 let value: T
             }

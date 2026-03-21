@@ -18,11 +18,11 @@ extension ServerModelManager {
         let userName = user.userName() ?? "User"
         let certName = "\(userName)@\(currentHost)"
 
-        print("📝 Starting registration flow for \(certName)...")
+        MumbleLogger.model.info("Starting registration flow for \(certName)")
 
         // 3. 生成新证书
         guard let newCertRef = MUCertificateController.generateSelfSignedCertificate(withName: certName, email: "") else {
-            print("❌ Failed to generate certificate during registration.")
+            MumbleLogger.certificate.error("Failed to generate certificate during registration")
             return
         }
 
@@ -30,7 +30,7 @@ extension ServerModelManager {
             CertificateModel.shared.refreshCertificates()
         }
 
-        print("✅ Certificate generated. Binding to favourite server...")
+        MumbleLogger.certificate.info("Certificate generated. Binding to favourite server")
 
         DispatchQueue.main.async {
             AppState.shared.isRegistering = true

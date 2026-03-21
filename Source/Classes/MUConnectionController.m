@@ -57,7 +57,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
 
     NSData *normalizedRef = [MUCertificateController normalizedIdentityPersistentRefForPersistentRef:ref];
     if (normalizedRef && ![normalizedRef isEqualToData:ref]) {
-        NSLog(@"🔧 Normalized %@ certificate ref (%lu -> %lu bytes).",
+        MULogDebug(Connection, @"Normalized %@ certificate ref (%lu -> %lu bytes).",
               label ?: @"",
               (unsigned long)[ref length],
               (unsigned long)[normalizedRef length]);
@@ -76,7 +76,7 @@ static NSArray *MUIdentityBackedChainForPersistentRef(NSData *ref, NSString *lab
     }
 
     if (rawChain && [rawChain count] > 0) {
-        NSLog(@"⚠️ %@ certificate ref resolved to cert-only chain (no private key identity). Ignoring it.",
+        MULogWarning(Connection, @"%@ certificate ref resolved to cert-only chain (no private key identity). Ignoring it.",
               label ?: @"");
     }
     return nil;
@@ -201,7 +201,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     BOOL wasConnected = (_connection != nil || _serverModel != nil);
     
     if (wasConnected) {
-        NSLog(@"🔄 Switching servers: Force disconnecting previous session...");
+        MULogInfo(Connection, @"Switching servers: Force disconnecting previous session...");
         // 模拟用户点击断开：这会停止线程、发送 Bye 消息、清理状态
         [self disconnectFromServer];
     }
@@ -222,7 +222,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
     
     if (wasConnected) {
-        NSLog(@"⏳ Waiting 0.5s for socket cleanup...");
+        MULogDebug(Connection, @"Waiting 0.5s for socket cleanup...");
 
         [self performSelector:@selector(establishConnection) withObject:nil afterDelay:0.5];
     } else {
@@ -235,7 +235,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 }
 
 - (void) disconnectFromServer {
-    NSLog(@"🛑 User initiated disconnect/cancel.");
+    MULogInfo(Connection, @"User initiated disconnect/cancel.");
     _isUserInitiatedDisconnect = YES;
     _suppressReconnectForDisconnect = NO;
     if ([_reconnectTimer isValid]) {
@@ -322,13 +322,13 @@ static CFTimeInterval MUMonotonicNow(void) {
         BOOL isSatisfied = (nw_path_get_status(path) == nw_path_status_satisfied);
         
         if (!strongSelf->_networkWasSatisfied && isSatisfied) {
-            NSLog(@"🌐 Network restored.");
+            MULogInfo(Connection, @"Network restored.");
             NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
             BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
             
             // 网络恢复后，如果当前没有连接或连接已断开，并且启用了自动重连，则触发重连
             if (autoReconnectEnabled && strongSelf->_connection == nil && strongSelf->_hostname != nil && !strongSelf->_isUserInitiatedDisconnect) {
-                NSLog(@"🔄 Triggering reconnect due to network restore...");
+                MULogInfo(Connection, @"Triggering reconnect due to network restore...");
                 strongSelf->_retryCount = 0;
                 [strongSelf establishConnection];
                 NSDictionary *info = @{
@@ -374,21 +374,21 @@ static CFTimeInterval MUMonotonicNow(void) {
         NSArray *certChain = MUIdentityBackedChainForPersistentRef(_certificateRef, @"server-specific");
         if (certChain && certChain.count > 0) {
             [_connection setCertificateChain:certChain];
-            NSLog(@"🔐 Using server-specific certificate for connection. (chain length: %lu)", (unsigned long)certChain.count);
+            MULogInfo(Connection, @"Using server-specific certificate for connection. (chain length: %lu)", (unsigned long)certChain.count);
         } else {
             // 专属证书不可用，回退到全局默认
-            NSLog(@"⚠️ Failed to resolve server-specific cert identity (%lu bytes). Falling back...", (unsigned long)_certificateRef.length);
+            MULogWarning(Connection, @"Failed to resolve server-specific cert identity (%lu bytes). Falling back...", (unsigned long)_certificateRef.length);
             NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
             if (globalCert) {
                 NSArray *fallbackChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
                 if (fallbackChain && fallbackChain.count > 0) {
                     [_connection setCertificateChain:fallbackChain];
-                    NSLog(@"🔐 Fell back to global default certificate.");
+                    MULogInfo(Connection, @"Fell back to global default certificate.");
                 } else {
-                    NSLog(@"👤 Global default certificate is unusable for client auth. Connecting anonymously.");
+                    MULogWarning(Connection, @"Global default certificate is unusable for client auth. Connecting anonymously.");
                 }
             } else {
-                NSLog(@"👤 No fallback certificate available. Connecting anonymously.");
+                MULogInfo(Connection, @"No fallback certificate available. Connecting anonymously.");
             }
         }
     } else {
@@ -398,17 +398,17 @@ static CFTimeInterval MUMonotonicNow(void) {
             NSArray *certChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
             if (certChain && certChain.count > 0) {
                 [_connection setCertificateChain:certChain];
-                NSLog(@"🔐 Using global default certificate.");
+                MULogInfo(Connection, @"Using global default certificate.");
             } else {
-                NSLog(@"👤 Global default certificate is unusable for client auth. Connecting anonymously.");
+                MULogWarning(Connection, @"Global default certificate is unusable for client auth. Connecting anonymously.");
             }
         } else {
-            NSLog(@"👤 Connecting anonymously (No certificate).");
+            MULogInfo(Connection, @"Connecting anonymously (No certificate).");
         }
     }
     
     // Ensure audio starts with a valid connection snapshot already attached.
-    NSLog(@"🎤 Starting Audio Engine...");
+    MULogInfo(Connection, @"Starting Audio Engine...");
     [[MKAudio sharedAudio] restart];
     
     [_connection connectToHost:_hostname port:_port];
@@ -456,7 +456,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     });
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        NSLog(@"🎤 [Async] Stopping Audio Engine (Release Mic)...");
+        MULogInfo(Connection, @"[Async] Stopping Audio Engine (Release Mic)...");
         [[MKAudio sharedAudio] stop];
         
         // 显式停用 Session，消除橙色点
@@ -466,9 +466,9 @@ static CFTimeInterval MUMonotonicNow(void) {
         [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
         
         if (error) {
-            NSLog(@"⚠️ [Async] Failed to deactivate AudioSession: %@", error.localizedDescription);
+            MULogWarning(Connection, @"[Async] Failed to deactivate AudioSession: %@", error.localizedDescription);
         } else {
-            NSLog(@"✅ [Async] Audio session deactivated successfully.");
+            MULogDebug(Connection, @"[Async] Audio session deactivated successfully.");
         }
 #endif
     });
@@ -511,7 +511,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     _socketConnectedAt = MUMonotonicNow();
     if (_connectFlowStartedAt > 0) {
         CFTimeInterval handshakeMs = (_socketConnectedAt - _connectFlowStartedAt) * 1000.0;
-        NSLog(@"📈 PERF connect_opened reconnect=%@ attempt=%ld handshake_ms=%.2f host=%@:%lu",
+        MULogDebug(Connection, @"PERF connect_opened reconnect=%@ attempt=%ld handshake_ms=%.2f host=%@:%lu",
               _connectFlowIsReconnect ? @"yes" : @"no",
               (long)_connectFlowAttempt,
               handshakeMs,
@@ -540,12 +540,12 @@ static CFTimeInterval MUMonotonicNow(void) {
     }
     
     if (_waitingForCertDecision) {
-        NSLog(@"🔐 Ignoring closedWithError while waiting for certificate trust decision.");
+        MULogDebug(Connection, @"Ignoring closedWithError while waiting for certificate trust decision.");
         return;
     }
 
     if (_suppressReconnectForDisconnect) {
-        NSLog(@"⛔ Reconnect suppressed for terminal disconnect reason (kick/ban).");
+        MULogInfo(Connection, @"Reconnect suppressed for terminal disconnect reason (kick/ban).");
         _suppressReconnectForDisconnect = NO;
         [self teardownConnection];
         return;
@@ -561,7 +561,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
 
     if (!autoReconnectEnabled) {
-        NSLog(@"🚫 Auto Reconnect is disabled. Showing error immediately.");
+        MULogInfo(Connection, @"Auto Reconnect is disabled. Showing error immediately.");
         [self postErrorWithTitle:title message:message];
         return;
     }
@@ -570,7 +570,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     NSInteger maxAttempts = [self configuredReconnectMaxAttempts];
 
     if (_retryCount >= maxAttempts) {
-        NSLog(@"❌ Max retries reached (%ld). Giving up.", (long)_retryCount);
+        MULogError(Connection, @"Max retries reached (%ld). Giving up.", (long)_retryCount);
         NSDictionary *failureInfo = _pendingReconnectFailureInfo;
         NSString *finalTitle = failureInfo[@"title"] ?: fallbackTitle;
         NSString *finalMessage = failureInfo[@"message"] ?: fallbackMessage;
@@ -583,7 +583,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     NSTimeInterval reconnectDelay = [self calculatedReconnectDelayForAttempt:currentAttempt
                                                                 baseInterval:[self configuredReconnectInterval]];
 
-    NSLog(@"⚠️ Connection closed unexpectedly. Attempting reconnect (Attempt %ld/%ld)...", (long)currentAttempt, (long)maxAttempts);
+    MULogWarning(Connection, @"Connection closed unexpectedly. Attempting reconnect (Attempt %ld/%ld)...", (long)currentAttempt, (long)maxAttempts);
     [self beginPerformanceConnectFlowIsReconnect:YES attempt:currentAttempt reason:message];
     
     // 通知 UI 显示 "Reconnecting..."
@@ -602,19 +602,19 @@ static CFTimeInterval MUMonotonicNow(void) {
     [_connection disconnect];
     _connection = nil;
 
-    NSLog(@"⏱️ Reconnect scheduled after %.2fs (attempt %ld/%ld).", reconnectDelay, (long)currentAttempt, (long)maxAttempts);
+    MULogDebug(Connection, @"Reconnect scheduled after %.2fs (attempt %ld/%ld).", reconnectDelay, (long)currentAttempt, (long)maxAttempts);
     [self scheduleReconnectAfterDelay:reconnectDelay];
 }
 
 - (void) performReconnect {
-    NSLog(@"🔄 Performing reconnect...");
+    MULogInfo(Connection, @"Performing reconnect...");
     [self establishConnection];
 }
 
 - (void) connection:(MKConnection*)conn unableToConnectWithError:(NSError *)err {
     if (_waitingForCertDecision) return;
 
-    NSLog(@"⚠️ unableToConnectWithError received. Routing into reconnect policy.");
+    MULogWarning(Connection, @"unableToConnectWithError received. Routing into reconnect policy.");
     [self connection:conn closedWithError:err];
 }
 
@@ -674,7 +674,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     _connectFlowIsReconnect = isReconnect;
     _connectFlowAttempt = attempt;
 
-    NSLog(@"📈 PERF connect_begin reconnect=%@ attempt=%ld reason=%@ host=%@:%lu",
+    MULogDebug(Connection, @"PERF connect_begin reconnect=%@ attempt=%ld reason=%@ host=%@:%lu",
           isReconnect ? @"yes" : @"no",
           (long)attempt,
           reason ?: @"",
@@ -689,7 +689,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 
     CFTimeInterval now = MUMonotonicNow();
     CFTimeInterval totalMs = (now - _connectFlowStartedAt) * 1000.0;
-    NSLog(@"📈 PERF connect_failed reconnect=%@ attempt=%ld total_ms=%.2f title=%@ message=%@",
+    MULogDebug(Connection, @"PERF connect_failed reconnect=%@ attempt=%ld total_ms=%.2f title=%@ message=%@",
           _connectFlowIsReconnect ? @"yes" : @"no",
           (long)_connectFlowAttempt,
           totalMs,
@@ -708,7 +708,7 @@ static CFTimeInterval MUMonotonicNow(void) {
                                                                              expirationHandler:^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
-        NSLog(@"⏳ Reconnect background task expired.");
+        MULogWarning(Connection, @"Reconnect background task expired.");
         [strongSelf endReconnectBackgroundTask];
     }];
 }
@@ -747,13 +747,13 @@ static CFTimeInterval MUMonotonicNow(void) {
                                                                 port:(NSInteger)[conn port]];
 
     if (storedDigest && [storedDigest isEqualToString:serverDigest]) {
-        NSLog(@"🔐 Certificate matches stored digest — auto-trusting.");
+        MULogInfo(Connection, @"Certificate matches stored digest — auto-trusting.");
         [conn setIgnoreSSLVerification:YES];
         [conn reconnect];
         return;
     }
 
-    NSLog(@"⚠️ Certificate trust failure — prompting user (changed=%@).", storedDigest ? @"YES" : @"NO");
+    MULogWarning(Connection, @"Certificate trust failure — prompting user (changed=%@).", storedDigest ? @"YES" : @"NO");
     _waitingForCertDecision = YES;
 
     NSString *subjectName = [cert subjectName] ?: NSLocalizedString(@"Unknown", nil);
@@ -787,7 +787,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     NSString *digest = [cert hexDigest];
     if (digest) {
         [MUDatabase storeDigest:digest forServerWithHostname:_hostname port:(NSInteger)_port];
-        NSLog(@"🔐 User accepted certificate trust — digest stored.");
+        MULogInfo(Connection, @"User accepted certificate trust — digest stored.");
     }
 
     [self teardownConnection];
@@ -796,7 +796,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 
 - (void) rejectCertificateTrust {
     _waitingForCertDecision = NO;
-    NSLog(@"🚫 User rejected certificate trust.");
+    MULogInfo(Connection, @"User rejected certificate trust.");
     [self teardownConnection];
     [self postErrorWithTitle:NSLocalizedString(@"Connection Rejected", nil)
                      message:NSLocalizedString(@"The server's certificate was not trusted.", nil)];
@@ -821,7 +821,7 @@ static CFTimeInterval MUMonotonicNow(void) {
         title = NSLocalizedString(@"Username Already in Use", nil);
         msg = NSLocalizedString(@"Your username is still active from a previous session.\nSince you are not registered, you cannot disconnect the old session immediately.\n\nTip: If you are seeing this from reconnecting, register your user on the server to allow instant reconnection in the future.", nil);
 
-        NSLog(@"⚠️ Username in use. Showing registration guidance and skipping reconnect.");
+        MULogWarning(Connection, @"Username in use. Showing registration guidance and skipping reconnect.");
         _pendingReconnectFailureInfo = nil;
         _retryCount = 0;
         [self postErrorWithTitle:title message:msg];
@@ -840,7 +840,7 @@ static CFTimeInterval MUMonotonicNow(void) {
         CFTimeInterval now = MUMonotonicNow();
         CFTimeInterval totalMs = (now - _connectFlowStartedAt) * 1000.0;
         CFTimeInterval authJoinMs = (_socketConnectedAt > 0) ? ((now - _socketConnectedAt) * 1000.0) : -1;
-        NSLog(@"📈 PERF connect_ready reconnect=%@ attempt=%ld total_ms=%.2f auth_join_ms=%.2f host=%@:%lu",
+        MULogDebug(Connection, @"PERF connect_ready reconnect=%@ attempt=%ld total_ms=%.2f auth_join_ms=%.2f host=%@:%lu",
               _connectFlowIsReconnect ? @"yes" : @"no",
               (long)_connectFlowAttempt,
               totalMs,

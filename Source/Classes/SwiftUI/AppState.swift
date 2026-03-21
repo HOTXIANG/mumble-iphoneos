@@ -2,19 +2,6 @@
 
 import SwiftUI
 import Combine
-import os
-
-// MARK: - Centralized Logger
-
-enum MumbleLogger {
-    static let connection = Logger(subsystem: "cn.hotxiang.Mumble", category: "Connection")
-    static let audio      = Logger(subsystem: "cn.hotxiang.Mumble", category: "Audio")
-    static let ui         = Logger(subsystem: "cn.hotxiang.Mumble", category: "UI")
-    static let model      = Logger(subsystem: "cn.hotxiang.Mumble", category: "Model")
-    static let handoff    = Logger(subsystem: "cn.hotxiang.Mumble", category: "Handoff")
-    static let general    = Logger(subsystem: "cn.hotxiang.Mumble", category: "General")
-    static let notification = Logger(subsystem: "cn.hotxiang.Mumble", category: "Notification")
-}
 
 // MARK: - Centralized Notification Names (ObjC-bridged)
 

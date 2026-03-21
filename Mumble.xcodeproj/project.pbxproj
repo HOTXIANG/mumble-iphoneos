@@ -67,6 +67,7 @@
 		F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */ = {isa = PBXBuildFile; fileRef = F26689952EE8A46A008FC7EB /* LOGO.psd */; };
 		F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689A42EE8A472008FC7EB /* TransparentLogo.png */; };
 		F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */; };
+				F2LOG00002000000009AF31D /* LogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2LOG00001000000009AF31D /* LogSettingsView.swift */; };
 		F28C6AEC2EE6E52F00DE9CD2 /* PreferencesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */; };
 		F28C6AF02EE6E55300DE9CD2 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */; };
 		F28C6AF42EE6F74500DE9CD2 /* AudioMeterModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AF22EE6F73E00DE9CD2 /* AudioMeterModel.swift */; };
@@ -346,6 +347,7 @@
 		F26689A42EE8A472008FC7EB /* TransparentLogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TransparentLogo.png; path = Resources/TransparentLogo.png; sourceTree = "<group>"; };
 		F28C6AE32EE6AA9B00DE9CD2 /* MUTextMessageProcessor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUTextMessageProcessor.h; sourceTree = "<group>"; };
 		F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUTextMessageProcessor.m; sourceTree = "<group>"; };
+				F2LOG00001000000009AF31D /* LogSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSettingsView.swift; sourceTree = "<group>"; };
 		F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesModel.swift; sourceTree = "<group>"; };
 		F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		F28C6AF22EE6F73E00DE9CD2 /* AudioMeterModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioMeterModel.swift; sourceTree = "<group>"; };
@@ -701,6 +703,7 @@
 				F4D1A0B42FA1000100AABBCC /* PreferencesView+macOS.swift */,
 				F4D1A0B62FA1000100AABBCC /* PreferencesView+SharedViews+iOS.swift */,
 				F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */,
+				F2LOG00001000000009AF31D /* LogSettingsView.swift */,
 			);
 			path = Preferences;
 			sourceTree = "<group>";
@@ -1149,6 +1152,7 @@
 				F4D1A0B22FA1000100AABBCC /* PreferencesView+macOS.swift in Sources */,
 				F4D1A0B52FA1000100AABBCC /* PreferencesView+SharedViews+iOS.swift in Sources */,
 				F28C6AEC2EE6E52F00DE9CD2 /* PreferencesModel.swift in Sources */,
+				F2LOG00002000000009AF31D /* LogSettingsView.swift in Sources */,
 				F2ECCD992F3D283100AEA117 /* HandoffManager.swift in Sources */,
 				F2FF568A2E0F81EE00D76B49 /* ChannelListView.swift in Sources */,
 				F2AD3A6E2E0E31EF00FC7006 /* SwiftRootViewController.swift in Sources */,

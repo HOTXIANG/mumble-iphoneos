@@ -143,7 +143,7 @@ static NSArray *BuildCertChainFromCert(SecCertificateRef cert) {
     
     err = SecItemCopyMatching((__bridge CFDictionaryRef)query, &thing);
     if (err != noErr) {
-        NSLog(@"⚠️ MUCertificateChainBuilder: SecItemCopyMatching failed with status %d for persistent ref (%lu bytes)", (int)err, (unsigned long)[persistentRef length]);
+        MULogWarning(Certificate, @"SecItemCopyMatching failed with status %d for persistent ref (%lu bytes)", (int)err, (unsigned long)[persistentRef length]);
         return nil;
     }
 

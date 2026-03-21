@@ -29,6 +29,7 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
     
     func startPinging() {
         guard !hostname.isEmpty else { return }
+        MumbleLogger.network.debug("Start pinging \(hostname):\(port)")
         // 取消/停止之前的（如果有）
         stopPinging()
 
@@ -51,6 +52,7 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
     }
     
     func stopPinging() {
+        MumbleLogger.network.debug("Stop pinging \(hostname):\(port)")
         startTask?.cancel()
         startTask = nil
         pinger?.setDelegate(nil)

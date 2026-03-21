@@ -26,6 +26,7 @@ extension MUConnectionController {
         certificateRef: Data? = nil,
         displayName: String? = nil
     ) async throws {
+        MumbleLogger.connection.info("Connecting async to \(hostname):\(port) as \(username)")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let state = ConnectionObserverState()
 
@@ -35,6 +36,7 @@ extension MUConnectionController {
                 object: nil,
                 queue: .main
             ) { [weak state] _ in
+                MumbleLogger.connection.info("Async connection succeeded")
                 state?.cleanup()
                 continuation.resume()
             }
@@ -49,8 +51,10 @@ extension MUConnectionController {
 
                 if let userInfo = notification.userInfo,
                    let message = userInfo["message"] as? String {
+                    MumbleLogger.connection.error("Async connection failed: \(message)")
                     continuation.resume(throwing: MumbleError.connectionFailed(reason: message))
                 } else {
+                    MumbleLogger.connection.error("Async connection failed: unknown error")
                     continuation.resume(throwing: MumbleError.connectionFailed(reason: "Unknown error"))
                 }
             }

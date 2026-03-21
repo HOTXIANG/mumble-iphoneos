@@ -50,7 +50,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
     NSString *newPath = [docs stringByAppendingPathComponent:@".mumble.sqlite"];
     if (![manager fileExistsAtPath:newPath] && [manager fileExistsAtPath:oldPath]) {
         if (![manager moveItemAtPath:oldPath toPath:newPath error:&err]) {
-            NSLog(@"MUDatabase: unable to move file to new spot (mumble.sqlite -> .mumble.sqlite)");
+            MULogError(Database, @"Unable to move file to new spot (mumble.sqlite -> .mumble.sqlite)");
         }
     }
 
@@ -61,7 +61,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
         newPath = correctPath;
         if (![manager fileExistsAtPath:newPath] && [manager fileExistsAtPath:oldPath]) {
             if (![manager moveItemAtPath:oldPath toPath:newPath error:&err]) {
-                NSLog(@"MUDatabase: Unable to move file to new spot (~/Documents -> ~/Library)");
+                MULogError(Database, @"Unable to move file to new spot (~/Documents -> ~/Library)");
             }
         }
     }
@@ -106,7 +106,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
             return;
         }
 
-        NSLog(@"Initializing database with SQLite version: %@", [FMDatabase sqliteLibVersion]);
+        MULogInfo(Database, @"Initializing database with SQLite version: %@", [FMDatabase sqliteLibVersion]);
 
         // Attempt to move old databases if we find ones
         // in our old locations.
@@ -118,9 +118,9 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
             return;
 
         if ([db open]) {
-            NSLog(@"MUDatabase: Initialized database at %@", dbPath);
+            MULogInfo(Database, @"Initialized database at %@", dbPath);
         } else {
-            NSLog(@"MUDatabase: Could not open database at %@", dbPath);
+            MULogError(Database, @"Could not open database at %@", dbPath);
             db = nil;
             return;
         }
@@ -145,9 +145,9 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
         [rs close];
         
         if (!columnExists) {
-            NSLog(@"MUDatabase: Upgrading table 'favourites' adding column 'certificate_ref'...");
+            MULogInfo(Database, @"Upgrading table 'favourites' adding column 'certificate_ref'...");
             if (![db executeUpdate:@"ALTER TABLE `favourites` ADD COLUMN `certificate_ref` BLOB"]) {
-                NSLog(@"MUDatabase: Failed to add column certificate_ref: %@", [db lastErrorMessage]);
+                MULogError(Database, @"Failed to add column certificate_ref: %@", [db lastErrorMessage]);
             }
         }
         
@@ -164,9 +164,9 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
         [rs2 close];
         
         if (!hiddenColumnExists) {
-            NSLog(@"MUDatabase: Upgrading table 'favourites' adding column 'hidden'...");
+            MULogInfo(Database, @"Upgrading table 'favourites' adding column 'hidden'...");
             if (![db executeUpdate:@"ALTER TABLE `favourites` ADD COLUMN `hidden` INTEGER DEFAULT 0"]) {
-                NSLog(@"MUDatabase: Failed to add column hidden: %@", [db lastErrorMessage]);
+                MULogError(Database, @"Failed to add column hidden: %@", [db lastErrorMessage]);
             }
         }
 
@@ -194,7 +194,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
         [db executeUpdate:@"VACUUM"];
 
         if ([db hadError]) {
-            NSLog(@"MUDatabase: Error: %@ (Code: %i)", [db lastErrorMessage], [db lastErrorCode]);
+            MULogError(Database, @"Error: %@ (Code: %i)", [db lastErrorMessage], [db lastErrorCode]);
         }
 
         [MUDatabase migratePasswordsFromDatabaseToKeychain];
@@ -396,7 +396,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
             NSError *err = nil;
             tokensJSON = [NSJSONSerialization dataWithJSONObject:tokens options:0 error:&err];
             if (err != nil) {
-                NSLog(@"MUDatabase#storeAccessTokens:forServerWithHostname:port: %@", err);
+                MULogError(Database, @"storeAccessTokens:forServerWithHostname:port: %@", err);
                 return;
             }
         }
@@ -415,7 +415,7 @@ static void *kMUDatabaseQueueKey = &kMUDatabaseQueueKey;
             NSData *tokensJSON = [result dataForColumnIndex:0];
             tokens = [NSJSONSerialization JSONObjectWithData:tokensJSON options:0 error:&err];
             if (err != nil) {
-                NSLog(@"MUDatabase#accessTokensForServerWithHostname:port: %@", err);
+                MULogError(Database, @"accessTokensForServerWithHostname:port: %@", err);
                 tokens = nil;
             }
         }
@@ -449,7 +449,7 @@ static NSString *const kMUKeychainServiceName = @"cn.hotxiang.Mumble.ServerPassw
     };
     OSStatus status = SecItemAdd((__bridge CFDictionaryRef)query, NULL);
     if (status != errSecSuccess) {
-        NSLog(@"MUDatabase: Keychain add failed (%d) for key %@", (int)status, key);
+        MULogError(Database, @"Keychain add failed (%d) for key %@", (int)status, key);
     }
 }
 
@@ -486,7 +486,7 @@ static NSString *const kMUKeychainServiceName = @"cn.hotxiang.Mumble.ServerPassw
     BOOL didMigrate = [[NSUserDefaults standardUserDefaults] boolForKey:@"MUPasswordKeychainMigrated"];
     if (didMigrate) return;
 
-    NSLog(@"MUDatabase: Migrating passwords from SQLite to Keychain...");
+    MULogInfo(Database, @"Migrating passwords from SQLite to Keychain...");
     FMResultSet *res = [db executeQuery:@"SELECT `hostname`, `port`, `username`, `password` FROM `favourites` WHERE `password` IS NOT NULL AND `password` != ''"];
     int count = 0;
     while ([res next]) {
@@ -504,7 +504,7 @@ static NSString *const kMUKeychainServiceName = @"cn.hotxiang.Mumble.ServerPassw
 
     if (count > 0) {
         [db executeUpdate:@"UPDATE `favourites` SET `password` = '' WHERE `password` IS NOT NULL AND `password` != ''"];
-        NSLog(@"MUDatabase: Migrated %d passwords to Keychain and cleared DB.", count);
+        MULogInfo(Database, @"Migrated %d passwords to Keychain and cleared DB.", count);
     }
 
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"MUPasswordKeychainMigrated"];

@@ -216,7 +216,7 @@ struct CertificatePreferencesView: View {
                 }
             }
         case .failure(let error):
-            print("Import picker failed: \(error.localizedDescription)")
+            MumbleLogger.certificate.error("Import picker failed: \(error.localizedDescription)")
         }
     }
     
@@ -253,7 +253,7 @@ struct CertificatePreferencesView: View {
         guard let cert = certToExport else { return }
 
         guard let tempURL = certModel.exportCertificate(cert, password: exportPassword) else {
-            print("❌ Export failed: unable to generate PKCS12 for \(cert.name)")
+            MumbleLogger.certificate.error("Export failed: unable to generate PKCS12 for \(cert.name)")
             exportResultMessage = "Failed to export certificate. Please verify this identity still contains a valid private key."
             showingExportResultAlert = true
             return
@@ -270,7 +270,7 @@ struct CertificatePreferencesView: View {
 
             let response = savePanel.runModal()
             guard response == .OK, let destinationURL = savePanel.url else {
-                print("ℹ️ Export cancelled by user for \(cert.name)")
+                MumbleLogger.certificate.info("Export cancelled by user for \(cert.name)")
                 try? FileManager.default.removeItem(at: tempURL)
                 return
             }
@@ -280,11 +280,11 @@ struct CertificatePreferencesView: View {
             }
             try FileManager.default.copyItem(at: tempURL, to: destinationURL)
 
-            print("✅ Export succeeded: \(destinationURL.path)")
+            MumbleLogger.certificate.info("Export succeeded: \(destinationURL.path)")
             exportResultMessage = "Certificate exported to:\n\(destinationURL.path)"
             showingExportResultAlert = true
         } catch {
-            print("❌ Export save failed: \(error.localizedDescription)")
+            MumbleLogger.certificate.error("Export save failed: \(error.localizedDescription)")
             exportResultMessage = "Failed to save exported file:\n\(error.localizedDescription)"
             showingExportResultAlert = true
         }
@@ -296,7 +296,7 @@ struct CertificatePreferencesView: View {
         do {
             try FileManager.default.removeItem(at: tempURL)
         } catch {
-            print("ℹ️ Failed to remove temporary export file: \(error.localizedDescription)")
+            MumbleLogger.certificate.warning("Failed to remove temporary export file: \(error.localizedDescription)")
         }
     }
 
@@ -319,7 +319,7 @@ struct CertificatePreferencesView: View {
 
         let response = panel.runModal()
         guard response == .OK, let url = panel.url else {
-            print("ℹ️ Import cancelled by user")
+            MumbleLogger.certificate.info("Import cancelled by user")
             return
         }
 

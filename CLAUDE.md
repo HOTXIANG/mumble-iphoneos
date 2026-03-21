@@ -291,15 +291,91 @@ NotificationCenter.default.addObserver(forName: .muConnectionOpened, object: nil
 
 ## 日志规范
 
-使用 `MumbleLogger`（基于 OSLog），禁止 `print()` 用于正式日志：
+项目使用统一日志系统（`LogManager` 单例 + `MumbleLogger` 入口），全面覆盖 Swift / ObjC / MumbleKit 三层。详细架构参见 `docs/LOGGING.md`。
+
+### 禁止事项
+
+- **禁止 `print()`**：所有正式日志必须通过 `MumbleLogger` 输出
+- **禁止裸 `NSLog()`**：ObjC 应用层使用 `MULog*` 宏，MumbleKit 使用 `MKLog*` 宏
+- **禁止无分类日志**：每条日志必须属于明确的分类
+
+### 日志等级（从高到低）
+
+| 等级 | 用途 | 示例 |
+|------|------|------|
+| `error` | 操作失败、需要关注 | 连接断开、证书创建失败 |
+| `warning` | 异常但可恢复 | 证书信任失败、格式回退 |
+| `info` | 正常操作节点 | 连接成功、服务器发现 |
+| `debug` | 开发调试细节 | 状态变更、性能计量 |
+| `verbose` | 极详细追踪 | 每帧数据、包收发 |
+
+### Swift 用法
 
 ```swift
-MumbleLogger.connection.info("连接状态更新")
+MumbleLogger.connection.info("已连接到 \(hostname):\(port)")
 MumbleLogger.audio.error("音频初始化失败：\(error)")
-MumbleLogger.ui.debug("UI 状态变更")
+MumbleLogger.plugin.debug("AU 加载完成：\(pluginName)")
+MumbleLogger.discovery.warning("服务解析超时：\(serviceName)")
 ```
 
-分类: `general`、`connection`、`audio`、`database`、`certificate`、`notification`、`ui`、`model`、`handoff`
+### ObjC 应用层用法（MU* 文件）
+
+```objc
+MULogInfo(Connection, @"连接成功: %@:%d", hostname, port);
+MULogError(Database, @"数据库迁移失败: %@", error);
+MULogDebug(Certificate, @"证书链长度: %d", chainLength);
+```
+
+### MumbleKit 用法（MK* 文件）
+
+```objc
+MKLogInfo(Audio, @"音频引擎启动: sampleRate=%f", rate);
+MKLogError(Network, @"包解析失败: type=%d size=%lu", type, size);
+MKLogVerbose(Codec, @"Opus 编码帧: %d bytes", encodedLength);
+```
+
+### 13 个日志分类
+
+| 分类 | 覆盖范围 |
+|------|---------|
+| `Connection` | 服务器连接/断开/重连 |
+| `Audio` | 音频引擎、设备、TTS |
+| `UI` | 视图状态、渲染性能 |
+| `Model` | ServerModelManager 状态 |
+| `Handoff` | Handoff/LiveActivity |
+| `General` | 应用生命周期、通用 |
+| `Notification` | 推送/本地通知 |
+| `Database` | SQLite/FMDB 操作 |
+| `Certificate` | 证书创建/导入/验证 |
+| `Plugin` | AU/VST3 插件加载/渲染 |
+| `Network` | 协议层包收发、加密 |
+| `Codec` | Opus/Speex 编解码 |
+| `Discovery` | LAN 服务发现 |
+
+### 运行时控制
+
+- **设置界面**：iOS `Settings → Developer → Logging` / macOS `Logging` 标签页，可按分类开关日志等级
+- **环境变量**（Xcode Scheme → Arguments → Environment Variables）：
+  - `MUMBLE_LOG_LEVEL=verbose|debug|info|warning|error`（全局等级覆盖）
+  - `MUMBLE_LOG_DISABLED=audio,plugin`（禁用指定分类）
+  - `MUMBLE_LOG_VERBOSE=connection,network`（指定分类设为 verbose）
+  - `MUMBLE_LOG_FILE=1`（启用文件持久化）
+- **默认等级**：Debug 构建 `debug`，Release 构建 `info`
+
+### 文件持久化（可选）
+
+- 设置界面或 `MUMBLE_LOG_FILE=1` 开启
+- 日志写入 `Documents/Logs/`（iOS）或 `Application Support/Mumble/Logs/`（macOS）
+- 按天滚动，保留最近 7 天
+- 设置界面可导出日志文件
+
+### 新增模块日志要求
+
+新增功能模块时必须添加对应日志：
+1. 确定所属分类（参考上表），不合适时使用 `General`
+2. 关键操作（创建/删除/连接/断开）至少 `info` 级
+3. 错误路径必须 `error` 或 `warning` 级，包含错误详情
+4. 性能敏感路径用 `debug`，包含耗时信息
 
 ---
 

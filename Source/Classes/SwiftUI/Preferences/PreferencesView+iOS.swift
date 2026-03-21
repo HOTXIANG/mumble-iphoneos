@@ -114,6 +114,12 @@ struct PreferencesView: View {
             Label("Certificates", systemImage: "checkmark.shield")
         }
 
+        Section(header: Text("Developer")) {
+            NavigationLink(destination: LogSettingsView()) {
+                Label("Logging", systemImage: "ladybug")
+            }
+        }
+
         Section {
             NavigationLink(destination: AboutView()) {
                 Label("About Mumble", systemImage: "info.circle")

@@ -611,7 +611,8 @@ struct MacSettingsRootView: View {
         case handoff
         case certificates
         case advanced
-        
+        case logging
+
         var preferredContentSize: NSSize {
             switch self {
             case .general:
@@ -630,6 +631,8 @@ struct MacSettingsRootView: View {
                 return NSSize(width: 550, height: 600)
             case .advanced:
                 return NSSize(width: 550, height: 340)
+            case .logging:
+                return NSSize(width: 550, height: 680)
             }
         }
     }
@@ -699,6 +702,13 @@ struct MacSettingsRootView: View {
                     Label("Advanced", systemImage: "slider.horizontal.3")
                 }
                 .tag(MacSettingsTab.advanced)
+
+            LogSettingsView()
+                .macSettingsCenteredPageStyle()
+                .tabItem {
+                    Label("Logging", systemImage: "ladybug")
+                }
+                .tag(MacSettingsTab.logging)
         }
         .background(MacSettingsWindowSizeAdaptor(targetSize: selectedTab.preferredContentSize))
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))

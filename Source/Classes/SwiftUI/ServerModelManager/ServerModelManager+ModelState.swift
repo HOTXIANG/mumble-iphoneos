@@ -220,7 +220,7 @@ extension ServerModelManager {
         updateLiveActivity()
 
         let elapsedMs = (CACurrentMediaTime() - startedAt) * 1000.0
-        MumbleLogger.model.debug("PERF rebuild_model_array reason=\(reason, privacy: .public) items=\(self.modelItems.count) elapsed_ms=\(elapsedMs, format: .fixed(precision: 2))")
+        MumbleLogger.model.debug("PERF rebuild_model_array reason=\(reason) items=\(self.modelItems.count) elapsed_ms=\(String(format: "%.2f", elapsedMs))")
     }
 
     private func addChannelTreeToModel(channel: MKChannel, indentLevel: Int, isTraversingPinnedTree: Bool = false) {

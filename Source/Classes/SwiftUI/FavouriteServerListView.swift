@@ -203,10 +203,10 @@ class FavouriteServerListViewModel: ObservableObject {
             let sorted = loaded.sorted {
                 ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
             }
-            print("📋 FavouriteServers: loaded \(sorted.count) visible servers from database")
+            MumbleLogger.database.debug("FavouriteServers: loaded \(sorted.count) visible servers from database")
             self.servers = sorted
         } else {
-            print("⚠️ FavouriteServers: fetchVisibleFavourites returned nil")
+            MumbleLogger.database.warning("FavouriteServers: fetchVisibleFavourites returned nil")
             self.servers = []
         }
     }
@@ -239,11 +239,11 @@ struct FavouriteServerListContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .task {
-            print("📋 FavouriteServers: .task fired")
+            MumbleLogger.ui.verbose("FavouriteServers: .task fired")
             viewModel.loadServers()
         }
         .onAppear {
-            print("📋 FavouriteServers: .onAppear fired")
+            MumbleLogger.ui.verbose("FavouriteServers: .onAppear fired")
             viewModel.loadServers()
             if !didRefreshCertificates {
                 didRefreshCertificates = true
@@ -383,7 +383,7 @@ struct FavouriteServerListContentView: View {
 
         // 现在统一使用真实删除，不再保留 hidden profile
         MUDatabase.deleteFavourite(server)
-        print("🗑️ Deleted favourite '\(server.displayName ?? "")'")
+        MumbleLogger.database.info("Deleted favourite '\(server.displayName ?? "")'")
         viewModel.loadServers()
     }
     

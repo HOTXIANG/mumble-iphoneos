@@ -266,7 +266,7 @@ struct NotificationSettingsView: View {
             // 进入页面时检查/请求权限
             UNUserNotificationCenter.current().requestAuthorization(options: notificationAuthorizationOptions) { granted, error in
                 if let error = error {
-                    print("Notification permission error: \(error)")
+                    MumbleLogger.notification.error("Notification permission error: \(error)")
                 }
             }
         }

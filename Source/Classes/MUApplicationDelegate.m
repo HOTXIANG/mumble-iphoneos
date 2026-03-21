@@ -70,7 +70,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
     [center setBadgeCount:0 withCompletionHandler:^(NSError * _Nullable error) {
         if (error) {
-            NSLog(@"Error setting badge count: %@", error.localizedDescription);
+            MULogError(General, @"Error setting badge count: %@", error.localizedDescription);
         }
     }];
     
@@ -451,7 +451,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     // In case we've been backgrounded by a phone call, MKAudio will
     // already have shut itself down.
     if (!_connectionActive) {
-        NSLog(@"MumbleApplicationDelegate: Not connected to a server. Stopping MKAudio.");
+        MULogInfo(General, @"Not connected to a server. Stopping MKAudio.");
         [[MKAudio sharedAudio] stop];
         
 #ifdef ENABLE_REMOTE_CONTROL
@@ -470,7 +470,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     // For regular backgrounding, we usually don't turn off the audio system, and
     // we won't have to start it again.
     if (_connectionActive && ![[MKAudio sharedAudio] isRunning]) {
-        NSLog(@"MumbleApplicationDelegate: Connection active but MKAudio not running. Starting it.");
+        MULogInfo(General, @"Connection active but MKAudio not running. Starting it.");
         [[MKAudio sharedAudio] start];
         
 #if ENABLE_REMOTE_CONTROL
