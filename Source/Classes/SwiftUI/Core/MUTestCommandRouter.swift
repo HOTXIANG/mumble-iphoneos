@@ -128,17 +128,30 @@ final class MUTestCommandRouter {
             return nil
 
         case "restart":
+            guard MUConnectionController.shared()?.isConnected() == true else {
+                throw TestCommandError("Not connected — audio engine not active")
+            }
             MKAudio.shared()?.restart()
             return nil
 
         case "status":
-            let audio = MKAudio.shared()
-            let connUser = MUConnectionController.shared()?.serverModel?.connectedUser()
-            return [
-                "running": audio?.isRunning() ?? false,
-                "selfMuted": connUser?.isSelfMuted() ?? false,
-                "selfDeafened": connUser?.isSelfDeafened() ?? false
-            ] as [String: Any]
+            // Only access MKAudio when connected to avoid blocking main thread
+            let connected = MUConnectionController.shared()?.isConnected() == true
+            if connected {
+                let connUser = MUConnectionController.shared()?.serverModel?.connectedUser()
+                return [
+                    "running": MKAudio.shared()?.isRunning ?? false,
+                    "selfMuted": connUser?.isSelfMuted() ?? false,
+                    "selfDeafened": connUser?.isSelfDeafened() ?? false
+                ] as [String: Any]
+            } else {
+                return [
+                    "running": false,
+                    "selfMuted": false,
+                    "selfDeafened": false,
+                    "note": "Not connected — audio engine not initialized"
+                ] as [String: Any]
+            }
 
         default:
             throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, restart, status")
@@ -341,10 +354,12 @@ final class MUTestCommandRouter {
             guard let hostname = params["hostname"] as? String else {
                 throw TestCommandError("Missing 'hostname'")
             }
-            let fav = MUFavouriteServer()
+            guard let fav = MUFavouriteServer() else {
+                throw TestCommandError("Failed to create MUFavouriteServer")
+            }
             fav.displayName = params["displayName"] as? String ?? hostname
             fav.hostName = hostname
-            fav.port = Int64(params["port"] as? Int ?? 64738)
+            fav.port = params["port"] as? UInt ?? 64738
             fav.userName = params["username"] as? String ?? "MumbleUser"
             fav.password = params["password"] as? String ?? ""
             MUDatabase.storeFavourite(fav)
@@ -354,7 +369,7 @@ final class MUTestCommandRouter {
             guard let hostname = params["hostname"] as? String else {
                 throw TestCommandError("Missing 'hostname'")
             }
-            let port = Int64(params["port"] as? Int ?? 64738)
+            let port = params["port"] as? UInt ?? 64738
             let favs = MUDatabase.fetchAllFavourites() as? [MUFavouriteServer] ?? []
             guard let fav = favs.first(where: { $0.hostName == hostname && $0.port == port }) else {
                 throw TestCommandError("Favourite not found: \(hostname):\(port)")
@@ -466,7 +481,7 @@ final class MUTestCommandRouter {
             var categories: [String: Any] = [:]
             for cat in LogCategory.allCases {
                 categories[cat.rawValue] = [
-                    "enabled": lm.isEnabled(for: cat),
+                    "enabled": lm.isEnabled(category: cat),
                     "level": "\(lm.level(for: cat))"
                 ]
             }
