@@ -89,6 +89,8 @@
 		F2A658612F589059009AF31D /* CertificateAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584C2F589059009AF31D /* CertificateAsync.swift */; };
 		F2A658622F589059009AF31D /* ConnectionAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584D2F589059009AF31D /* ConnectionAsync.swift */; };
 		F2A658632F589059009AF31D /* LogCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658572F589059009AF31D /* LogCategories.swift */; };
+		F2B7C0A32F7D0001009AF31D /* MUTestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B7C0A12F7D0001009AF31D /* MUTestServer.swift */; };
+		F2B7C0A42F7D0001009AF31D /* MUTestCommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B7C0A22F7D0001009AF31D /* MUTestCommandRouter.swift */; };
 		F2A658642F589059009AF31D /* NotificationConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658502F589059009AF31D /* NotificationConstants.swift */; };
 		F2AD3A5D2E0E2F3900FC7006 /* MumbleNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A5B2E0E2F3500FC7006 /* MumbleNavigationView.swift */; };
 		F2AD3A642E0E2F7900FC7006 /* MumbleContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A622E0E2F7300FC7006 /* MumbleContentView.swift */; };
@@ -369,6 +371,8 @@
 		F2A658542F589059009AF31D /* MumbleError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleError.swift; sourceTree = "<group>"; };
 		F2A658552F589059009AF31D /* MumbleError+Localized.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MumbleError+Localized.swift"; sourceTree = "<group>"; };
 		F2A658572F589059009AF31D /* LogCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCategories.swift; sourceTree = "<group>"; };
+		F2B7C0A12F7D0001009AF31D /* MUTestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUTestServer.swift; sourceTree = "<group>"; };
+		F2B7C0A22F7D0001009AF31D /* MUTestCommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUTestCommandRouter.swift; sourceTree = "<group>"; };
 		F2A658582F589059009AF31D /* MumbleLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MumbleLogger.h; sourceTree = "<group>"; };
 		F2A658592F589059009AF31D /* MumbleLogger.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MumbleLogger.m; sourceTree = "<group>"; };
 		F2AD3A5B2E0E2F3500FC7006 /* MumbleNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleNavigationView.swift; sourceTree = "<group>"; };
@@ -770,6 +774,8 @@
 				F2A658572F589059009AF31D /* LogCategories.swift */,
 				F2A658582F589059009AF31D /* MumbleLogger.h */,
 				F2A658592F589059009AF31D /* MumbleLogger.m */,
+				F2B7C0A12F7D0001009AF31D /* MUTestServer.swift */,
+				F2B7C0A22F7D0001009AF31D /* MUTestCommandRouter.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -1177,6 +1183,8 @@
 				F2A658612F589059009AF31D /* CertificateAsync.swift in Sources */,
 				F2A658622F589059009AF31D /* ConnectionAsync.swift in Sources */,
 				F2A658632F589059009AF31D /* LogCategories.swift in Sources */,
+				F2B7C0A32F7D0001009AF31D /* MUTestServer.swift in Sources */,
+				F2B7C0A42F7D0001009AF31D /* MUTestCommandRouter.swift in Sources */,
 				F2A658642F589059009AF31D /* NotificationConstants.swift in Sources */,
 				2836767D1525053A0015958E /* MUCertificateChainBuilder.m in Sources */,
 				F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */,

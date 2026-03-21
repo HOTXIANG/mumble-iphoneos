@@ -62,6 +62,10 @@ struct MumbleApp: App {
                     Task {
                         await AudioPluginRackManager.shared.initializeOnStartup()
                     }
+
+                    #if DEBUG
+                    MUTestServer.shared.start(serverManager: serverManager)
+                    #endif
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .muConnectionOpened)) { _ in
                     joinPendingDeepLinkChannelIfNeeded()
