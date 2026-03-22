@@ -8,10 +8,16 @@
 import SwiftUI
 
 struct AboutView: View {
+    private enum AboutDestination: Hashable {
+        case license
+        case acknowledgements
+    }
+
     @Environment(\.colorScheme) private var colorScheme
     // 动态获取版本号
     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? NSLocalizedString("Unknown", comment: "")
     let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? NSLocalizedString("Unknown", comment: "")
+    @State private var automationDestination: AboutDestination? = nil
 
     private var preferredLogoName: String {
         colorScheme == .dark ? "TransparentLogoDarkGlass" : "TransparentLogoBrightGlass"
@@ -82,22 +88,34 @@ struct AboutView: View {
         
         // 法律信息区
         Section(header: Text("Legal")) {
-            NavigationLink("License") {
-                ScrollView {
+            NavigationLink(
+                "License",
+                destination: ScrollView {
                     Text("Mumble for iOS is Free Software...")
                         .padding()
                 }
                 .navigationTitle("License")
-            }
+                .onAppear {
+                    AppState.shared.setAutomationCurrentScreen("aboutLicense")
+                },
+                tag: .license,
+                selection: $automationDestination
+            )
             
-            NavigationLink("Third Party Libraries") {
-                List {
+            NavigationLink(
+                "Third Party Libraries",
+                destination: List {
                     Text("OpenSSL")
                     Text("MumbleKit")
                     Text("Protobuf")
                 }
                 .navigationTitle("Acknowledgements")
-            }
+                .onAppear {
+                    AppState.shared.setAutomationCurrentScreen("aboutAcknowledgements")
+                },
+                tag: .acknowledgements,
+                selection: $automationDestination
+            )
         }
         
         // 版权区
@@ -127,5 +145,32 @@ struct AboutView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("about")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "aboutLicense":
+                automationDestination = .license
+            case "aboutAcknowledgements":
+                automationDestination = .acknowledgements
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            switch target {
+            case nil:
+                automationDestination = nil
+            case "aboutLicense" where automationDestination == .license:
+                automationDestination = nil
+            case "aboutAcknowledgements" where automationDestination == .acknowledgements:
+                automationDestination = nil
+            default:
+                break
+            }
+        }
     }
 }

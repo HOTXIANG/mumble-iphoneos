@@ -261,6 +261,7 @@ struct ACLEntryEditView: View {
         }
         .disabled(entry.isInherited)
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("aclEntryEdit")
             if entry.userID >= 0 {
                 serverManager.requestACLUserNames(for: [entry.userID])
             }
@@ -594,6 +595,7 @@ struct GroupEntryEditView: View {
         }
         .disabled(entry.isInherited)
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("groupEntryEdit")
             let ids = Set(entry.members + entry.excludedMembers + entry.inheritedMembers).filter { $0 >= 0 }
             serverManager.requestACLUserNames(for: Array(ids))
         }

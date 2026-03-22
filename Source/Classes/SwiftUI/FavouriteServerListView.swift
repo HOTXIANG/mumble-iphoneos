@@ -260,6 +260,28 @@ struct FavouriteServerListContentView: View {
         } message: { server in
             Text("Are you sure you want to delete '\(server.displayName ?? NSLocalizedString("this server", comment: ""))'?")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String, target == "favouriteDelete" else { return }
+            if let primaryKey = notification.userInfo?["primaryKey"] as? Int,
+               let server = viewModel.servers.first(where: { $0.primaryKey == primaryKey }) {
+                serverToDelete = server
+                showingDeleteAlert = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "favouriteDelete" {
+                showingDeleteAlert = false
+                serverToDelete = nil
+            }
+        }
+        .onChange(of: showingDeleteAlert) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedAlert("favouriteDelete")
+            } else if AppState.shared.automationPresentedAlert == "favouriteDelete" {
+                AppState.shared.setAutomationPresentedAlert(nil)
+            }
+        }
     }
     
     @ViewBuilder
@@ -446,6 +468,7 @@ struct FavouriteServerListContentView: View {
 struct FavouriteServerListView: MumbleContentView {
     @EnvironmentObject var navigationManager: NavigationManager
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
 
     var isModalPresentation: Bool = false
     
@@ -465,6 +488,50 @@ struct FavouriteServerListView: MumbleContentView {
             refreshTrigger: refreshTrigger,
             dismissOnConnect: isModalPresentation
         )
+        .onAppear {
+            appState.setAutomationCurrentScreen("favouriteList")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "favouriteNew":
+                showingNewSheet = true
+            case "favouriteEdit":
+                let primaryKey =
+                    (notification.userInfo?["primaryKey"] as? NSNumber)?.intValue
+                    ?? (notification.userInfo?["primaryKey"] as? Int)
+                guard let primaryKey,
+                      let server = (MUDatabase.fetchAllFavourites() as? [MUFavouriteServer])?.first(where: { $0.primaryKey == primaryKey }) else {
+                    return
+                }
+                serverToEdit = EditableServer(server)
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "favouriteNew" {
+                showingNewSheet = false
+            }
+            if target == nil || target == "favouriteEdit" {
+                serverToEdit = nil
+            }
+        }
+        .onChange(of: showingNewSheet) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("favouriteNew")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "favouriteNew")
+            }
+        }
+        .onChange(of: serverToEdit?.id) { _, newValue in
+            if newValue != nil {
+                appState.setAutomationPresentedSheet("favouriteEdit")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "favouriteEdit")
+            }
+        }
         // 新建收藏
         .sheet(isPresented: $showingNewSheet, onDismiss: {
             // Sheet 完全关闭后再刷新列表，避免 macOS 上 SwiftUI 在 sheet 动画期间不传播状态

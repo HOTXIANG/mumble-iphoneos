@@ -199,184 +199,407 @@ struct ServerChannelView: View {
     @State private var pendingNicknameInput: String = ""
     
     var body: some View {
+        let baseView = AnyView(channelContent)
+        let overlayView = AnyView(
+            baseView
+                .overlay(alignment: .bottom, content: movingUserOverlay)
+                .animation(.easeInOut(duration: 0.25), value: serverManager.movingUser != nil)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+        )
+        let sheetView = AnyView(
+            overlayView
+                .sheet(item: $selectedUserForConfig, content: userAudioSettingsSheet)
+                .sheet(item: $selectedUserForInfo, content: userInfoSheet)
+                .sheet(item: $selectedUserForStats, content: userStatsSheet)
+                .sheet(item: $selectedChannelForInfo, content: channelInfoSheet)
+                .sheet(item: $selectedUserForPM, content: privateMessageSheet)
+                .sheet(item: $selectedChannelForEdit, content: editChannelSheet)
+                .sheet(item: $selectedChannelForCreate, content: createChannelSheet)
+        )
+        let alertView = AnyView(
+            sheetView
+                .alert("Set Nickname", isPresented: renameAlertBinding, actions: renameAlertActions, message: renameAlertMessage)
+                .alert("Channel Password", isPresented: channelPasswordAlertBinding, actions: channelPasswordAlertActions, message: channelPasswordAlertMessage)
+        )
+        let notificationView = AnyView(
+            alertView
+                .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI), perform: handleAutomationOpenUI)
+                .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI), perform: handleAutomationDismissUI)
+        )
+        let sheetStateView = AnyView(
+            notificationView
+                .onChange(of: selectedUserForConfig?.session()) { _, newValue in
+                    syncAutomationSheet(newValue != nil ? "userAudioSettings" : nil, clearing: "userAudioSettings")
+                }
+                .onChange(of: selectedUserForInfo?.session()) { _, newValue in
+                    syncAutomationSheet(newValue != nil ? "userInfo" : nil, clearing: "userInfo")
+                }
+                .onChange(of: selectedUserForStats?.session()) { _, newValue in
+                    syncAutomationSheet(newValue != nil ? "userStats" : nil, clearing: "userStats")
+                }
+                .onChange(of: selectedChannelForInfo?.channelId()) { _, newValue in
+                    syncAutomationSheet(newValue != nil ? "channelInfo" : nil, clearing: "channelInfo")
+                }
+        )
+        let remainingStateView = AnyView(
+            sheetStateView
+                .onChange(of: selectedUserForPM?.session()) { _, newValue in
+                    syncAutomationSheet(newValue != nil ? "privateMessage" : nil, clearing: "privateMessage")
+                }
+                .onChange(of: selectedChannelForEdit?.channelId()) { _, newValue in
+                    syncAutomationSheet(newValue != nil ? "channelEdit" : nil, clearing: "channelEdit")
+                }
+                .onChange(of: selectedChannelForCreate?.channelId()) { _, newValue in
+                    syncAutomationSheet(newValue != nil ? "channelCreate" : nil, clearing: "channelCreate")
+                }
+                .onChange(of: selectedUserForRename?.session()) { _, newValue in
+                    syncAutomationAlert(newValue != nil ? "userRename" : nil, clearing: "userRename")
+                }
+        )
+        return AnyView(
+            remainingStateView
+                .onChange(of: serverManager.passwordPromptChannel?.channelId()) { _, newValue in
+                    syncAutomationAlert(newValue != nil ? "channelPassword" : nil, clearing: "channelPassword")
+                }
+                .onChange(of: serverManager.movingUser?.session()) { _, _ in
+                    syncMovingOverlayState()
+                }
+                .onAppear(perform: syncMovingOverlayState)
+        )
+    }
+
+    private var channelContent: some View {
         ZStack {
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: kRowSpacing) {
                     Color.clear.frame(height: 10)
-                    
-                    if let root = MUConnectionController.shared()?.serverModel?.rootChannel() {
-                        ChannelTreeRow(
-                            channel: root,
-                            level: 0,
-                            serverManager: serverManager,
-                            onUserTap: { user in
-                                self.selectedUserForConfig = user
-                            },
-                            onUserInfoTap: { user in
-                                self.selectedUserForInfo = user
-                            },
-                            onChannelInfoTap: { channel in
-                                self.selectedChannelForInfo = channel
-                            },
-                            onUserPMTap: { user in
-                                self.selectedUserForPM = user
-                            },
-                            onUserStatsTap: { user in
-                                self.selectedUserForStats = user
-                            },
-                            onUserRenameTap: { user in
-                                self.selectedUserForRename = user
-                                self.pendingNicknameInput = serverManager.localNicknames[user.session()] ?? ""
-                            },
-                            onChannelEditTap: { channel in
-                                self.selectedChannelForEdit = channel
-                            },
-                            onChannelCreateTap: { channel in
-                                self.selectedChannelForCreate = channel
-                            }
-                        )
-                    } else {
-                        VStack(spacing: 12) {
-                            ProgressView().tint(.accentColor)
-                            Text("Loading channels...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 100)
-                    }
-                    
+                    channelTreeContent
                     Color.clear.frame(height: 80)
                 }
                 .padding(.leading, 16)
                 .padding(.trailing, isSplitLayout ? 4 : 16)
             }
         }
-        .overlay(alignment: .bottom) {
-            if let movingUser = serverManager.movingUser {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.right.arrow.left")
-                        .foregroundColor(.white)
-                        .font(.system(size: 12))
-                    Text("Moving \(movingUser.userName() ?? NSLocalizedString("user", comment: "")) — tap a channel")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    Spacer()
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            serverManager.movingUser = nil
-                        }
-                    } label: {
-                        Text("Cancel")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.primary.opacity(0.18), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var channelTreeContent: some View {
+        if let root = MUConnectionController.shared()?.serverModel?.rootChannel() {
+            ChannelTreeRow(
+                channel: root,
+                level: 0,
+                serverManager: serverManager,
+                onUserTap: { user in
+                    selectedUserForConfig = user
+                },
+                onUserInfoTap: { user in
+                    selectedUserForInfo = user
+                },
+                onChannelInfoTap: { channel in
+                    selectedChannelForInfo = channel
+                },
+                onUserPMTap: { user in
+                    selectedUserForPM = user
+                },
+                onUserStatsTap: { user in
+                    selectedUserForStats = user
+                },
+                onUserRenameTap: { user in
+                    presentNicknameEditor(for: user)
+                },
+                onChannelEditTap: { channel in
+                    selectedChannelForEdit = channel
+                },
+                onChannelCreateTap: { channel in
+                    selectedChannelForCreate = channel
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial)
-                .background(Color.accentColor.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            )
+        } else {
+            VStack(spacing: 12) {
+                ProgressView().tint(.accentColor)
+                Text("Loading channels...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 100)
         }
-        .animation(.easeInOut(duration: 0.25), value: serverManager.movingUser != nil)
-        .scrollContentBackground(.hidden)
-        .background(Color.clear)
-        .sheet(item: $selectedUserForConfig) { user in
-            UserAudioSettingsView(
-                manager: serverManager,
-                userSession: user.session(),
-                userName: user.userName() ?? NSLocalizedString("User", comment: "")
-            )
-            .presentationDetents([.medium])
+    }
+
+    @ViewBuilder
+    private func movingUserOverlay() -> some View {
+        if let movingUser = serverManager.movingUser {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.right.arrow.left")
+                    .foregroundColor(.white)
+                    .font(.system(size: 12))
+                Text("Moving \(movingUser.userName() ?? NSLocalizedString("user", comment: "")) — tap a channel")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                Spacer()
+                Button(action: cancelMoveMode) {
+                    Text("Cancel")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.primary.opacity(0.18), in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .background(Color.accentColor.opacity(0.6))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
-        .sheet(item: $selectedUserForInfo) { user in
-            let isSelf = user.session() == MUConnectionController.shared()?.serverModel?.connectedUser()?.session()
-            UserInfoView(user: user, isSelf: isSelf, serverManager: serverManager)
-        }
-        .sheet(item: $selectedUserForStats) { user in
-            UserStatsView(user: user, serverManager: serverManager)
-        }
-        .sheet(item: $selectedChannelForInfo) { channel in
-            ChannelInfoView(channel: channel)
-        }
-        .sheet(item: $selectedUserForPM) { user in
-            PrivateMessageInputView(
-                targetUser: user,
-                serverManager: serverManager
-            )
-        }
-        .sheet(item: $selectedChannelForEdit) { channel in
-            EditChannelView(
-                channel: channel,
-                serverManager: serverManager
-            )
-        }
-        .sheet(item: $selectedChannelForCreate) { channel in
-            CreateChannelView(
-                parentChannel: channel,
-                serverManager: serverManager
-            )
-        }
-        .alert("Set Nickname", isPresented: Binding(
+    }
+
+    private var renameAlertBinding: Binding<Bool> {
+        Binding(
             get: { selectedUserForRename != nil },
-            set: { if !$0 { selectedUserForRename = nil } }
-        )) {
-            TextField("Nickname", text: $pendingNicknameInput)
-            Button("Cancel", role: .cancel) {
-                selectedUserForRename = nil
-                pendingNicknameInput = ""
-            }
-            Button("Reset", role: .destructive) {
-                if let user = selectedUserForRename {
-                    serverManager.setLocalNickname(nil, for: user)
+            set: { isPresented in
+                if !isPresented {
+                    clearNicknameSelection()
                 }
-                selectedUserForRename = nil
-                pendingNicknameInput = ""
             }
-            Button("Save") {
-                if let user = selectedUserForRename {
-                    let normalizedNickname = pendingNicknameInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    serverManager.setLocalNickname(normalizedNickname.isEmpty ? nil : normalizedNickname, for: user)
-                }
-                selectedUserForRename = nil
-                pendingNicknameInput = ""
-            }
-        } message: {
-            if let user = selectedUserForRename {
-                Text("Enter a local nickname for \(user.userName() ?? "this user") (leave blank to reset):")
-            }
-        }
-        .alert("Channel Password", isPresented: Binding(
+        )
+    }
+
+    private var channelPasswordAlertBinding: Binding<Bool> {
+        Binding(
             get: { serverManager.passwordPromptChannel != nil },
-            set: { if !$0 { serverManager.passwordPromptChannel = nil } }
-        )) {
-            SecureField("Enter password", text: $serverManager.pendingPasswordInput)
-            Button("Cancel", role: .cancel) {
-                serverManager.passwordPromptChannel = nil
-                serverManager.pendingPasswordInput = ""
-            }
-            Button("Join") {
-                if let channel = serverManager.passwordPromptChannel {
-                    serverManager.submitPasswordAndJoin(channel: channel, password: serverManager.pendingPasswordInput)
+            set: { isPresented in
+                if !isPresented {
+                    clearPendingChannelPassword()
                 }
-                serverManager.passwordPromptChannel = nil
+            }
+        )
+    }
+
+    private func userAudioSettingsSheet(user: MKUser) -> some View {
+        UserAudioSettingsView(
+            manager: serverManager,
+            userSession: user.session(),
+            userName: user.userName() ?? NSLocalizedString("User", comment: "")
+        )
+        .presentationDetents([.medium])
+    }
+
+    private func userInfoSheet(user: MKUser) -> some View {
+        let isSelf = user.session() == MUConnectionController.shared()?.serverModel?.connectedUser()?.session()
+        return UserInfoView(user: user, isSelf: isSelf, serverManager: serverManager)
+    }
+
+    private func userStatsSheet(user: MKUser) -> some View {
+        UserStatsView(user: user, serverManager: serverManager)
+    }
+
+    private func channelInfoSheet(channel: MKChannel) -> some View {
+        ChannelInfoView(channel: channel)
+    }
+
+    private func privateMessageSheet(user: MKUser) -> some View {
+        PrivateMessageInputView(targetUser: user, serverManager: serverManager)
+    }
+
+    private func editChannelSheet(channel: MKChannel) -> some View {
+        EditChannelView(channel: channel, serverManager: serverManager)
+    }
+
+    private func createChannelSheet(channel: MKChannel) -> some View {
+        CreateChannelView(parentChannel: channel, serverManager: serverManager)
+    }
+
+    @ViewBuilder
+    private func renameAlertActions() -> some View {
+        TextField("Nickname", text: $pendingNicknameInput)
+        Button("Cancel", role: .cancel, action: clearNicknameSelection)
+        Button("Reset", role: .destructive, action: resetNicknameSelection)
+        Button("Save", action: saveNicknameSelection)
+    }
+
+    @ViewBuilder
+    private func renameAlertMessage() -> some View {
+        if let user = selectedUserForRename {
+            Text("Enter a local nickname for \(user.userName() ?? "this user") (leave blank to reset):")
+        }
+    }
+
+    @ViewBuilder
+    private func channelPasswordAlertActions() -> some View {
+        SecureField("Enter password", text: $serverManager.pendingPasswordInput)
+        Button("Cancel", role: .cancel, action: clearPendingChannelPassword)
+        Button("Join", action: submitPendingChannelPassword)
+    }
+
+    @ViewBuilder
+    private func channelPasswordAlertMessage() -> some View {
+        if let channel = serverManager.passwordPromptChannel {
+            Text("Enter the password to join \"\(channel.channelName() ?? NSLocalizedString("this channel", comment: ""))\"")
+        }
+    }
+
+    private func presentNicknameEditor(for user: MKUser) {
+        selectedUserForRename = user
+        pendingNicknameInput = serverManager.localNicknames[user.session()] ?? ""
+    }
+
+    private func clearNicknameSelection() {
+        selectedUserForRename = nil
+        pendingNicknameInput = ""
+    }
+
+    private func resetNicknameSelection() {
+        if let user = selectedUserForRename {
+            serverManager.setLocalNickname(nil, for: user)
+        }
+        clearNicknameSelection()
+    }
+
+    private func saveNicknameSelection() {
+        if let user = selectedUserForRename {
+            let normalizedNickname = pendingNicknameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            serverManager.setLocalNickname(normalizedNickname.isEmpty ? nil : normalizedNickname, for: user)
+        }
+        clearNicknameSelection()
+    }
+
+    private func clearPendingChannelPassword() {
+        serverManager.passwordPromptChannel = nil
+        serverManager.pendingPasswordInput = ""
+    }
+
+    private func submitPendingChannelPassword() {
+        if let channel = serverManager.passwordPromptChannel {
+            serverManager.submitPasswordAndJoin(channel: channel, password: serverManager.pendingPasswordInput)
+        }
+        clearPendingChannelPassword()
+    }
+
+    private func cancelMoveMode() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            serverManager.movingUser = nil
+        }
+    }
+
+    private func handleAutomationOpenUI(_ notification: Notification) {
+        guard let target = notification.userInfo?["target"] as? String else { return }
+        switch target {
+        case "userAudioSettings":
+            selectedUserForConfig = resolveUser(from: notification.userInfo)
+        case "userInfo":
+            selectedUserForInfo = resolveUser(from: notification.userInfo)
+        case "userStats":
+            selectedUserForStats = resolveUser(from: notification.userInfo)
+        case "privateMessage":
+            selectedUserForPM = resolveUser(from: notification.userInfo)
+        case "channelInfo":
+            selectedChannelForInfo = resolveChannel(from: notification.userInfo)
+        case "channelEdit":
+            selectedChannelForEdit = resolveChannel(from: notification.userInfo)
+        case "channelCreate":
+            selectedChannelForCreate = resolveChannel(from: notification.userInfo)
+        case "userRename":
+            if let user = resolveUser(from: notification.userInfo) {
+                presentNicknameEditor(for: user)
+            }
+        case "channelPassword":
+            if let channel = resolveChannel(from: notification.userInfo) {
+                serverManager.passwordPromptChannel = channel
                 serverManager.pendingPasswordInput = ""
             }
-        } message: {
-            if let channel = serverManager.passwordPromptChannel {
-                Text("Enter the password to join \"\(channel.channelName() ?? NSLocalizedString("this channel", comment: ""))\"")
+        default:
+            break
+        }
+    }
+
+    private func handleAutomationDismissUI(_ notification: Notification) {
+        let target = notification.userInfo?["target"] as? String
+        if target == nil || target == "userAudioSettings" { selectedUserForConfig = nil }
+        if target == nil || target == "userInfo" { selectedUserForInfo = nil }
+        if target == nil || target == "userStats" { selectedUserForStats = nil }
+        if target == nil || target == "privateMessage" { selectedUserForPM = nil }
+        if target == nil || target == "channelInfo" { selectedChannelForInfo = nil }
+        if target == nil || target == "channelEdit" { selectedChannelForEdit = nil }
+        if target == nil || target == "channelCreate" { selectedChannelForCreate = nil }
+        if target == nil || target == "userRename" {
+            clearNicknameSelection()
+        }
+        if target == nil || target == "channelPassword" {
+            clearPendingChannelPassword()
+        }
+    }
+
+    private func resolveUser(from userInfo: [AnyHashable: Any]?) -> MKUser? {
+        guard let sessionValue = userInfo?["session"] else { return nil }
+        guard let session = uintValue(sessionValue) else { return nil }
+        return serverManager.getUserBySession(session)
+    }
+
+    private func resolveChannel(from userInfo: [AnyHashable: Any]?) -> MKChannel? {
+        guard let channelValue = userInfo?["channelId"] else { return nil }
+        guard let channelId = uintValue(channelValue) else { return nil }
+        return findChannel(id: channelId, in: MUConnectionController.shared()?.serverModel?.rootChannel())
+    }
+
+    private func uintValue(_ value: Any?) -> UInt? {
+        switch value {
+        case let number as NSNumber:
+            return number.uintValue
+        case let value as UInt:
+            return value
+        case let value as Int where value >= 0:
+            return UInt(value)
+        case let value as String:
+            return UInt(value)
+        default:
+            return nil
+        }
+    }
+
+    private func findChannel(id: UInt, in root: MKChannel?) -> MKChannel? {
+        guard let root else { return nil }
+        if root.channelId() == id { return root }
+        if let children = root.channels() as? [MKChannel] {
+            for child in children {
+                if let found = findChannel(id: id, in: child) {
+                    return found
+                }
             }
         }
+        return nil
+    }
+
+    private func syncAutomationSheet(_ current: String?, clearing fallback: String) {
+        if let current {
+            AppState.shared.setAutomationPresentedSheet(current)
+        } else {
+            AppState.shared.clearAutomationPresentedSheet(ifMatches: fallback)
+        }
+    }
+
+    private func syncAutomationAlert(_ current: String?, clearing fallback: String) {
+        if let current {
+            AppState.shared.setAutomationPresentedAlert(current)
+        } else if AppState.shared.automationPresentedAlert == fallback {
+            AppState.shared.setAutomationPresentedAlert(nil)
+        }
+    }
+
+    private func syncMovingOverlayState() {
+        var overlays = AppState.shared.automationVisibleOverlays
+        overlays.removeAll { $0 == "moveUser" }
+        if serverManager.movingUser != nil {
+            overlays.append("moveUser")
+        }
+        AppState.shared.setAutomationVisibleOverlays(overlays)
     }
 }
 
@@ -1742,6 +1965,22 @@ struct PrivateMessageInputView: View {
                 }
             )
             .presentationDetents([.medium, .large])
+        }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("privateMessage")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "imageSendConfirm" {
+                pendingPrivateImage = nil
+            }
+        }
+        .onChange(of: pendingPrivateImage?.id) { _, value in
+            if value != nil {
+                AppState.shared.setAutomationPresentedSheet("imageSendConfirm")
+            } else if AppState.shared.automationPresentedSheet == "imageSendConfirm" {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "imageSendConfirm")
+            }
         }
     }
     

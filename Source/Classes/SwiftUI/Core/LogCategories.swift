@@ -9,6 +9,36 @@
 import Foundation
 import OSLog
 
+extension Notification.Name {
+    static let mumbleLogEntryAdded = Notification.Name("MumbleLogEntryAdded")
+}
+
+private struct RecentLogEntry: Sendable {
+    let timestamp: String
+    let category: String
+    let level: String
+    let levelRaw: Int
+    let symbol: String
+    let message: String
+    let file: String
+    let function: String
+    let line: Int
+
+    var dictionary: [String: Any] {
+        [
+            "timestamp": timestamp,
+            "category": category,
+            "level": level,
+            "levelRaw": levelRaw,
+            "symbol": symbol,
+            "message": message,
+            "file": file,
+            "function": function,
+            "line": line
+        ]
+    }
+}
+
 // MARK: - Log Level
 
 /// 日志等级，从高到低：error > warning > info > debug > verbose
@@ -41,6 +71,16 @@ enum LogLevel: Int, Comparable, CaseIterable, Codable, Sendable {
         case .info:    return "INFO"
         case .warning: return "WARNING"
         case .error:   return "ERROR"
+        }
+    }
+
+    var apiValue: String {
+        switch self {
+        case .verbose: return "verbose"
+        case .debug: return "debug"
+        case .info: return "info"
+        case .warning: return "warning"
+        case .error: return "error"
         }
     }
 
@@ -128,6 +168,10 @@ final class LogManager: @unchecked Sendable {
 
     /// 串行队列保护并发访问
     private let queue = DispatchQueue(label: "cn.hotxiang.Mumble.LogManager", qos: .utility)
+
+    /// 最近日志缓冲，供 WebSocket 调试与 AI agent 回放使用
+    private var recentEntries: [RecentLogEntry] = []
+    private let maxRecentEntries = 2000
 
     /// 默认日志等级
     private let defaultLevel: LogLevel = {
@@ -270,6 +314,35 @@ final class LogManager: @unchecked Sendable {
             UserDefaults.standard.removeObject(forKey: "LogGlobalEnabled")
             UserDefaults.standard.removeObject(forKey: "LogFilePersistenceEnabled")
             fileWriter.close()
+            recentEntries.removeAll()
+        }
+    }
+
+    func clearRecentEntries() {
+        queue.sync {
+            recentEntries.removeAll()
+        }
+    }
+
+    func getRecentEntries(limit: Int = 200,
+                          category: LogCategory? = nil,
+                          minimumLevel: LogLevel? = nil) -> [[String: Any]] {
+        queue.sync {
+            let boundedLimit = max(0, min(limit, maxRecentEntries))
+            guard boundedLimit > 0 else { return [] }
+
+            let filtered = recentEntries.filter { entry in
+                if let category, entry.category != category.rawValue {
+                    return false
+                }
+                if let minimumLevel,
+                   let entryLevel = LogLevel(rawValue: entry.levelRaw),
+                   entryLevel < minimumLevel {
+                    return false
+                }
+                return true
+            }
+            return Array(filtered.suffix(boundedLimit)).map(\.dictionary)
         }
     }
 
@@ -288,17 +361,39 @@ final class LogManager: @unchecked Sendable {
         guard level >= threshold else { return }
 
         let msg = message()
+        let timestamp = LogManager.timestampFormatter.string(from: Date())
+        let fileName = (file as NSString).lastPathComponent
+        let entry = RecentLogEntry(
+            timestamp: timestamp,
+            category: category.rawValue,
+            level: level.apiValue,
+            levelRaw: level.rawValue,
+            symbol: level.symbol,
+            message: msg,
+            file: fileName,
+            function: function,
+            line: line
+        )
 
         // OSLog 输出
         if let osLog = loggers[category] {
             os_log("%{public}@", log: osLog, type: level.osLogType, msg)
         }
 
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.recentEntries.append(entry)
+            if self.recentEntries.count > self.maxRecentEntries {
+                self.recentEntries.removeFirst(self.recentEntries.count - self.maxRecentEntries)
+            }
+        }
+
+        NotificationCenter.default.post(name: .mumbleLogEntryAdded, object: nil, userInfo: entry.dictionary)
+
         // 可选文件持久化
         if _isFilePersistenceEnabled {
-            let fileName = (file as NSString).lastPathComponent
-            let entry = "\(LogManager.timestampFormatter.string(from: Date())) \(level.symbol) [\(category.rawValue)] \(fileName):\(line) \(function) — \(msg)"
-            fileWriter.write(entry)
+            let lineText = "\(timestamp) \(level.symbol) [\(category.rawValue)] \(fileName):\(line) \(function) — \(msg)"
+            fileWriter.write(lineText)
         }
     }
 

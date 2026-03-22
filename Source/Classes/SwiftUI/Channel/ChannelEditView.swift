@@ -108,6 +108,9 @@ struct CreateChannelView: View {
                 }
             }
         }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("channelCreate")
+        }
     }
     
     private func createChannel() {
@@ -294,6 +297,20 @@ struct EditChannelView: View {
                 }
             }
         }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("channelEdit")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "channelProperties":
+                selectedTab = .properties
+            case "channelEditACL":
+                selectedTab = .acl
+            default:
+                break
+            }
+        }
     }
 }
 
@@ -464,6 +481,25 @@ struct ChannelPropertiesView: View {
             Text("Are you sure you want to delete \"\(channel.channelName() ?? NSLocalizedString("this channel", comment: ""))\"? This action cannot be undone.")
         }
         .onAppear { loadChannelInfo() }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            if target == "channelDelete" {
+                showDeleteConfirmation = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "channelDelete" {
+                showDeleteConfirmation = false
+            }
+        }
+        .onChange(of: showDeleteConfirmation) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedAlert("channelDelete")
+            } else if AppState.shared.automationPresentedAlert == "channelDelete" {
+                AppState.shared.setAutomationPresentedAlert(nil)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.channelDescriptionChangedNotification)) { notification in
             if let chanId = notification.userInfo?["channelId"] as? UInt,
                chanId == channel.channelId(),
@@ -624,13 +660,73 @@ struct ChannelACLContentView: View {
                 commitGroupEntryDraft()
             }
         }
-        .onAppear { loadACL() }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("channelEditACL")
+            loadACL()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "channelACLAcls":
+                selectedSubTab = .acls
+            case "channelACLGroups":
+                selectedSubTab = .groups
+            case "aclEntryEdit":
+                selectedSubTab = .acls
+                if let index = notification.userInfo?["index"] as? Int,
+                   aclEntries.indices.contains(index),
+                   !aclEntries[index].isInherited {
+                    beginEditACLEntry(aclEntries[index])
+                } else {
+                    beginAddACLEntry()
+                }
+            case "groupEntryEdit":
+                selectedSubTab = .groups
+                if let index = notification.userInfo?["index"] as? Int,
+                   groupEntries.indices.contains(index),
+                   !groupEntries[index].isInherited {
+                    beginEditGroupEntry(groupEntries[index])
+                } else {
+                    beginAddGroupEntry()
+                }
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            switch target {
+            case nil:
+                aclDraftEntry = nil
+                groupDraftEntry = nil
+            case "aclEntryEdit":
+                aclDraftEntry = nil
+            case "groupEntryEdit":
+                groupDraftEntry = nil
+            default:
+                break
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.aclReceivedNotification)) { notification in
             guard let userInfo = notification.userInfo,
                   let accessControl = userInfo["accessControl"] as? MKAccessControl,
                   let chan = userInfo["channel"] as? MKChannel,
                   chan.channelId() == channel.channelId() else { return }
             parseAccessControl(accessControl)
+        }
+        .onChange(of: aclDraftEntry?.id) { _, value in
+            if value != nil {
+                AppState.shared.setAutomationPresentedSheet("aclEntryEdit")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "aclEntryEdit")
+            }
+        }
+        .onChange(of: groupDraftEntry?.id) { _, value in
+            if value != nil {
+                AppState.shared.setAutomationPresentedSheet("groupEntryEdit")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "groupEntryEdit")
+            }
         }
     }
     

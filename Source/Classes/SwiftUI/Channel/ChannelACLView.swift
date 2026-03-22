@@ -81,7 +81,53 @@ struct ChannelACLView: View {
                 }
             }
         }
-        .onAppear { loadACL() }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("channelACL")
+            loadACL()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "channelACLAcls":
+                selectedTab = .acls
+            case "channelACLGroups":
+                selectedTab = .groups
+            case "aclEntryEdit":
+                selectedTab = .acls
+                if let index = notification.userInfo?["index"] as? Int,
+                   aclEntries.indices.contains(index),
+                   !aclEntries[index].isInherited {
+                    beginEditACLEntry(aclEntries[index])
+                } else {
+                    beginAddACLEntry()
+                }
+            case "groupEntryEdit":
+                selectedTab = .groups
+                if let index = notification.userInfo?["index"] as? Int,
+                   groupEntries.indices.contains(index),
+                   !groupEntries[index].isInherited {
+                    beginEditGroupEntry(groupEntries[index])
+                } else {
+                    beginAddGroupEntry()
+                }
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            switch target {
+            case nil:
+                aclDraftEntry = nil
+                groupDraftEntry = nil
+            case "aclEntryEdit":
+                aclDraftEntry = nil
+            case "groupEntryEdit":
+                groupDraftEntry = nil
+            default:
+                break
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.aclReceivedNotification)) { notification in
             guard let userInfo = notification.userInfo,
                   let accessControl = userInfo["accessControl"] as? MKAccessControl,
@@ -89,6 +135,20 @@ struct ChannelACLView: View {
                   chan.channelId() == channel.channelId() else { return }
             
             parseAccessControl(accessControl)
+        }
+        .onChange(of: aclDraftEntry?.id) { _, value in
+            if value != nil {
+                AppState.shared.setAutomationPresentedSheet("aclEntryEdit")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "aclEntryEdit")
+            }
+        }
+        .onChange(of: groupDraftEntry?.id) { _, value in
+            if value != nil {
+                AppState.shared.setAutomationPresentedSheet("groupEntryEdit")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "groupEntryEdit")
+            }
         }
     }
     

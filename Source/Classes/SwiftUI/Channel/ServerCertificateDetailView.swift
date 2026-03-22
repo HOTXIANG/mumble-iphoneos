@@ -75,6 +75,9 @@ struct ServerCertificateDetailView: View {
             .onAppear(perform: loadCurrentCert)
         }
         .presentationDetents([.medium])
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("serverCertificate")
+        }
     }
     
     private func loadCurrentCert() {

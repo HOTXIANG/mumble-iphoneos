@@ -47,9 +47,10 @@
 		E1F2A3B52F90500100ABC001 /* ServerModelManager+Messaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B52F90500100ABC002 /* ServerModelManager+Messaging.swift */; };
 		F1A2B3C42F90600100ABC001 /* ServerModelManager+ModelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C42F90600100ABC002 /* ServerModelManager+ModelState.swift */; };
 		F1A2B3C52F90600100ABC001 /* ServerModelManager+Registration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C52F90600100ABC002 /* ServerModelManager+Registration.swift */; };
-		F209E8732F6885160015071A /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */; };
+		F20581B62F6FD568006BC896 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C62E216A7F000AA092 /* Assets.xcassets */; };
+		F20581BE2F6FD56D006BC896 /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */; };
+		F20581BF2F6FD5D5006BC896 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* LaunchScreen.storyboard */; platformFilter = ios; };
 		F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */ = {isa = PBXBuildFile; fileRef = F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */; };
-		F220ECB52F30E6100017CCCC /* MUCertificateCreationProgressView.xib in Resources */ = {isa = PBXBuildFile; fileRef = F220ECB32F30E6100017CCCC /* MUCertificateCreationProgressView.xib */; platformFilter = ios; };
 		F220ECD12F30FB1A0017CCCC /* SystemMuteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */; };
 		F23EEF7D2F45600400743254 /* TransparentLogoBrightGlass.png in Resources */ = {isa = PBXBuildFile; fileRef = F23EEF7C2F45600400743254 /* TransparentLogoBrightGlass.png */; };
 		F23EEF7F2F45600900743254 /* TransparentLogoDarkGlass.png in Resources */ = {isa = PBXBuildFile; fileRef = F23EEF7E2F45600900743254 /* TransparentLogoDarkGlass.png */; };
@@ -63,11 +64,9 @@
 		F25F34AD2F1729C600420631 /* MumbleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34AC2F1729BF00420631 /* MumbleApp.swift */; };
 		F25F34B22F17353F00420631 /* LocalUserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B02F17353500420631 /* LocalUserPreferences.swift */; };
 		F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */; };
-		F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* Launch Screen.storyboard */; platformFilter = ios; };
 		F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */ = {isa = PBXBuildFile; fileRef = F26689952EE8A46A008FC7EB /* LOGO.psd */; };
 		F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689A42EE8A472008FC7EB /* TransparentLogo.png */; };
 		F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */; };
-				F2LOG00002000000009AF31D /* LogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2LOG00001000000009AF31D /* LogSettingsView.swift */; };
 		F28C6AEC2EE6E52F00DE9CD2 /* PreferencesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */; };
 		F28C6AF02EE6E55300DE9CD2 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */; };
 		F28C6AF42EE6F74500DE9CD2 /* AudioMeterModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AF22EE6F73E00DE9CD2 /* AudioMeterModel.swift */; };
@@ -83,14 +82,11 @@
 		F2A6585B2F589059009AF31D /* DatabaseAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584E2F589059009AF31D /* DatabaseAsync.swift */; };
 		F2A6585C2F589059009AF31D /* StringConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658512F589059009AF31D /* StringConstants.swift */; };
 		F2A6585D2F589059009AF31D /* MumbleError+Localized.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658552F589059009AF31D /* MumbleError+Localized.swift */; };
-		F2A6585E2F589059009AF31D /* MumbleLogger.m in Sources */ = {isa = PBXBuildFile; fileRef = F2A658592F589059009AF31D /* MumbleLogger.m */; };
 		F2A6585F2F589059009AF31D /* UIConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658522F589059009AF31D /* UIConstants.swift */; };
 		F2A658602F589059009AF31D /* MumbleError.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658542F589059009AF31D /* MumbleError.swift */; };
 		F2A658612F589059009AF31D /* CertificateAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584C2F589059009AF31D /* CertificateAsync.swift */; };
 		F2A658622F589059009AF31D /* ConnectionAsync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A6584D2F589059009AF31D /* ConnectionAsync.swift */; };
 		F2A658632F589059009AF31D /* LogCategories.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658572F589059009AF31D /* LogCategories.swift */; };
-		F2B7C0A32F7D0001009AF31D /* MUTestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B7C0A12F7D0001009AF31D /* MUTestServer.swift */; };
-		F2B7C0A42F7D0001009AF31D /* MUTestCommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B7C0A22F7D0001009AF31D /* MUTestCommandRouter.swift */; };
 		F2A658642F589059009AF31D /* NotificationConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A658502F589059009AF31D /* NotificationConstants.swift */; };
 		F2AD3A5D2E0E2F3900FC7006 /* MumbleNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A5B2E0E2F3500FC7006 /* MumbleNavigationView.swift */; };
 		F2AD3A642E0E2F7900FC7006 /* MumbleContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A622E0E2F7300FC7006 /* MumbleContentView.swift */; };
@@ -98,6 +94,8 @@
 		F2AD3A6E2E0E31EF00FC7006 /* SwiftRootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A6C2E0E31E500FC7006 /* SwiftRootViewController.swift */; };
 		F2AD3A722E0E409900FC7006 /* FavouriteServerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A702E0E408700FC7006 /* FavouriteServerListView.swift */; };
 		F2AD3A762E0E40BD00FC7006 /* FavouriteServerEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2AD3A742E0E40B300FC7006 /* FavouriteServerEditView.swift */; };
+		F2B7C0A32F7D0001009AF31D /* MUTestServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B7C0A12F7D0001009AF31D /* MUTestServer.swift */; };
+		F2B7C0A42F7D0001009AF31D /* MUTestCommandRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B7C0A22F7D0001009AF31D /* MUTestCommandRouter.swift */; };
 		F2C0EE392E0E120300B80B44 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C0EE372E0E11F900B80B44 /* WelcomeView.swift */; };
 		F2CBB04D2F090CE200D88E21 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F2CBB04C2F090CE200D88E21 /* WidgetKit.framework */; };
 		F2CBB04F2F090CE200D88E21 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F2CBB04E2F090CE200D88E21 /* SwiftUI.framework */; };
@@ -124,13 +122,13 @@
 		F2E9CC072F07A40300464F79 /* ServerCertificateDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC062F07A3EF00464F79 /* ServerCertificateDetailView.swift */; };
 		F2E9CC0C2F07D00600464F79 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC0A2F07D00000464F79 /* AboutView.swift */; };
 		F2ECCD992F3D283100AEA117 /* HandoffManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ECCD982F3D283100AEA117 /* HandoffManager.swift */; };
-		F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C62E216A7F000AA092 /* Assets.xcassets */; };
 		F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56722E0F711A00D76B49 /* MessagesView.swift */; };
 		F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */; };
 		F2FF567C2E0F711A00D76B49 /* ChannelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56712E0F711A00D76B49 /* ChannelView.swift */; };
 		F2FF567E2E0F711A00D76B49 /* ChannelDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */; };
 		F2FF567F2E0F711A00D76B49 /* ServerModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */; };
 		F2FF568A2E0F81EE00D76B49 /* ChannelListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */; };
+		F2LOG00002000000009AF31D /* LogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2LOG00001000000009AF31D /* LogSettingsView.swift */; };
 		F3A4B5C42F90800100ABC001 /* ServerModelManager+Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A4B5C42F90800100ABC002 /* ServerModelManager+Entry.swift */; };
 		F4A5B6C42F90900100ABC001 /* ChannelACLModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C42F90900100ABC002 /* ChannelACLModels.swift */; };
 		F4A5B6C52F90900100ABC001 /* ChannelACLRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C52F90900100ABC002 /* ChannelACLRows.swift */; };
@@ -343,13 +341,12 @@
 		F25F34AC2F1729BF00420631 /* MumbleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleApp.swift; sourceTree = "<group>"; };
 		F25F34B02F17353500420631 /* LocalUserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUserPreferences.swift; sourceTree = "<group>"; };
 		F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAudioSettingsView.swift; sourceTree = "<group>"; };
-		F26689922EE89F20008FC7EB /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
+		F26689922EE89F20008FC7EB /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		F26689952EE8A46A008FC7EB /* LOGO.psd */ = {isa = PBXFileReference; lastKnownFileType = file; name = LOGO.psd; path = Resources/LOGO.psd; sourceTree = "<group>"; };
 		F26689962EE8A46A008FC7EB /* NeoMumble.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = NeoMumble.icon; path = Resources/NeoMumble.icon; sourceTree = "<group>"; };
 		F26689A42EE8A472008FC7EB /* TransparentLogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TransparentLogo.png; path = Resources/TransparentLogo.png; sourceTree = "<group>"; };
 		F28C6AE32EE6AA9B00DE9CD2 /* MUTextMessageProcessor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MUTextMessageProcessor.h; sourceTree = "<group>"; };
 		F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MUTextMessageProcessor.m; sourceTree = "<group>"; };
-				F2LOG00001000000009AF31D /* LogSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSettingsView.swift; sourceTree = "<group>"; };
 		F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesModel.swift; sourceTree = "<group>"; };
 		F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		F28C6AF22EE6F73E00DE9CD2 /* AudioMeterModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioMeterModel.swift; sourceTree = "<group>"; };
@@ -371,8 +368,6 @@
 		F2A658542F589059009AF31D /* MumbleError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleError.swift; sourceTree = "<group>"; };
 		F2A658552F589059009AF31D /* MumbleError+Localized.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MumbleError+Localized.swift"; sourceTree = "<group>"; };
 		F2A658572F589059009AF31D /* LogCategories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCategories.swift; sourceTree = "<group>"; };
-		F2B7C0A12F7D0001009AF31D /* MUTestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUTestServer.swift; sourceTree = "<group>"; };
-		F2B7C0A22F7D0001009AF31D /* MUTestCommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUTestCommandRouter.swift; sourceTree = "<group>"; };
 		F2A658582F589059009AF31D /* MumbleLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MumbleLogger.h; sourceTree = "<group>"; };
 		F2A658592F589059009AF31D /* MumbleLogger.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MumbleLogger.m; sourceTree = "<group>"; };
 		F2AD3A5B2E0E2F3500FC7006 /* MumbleNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MumbleNavigationView.swift; sourceTree = "<group>"; };
@@ -381,6 +376,8 @@
 		F2AD3A6C2E0E31E500FC7006 /* SwiftRootViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftRootViewController.swift; sourceTree = "<group>"; };
 		F2AD3A702E0E408700FC7006 /* FavouriteServerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavouriteServerListView.swift; sourceTree = "<group>"; };
 		F2AD3A742E0E40B300FC7006 /* FavouriteServerEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavouriteServerEditView.swift; sourceTree = "<group>"; };
+		F2B7C0A12F7D0001009AF31D /* MUTestServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUTestServer.swift; sourceTree = "<group>"; };
+		F2B7C0A22F7D0001009AF31D /* MUTestCommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUTestCommandRouter.swift; sourceTree = "<group>"; };
 		F2C0EE372E0E11F900B80B44 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		F2CBB04B2F090CE200D88E21 /* MumbleWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MumbleWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F2CBB04C2F090CE200D88E21 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -419,6 +416,7 @@
 		F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelManager.swift; sourceTree = "<group>"; };
 		F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelNotificationManager.swift; sourceTree = "<group>"; };
 		F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelListView.swift; sourceTree = "<group>"; };
+		F2LOG00001000000009AF31D /* LogSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSettingsView.swift; sourceTree = "<group>"; };
 		F3A100112F9A000100AABBCC /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = SOURCE_ROOT; };
 		F3A4B5C42F90800100ABC002 /* ServerModelManager+Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerModelManager+Entry.swift"; sourceTree = "<group>"; };
 		F4A5B6C42F90900100ABC002 /* ChannelACLModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelACLModels.swift; sourceTree = "<group>"; };
@@ -492,7 +490,7 @@
 				2872F7C4124668880078C0B1 /* Certificates */,
 				28BF8E1C11D93A1900B72770 /* Database */,
 				2838EA0C1293165700035C5D /* Preferences */,
-				F26689922EE89F20008FC7EB /* Launch Screen.storyboard */,
+				F26689922EE89F20008FC7EB /* LaunchScreen.storyboard */,
 				2861C25D116BE905002B8514 /* MUApplicationDelegate.h */,
 				DACDA3C1F4874CE092C31920 /* MUMacApplicationDelegate.swift */,
 				2861C25E116BE905002B8514 /* MUApplicationDelegate.m */,
@@ -1021,19 +1019,18 @@
 			isa = PBXResourcesBuildPhase;
 			files = (
 				F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */,
+				F20581BE2F6FD56D006BC896 /* NeoMumble.icon in Resources */,
 				F23EEF832F4563E100743254 /* TransparentLogoWhite.png in Resources */,
+				F20581B62F6FD568006BC896 /* Assets.xcassets in Resources */,
+				F20581BF2F6FD5D5006BC896 /* LaunchScreen.storyboard in Resources */,
 				F23EEF812F4563DD00743254 /* TransparentLogoBlack.png in Resources */,
 				F23EEF7D2F45600400743254 /* TransparentLogoBrightGlass.png in Resources */,
-				F2FBE1C72E216A7F000AA092 /* Assets.xcassets in Resources */,
 				28DC1C7013DE596B0037CDC2 /* Continents.plist in Resources */,
 				F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */,
-				F220ECB52F30E6100017CCCC /* MUCertificateCreationProgressView.xib in Resources */,
 				28DC1C7213DE596B0037CDC2 /* Countries.plist in Resources */,
-				F26689932EE89F20008FC7EB /* Launch Screen.storyboard in Resources */,
 				280256381510D70D00178B08 /* Localizable.strings in Resources */,
 				F23EEF7F2F45600900743254 /* TransparentLogoDarkGlass.png in Resources */,
 				F24EB7B12F3E4AB500904644 /* PrivacyInfo.xcprivacy in Resources */,
-				F209E8732F6885160015071A /* NeoMumble.icon in Resources */,
 			);
 		};
 		F2CBB0492F090CE200D88E21 /* Resources */ = {
@@ -1176,7 +1173,6 @@
 				F2DF9A382F656319009D5C87 /* BanListView.swift in Sources */,
 				F2DF9A472F656350009D5C87 /* FriendsManager.swift in Sources */,
 				F2DF9A492F656357009D5C87 /* ChannelFilterManager.swift in Sources */,
-				F2A6585E2F589059009AF31D /* MumbleLogger.m in Sources */,
 				F2A6585F2F589059009AF31D /* UIConstants.swift in Sources */,
 				F2DF9A432F65632C009D5C87 /* RegisteredUserListView.swift in Sources */,
 				F2A658602F589059009AF31D /* MumbleError.swift in Sources */,
@@ -1260,7 +1256,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
@@ -1280,6 +1276,10 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
 				HEADER_SEARCH_PATHS = (
 					"\"${PROJECT_DIR}/MumbleKit/src/\"",
 					"\"${PROJECT_DIR}/Source/Classes/\"",
@@ -1290,7 +1290,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1304,6 +1304,7 @@
 				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = NO;
 				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = NO;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_COMPILATION_MODE = singlefile;
 				SWIFT_ENABLE_EMIT_CONST_VALUES = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Source/Classes/SwiftUI/Mumble-Bridging-Header.h";
@@ -1327,7 +1328,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1357,7 +1358,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1406,7 +1407,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1436,7 +1437,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1485,7 +1486,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1515,7 +1516,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1573,9 +1574,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1608,7 +1609,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1646,7 +1647,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1674,9 +1675,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1709,7 +1710,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1741,7 +1742,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1768,9 +1769,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1803,7 +1804,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1835,7 +1836,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1862,9 +1863,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1897,7 +1898,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 400600000;
+				CURRENT_PROJECT_VERSION = 400700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1929,7 +1930,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 4.6.0;
+				MARKETING_VERSION = 4.7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (

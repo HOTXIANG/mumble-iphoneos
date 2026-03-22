@@ -86,6 +86,7 @@ struct UserAudioSettingsView: View {
             }
         }
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("userAudioSettings")
             loadCurrentState()
         }
     }

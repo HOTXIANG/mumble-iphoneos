@@ -235,6 +235,7 @@ struct FavouriteServerEditView: View {
         }
         .onAppear {
             // 确保证书状态是最新的
+            AppState.shared.setAutomationCurrentScreen(isEditMode ? "favouriteEdit" : "favouriteNew")
             certModel.refreshCertificates()
             reconcileSelectedCertificateTagIfNeeded()
         }

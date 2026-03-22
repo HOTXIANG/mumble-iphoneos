@@ -237,6 +237,7 @@ struct NotificationSettingsView: View {
         }
         .navigationTitle("Notifications")
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("notificationSettings")
             // 兼容旧版本的单一开关：如果新开关尚未写入，则沿用旧值
             let defaults = UserDefaults.standard
             let legacy = defaults.object(forKey: "NotificationNotifyUserMessages") as? Bool ?? true
@@ -359,6 +360,9 @@ struct TTSSettingsView: View {
             #endif
         }
         .navigationTitle("Text-to-Speech")
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("ttsSettings")
+        }
     }
 }
 
@@ -451,6 +455,7 @@ struct AudioTransmissionSettingsView: View {
         .onChange(of: vadHoldSeconds) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: enableStereoInput) { PreferencesModel.shared.notifySettingsChanged() }
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("audioTransmissionSettings")
             serverManager.startAudioTest()
             platformRefreshDevices()
             syncAudioMeter(for: transmitMethod)
@@ -530,6 +535,9 @@ struct AdvancedAudioSettingsView: View {
             platformAdvancedSettingsContent
         }
         .navigationTitle("Advanced")
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("advancedAudioSettings")
+        }
 #if os(iOS)
         .fullScreenCover(isPresented: $showPluginMixer) {
             NavigationStack {
@@ -555,6 +563,30 @@ struct AdvancedAudioSettingsView: View {
         .onChange(of: pluginInputTrackGain) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: pluginRemoteBusEnabled) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: pluginRemoteBusGain) { PreferencesModel.shared.notifySettingsChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            if target == "audioPluginMixer" {
+                openPluginMixer()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            guard target == nil || target == "audioPluginMixer" else { return }
+            #if os(macOS)
+            AudioPluginMixerWindowController.shared.closeWindow()
+            #else
+            showPluginMixer = false
+            #endif
+        }
+        #if os(iOS)
+        .onChange(of: showPluginMixer) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedSheet("audioPluginMixer")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "audioPluginMixer")
+            }
+        }
+        #endif
     }
 
     func openPluginMixer() {
@@ -565,4 +597,3 @@ struct AdvancedAudioSettingsView: View {
 #endif
     }
 }
-

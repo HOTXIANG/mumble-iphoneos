@@ -332,6 +332,7 @@ struct UserInfoView: View {
             #endif
         }
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("userInfo")
             loadComment()
             avatarImage = serverManager.avatarImage(for: user.session())
             serverManager.updateAvatarCache(for: user)
@@ -516,6 +517,7 @@ struct ChannelInfoView: View {
             }
         }
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("channelInfo")
             loadDescription()
         }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.channelDescriptionChangedNotification)) { notification in

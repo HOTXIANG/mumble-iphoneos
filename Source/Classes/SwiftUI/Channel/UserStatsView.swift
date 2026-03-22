@@ -62,9 +62,10 @@ struct UserStatsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .onAppear {
-                serverManager.requestUserStats(for: user)
-            }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("userStats")
+            serverManager.requestUserStats(for: user)
+        }
             .onReceive(refreshTimer) { _ in
                 serverManager.requestUserStats(for: user)
             }

@@ -1007,6 +1007,19 @@ struct MessagesView: View {
             appState.isImmersiveStatusBarHidden = false
         }
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "imageSendConfirm" {
+                selectedImageForSend = nil
+            }
+        }
+        .onChange(of: selectedImageForSend?.id) { _, value in
+            if value != nil {
+                AppState.shared.setAutomationPresentedSheet("imageSendConfirm")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "imageSendConfirm")
+            }
+        }
     }
     
     private func handleImageTap(payload: MessageImageTapPayload) {
@@ -2482,6 +2495,9 @@ struct ImageConfirmationView: View {
         }
         .padding(.bottom)
         .interactiveDismissDisabled(isSending)
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("imageSendConfirm")
+        }
     }
 }
 

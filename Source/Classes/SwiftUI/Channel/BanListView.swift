@@ -155,10 +155,32 @@ struct BanListView: View {
                 AddBanView { newEntry in entries.append(newEntry) }
             }
             .onAppear { serverManager.requestBanList() }
-            .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.banListReceivedNotification)) { notification in
-                parseBanList(notification.userInfo?["banList"])
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+                guard let target = notification.userInfo?["target"] as? String else { return }
+                if target == "banAdd" {
+                    showingAddSheet = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+                let target = notification.userInfo?["target"] as? String
+                if target == nil || target == "banAdd" {
+                    showingAddSheet = false
+                }
+            }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.banListReceivedNotification)) { notification in
+            parseBanList(notification.userInfo?["banList"])
+        }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("banList")
+        }
+        .onChange(of: showingAddSheet) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedSheet("banAdd")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "banAdd")
             }
         }
+    }
     }
 
     private func parseBanList(_ raw: Any?) {
@@ -311,6 +333,9 @@ private struct AddBanView: View {
                     .disabled(ipAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+        }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("banAdd")
         }
     }
 

@@ -379,6 +379,85 @@ MKLogVerbose(Codec, @"Opus 编码帧: %d bytes", encodedLength);
 
 ---
 
+## 自动化测试（WebSocket 测试服务器）
+
+项目内嵌了 WebSocket 测试服务器（`MUTestServer`），仅 `#if DEBUG` 编译。AI agent 或脚本可通过 WebSocket 远程控制 App 执行全部功能。详细架构和完整命令参考见 `docs/TESTING.md`。
+
+### 架构
+
+```
+AI Agent (websocat/Python) → ws://localhost:54296 → MUTestServer → MUTestCommandRouter → App 模块
+```
+
+- **零依赖**：基于 Apple `Network.framework` NWListener + NWProtocolWebSocket
+- **仅 DEBUG**：Release 构建中完全不存在
+- **JSON 协议**：`{"action": "domain.command", "params": {...}}` → `{"success": true, "data": {...}}`
+
+### 快速使用
+
+```bash
+# 安装 CLI 工具
+brew install websocat
+
+# App 以 Debug 模式运行后连接
+websocat ws://localhost:54296
+
+# 发送命令
+{"action": "help.actions"}
+{"action": "state.get"}
+{"action": "favourite.list"}
+{"action": "log.getConfig"}
+```
+
+### 14 个命令域（80+ 命令）
+
+| 域 | 关键命令 | 说明 |
+|------|----------|------|
+| `connection` | `connect`, `disconnect`, `acceptCert`, `rejectCert`, `status` | 服务器连接管理 |
+| `audio` | `mute`, `toggleMute`, `startTest`, `forceTransmit`, `status` | 音频控制与本地测试 |
+| `channel` | `list`, `info`, `edit`, `move`, `listen`, `togglePinned` | 频道操作与可见性控制 |
+| `message` | `send`, `sendTree`, `sendPrivate`, `sendImage`, `sendPrivateImage`, `listImages`, `exportImage`, `previewImage`, `history`, `markRead` | 文本、图片与图片预览调试 |
+| `plugin` | `listTracks`, `available`, `add`, `remove`, `move`, `setBypass`, `setGain`, `load`, `unload`, `parameters`, `setParameter`, `presets` | 插件混音器语义控制 |
+| `user` | `list`, `self`, `info`, `kick`, `ban`, `setVolume`, `serverMute`, `stats` | 用户操作 |
+| `favourite` | `list`, `info`, `add`, `update`, `remove`, `connect` | 收藏管理 |
+| `settings` | `get`, `set`, `list` | UserDefaults 读写 |
+| `state` | `get`, `snapshot` | 完整应用状态快照 |
+| `app` | `get`, `setTab`, `setViewMode`, `clearError`, `cancelConnection` | UI / 弹窗 / 交互状态控制 |
+| `ui` | `get`, `open`, `dismiss`, `back`, `root` | 页面级自动化与导航控制，已覆盖设置子页、关于页、频道编辑页内 tab/弹层、ACL 编辑、Ban Add、插件混音器、证书弹层等 UI 目标 |
+| `server` | `getBanList`, `setBanList`, `addBan`, `removeBan`, `getRegisteredUsers` | 管理页数据操作 |
+| `certificate` | `list`, `generate`, `delete`, `import`, `export` | 本地身份页自动化 |
+| `log` | `setLevel`, `recent`, `stream`, `marker`, `files`, `reset` | 日志系统远程控制与监控 |
+| `help` | `actions` | 列出所有命令 |
+
+### 事件推送
+
+连接后自动接收：`connection.opened/closed/connecting/error`、`connection.udpStatus`、`audio.restarted/error`、`app.toast`、`message.sendFailed`、`channel.listeningAdded/Removed`、`log.entry`、`ui.changed`
+
+### 文件结构
+
+| 文件 | 位置 | 职责 |
+|------|------|------|
+| `MUTestServer.swift` | `Source/Classes/SwiftUI/Core/` | NWListener WebSocket 服务器、连接管理、事件推送 |
+| `MUTestCommandRouter.swift` | `Source/Classes/SwiftUI/Core/` | JSON 命令路由、所有域处理器 |
+
+### 已知注意事项
+
+- **`MKAudio.shared()` 不可在未连接时调用**：会阻塞主线程。`audio.*` 命令在未连接时返回安全默认值
+- **iOS 真机**：需 USB 端口转发或同网络访问设备 IP
+- **iOS 模拟器**：直接通过 `localhost:54296` 访问
+
+### 新增测试命令规范
+
+添加新命令时遵循：
+1. 在 `MUTestCommandRouter.swift` 对应域的 switch 中添加 case
+2. 更新 `handleHelp` 中的命令列表
+3. 更新 `docs/TESTING.md` 文档
+4. 所有必需参数缺失时抛出 `TestCommandError("Missing 'paramName'")`
+5. 需要连接的操作先 `guard let model = MUConnectionController.shared()?.serverModel`
+6. 避免在未连接状态下触发可能阻塞主线程的单例初始化（如 `MKAudio.shared()`）
+
+---
+
 ## 错误处理
 
 - 统一使用 `MumbleError` 枚举（`Core/Errors/`）

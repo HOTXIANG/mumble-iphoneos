@@ -41,6 +41,7 @@ struct WelcomeContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var lanModel = LanDiscoveryModel()
     @ObservedObject private var recentManager = RecentServerManager.shared
+    @ObservedObject private var appState = AppState.shared
     
     @State private var favouriteServers: [MUFavouriteServer] = []
     @State private var showFavouritesSheet = false
@@ -250,10 +251,36 @@ struct WelcomeContentView: View {
         }
         .background(Color.clear)
         .onAppear {
+            appState.setAutomationCurrentScreen("welcome")
             lanModel.start()
         }
         .onDisappear {
             lanModel.stop()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            guard target == "favouriteList" else { return }
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                navigationManager.navigate(to: .swiftUI(.favouriteServerList))
+            } else {
+                showFavouritesSheet = true
+            }
+            #else
+            showFavouritesSheet = true
+            #endif
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            guard target == nil || target == "favouriteList" else { return }
+            showFavouritesSheet = false
+        }
+        .onChange(of: showFavouritesSheet) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("favouriteList")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "favouriteList")
+            }
         }
         .sheet(isPresented: $showFavouritesSheet) {
             NavigationStack {
@@ -340,6 +367,7 @@ struct WelcomeView: MumbleContentView {
     @State private var showingAbout = false
     @EnvironmentObject var navigationManager: NavigationManager
     @EnvironmentObject var serverManager: ServerModelManager
+    @ObservedObject private var appState = AppState.shared
     
     var navigationConfig: any NavigationConfigurable {
         WelcomeNavigationConfig(
@@ -350,6 +378,26 @@ struct WelcomeView: MumbleContentView {
     
     var contentBody: some View {
         WelcomeContentView()
+            .onAppear {
+                appState.setAutomationCurrentScreen("welcome")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+                guard let target = notification.userInfo?["target"] as? String else { return }
+                guard target == "preferences" else { return }
+                showingPreferences = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+                let target = notification.userInfo?["target"] as? String
+                guard target == nil || target == "preferences" else { return }
+                showingPreferences = false
+            }
+            .onChange(of: showingPreferences) { _, isPresented in
+                if isPresented {
+                    appState.setAutomationPresentedSheet("preferences")
+                } else {
+                    appState.clearAutomationPresentedSheet(ifMatches: "preferences")
+                }
+            }
             #if os(iOS)
             .sheet(isPresented: $showingPreferences, onDismiss: {
                 serverManager.stopAudioTest()
@@ -1012,6 +1060,18 @@ struct AppRootView: View {
                 serverManager.startAudioTest()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            handleAutomationOpen(target: target)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            handleAutomationDismiss(target: target)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationNavigate)) { notification in
+            guard let command = notification.userInfo?["command"] as? String else { return }
+            handleAutomationNavigation(command: command)
+        }
         #if os(iOS)
         // iOS 全局图片预览 overlay（覆盖整个 App 界面，包括 iPad 分栏）
         .overlay {
@@ -1100,10 +1160,42 @@ struct AppRootView: View {
         .onAppear {
             languageManager.reapplyCurrentLanguage()
             serverManager.activate()
+            appState.setAutomationCurrentScreen("welcome")
             if !hasCompletedVADOnboarding {
                 showVADOnboarding = true
             }
+            syncAutomationAlertState()
+            syncAutomationOverlayState()
         }
+        .onChange(of: showVADOnboarding) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("vadOnboarding")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "vadOnboarding")
+            }
+        }
+        .onChange(of: appState.activeError?.id) { _, _ in
+            syncAutomationAlertState()
+        }
+        .onChange(of: appState.pendingCertTrust?.id) { _, _ in
+            syncAutomationAlertState()
+        }
+        .onChange(of: appState.activeToast?.id) { _, _ in
+            syncAutomationOverlayState()
+        }
+        .onChange(of: appState.isConnecting) { _, _ in
+            syncAutomationOverlayState()
+        }
+        #if os(iOS)
+        .onChange(of: appState.activeImagePreview?.id) { _, _ in
+            syncAutomationOverlayState()
+        }
+        #endif
+        #if os(macOS)
+        .onChange(of: appState.activeMacImagePreview?.id) { _, _ in
+            syncAutomationOverlayState()
+        }
+        #endif
         .animation(.default, value: appState.isConnecting)
         .animation(.spring(), value: appState.isConnected)
         .animation(.easeInOut(duration: 0.2), value: showVADOnboarding)
@@ -1235,5 +1327,116 @@ struct AppRootView: View {
                 ChannelListView()
             }
         }
+    }
+
+    private func handleAutomationOpen(target: String) {
+        switch target {
+        case "welcome":
+            navigationManager.goToRoot()
+            sidebarNavigationManager.goToRoot()
+            appState.setAutomationCurrentScreen("welcome")
+        case "favouriteList":
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                navigationManager.navigate(to: .swiftUI(.favouriteServerList))
+            } else {
+                sidebarNavigationManager.navigate(to: .swiftUI(.favouriteServerList))
+            }
+            #else
+            sidebarNavigationManager.navigate(to: .swiftUI(.favouriteServerList))
+            #endif
+        case "channelList":
+            guard appState.isConnected else { return }
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                navigationManager.navigate(to: .swiftUI(.channelList))
+            }
+            #endif
+            appState.setAutomationCurrentScreen("channelList")
+        case "vadOnboarding":
+            showVADOnboarding = true
+        default:
+            break
+        }
+    }
+
+    private func handleAutomationDismiss(target: String?) {
+        switch target {
+        case nil:
+            if showVADOnboarding {
+                showVADOnboarding = false
+            }
+        case "vadOnboarding":
+            showVADOnboarding = false
+        case "toast":
+            appState.activeToast = nil
+        case "error":
+            appState.activeError = nil
+        case "certTrust":
+            MUConnectionController.shared()?.rejectCertificateTrust()
+            appState.pendingCertTrust = nil
+        case "imagePreview":
+            #if os(iOS)
+            appState.activeImagePreview = nil
+            appState.hiddenPreviewSourceID = nil
+            #endif
+            #if os(macOS)
+            appState.activeMacImagePreview = nil
+            appState.hiddenMacPreviewSourceID = nil
+            #endif
+        default:
+            break
+        }
+    }
+
+    private func handleAutomationNavigation(command: String) {
+        switch command {
+        case "back":
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                navigationManager.goBack()
+            } else {
+                sidebarNavigationManager.goBack()
+            }
+            #else
+            sidebarNavigationManager.goBack()
+            #endif
+        case "root":
+            navigationManager.goToRoot()
+            sidebarNavigationManager.goToRoot()
+        default:
+            break
+        }
+    }
+
+    private func syncAutomationAlertState() {
+        if appState.pendingCertTrust != nil {
+            appState.setAutomationPresentedAlert("certTrust")
+        } else if appState.activeError != nil {
+            appState.setAutomationPresentedAlert("error")
+        } else {
+            appState.setAutomationPresentedAlert(nil)
+        }
+    }
+
+    private func syncAutomationOverlayState() {
+        var overlays: [String] = []
+        if appState.isConnecting {
+            overlays.append("connecting")
+        }
+        if appState.activeToast != nil {
+            overlays.append("toast")
+        }
+        #if os(iOS)
+        if appState.activeImagePreview != nil {
+            overlays.append("imagePreview")
+        }
+        #endif
+        #if os(macOS)
+        if appState.activeMacImagePreview != nil {
+            overlays.append("imagePreview")
+        }
+        #endif
+        appState.setAutomationVisibleOverlays(overlays)
     }
 }

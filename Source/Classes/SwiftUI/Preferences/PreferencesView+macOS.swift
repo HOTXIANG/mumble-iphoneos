@@ -580,6 +580,40 @@ private struct MacGeneralSettingsTabView: View {
         } message: {
             Text(NSLocalizedString("Language changes are applied immediately.", comment: ""))
         }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            if target == "about" {
+                showingAboutSheet = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            switch target {
+            case nil:
+                showingAboutSheet = false
+                showingLanguageChangedAlert = false
+            case "about":
+                showingAboutSheet = false
+            case "preferencesLanguageChanged":
+                showingLanguageChangedAlert = false
+            default:
+                break
+            }
+        }
+        .onChange(of: showingAboutSheet) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedSheet("about")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "about")
+            }
+        }
+        .onChange(of: showingLanguageChangedAlert) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedAlert("preferencesLanguageChanged")
+            } else if AppState.shared.automationPresentedAlert == "preferencesLanguageChanged" {
+                AppState.shared.setAutomationPresentedAlert(nil)
+            }
+        }
     }
 }
 
@@ -717,6 +751,66 @@ struct MacSettingsRootView: View {
         .toggleStyle(.checkbox)
         .onAppear {
             languageManager.reapplyCurrentLanguage()
+            syncAutomationCurrentScreen(for: selectedTab)
+        }
+        .onChange(of: selectedTab) { _, newValue in
+            syncAutomationCurrentScreen(for: newValue)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String,
+                  let tab = automationTab(for: target) else { return }
+            selectedTab = tab
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            guard let target,
+                  let tab = automationTab(for: target),
+                  selectedTab == tab else { return }
+            selectedTab = .general
+        }
+    }
+
+    private func automationTab(for target: String) -> MacSettingsTab? {
+        switch target {
+        case "preferences":
+            return .general
+        case "audioTransmissionSettings":
+            return .input
+        case "notificationSettings":
+            return .notifications
+        case "ttsSettings":
+            return .tts
+        case "certificateSettings":
+            return .certificates
+        case "advancedAudioSettings":
+            return .advanced
+        case "logSettings":
+            return .logging
+        default:
+            return nil
+        }
+    }
+
+    private func syncAutomationCurrentScreen(for tab: MacSettingsTab) {
+        switch tab {
+        case .general:
+            AppState.shared.setAutomationCurrentScreen("preferences")
+        case .input:
+            AppState.shared.setAutomationCurrentScreen("audioTransmissionSettings")
+        case .output:
+            AppState.shared.setAutomationCurrentScreen("preferencesOutputSettings")
+        case .notifications:
+            AppState.shared.setAutomationCurrentScreen("notificationSettings")
+        case .tts:
+            AppState.shared.setAutomationCurrentScreen("ttsSettings")
+        case .handoff:
+            AppState.shared.setAutomationCurrentScreen("preferencesHandoffSettings")
+        case .certificates:
+            AppState.shared.setAutomationCurrentScreen("certificateSettings")
+        case .advanced:
+            AppState.shared.setAutomationCurrentScreen("advancedAudioSettings")
+        case .logging:
+            AppState.shared.setAutomationCurrentScreen("logSettings")
         }
     }
 }

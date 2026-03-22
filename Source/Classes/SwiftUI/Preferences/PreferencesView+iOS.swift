@@ -2,6 +2,16 @@
 import SwiftUI
 
 struct PreferencesView: View {
+    private enum AutomationDestination: Hashable {
+        case audioTransmissionSettings
+        case advancedAudioSettings
+        case notificationSettings
+        case ttsSettings
+        case certificateSettings
+        case logSettings
+        case about
+    }
+
     @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
     @AppStorage("AudioOutputVolume") var outputVolume: Double = 1.0
@@ -9,6 +19,7 @@ struct PreferencesView: View {
     @AppStorage("HandoffPreferredProfileKey") var handoffPreferredProfileKey: Int = -1
     @Environment(\.dismiss) var dismiss
     @State private var showingLanguageChangedAlert = false
+    @State private var automationDestination: AutomationDestination? = nil
 
     private var selectedAppColorScheme: AppColorSchemeOption {
         AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
@@ -84,20 +95,36 @@ struct PreferencesView: View {
                 .padding(.vertical, 4)
             }
 
-            NavigationLink(destination: AudioTransmissionSettingsView()) {
+            NavigationLink(
+                destination: AudioTransmissionSettingsView(),
+                tag: .audioTransmissionSettings,
+                selection: $automationDestination
+            ) {
                 Label("Input Setting", systemImage: "mic")
             }
 
-            NavigationLink(destination: AdvancedAudioSettingsView()) {
+            NavigationLink(
+                destination: AdvancedAudioSettingsView(),
+                tag: .advancedAudioSettings,
+                selection: $automationDestination
+            ) {
                 Label("Advanced & Network", systemImage: "slider.horizontal.3")
             }
         }
 
         Section(header: Text("Notifications")) {
-            NavigationLink(destination: NotificationSettingsView()) {
+            NavigationLink(
+                destination: NotificationSettingsView(),
+                tag: .notificationSettings,
+                selection: $automationDestination
+            ) {
                 Label("Push Notifications", systemImage: "bell.badge")
             }
-            NavigationLink(destination: TTSSettingsView()) {
+            NavigationLink(
+                destination: TTSSettingsView(),
+                tag: .ttsSettings,
+                selection: $automationDestination
+            ) {
                 Label("Text-to-Speech", systemImage: "waveform")
             }
         }
@@ -110,18 +137,30 @@ struct PreferencesView: View {
             Toggle("Sync Local User Volume on Handoff", isOn: $handoffSyncLocalAudioSettings)
         }
 
-        NavigationLink(destination: CertificatePreferencesView()) {
+        NavigationLink(
+            destination: CertificatePreferencesView(),
+            tag: .certificateSettings,
+            selection: $automationDestination
+        ) {
             Label("Certificates", systemImage: "checkmark.shield")
         }
 
         Section(header: Text("Developer")) {
-            NavigationLink(destination: LogSettingsView()) {
+            NavigationLink(
+                destination: LogSettingsView(),
+                tag: .logSettings,
+                selection: $automationDestination
+            ) {
                 Label("Logging", systemImage: "ladybug")
             }
         }
 
         Section {
-            NavigationLink(destination: AboutView()) {
+            NavigationLink(
+                destination: AboutView(),
+                tag: .about,
+                selection: $automationDestination
+            ) {
                 Label("About Mumble", systemImage: "info.circle")
             }
         } footer: {
@@ -159,7 +198,61 @@ struct PreferencesView: View {
             Text(NSLocalizedString("Language changes are applied immediately.", comment: ""))
         }
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("preferences")
             languageManager.reapplyCurrentLanguage()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "notificationSettings":
+                automationDestination = .notificationSettings
+            case "ttsSettings":
+                automationDestination = .ttsSettings
+            case "audioTransmissionSettings":
+                automationDestination = .audioTransmissionSettings
+            case "advancedAudioSettings":
+                automationDestination = .advancedAudioSettings
+            case "certificateSettings":
+                automationDestination = .certificateSettings
+            case "logSettings":
+                automationDestination = .logSettings
+            case "about":
+                automationDestination = .about
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            switch target {
+            case nil:
+                automationDestination = nil
+            case "preferencesLanguageChanged":
+                showingLanguageChangedAlert = false
+            case "notificationSettings" where automationDestination == .notificationSettings:
+                automationDestination = nil
+            case "ttsSettings" where automationDestination == .ttsSettings:
+                automationDestination = nil
+            case "audioTransmissionSettings" where automationDestination == .audioTransmissionSettings:
+                automationDestination = nil
+            case "advancedAudioSettings" where automationDestination == .advancedAudioSettings:
+                automationDestination = nil
+            case "certificateSettings" where automationDestination == .certificateSettings:
+                automationDestination = nil
+            case "logSettings" where automationDestination == .logSettings:
+                automationDestination = nil
+            case "about" where automationDestination == .about:
+                automationDestination = nil
+            default:
+                break
+            }
+        }
+        .onChange(of: showingLanguageChangedAlert) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedAlert("preferencesLanguageChanged")
+            } else if AppState.shared.automationPresentedAlert == "preferencesLanguageChanged" {
+                AppState.shared.setAutomationPresentedAlert(nil)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .mumbleShowVADTutorialAgain)) { _ in
             dismiss()

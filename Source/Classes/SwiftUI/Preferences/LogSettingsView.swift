@@ -29,6 +29,7 @@ struct LogSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("logSettings")
             loadCurrentState()
         }
         .alert("Reset Logging Settings", isPresented: $showingResetAlert) {
@@ -39,6 +40,25 @@ struct LogSettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("All logging categories will be reset to default levels and enabled state.")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            if target == "logReset" {
+                showingResetAlert = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "logReset" {
+                showingResetAlert = false
+            }
+        }
+        .onChange(of: showingResetAlert) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedAlert("logReset")
+            } else if AppState.shared.automationPresentedAlert == "logReset" {
+                AppState.shared.setAutomationPresentedAlert(nil)
+            }
         }
     }
 

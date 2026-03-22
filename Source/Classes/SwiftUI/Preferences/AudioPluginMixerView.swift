@@ -75,6 +75,11 @@ final class AudioPluginMixerWindowController: NSObject {
         self.window = window
     }
 
+    func closeWindow() {
+        window?.close()
+        window = nil
+    }
+
     @objc private func handleMixerWindowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow, closing == window else { return }
         window = nil
@@ -319,6 +324,7 @@ struct AudioPluginMixerView: View {
             }
         }
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("audioPluginMixer")
             loadPluginChainState()
             loadPluginCategoryConfiguration()
             let remoteBusChainCount = pluginChainByTrack["remoteBus"]?.count ?? 0
@@ -341,6 +347,38 @@ struct AudioPluginMixerView: View {
         .onDisappear {
             // Mixer 关闭时，抓取所有插件的当前参数值并持久化
             snapshotAllPluginParameters()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            applyAutomationTrackSelection(from: notification.userInfo)
+            switch target {
+            case "pluginBrowser":
+                showingPluginBrowser = true
+            case "pluginEditor":
+                if let plugin = automationPlugin(from: notification.userInfo) {
+                    openPluginEditor(for: plugin)
+                }
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            switch target {
+            case nil:
+                showingPluginBrowser = false
+                #if os(iOS)
+                showingPluginEditor = false
+                #endif
+            case "pluginBrowser":
+                showingPluginBrowser = false
+            case "pluginEditor":
+                #if os(iOS)
+                showingPluginEditor = false
+                #endif
+            default:
+                break
+            }
         }
         .onChange(of: selectedTrack) {
             loadSelectedTrackState()
@@ -403,6 +441,52 @@ struct AudioPluginMixerView: View {
             }
         }
 #endif
+        .onChange(of: showingPluginBrowser) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedSheet("pluginBrowser")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "pluginBrowser")
+            }
+        }
+#if os(iOS)
+        .onChange(of: showingPluginEditor) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedSheet("pluginEditor")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "pluginEditor")
+            }
+        }
+#endif
+    }
+
+    private func applyAutomationTrackSelection(from userInfo: [AnyHashable: Any]?) {
+        guard let userInfo else { return }
+        if let trackKey = userInfo["trackKey"] as? String {
+            switch trackKey {
+            case "input":
+                selectedTrack = .input
+            case "remoteBus":
+                selectedTrack = .remoteBus
+            default:
+                if trackKey.hasPrefix("remoteSession:"),
+                   let session = Int(trackKey.split(separator: ":").last ?? "") {
+                    selectedTrack = .remoteSession(session)
+                }
+            }
+        } else if let session = userInfo["session"] as? Int {
+            selectedTrack = .remoteSession(session)
+        }
+    }
+
+    private func automationPlugin(from userInfo: [AnyHashable: Any]?) -> TrackPlugin? {
+        if let pluginID = userInfo?["pluginID"] as? String,
+           let plugin = findPlugin(withID: pluginID) {
+            return plugin
+        }
+        if let slotIndex = userInfo?["slotIndex"] as? Int {
+            return pluginAtSlot(slotIndex)
+        }
+        return selectedPlugin
     }
 
     private var mixerTransportBar: some View {
@@ -965,6 +1049,9 @@ struct AudioPluginMixerView: View {
 #if os(macOS)
         .frame(minWidth: 780, minHeight: 620)
 #endif
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("pluginBrowser")
+        }
     }
 
     private var pluginCategoryManagementPanel: some View {
@@ -2645,6 +2732,7 @@ private struct PluginEditorWindowContentView: View {
         }
         .frame(minWidth: 640, maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("pluginEditor")
             if controller == nil {
                 selectedTab = .parameters
             }

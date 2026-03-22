@@ -293,7 +293,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     if (now - _lastAudioRestartTime < 0.5) {
-        MULogDebug(audio, "Audio restart ignored (too frequent)");
+        MULogDebug(audio, @"Audio restart ignored (too frequent)");
         return;
     }
     _lastAudioRestartTime = now;
@@ -394,14 +394,14 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     [audio setRemoteBusPreviewGain:[defaults floatForKey:@"AudioPluginRemoteBusGain"]
                            enabled:[defaults boolForKey:@"AudioPluginRemoteBusEnabled"]];
     if (shouldRestart) {
-        MULogInfo(audio, "Settings changed while active. Restarting audio engine.");
+        MULogInfo(audio, @"Settings changed while active. Restarting audio engine.");
         [audio restart];
     } else {
-        MULogDebug(audio, "Settings updated without restart.");
+        MULogDebug(audio, @"Settings updated without restart.");
     }
     _lastAudioRestartSignature = [restartSignature copy];
 
-    MULogInfo(audio, "Audio setup completed.");
+    MULogInfo(audio, @"Audio setup completed.");
 }
 
 // Reload application preferences...

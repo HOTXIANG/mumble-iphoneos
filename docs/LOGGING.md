@@ -233,6 +233,33 @@ LogManager.shared.resetToDefaults()
 - iOS：通过 `UIActivityViewController` 分享
 - macOS：通过 `NSSavePanel` 保存
 
+### WebSocket 调试集成
+
+在 `DEBUG` 构建中，`MUTestServer` 会额外维护一份内存中的最近日志缓冲，并支持通过 WebSocket 读取和订阅：
+
+- `log.recent`：读取最近日志，支持按分类和最低等级过滤
+- `log.stream`：为当前 WebSocket 连接开启实时日志推送
+- `log.marker`：写入调试标记，方便 AI agent 划分一次自动化执行前后的日志窗口
+- `log.files`：列出当前日志文件和历史文件
+- `ui.changed`：配合 `log.entry` 追踪当前页面 / sheet / alert / overlay 状态，便于把日志窗口和具体 UI 交互对齐
+
+实时推送事件格式为：
+
+```json
+{
+  "event": "log.entry",
+  "data": {
+    "timestamp": "2026-03-22 15:04:12.345",
+    "category": "Audio",
+    "level": "debug",
+    "message": "Audio restarted - restoring mute state: muted=false, deafened=false",
+    "file": "ServerModelManager+AudioState.swift",
+    "function": "restoreMuteDeafenStateAfterAudioRestart()",
+    "line": 145
+  }
+}
+```
+
 ## 新增模块日志规范
 
 为新功能添加日志时遵循以下原则：

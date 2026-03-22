@@ -103,7 +103,61 @@ struct CertificatePreferencesView: View {
                 )
             })
             .onAppear {
+                AppState.shared.setAutomationCurrentScreen("certificateSettings")
                 certModel.refreshCertificates()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+                guard let target = notification.userInfo?["target"] as? String else { return }
+                switch target {
+                case "certificateDelete":
+                    if let cert = automationCertificate(from: notification.userInfo) {
+                        prepareDelete(cert)
+                    }
+                case "certificateExportPassword":
+                    if let cert = automationCertificate(from: notification.userInfo) {
+                        prepareExport(cert)
+                    }
+                default:
+                    break
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+                let target = notification.userInfo?["target"] as? String
+                switch target {
+                case nil:
+                    showingImportPasswordAlert = false
+                    showingImportErrorAlert = false
+                    showingExportPasswordAlert = false
+                    showingExportResultAlert = false
+                    showingShareSheet = false
+                    showingDeleteConfirmation = false
+                case "certificateImportPassword":
+                    showingImportPasswordAlert = false
+                case "certificateImportError":
+                    showingImportErrorAlert = false
+                case "certificateExportPassword":
+                    showingExportPasswordAlert = false
+                case "certificateExportResult":
+                    showingExportResultAlert = false
+                case "certificateExportShare":
+                    showingShareSheet = false
+                case "certificateDelete":
+                    showingDeleteConfirmation = false
+                default:
+                    break
+                }
+            }
+            .onChange(of: showingImportPasswordAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingImportErrorAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingExportPasswordAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingExportResultAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingDeleteConfirmation) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingShareSheet) { _, isPresented in
+                if isPresented {
+                    AppState.shared.setAutomationPresentedSheet("certificateExportShare")
+                } else {
+                    AppState.shared.clearAutomationPresentedSheet(ifMatches: "certificateExportShare")
+                }
             }
     }
     
@@ -340,6 +394,34 @@ struct CertificatePreferencesView: View {
         #else
         showingImportPicker = true
         #endif
+    }
+
+    private func automationCertificate(from userInfo: [AnyHashable: Any]?) -> CertificateItem? {
+        if let id = userInfo?["id"] as? Data,
+           let cert = certModel.certificates.first(where: { $0.id == id }) {
+            return cert
+        }
+        if let name = userInfo?["name"] as? String,
+           let cert = certModel.certificates.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            return cert
+        }
+        return nil
+    }
+
+    private func syncAutomationAlertState() {
+        if showingDeleteConfirmation {
+            AppState.shared.setAutomationPresentedAlert("certificateDelete")
+        } else if showingExportResultAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateExportResult")
+        } else if showingExportPasswordAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateExportPassword")
+        } else if showingImportErrorAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateImportError")
+        } else if showingImportPasswordAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateImportPassword")
+        } else if ["certificateDelete", "certificateExportResult", "certificateExportPassword", "certificateImportError", "certificateImportPassword"].contains(AppState.shared.automationPresentedAlert ?? "") {
+            AppState.shared.setAutomationPresentedAlert(nil)
+        }
     }
 }
 

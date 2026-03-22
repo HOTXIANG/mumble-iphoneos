@@ -83,6 +83,9 @@ struct AccessTokensView: View {
             }
             .onAppear { loadTokens() }
         }
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("accessTokens")
+        }
     }
 
     // MARK: - Subviews

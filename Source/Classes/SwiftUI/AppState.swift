@@ -22,6 +22,10 @@ extension Notification.Name {
 
     static let muPreferencesChanged      = Notification.Name("MumblePreferencesChanged")
     static let muCertificateTrustFailure = Notification.Name("MUCertificateTrustFailureNotification")
+    static let muAutomationOpenUI        = Notification.Name("MUAutomationOpenUINotification")
+    static let muAutomationDismissUI     = Notification.Name("MUAutomationDismissUINotification")
+    static let muAutomationNavigate      = Notification.Name("MUAutomationNavigateNotification")
+    static let muAutomationUIStateChanged = Notification.Name("MUAutomationUIStateChangedNotification")
 
     #if os(macOS)
     static let muMacAudioInputDevicesChanged = Notification.Name("MUMacAudioInputDevicesChanged")
@@ -149,6 +153,10 @@ class AppState: ObservableObject {
     @Published var currentTab: Tab = .channels // 默认是频道列表
     @Published var isInChannelView: Bool = false
     @Published var isChannelSplitLayout: Bool = false
+    @Published var automationCurrentScreen: String = "welcome"
+    @Published var automationPresentedSheet: String? = nil
+    @Published var automationPresentedAlert: String? = nil
+    @Published var automationVisibleOverlays: [String] = []
     
     #if os(iOS)
     @Published var isImmersiveStatusBarHidden: Bool = false
@@ -411,6 +419,46 @@ class AppState: ObservableObject {
         self.pendingRegistration = false
     }
 
+    func setAutomationCurrentScreen(_ screen: String) {
+        guard automationCurrentScreen != screen else { return }
+        automationCurrentScreen = screen
+        postAutomationUIStateChanged()
+    }
+
+    func setAutomationPresentedSheet(_ sheet: String?) {
+        guard automationPresentedSheet != sheet else { return }
+        automationPresentedSheet = sheet
+        postAutomationUIStateChanged()
+    }
+
+    func clearAutomationPresentedSheet(ifMatches sheet: String) {
+        guard automationPresentedSheet == sheet else { return }
+        automationPresentedSheet = nil
+        postAutomationUIStateChanged()
+    }
+
+    func setAutomationPresentedAlert(_ alert: String?) {
+        guard automationPresentedAlert != alert else { return }
+        automationPresentedAlert = alert
+        postAutomationUIStateChanged()
+    }
+
+    func setAutomationVisibleOverlays(_ overlays: [String]) {
+        let normalized = Array(Set(overlays)).sorted()
+        guard automationVisibleOverlays != normalized else { return }
+        automationVisibleOverlays = normalized
+        postAutomationUIStateChanged()
+    }
+
+    func automationUISnapshot() -> [String: Any] {
+        [
+            "currentScreen": automationCurrentScreen,
+            "presentedSheet": automationPresentedSheet ?? NSNull(),
+            "presentedAlert": automationPresentedAlert ?? NSNull(),
+            "visibleOverlays": automationVisibleOverlays
+        ]
+    }
+
     private func showToast(message: String, type: AppToast.ToastType) {
         withAnimation(.spring()) {
             activeToast = AppToast(message: message, type: type)
@@ -427,4 +475,12 @@ class AppState: ObservableObject {
     }
 
     private var toastWorkItem: DispatchWorkItem?
+
+    private func postAutomationUIStateChanged() {
+        NotificationCenter.default.post(
+            name: .muAutomationUIStateChanged,
+            object: nil,
+            userInfo: automationUISnapshot()
+        )
+    }
 }
