@@ -138,6 +138,7 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
     var stageGain: Float
     var autoLoad: Bool
     var savedParameterValues: [String: Float]
+    var sidechainSourceKey: String?  // NEW — nil means no sidechain
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -149,6 +150,7 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
         case stageGain
         case autoLoad
         case savedParameterValues
+        case sidechainSourceKey
     }
 
     init(
@@ -160,7 +162,8 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
         bypassed: Bool = false,
         stageGain: Float = 1.0,
         autoLoad: Bool = true,
-        savedParameterValues: [String: Float] = [:]
+        savedParameterValues: [String: Float] = [:],
+        sidechainSourceKey: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -171,6 +174,7 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
         self.stageGain = stageGain
         self.autoLoad = autoLoad
         self.savedParameterValues = savedParameterValues
+        self.sidechainSourceKey = sidechainSourceKey
     }
 
     init(from decoder: Decoder) throws {
@@ -184,6 +188,7 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
         stageGain = try container.decodeIfPresent(Float.self, forKey: .stageGain) ?? 1.0
         autoLoad = try container.decodeIfPresent(Bool.self, forKey: .autoLoad) ?? true
         savedParameterValues = try container.decodeIfPresent([String: Float].self, forKey: .savedParameterValues) ?? [:]
+        sidechainSourceKey = try container.decodeIfPresent(String.self, forKey: .sidechainSourceKey)
     }
 }
 

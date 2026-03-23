@@ -206,6 +206,15 @@ final class AudioPluginRackManager: ObservableObject {
         unloadAudioUnit(for: plugin)
     }
 
+    func setSidechainSource(_ sourceKey: String?, forPluginID pluginID: String, inTrack trackKey: String) {
+        guard var chain = pluginChainByTrack[trackKey],
+              let index = chain.firstIndex(where: { $0.id == pluginID }) else { return }
+        chain[index].sidechainSourceKey = sourceKey
+        pluginChainByTrack[trackKey] = chain
+        savePluginChainState()
+        syncDSPChain(for: trackKey)
+    }
+
     func parameters(trackKey: String, pluginID: String) -> [AudioPluginParameterInfo] {
         refreshParameters(for: pluginID, trackKey: trackKey)
         return parameterStateByPlugin[pluginID] ?? []
@@ -452,9 +461,14 @@ final class AudioPluginRackManager: ObservableObject {
                 let mix = NSNumber(value: min(max(plugin.stageGain, 0.0), 1.0))
 
                 if let audioUnit = loadedAudioUnits[loadedKey] {
-                    return ["audioUnit": audioUnit, "mix": mix] as NSDictionary
+                    var dict: [String: Any] = ["audioUnit": audioUnit, "mix": mix]
+                    if let sc = plugin.sidechainSourceKey, !sc.isEmpty {
+                        dict["sidechainSource"] = sc
+                    }
+                    return dict as NSDictionary
                 } else if let vst3Host = loadedVST3Hosts[loadedKey] {
                     return ["vst3Host": vst3Host, "mix": mix] as NSDictionary
+                    // VST3 sidechain not supported yet
                 }
                 return nil
             }
