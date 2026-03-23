@@ -777,8 +777,23 @@ final class MUTestCommandRouter {
             let selection = try requireTrackPlugin(params)
             return ["trackKey": trackKey, "pluginID": selection.plugin.id, "sidechainSource": selection.plugin.sidechainSourceKey ?? "none"]
 
+        case "debugSync":
+            // Debug command: sync a specific track's DSP chain
+            let trackKey = try requirePluginTrackKey(params)
+            let manager = AudioPluginRackManager.shared
+            manager.syncDSPChain(for: trackKey)
+            return ["status": "synced", "trackKey": trackKey]
+
+        case "debugListLoaded":
+            // Debug command: list all loaded audio units
+            let manager = AudioPluginRackManager.shared
+            return [
+                "loadedAudioUnitKeys": Array(manager.loadedAudioUnits.keys),
+                "pluginChainByTrack": manager.pluginChainByTrack.mapValues { $0.count }
+            ]
+
         default:
-            throw TestCommandError("Unknown plugin.\(cmd). Available: listTracks, get, available, scanPaths, addScanPath, removeScanPath, buffer, setBuffer, add, remove, move, setBypass, setGain, load, unload, parameters, setParameter, presets, savePreset, applyPreset, deletePreset, setSidechain, getSidechain")
+            throw TestCommandError("Unknown plugin.\(cmd). Available: listTracks, get, available, scanPaths, addScanPath, removeScanPath, buffer, setBuffer, add, remove, move, setBypass, setGain, load, unload, parameters, setParameter, presets, savePreset, applyPreset, deletePreset, setSidechain, getSidechain, debugSync, debugListLoaded")
         }
     }
 
