@@ -764,8 +764,21 @@ final class MUTestCommandRouter {
             }
             return serializePluginPreset(preset)
 
+        case "setSidechain":
+            let trackKey = try requirePluginTrackKey(params)
+            guard let source = params["source"] as? String else { throw TestCommandError("Missing 'source'") }
+            let selection = try requireTrackPlugin(params)
+            let sourceKey = source == "none" ? nil : source
+            await manager.setSidechainSource(sourceKey, forPluginID: selection.plugin.id, inTrack: trackKey)
+            return ["trackKey": trackKey, "pluginID": selection.plugin.id, "sidechainSource": source]
+
+        case "getSidechain":
+            let trackKey = try requirePluginTrackKey(params)
+            let selection = try requireTrackPlugin(params)
+            return ["trackKey": trackKey, "pluginID": selection.plugin.id, "sidechainSource": selection.plugin.sidechainSourceKey ?? "none"]
+
         default:
-            throw TestCommandError("Unknown plugin.\(cmd). Available: listTracks, get, available, scanPaths, addScanPath, removeScanPath, buffer, setBuffer, add, remove, move, setBypass, setGain, load, unload, parameters, setParameter, presets, savePreset, applyPreset, deletePreset")
+            throw TestCommandError("Unknown plugin.\(cmd). Available: listTracks, get, available, scanPaths, addScanPath, removeScanPath, buffer, setBuffer, add, remove, move, setBypass, setGain, load, unload, parameters, setParameter, presets, savePreset, applyPreset, deletePreset, setSidechain, getSidechain")
         }
     }
 
@@ -1411,7 +1424,7 @@ final class MUTestCommandRouter {
                 "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "restart", "forceTransmit", "status"],
                 "channel": ["list", "info", "join", "create", "edit", "move", "remove", "listen", "unlisten", "toggleCollapse", "togglePinned", "toggleHidden", "requestACL", "getACL", "setACL", "setAccessTokens", "getAccessTokens", "submitPassword", "scanPermissions", "link", "unlink", "unlinkAll", "current"],
                 "message": ["send", "sendTree", "sendPrivate", "sendImage", "sendPrivateImage", "listImages", "exportImage", "previewImage", "history", "markRead"],
-                "plugin": ["listTracks", "get", "available", "scanPaths", "addScanPath", "removeScanPath", "buffer", "setBuffer", "add", "remove", "move", "setBypass", "setGain", "load", "unload", "parameters", "setParameter", "presets", "savePreset", "applyPreset", "deletePreset"],
+                "plugin": ["listTracks", "get", "available", "scanPaths", "addScanPath", "removeScanPath", "buffer", "setBuffer", "add", "remove", "move", "setBypass", "setGain", "load", "unload", "parameters", "setParameter", "presets", "savePreset", "applyPreset", "deletePreset", "setSidechain", "getSidechain"],
                 "user": ["list", "self", "registerSelf", "info", "setNickname", "getComment", "setSelfComment", "setAvatar", "removeAvatar", "kick", "ban", "setVolume", "setLocalMute", "move", "serverMute", "serverDeafen", "prioritySpeaker", "stats"],
                 "favourite": ["list", "info", "add", "update", "remove", "connect", "pinWidget", "unpinWidget"],
                 "settings": ["get", "set", "list"],
@@ -1629,7 +1642,8 @@ final class MUTestCommandRouter {
             "isLoaded": isLoaded,
             "isLoading": manager.loadingPluginIDs.contains(plugin.id),
             "error": manager.lastLoadErrorByPlugin[plugin.id] ?? NSNull(),
-            "parameterCount": manager.parameterStateByPlugin[plugin.id]?.count ?? 0
+            "parameterCount": manager.parameterStateByPlugin[plugin.id]?.count ?? 0,
+            "sidechainSource": plugin.sidechainSourceKey ?? "none"
         ]
     }
 
