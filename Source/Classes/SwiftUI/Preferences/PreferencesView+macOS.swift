@@ -628,7 +628,7 @@ private struct MacHandoffSettingsTabView: View {
                 Toggle("", isOn: $handoffSyncLocalAudioSettings)
                     .labelsHidden()
             }
-            Text("Choose which profile to use when continuing a session from another device. 'Automatic' will match by server address.")
+            Text("Choose which profile to use when continuing a session from another device. \n'Automatic' will match by server address.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -650,23 +650,23 @@ struct MacSettingsRootView: View {
         var preferredContentSize: NSSize {
             switch self {
             case .general:
-                return NSSize(width: 550, height: 220)
+                return NSSize(width: 650, height: 220)
             case .input:
-                return NSSize(width: 550, height: 520)
+                return NSSize(width: 650, height: 520)
             case .output:
-                return NSSize(width: 550, height: 220)
+                return NSSize(width: 650, height: 220)
             case .notifications:
-                return NSSize(width: 550, height: 380)
+                return NSSize(width: 650, height: 380)
             case .tts:
-                return NSSize(width: 550, height: 450)
+                return NSSize(width: 650, height: 450)
             case .handoff:
-                return NSSize(width: 550, height: 220)
+                return NSSize(width: 650, height: 220)
             case .certificates:
-                return NSSize(width: 550, height: 600)
+                return NSSize(width: 650, height: 600)
             case .advanced:
-                return NSSize(width: 550, height: 340)
+                return NSSize(width: 650, height: 340)
             case .logging:
-                return NSSize(width: 550, height: 680)
+                return NSSize(width: 650, height: 600)
             }
         }
     }
@@ -675,11 +675,14 @@ struct MacSettingsRootView: View {
     @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
     @State private var selectedTab: MacSettingsTab = .general
-    
     private var selectedAppColorScheme: AppColorSchemeOption {
         AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
     }
-    
+
+    private var currentTabContentSize: NSSize {
+        selectedTab.preferredContentSize
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             MacGeneralSettingsTabView()
@@ -744,7 +747,7 @@ struct MacSettingsRootView: View {
                 }
                 .tag(MacSettingsTab.logging)
         }
-        .background(MacSettingsWindowSizeAdaptor(targetSize: selectedTab.preferredContentSize))
+        .background(MacSettingsWindowSizeAdaptor(targetSize: currentTabContentSize))
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .id(languageManager.localeIdentifier)
         .modifier(SettingsColorSchemeOverrideModifier(option: selectedAppColorScheme))

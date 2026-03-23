@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -21,50 +22,202 @@ struct LogSettingsView: View {
     @State private var showingExportSheet = false
 
     var body: some View {
+        logSettingsBody
+            .onAppear {
+                AppState.shared.setAutomationCurrentScreen("logSettings")
+                loadCurrentState()
+            }
+            .alert("Reset Logging Settings", isPresented: $showingResetAlert) {
+                Button("Reset", role: .destructive) {
+                    LogManager.shared.resetToDefaults()
+                    loadCurrentState()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("All logging categories will be reset to default levels and enabled state.")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+                guard let target = notification.userInfo?["target"] as? String else { return }
+                if target == "logReset" {
+                    showingResetAlert = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+                let target = notification.userInfo?["target"] as? String
+                if target == nil || target == "logReset" {
+                    showingResetAlert = false
+                }
+            }
+            .onChange(of: showingResetAlert) { _, isPresented in
+                if isPresented {
+                    AppState.shared.setAutomationPresentedAlert("logReset")
+                } else if AppState.shared.automationPresentedAlert == "logReset" {
+                    AppState.shared.setAutomationPresentedAlert(nil)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var logSettingsBody: some View {
+        #if os(macOS)
+        ScrollView {
+            Form {
+                logSettingsContent
+            }
+            .formStyle(.grouped)
+        }
+        #else
         Form {
             logSettingsContent
         }
-        #if os(iOS)
         .navigationTitle("Logging")
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .onAppear {
-            AppState.shared.setAutomationCurrentScreen("logSettings")
-            loadCurrentState()
-        }
-        .alert("Reset Logging Settings", isPresented: $showingResetAlert) {
-            Button("Reset", role: .destructive) {
-                LogManager.shared.resetToDefaults()
-                loadCurrentState()
+    }
+
+    @ViewBuilder
+    private var logSettingsContent: some View {
+        #if os(macOS)
+        macOSLogSettingsContent
+        #else
+        iOSLogSettingsContent
+        #endif
+    }
+
+    // MARK: - macOS (LabeledContent 风格)
+
+    #if os(macOS)
+    @ViewBuilder
+    private var macOSLogSettingsContent: some View {
+        Section {
+            LabeledContent("Logging:") {
+                Toggle("Enable Logging", isOn: $isGlobalEnabled)
+                    .onChange(of: isGlobalEnabled) { _, newValue in
+                        LogManager.shared.isEnabled = newValue
+                    }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("All logging categories will be reset to default levels and enabled state.")
+            .padding(.bottom, 2)
+
+            LabeledContent("File Output:") {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Write Logs to File", isOn: $isFilePersistenceEnabled)
+                        .onChange(of: isFilePersistenceEnabled) { _, newValue in
+                            LogManager.shared.isFilePersistenceEnabled = newValue
+                            NotificationCenter.default.post(name: .muLogFilePersistenceChanged, object: nil)
+                        }
+                    Text(isFilePersistenceEnabled
+                         ? "Log files are stored locally and rotated every 7 days."
+                         : "When file logging is off, logs are only available in Console.app.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        } header: {
+            Text("Global")
+                .font(.headline)
+                .padding(.vertical, 4)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
-            guard let target = notification.userInfo?["target"] as? String else { return }
-            if target == "logReset" {
-                showingResetAlert = true
+
+        if isFilePersistenceEnabled {
+            Section(header: Text("Log Files").font(.headline).padding(.vertical, 4)) {
+                let fileWriter = LogManager.shared.fileWriter
+                let files = fileWriter.allLogFileURLs
+
+                if files.isEmpty {
+                    LabeledContent("Status:") {
+                        Text("No log files yet.")
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    LabeledContent("Files:") {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(files, id: \.lastPathComponent) { url in
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "doc.text")
+                                            .foregroundColor(.secondary)
+                                        Text(url.lastPathComponent)
+                                            .font(.system(.body, design: .monospaced))
+                                        Text(fileSizeString(url))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 120)
+                    }
+
+                    LabeledContent("Export:") {
+                        Button {
+                            exportLogs()
+                        } label: {
+                            Label("Export All Logs", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
-            let target = notification.userInfo?["target"] as? String
-            if target == nil || target == "logReset" {
-                showingResetAlert = false
+
+        Section {
+            ForEach(LogCategory.allCases, id: \.self) { category in
+                macOSCategoryRow(category)
             }
+        } header: {
+            Text("Categories")
+                .font(.headline)
+                .padding(.vertical, 4)
+        } footer: {
+            Text("Each category can be individually enabled/disabled and set to a log level.")
         }
-        .onChange(of: showingResetAlert) { _, isPresented in
-            if isPresented {
-                AppState.shared.setAutomationPresentedAlert("logReset")
-            } else if AppState.shared.automationPresentedAlert == "logReset" {
-                AppState.shared.setAutomationPresentedAlert(nil)
+
+        Section(header: Text("Developer").font(.headline).padding(.vertical, 4)) {
+            LabeledContent("Environment:") {
+                VStack(alignment: .leading, spacing: 6) {
+                    labeledCode("MUMBLE_LOG_LEVEL", description: "verbose|debug|info|warning|error")
+                    labeledCode("MUMBLE_LOG_DISABLED", description: "audio,plugin,...")
+                    labeledCode("MUMBLE_LOG_VERBOSE", description: "connection,network,...")
+                    labeledCode("MUMBLE_LOG_FILE", description: "1 (enable file logging)")
+                }
+            }
+
+            LabeledContent("Reset:") {
+                Button("Reset All to Defaults", role: .destructive) {
+                    showingResetAlert = true
+                }
             }
         }
     }
 
     @ViewBuilder
-    private var logSettingsContent: some View {
-        // 全局控制
+    private func macOSCategoryRow(_ category: LogCategory) -> some View {
+        let enabled = categoryEnabledBinding(category)
+        let level = categoryLevelBinding(category)
+
+        LabeledContent(category.rawValue) {
+            HStack(spacing: 12) {
+                Toggle("", isOn: enabled)
+                    .labelsHidden()
+                if categoryStates[category] ?? true {
+                    Picker("", selection: level) {
+                        ForEach(LogLevel.allCases, id: \.self) { lvl in
+                            Text(lvl.label).tag(lvl)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 120)
+                }
+            }
+        }
+    }
+    #endif
+
+    // MARK: - iOS
+
+    #if os(iOS)
+    @ViewBuilder
+    private var iOSLogSettingsContent: some View {
         Section {
             Toggle("Enable Logging", isOn: $isGlobalEnabled)
                 .onChange(of: isGlobalEnabled) { _, newValue in
@@ -85,7 +238,6 @@ struct LogSettingsView: View {
             }
         }
 
-        // 文件操作
         if isFilePersistenceEnabled {
             Section(header: Text("Log Files")) {
                 let fileWriter = LogManager.shared.fileWriter
@@ -96,12 +248,11 @@ struct LogSettingsView: View {
                         .foregroundColor(.secondary)
                 } else {
                     ForEach(files, id: \.lastPathComponent) { url in
-                        HStack {
+                        HStack(spacing: 4) {
                             Image(systemName: "doc.text")
                                 .foregroundColor(.secondary)
                             Text(url.lastPathComponent)
                                 .font(.system(.body, design: .monospaced))
-                            Spacer()
                             Text(fileSizeString(url))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -117,10 +268,9 @@ struct LogSettingsView: View {
             }
         }
 
-        // 分类等级控制
         Section {
             ForEach(LogCategory.allCases, id: \.self) { category in
-                categoryRow(category)
+                iOSCategoryRow(category)
             }
         } header: {
             Text("Categories")
@@ -128,12 +278,10 @@ struct LogSettingsView: View {
             Text("Each category can be individually enabled/disabled and set to a log level. Only messages at or above the set level will be logged.")
         }
 
-        // 环境变量说明
         Section(header: Text("Developer")) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Environment Variables")
                     .font(.headline)
-
                 Group {
                     labeledCode("MUMBLE_LOG_LEVEL", description: "verbose|debug|info|warning|error")
                     labeledCode("MUMBLE_LOG_DISABLED", description: "audio,plugin,...")
@@ -150,22 +298,9 @@ struct LogSettingsView: View {
     }
 
     @ViewBuilder
-    private func categoryRow(_ category: LogCategory) -> some View {
-        let enabled = Binding<Bool>(
-            get: { categoryStates[category] ?? true },
-            set: { newValue in
-                categoryStates[category] = newValue
-                LogManager.shared.setEnabled(newValue, for: category)
-            }
-        )
-
-        let level = Binding<LogLevel>(
-            get: { categoryLevels[category] ?? .info },
-            set: { newValue in
-                categoryLevels[category] = newValue
-                LogManager.shared.setLevel(newValue, for: category)
-            }
-        )
+    private func iOSCategoryRow(_ category: LogCategory) -> some View {
+        let enabled = categoryEnabledBinding(category)
+        let level = categoryLevelBinding(category)
 
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -182,6 +317,29 @@ struct LogSettingsView: View {
                 }
             }
         }
+    }
+    #endif
+
+    // MARK: - Shared Helpers
+
+    private func categoryEnabledBinding(_ category: LogCategory) -> Binding<Bool> {
+        Binding<Bool>(
+            get: { categoryStates[category] ?? true },
+            set: { newValue in
+                categoryStates[category] = newValue
+                LogManager.shared.setEnabled(newValue, for: category)
+            }
+        )
+    }
+
+    private func categoryLevelBinding(_ category: LogCategory) -> Binding<LogLevel> {
+        Binding<LogLevel>(
+            get: { categoryLevels[category] ?? .info },
+            set: { newValue in
+                categoryLevels[category] = newValue
+                LogManager.shared.setLevel(newValue, for: category)
+            }
+        )
     }
 
     @ViewBuilder
@@ -232,18 +390,30 @@ struct LogSettingsView: View {
         #else
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "mumble-logs.zip"
+        panel.allowedContentTypes = [.zip]
         panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
-            // 简单拼接所有日志到一个文件
-            var combined = Data()
-            for file in files {
-                if let data = try? Data(contentsOf: file) {
-                    combined.append("=== \(file.lastPathComponent) ===\n".data(using: .utf8)!)
-                    combined.append(data)
-                    combined.append("\n\n".data(using: .utf8)!)
+            guard response == .OK, let destination = panel.url else { return }
+            // 创建临时目录，复制日志文件后用 /usr/bin/ditto 压缩为真正的 zip
+            let tmpDir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("mumble-log-export-\(UUID().uuidString)")
+            do {
+                try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+                for file in files {
+                    try FileManager.default.copyItem(
+                        at: file,
+                        to: tmpDir.appendingPathComponent(file.lastPathComponent)
+                    )
                 }
+                // ditto -c -k 创建标准 zip
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+                process.arguments = ["-c", "-k", "--sequesterRsrc", tmpDir.path, destination.path]
+                try process.run()
+                process.waitUntilExit()
+            } catch {
+                MumbleLogger.general.error("日志导出失败: \(error.localizedDescription)")
             }
-            try? combined.write(to: url)
+            try? FileManager.default.removeItem(at: tmpDir)
         }
         #endif
     }

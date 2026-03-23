@@ -24,6 +24,7 @@ private let kArrowSize: CGFloat = 9.0     // 箭头大小
 private let kArrowWidth: CGFloat = 14.0   // 箭头占位宽度
 private let kChannelIconSize: CGFloat = 10.0
 private let kChannelIconWidth: CGFloat = 16.0
+private let kDropHighlightCornerRadius: CGFloat = 12.0 // 与 TintedGlassRowModifier 圆角一致
 #else
 private let kRowSpacing: CGFloat = 7.0    // 行与行之间的间隙
 private let kRowPaddingV: CGFloat = 6.0   // 行内部的垂直边距
@@ -37,6 +38,7 @@ private let kArrowSize: CGFloat = 10.0    // 箭头大小
 private let kArrowWidth: CGFloat = 16.0   // 箭头占位宽度
 private let kChannelIconSize: CGFloat = 12.0
 private let kChannelIconWidth: CGFloat = 20.0
+private let kDropHighlightCornerRadius: CGFloat = 13.0 // 与 TintedGlassRowModifier 圆角一致
 #endif
 
 // MARK: - 1. Main Layout Container
@@ -908,15 +910,12 @@ struct ChannelTreeRow: View {
                 }
                 } // end else (not move mode)
             }
-            .onDrag {
-                NSItemProvider(object: "channel:\(channel.channelId())" as NSString)
-            }
-            // 拖拽用户到此频道的 drop target
+            // 拖拽用户到此频道的 drop target（频道不可拖拽，仅用户可拖拽）
             .onDrop(of: [UTType.plainText], isTargeted: $isDropTargeted) { providers in
                 handleUserDrop(providers: providers)
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: kDropHighlightCornerRadius)
                     .stroke(Color.accentColor, lineWidth: 2)
                     .opacity(isDropTargeted ? 1 : 0)
                     .animation(.easeInOut(duration: 0.15), value: isDropTargeted)
@@ -1125,20 +1124,14 @@ struct ChannelTreeRow: View {
         #endif
     }
     
-    /// 处理拖拽用户/频道到频道的 drop 操作
+    /// 处理拖拽用户到频道的 drop 操作
     private func handleUserDrop(providers: [NSItemProvider]) -> Bool {
         for provider in providers {
             if provider.canLoadObject(ofClass: NSString.self) {
                 provider.loadObject(ofClass: NSString.self) { item, _ in
                     guard let itemString = item as? String else { return }
                     DispatchQueue.main.async {
-                        if itemString.hasPrefix("channel:") {
-                            let idPart = itemString.dropFirst(8)
-                            if let chanId = UInt(idPart),
-                               let draggedChan = serverManager.serverModel?.channel(withId: chanId) {
-                                serverManager.moveChannel(draggedChan, to: channel)
-                            }
-                        } else if let session = UInt(itemString) {
+                        if let session = UInt(itemString) {
                             serverManager.moveUser(session: session, toChannelId: channel.channelId())
                         }
                     }

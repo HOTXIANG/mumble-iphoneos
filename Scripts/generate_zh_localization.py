@@ -152,8 +152,19 @@ MANUAL_TRANSLATIONS = {
     "Mode": "模式",
     "Transmission Method": "传输方式",
     "Transmission Method:": "传输方式：",
+    "Buffer": "缓冲区",
+    "Categories": "分类",
+    "Developer": "开发者",
+    "Enable Logging": "启用日志",
+    "Environment Variables": "环境变量",
+    "Environment:": "环境变量：",
+    "Export All Logs": "导出全部日志",
+    "Export:": "导出：",
     "Favourite Servers": "服务器收藏夹",
+    "File Output:": "文件输出：",
+    "Files:": "文件：",
     "Favourites": "收藏夹",
+    "Global": "全局",
     "Join a Server": "加入服务器",
     "Choose a favourite server to connect quickly": "选择一个收藏的服务器以快速连接",
     "Your saved servers": "你保存的服务器",
@@ -205,7 +216,18 @@ MANUAL_TRANSLATIONS = {
     "OK": "确定",
     "Done": "完成",
     "Enable": "启用",
+    "Log Files": "日志文件",
+    "Log files are stored locally and rotated every 7 days.": "日志文件会保存在本地，并每 7 天轮换一次。",
+    "Logging": "日志",
+    "Logging:": "日志：",
     "Level:": "电平：",
+    "No log files yet.": "还没有日志文件。",
+    "Plugins": "插件",
+    "Refresh": "刷新",
+    "Reset": "重置",
+    "Reset All to Defaults": "全部重置为默认值",
+    "Reset Logging Settings": "重置日志设置",
+    "Reset:": "重置：",
     "Save": "保存",
     "Edit": "编辑",
     "Comment": "备注",
@@ -255,6 +277,7 @@ MANUAL_TRANSLATIONS = {
     "Local Volume: %d%%": "本地音量：%d%%",
     "Missing": "缺失",
     "Someone": "某人",
+    "Status:": "状态：",
     "System": "系统",
     "Unknown": "未知",
     "Unknown Channel": "未知频道",
@@ -436,6 +459,7 @@ MANUAL_TRANSLATIONS = {
     "Add": "添加",
     "Add Ban": "添加封禁",
     "Add Friend": "添加好友",
+    "All logging categories will be reset to default levels and enabled state.": "所有日志分类都将重置为默认级别和启用状态。",
     "Audio & Links": "音频与链接",
     "Auto Reconnect": "自动重连",
     "Ban": "封禁",
@@ -466,9 +490,14 @@ MANUAL_TRANSLATIONS = {
     "Set Nickname": "设置昵称",
     "Social": "社交",
     "The server ban list is empty.": "服务器封禁列表为空。",
+    "Each category can be individually \nenabled/disabled and set to a log level.": "每个分类都可以单独启用/禁用，并设置日志级别。",
+    "Each category can be individually enabled/disabled and set to a log level.": "每个分类都可以单独启用/禁用，并设置日志级别。",
+    "Each category can be individually enabled/disabled and set to a log level. Only messages at or above the set level will be logged.": "每个分类都可以单独启用/禁用，并设置日志级别。只有达到或高于所设级别的消息才会被记录。",
     "Token": "令牌",
     "Unignore Messages": "取消忽略消息",
     "Unlink All": "取消全部链接",
+    "When file logging is off, logs are only available in Console.app.": "关闭文件日志后，日志只能在 Console.app 中查看。",
+    "Write Logs to File": "将日志写入文件",
     # Plural-like placeholders
     "%lu\\nppl": "%lu\\n人",
     "%u\\nppl": "%u\\n人",
@@ -508,11 +537,16 @@ def strings_unescape(value: str) -> str:
 def parse_strings(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
-    try:
-        text = path.read_text(encoding="utf-16")
-    except UnicodeDecodeError:
-        # Backward compatibility: handle legacy UTF-16LE files without BOM.
-        text = path.read_text(encoding="utf-16-le")
+    raw = path.read_bytes()
+    text = None
+    for encoding in ("utf-8", "utf-16", "utf-16-le", "utf-16-be"):
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        raise UnicodeDecodeError("parse_strings", raw, 0, 1, f"Unable to decode {path}")
     return {
         strings_unescape(m.group(1)): strings_unescape(m.group(2))
         for m in KEY_VALUE_RE.finditer(text)
@@ -595,6 +629,7 @@ def collect_swiftui_literals() -> set[str]:
                 literal = match.group(1)
                 if "\\(" in literal:
                     continue
+                literal = strings_unescape(literal)
                 if literal == "":
                     continue
                 keys.add(literal)
@@ -637,6 +672,21 @@ def normalize_value(value: str, term_rules: list[tuple[str, str]]) -> str:
     return value
 
 
+def lookup_key_variants(key: str) -> list[str]:
+    variants: list[str] = []
+
+    def add(candidate: str) -> None:
+        if candidate and candidate not in variants:
+            variants.append(candidate)
+
+    add(key)
+    collapsed_newlines = re.sub(r"[ \t]*\n[ \t]*", "\n", key)
+    add(collapsed_newlines)
+    add(collapsed_newlines.replace("\n", " "))
+    add(re.sub(r"\s+", " ", key).strip())
+    return variants
+
+
 def get_translation(key: str, seed_map: dict[str, str], term_rules: list[tuple[str, str]]) -> str:
     if key == "%lu\\nppl":
         return "%lu\\n人"
@@ -645,19 +695,25 @@ def get_translation(key: str, seed_map: dict[str, str], term_rules: list[tuple[s
     if key.startswith("Below: input under this level is treated as silence."):
         return "静音阈值：低于此值会被视为静音。\\n语音阈值：高于此值会被视为语音。\\n静音保持：当输入持续低于静音阈值达到该时长后，才会切换为静音。"
 
-    if key in MANUAL_TRANSLATIONS:
-        return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[key]), term_rules)
-    escaped_key = strings_escape(key)
-    if escaped_key in MANUAL_TRANSLATIONS:
-        return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[escaped_key]), term_rules)
-    if key in VALUE_FIXUPS:
-        return normalize_value(strings_unescape(VALUE_FIXUPS[key]), term_rules)
+    candidates = lookup_key_variants(key)
 
-    seed = seed_map.get(key)
-    if seed:
-        seed = restore_placeholder_tokens(seed, key)
-        seed = normalize_value(seed, term_rules)
-        return seed
+    for candidate in candidates:
+        if candidate in MANUAL_TRANSLATIONS:
+            return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[candidate]), term_rules)
+
+        escaped_candidate = strings_escape(candidate)
+        if escaped_candidate in MANUAL_TRANSLATIONS:
+            return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[escaped_candidate]), term_rules)
+
+        if candidate in VALUE_FIXUPS:
+            return normalize_value(strings_unescape(VALUE_FIXUPS[candidate]), term_rules)
+
+    for candidate in candidates:
+        seed = seed_map.get(candidate)
+        if seed:
+            seed = restore_placeholder_tokens(seed, key)
+            seed = normalize_value(seed, term_rules)
+            return seed
 
     # 无翻译时 fallback 原文，避免生成空值
     return normalize_value(key, term_rules)

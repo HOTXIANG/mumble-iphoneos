@@ -31,6 +31,7 @@
 "Advanced Audio" = "Advanced Audio";
 "Always" = "Always";
 "Amplitude" = "Amplitude";
+"All logging categories will be reset to default levels and enabled state." = "All logging categories will be reset to default levels and enabled state.";
 "Appearance:" = "Appearance:";
 "Apply to Selected Track" = "Apply to Selected Track";
 "Apply Track Preview:" = "Apply Track Preview:";
@@ -59,8 +60,10 @@
 "Balanced" = "Balanced";
 "Banned by %@ for reason: \"%@\"" = "Banned by %1$@ for reason: \"%2$@\"";
 "BUS" = "BUS";
+"Buffer" = "Buffer";
 "Bypassed" = "Bypassed";
 "Cancel" = "Cancel";
+"Categories" = "Categories";
 "Cannot modify SuperUser" = "Cannot modify SuperUser";
 "Certificate" = "Certificate";
 "Certificate Mismatch" = "Certificate Mismatch";
@@ -69,6 +72,7 @@
 "Chain Live" = "Chain Live";
 "Channel is full" = "Channel is full";
 "Channels:" = "Channels:";
+"Choose which profile to use when continuing a session from another device. \n'Automatic' will match by server address." = "Choose which profile to use when continuing a session from another device. \n'Automatic' will match by server address.";
 "Clear Messages" = "Clear Messages";
 "Clear Slot" = "Clear Slot";
 "Click Load to instantiate this Audio Unit" = "Click Load to instantiate this Audio Unit";
@@ -88,6 +92,7 @@
 "Custom Quality" = "Custom Quality";
 "Custom Scan Paths" = "Custom Scan Paths";
 "Delete" = "Delete";
+"Developer" = "Developer";
 "Delete Certificate Chain" = "Delete Certificate Chain";
 "Delete Favourite" = "Delete Favourite";
 "Description" = "Description";
@@ -98,6 +103,9 @@
 "Distortion" = "Distortion";
 "Do you want to upgrade?" = "Do you want to upgrade?";
 "Done" = "Done";
+"Each category can be individually \nenabled/disabled and set to a log level." = "Each category can be individually \nenabled/disabled and set to a log level.";
+"Each category can be individually enabled/disabled and set to a log level." = "Each category can be individually enabled/disabled and set to a log level.";
+"Each category can be individually enabled/disabled and set to a log level. Only messages at or above the set level will be logged." = "Each category can be individually enabled/disabled and set to a log level. Only messages at or above the set level will be logged.";
 "Drag-and-drop ordering will be enabled in the next phase. Current preview applies gain at the selected lane." = "Drag-and-drop ordering will be enabled in the next phase. Current preview applies gain at the selected lane.";
 "Dynamics" = "Dynamics";
 "Each track provides fixed insert slots. Click a slot to choose or replace a plugin." = "Each track provides fixed insert slots. Click a slot to choose or replace a plugin.";
@@ -107,13 +115,18 @@
 "Edit Favourite" = "Edit Favourite";
 "Email" = "Email";
 "Empty slot" = "Empty slot";
+"Enable Logging" = "Enable Logging";
 "Enable QoS:" = "Enable QoS:";
 "Enable Sidetone" = "Enable Sidetone";
 "Enter Password" = "Enter Password";
+"Environment Variables" = "Environment Variables";
+"Environment:" = "Environment:";
 "EQ" = "EQ";
 "Expired" = "Expired";
 "Expires on %@" = "Expires on %@";
 "Export" = "Export";
+"Export:" = "Export:";
+"Export All Logs" = "Export All Logs";
 "Export Certificate Chain" = "Export Certificate Chain";
 "Export Failed" = "Export Failed";
 "Export Image" = "Export Image";
@@ -123,6 +136,8 @@
 "Failed to load %@: %@" = "Failed to load %@: %@";
 "Failed to parse Audio Unit identifier" = "Failed to parse Audio Unit identifier";
 "Favourite Servers" = "Favourite Servers";
+"File Output:" = "File Output:";
+"Files:" = "Files:";
 "File '%@' could not be deleted: %@" = "File '%1$@' could not be deleted: %2$@";
 "Filename" = "Filename";
 "Filesystem plugins are discoverable now; runtime hosting for VST3/Component will be connected in next phase." = "Filesystem plugins are discoverable now; runtime hosting for VST3/Component will be connected in next phase.";
@@ -132,6 +147,7 @@
 "FS" = "FS";
 "Generate New Certificate" = "Generate New Certificate";
 "Generating Certificate" = "Generating Certificate";
+"Global" = "Global";
 "Handoff:" = "Handoff:";
 "Help" = "Help";
 "High" = "High";
@@ -171,6 +187,10 @@
 "Load" = "Load";
 "Load plugin first" = "Load plugin first";
 "Loaded %@" = "Loaded %@";
+"Log Files" = "Log Files";
+"Log files are stored locally and rotated every 7 days." = "Log files are stored locally and rotated every 7 days.";
+"Logging" = "Logging";
+"Logging:" = "Logging:";
 "Loading Audio Unit..." = "Loading Audio Unit...";
 "Local microphone before encode" = "Local microphone before encode";
 "Low" = "Low";
@@ -210,6 +230,7 @@
 "No plugin bundles found in scan paths" = "No plugin bundles found in scan paths";
 "No plugins available" = "No plugins available";
 "No plugins inserted on this track" = "No plugins inserted on this track";
+"No log files yet." = "No log files yet.";
 "No reason" = "No reason";
 "None" = "None";
 "Not After" = "Not After";
@@ -252,6 +273,7 @@
 "Plugin set to manual-load" = "Plugin set to manual-load";
 "Plugin UI" = "Plugin UI";
 "PM %@" = "PM %@";
+"Plugins" = "Plugins";
 "Port" = "Port";
 "Post-mix remote output bus" = "Post-mix remote output bus";
 "Preferences" = "Preferences";
@@ -269,6 +291,7 @@
 "Reconnect Interval" = "Reconnect Interval";
 "Reconnect Interval:" = "Reconnect Interval:";
 "Reconnect Interval: %.1f s" = "Reconnect Interval: %.1f s";
+"Refresh" = "Refresh";
 "Refresh Audio Units" = "Refresh Audio Units";
 "Refresh Parameters" = "Refresh Parameters";
 "Refresh Remote Tracks" = "Refresh Remote Tracks";
@@ -290,6 +313,10 @@
 "Remove Importable Certificates" = "Remove Importable Certificates";
 "Remove Plugin" = "Remove Plugin";
 "Removed %@" = "Removed %@";
+"Reset" = "Reset";
+"Reset All to Defaults" = "Reset All to Defaults";
+"Reset Logging Settings" = "Reset Logging Settings";
+"Reset:" = "Reset:";
 "Reverb" = "Reverb";
 "Scan Plugin Bundles" = "Scan Plugin Bundles";
 "Scanned Plugin Bundles" = "Scanned Plugin Bundles";
@@ -322,6 +349,7 @@
 "State: Loaded (%d params)" = "State: Loaded (%d params)";
 "State: Loading" = "State: Loading";
 "State: Unloaded" = "State: Unloaded";
+"Status:" = "Status:";
 "Subject" = "Subject";
 "Support" = "Support";
 "Switched to channel view mode." = "Switched to channel view mode.";
@@ -367,6 +395,8 @@
 "We're terribly sorry. It looks like Mumble has recently crashed. Do you want to send a crash report to the Mumble developers?" = "We're terribly sorry. It looks like Mumble has recently crashed. Do you want to send a crash report to the Mumble developers?";
 "Website" = "Website";
 "Welcome Message" = "Welcome Message";
+"When file logging is off, logs are only available in Console.app." = "When file logging is off, logs are only available in Console.app.";
+"Write Logs to File" = "Write Logs to File";
 "Wrong certificate or password for existing user" = "Wrong certificate or password for existing user";
 "Wrong server password" = "Wrong server password";
 "Yes" = "Yes";

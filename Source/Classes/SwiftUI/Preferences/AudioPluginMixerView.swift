@@ -50,14 +50,15 @@ final class AudioPluginMixerWindowController: NSObject {
             return
         }
 
-        let rootView = NavigationStack {
-            AudioPluginMixerView()
-                .navigationTitle("Audio Plugin Mixer")
-        }
+        let rootView = AudioPluginMixerView()
+            .modifier(MixerColorSchemeModifier())
         let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = NSLocalizedString("Audio Plugin Mixer", comment: "")
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.title = ""
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = .windowBackgroundColor  // 跟随系统亮暗模式
         window.setContentSize(NSSize(width: 960, height: 640))
         window.minSize = NSSize(width: 780, height: 520)
         window.center()
@@ -72,6 +73,14 @@ final class AudioPluginMixerWindowController: NSObject {
             object: window
         )
 
+        // 监听系统亮暗模式变化，强制窗口刷新外观
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleAppearanceChanged(_:)),
+            name: .init("AppleInterfaceThemeChangedNotification"),
+            object: nil
+        )
+
         self.window = window
     }
 
@@ -82,7 +91,32 @@ final class AudioPluginMixerWindowController: NSObject {
 
     @objc private func handleMixerWindowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow, closing == window else { return }
+        DistributedNotificationCenter.default().removeObserver(self, name: .init("AppleInterfaceThemeChangedNotification"), object: nil)
         window = nil
+    }
+
+    @objc private func handleAppearanceChanged(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let window = self?.window else { return }
+            // 重新继承系统外观
+            window.appearance = nil
+            window.invalidateShadow()
+            window.displayIfNeeded()
+        }
+    }
+}
+
+/// 读取 AppColorScheme 设置并应用到 Mixer 窗口，确保跟随用户选择的亮暗模式
+private struct MixerColorSchemeModifier: ViewModifier {
+    @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = "system"
+
+    func body(content: Content) -> some View {
+        let option = AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
+        if let scheme = option.preferredColorScheme {
+            content.preferredColorScheme(scheme)
+        } else {
+            content
+        }
     }
 }
 #endif
@@ -156,41 +190,24 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
 struct AudioPluginMixerView: View {
     private let maxInsertSlots: Int = 8
 
+    private struct HearableUser: Identifiable, Hashable {
+        let id: String       // userHash（持久化键）
+        let session: UInt
+        let userName: String
+    }
+
     private enum MixerTrack: Hashable {
         case input
-        case remoteBus
-        case remoteSession(Int)
-
-        var title: String {
-            switch self {
-            case .input:
-                return NSLocalizedString("Input Track", comment: "")
-            case .remoteBus:
-                return NSLocalizedString("Remote Bus", comment: "")
-            case .remoteSession(let session):
-                return String(format: NSLocalizedString("Session %d", comment: ""), session)
-            }
-        }
-
-        var subtitle: String {
-            switch self {
-            case .input:
-                return NSLocalizedString("Local microphone before encode", comment: "")
-            case .remoteBus:
-                return NSLocalizedString("Post-mix remote output bus", comment: "")
-            case .remoteSession:
-                return NSLocalizedString("Per-user remote audio lane", comment: "")
-            }
-        }
+        case masterBus1
+        case masterBus2
+        case remoteUser(String)  // keyed by userHash
 
         var shortLabel: String {
             switch self {
-            case .input:
-                return NSLocalizedString("IN", comment: "")
-            case .remoteBus:
-                return NSLocalizedString("BUS", comment: "")
-            case .remoteSession:
-                return NSLocalizedString("USR", comment: "")
+            case .input:     return "IN"
+            case .masterBus1: return "M1"
+            case .masterBus2: return "M2"
+            case .remoteUser: return "USR"
             }
         }
     }
@@ -251,16 +268,23 @@ struct AudioPluginMixerView: View {
 
     @AppStorage("AudioPluginInputTrackGain") private var pluginInputTrackGain: Double = 1.0
     @AppStorage("AudioPluginRemoteBusGain") private var pluginRemoteBusGain: Double = 1.0
+    @AppStorage("AudioPluginRemoteBus2Gain") private var pluginRemoteBus2Gain: Double = 1.0
     @AppStorage("AudioPluginCustomScanPaths") private var pluginCustomScanPaths: String = ""
     @AppStorage("AudioPluginTrackChainsV1") private var pluginTrackChainsData: String = ""
     @AppStorage("AudioPluginPresetsV1") private var pluginPresetsData: String = ""
     @AppStorage("AudioPluginHostBufferFrames") private var pluginHostBufferFrames: Int = 256
     @AppStorage("AudioPluginCategoryOverridesV1") private var pluginCategoryOverridesData: String = ""
     @AppStorage("AudioPluginCustomCategoriesV1") private var pluginCustomCategoriesData: String = ""
+    @AppStorage("AudioPluginBusAssignmentsV1") private var busAssignmentsData: String = ""
 
     @State private var pluginRemoteTrackGain: Double = 1.0
     @State private var remoteTrackSettings: [Int: (enabled: Bool, gain: Double)] = [:]
     @State private var remoteSessionOrder: [Int] = []
+    @State private var hearableUsers: [HearableUser] = []
+    @State private var sessionToHash: [UInt: String] = [:]
+    @State private var hashToSession: [String: UInt] = [:]
+    @State private var busAssignments: [String: Int] = [:]  // userHash -> 0(bus1) or 1(bus2)
+    @State private var listeningChannelIds: Set<UInt> = []  // 本地维护的监听频道集合
     @State private var selectedTrack: MixerTrack = .input
     @State private var installedAudioUnits: [DiscoveredPlugin] = []
     @State private var scannedFilesystemPlugins: [DiscoveredPlugin] = []
@@ -290,173 +314,135 @@ struct AudioPluginMixerView: View {
     @State private var customPluginCategories: [String] = []
     @State private var customCategoryInput: String = ""
 
+    #if os(macOS)
+    /// 将非 Optional 的 selectedTrack 桥接为 Optional Binding（List selection 需要）
+    private var selectedTrackBinding: Binding<MixerTrack?> {
+        Binding<MixerTrack?>(
+            get: { selectedTrack },
+            set: { newValue in
+                if let newValue { selectedTrack = newValue }
+            }
+        )
+    }
+    #endif
+
     var body: some View {
-        VStack(spacing: 0) {
-            mixerTransportBar
-            Divider()
-            GeometryReader { geometry in
-                let isWideLayout = geometry.size.width >= 900
-                let isCompact = geometry.size.width < 500
-                Group {
-                    if isWideLayout {
-                        HStack(spacing: 0) {
-                            mixerTrackSidebar
-                                .frame(width: min(340, max(260, geometry.size.width * 0.33)))
-                            Divider()
-                            mixerWorkspace(compact: false)
-                        }
-                    } else if isCompact {
-                        // iPhone 竖屏：紧凑水平轨道选择器 + 全屏工作区
-                        VStack(spacing: 0) {
-                            compactTrackPicker
-                            Divider()
-                            mixerWorkspace(compact: true)
-                        }
-                    } else {
-                        VStack(spacing: 0) {
-                            mixerTrackSidebar
-                                .frame(height: 300)
-                            Divider()
-                            mixerWorkspace(compact: false)
-                        }
-                    }
+        mixerBodyCore
+            .modifier(MixerSheetsModifier(
+                showingPluginBrowser: $showingPluginBrowser,
+                showingPluginEditor: showingPluginEditorBinding,
+                pluginEditorController: pluginEditorControllerValue,
+                pluginEditorTitle: pluginEditorTitleValue,
+                pluginBrowserSheet: { pluginBrowserSheet },
+                onPluginEditorDismiss: {
+                    snapshotAllPluginParameters()
+                    #if os(iOS)
+                    pluginEditorController = nil
+                    pluginEditorTitle = ""
+                    selectedPluginID = nil
+                    #endif
                 }
-            }
-        }
-        .onAppear {
-            AppState.shared.setAutomationCurrentScreen("audioPluginMixer")
-            loadPluginChainState()
-            loadPluginCategoryConfiguration()
-            let remoteBusChainCount = pluginChainByTrack["remoteBus"]?.count ?? 0
-            NSLog("MKAudioProbe: Mixer onAppear remoteBusChain=\(remoteBusChainCount) selectedTrack=\(String(describing: selectedTrack))")
-            loadPluginPresets()
-            refreshRemoteSessionOrder()
-            refreshInstalledAudioUnits()
+            ))
+    }
+
+    /// body 拆分：核心 onAppear / onReceive / onChange（减轻 type-checker 压力）
+    private var mixerBodyCore: some View {
+        mixerContentView
+        .onAppear { performOnAppear() }
+        .onDisappear { snapshotAllPluginParameters() }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userJoinedNotification)) { _ in refreshHearableUsers() }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userLeftNotification)) { _ in refreshHearableUsers() }
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userMovedNotification)) { _ in refreshHearableUsers() }
+        .onReceive(NotificationCenter.default.publisher(for: .mkListeningChannelAdd)) { n in handleListeningChannelAdd(n) }
+        .onReceive(NotificationCenter.default.publisher(for: .mkListeningChannelRemove)) { n in handleListeningChannelRemove(n) }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { n in handleAutomationOpenUI(n) }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { n in handleAutomationDismissUI(n) }
+        .onChange(of: selectedTrack) { loadSelectedTrackState(); normalizeSelectedPluginSelection(); rebuildProcessorStateMachine() }
+        .onChange(of: pluginInputTrackGain) { applyLivePreviewForTrackKey("input"); PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: pluginRemoteBusGain) { applyLivePreviewForTrackKey("masterBus1"); PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: pluginRemoteBus2Gain) { applyLivePreviewForTrackKey("masterBus2"); PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: pluginRemoteTrackGain) { applyRemoteTrackPreview(); PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: pluginHostBufferFrames) { syncPluginHostBufferFrames(); PreferencesModel.shared.notifySettingsChanged() }
+    }
+
+    private func performOnAppear() {
+        AppState.shared.setAutomationCurrentScreen("audioPluginMixer")
+        loadPluginChainState()
+        migrateRemoteBusToMasterBus1()
+        loadBusAssignments()
+        loadPluginCategoryConfiguration()
+        loadPluginPresets()
+        initializeListeningChannels()
+        refreshRemoteSessionOrder()
+        refreshInstalledAudioUnits()
 #if os(macOS)
-            refreshFilesystemPluginScan()
+        refreshFilesystemPluginScan()
 #endif
-            loadSelectedTrackState()
-            normalizeSelectedPluginSelection()
-            applyLivePreviewForAllTracks()
-            rebuildProcessorStateMachine()
-            syncPluginHostBufferFrames()
-            Task {
-                await loadPersistedAudioUnits()
+        loadSelectedTrackState()
+        normalizeSelectedPluginSelection()
+        applyLivePreviewForAllTracks()
+        rebuildProcessorStateMachine()
+        syncPluginHostBufferFrames()
+        Task { await loadPersistedAudioUnits() }
+    }
+
+    private func handleAutomationOpenUI(_ notification: Notification) {
+        guard let target = notification.userInfo?["target"] as? String else { return }
+        applyAutomationTrackSelection(from: notification.userInfo)
+        switch target {
+        case "pluginBrowser":
+            showingPluginBrowser = true
+        case "pluginEditor":
+            if let plugin = automationPlugin(from: notification.userInfo) {
+                openPluginEditor(for: plugin)
             }
+        default:
+            break
         }
-        .onDisappear {
-            // Mixer 关闭时，抓取所有插件的当前参数值并持久化
-            snapshotAllPluginParameters()
+    }
+
+    private func handleAutomationDismissUI(_ notification: Notification) {
+        let target = notification.userInfo?["target"] as? String
+        switch target {
+        case nil:
+            showingPluginBrowser = false
+            #if os(iOS)
+            showingPluginEditor = false
+            #endif
+        case "pluginBrowser":
+            showingPluginBrowser = false
+        case "pluginEditor":
+            #if os(iOS)
+            showingPluginEditor = false
+            #endif
+        default:
+            break
         }
-        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
-            guard let target = notification.userInfo?["target"] as? String else { return }
-            applyAutomationTrackSelection(from: notification.userInfo)
-            switch target {
-            case "pluginBrowser":
-                showingPluginBrowser = true
-            case "pluginEditor":
-                if let plugin = automationPlugin(from: notification.userInfo) {
-                    openPluginEditor(for: plugin)
-                }
-            default:
-                break
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
-            let target = notification.userInfo?["target"] as? String
-            switch target {
-            case nil:
-                showingPluginBrowser = false
-                #if os(iOS)
-                showingPluginEditor = false
-                #endif
-            case "pluginBrowser":
-                showingPluginBrowser = false
-            case "pluginEditor":
-                #if os(iOS)
-                showingPluginEditor = false
-                #endif
-            default:
-                break
-            }
-        }
-        .onChange(of: selectedTrack) {
-            loadSelectedTrackState()
-            normalizeSelectedPluginSelection()
-            rebuildProcessorStateMachine()
-        }
-        .onChange(of: pluginInputTrackGain) {
-            applyLivePreviewForTrackKey("input")
-            PreferencesModel.shared.notifySettingsChanged()
-        }
-        .onChange(of: pluginRemoteBusGain) {
-            applyLivePreviewForTrackKey("remoteBus")
-            PreferencesModel.shared.notifySettingsChanged()
-        }
-        .onChange(of: pluginRemoteTrackGain) {
-            applyRemoteTrackPreview()
-            PreferencesModel.shared.notifySettingsChanged()
-        }
-        .onChange(of: pluginHostBufferFrames) {
-            syncPluginHostBufferFrames()
-            PreferencesModel.shared.notifySettingsChanged()
-        }
-#if os(iOS)
-        .sheet(isPresented: $showingPluginEditor) {
-            NavigationStack {
-                Group {
-                    if let pluginEditorController {
-                        PluginEditorHostView(controller: pluginEditorController)
-                    } else {
-                        Text(NSLocalizedString("Plugin UI is unavailable", comment: ""))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .navigationTitle(pluginEditorTitle)
-                .toolbar {
-                    ToolbarItem(placement: .automatic) {
-                        Button(NSLocalizedString("Done", comment: "")) {
-                            showingPluginEditor = false
-                        }
-                    }
-                }
-            }
-#if os(macOS)
-            .frame(minWidth: 860, minHeight: 540)
-#endif
-        }
-#endif
-        .sheet(isPresented: $showingPluginBrowser) {
-            pluginBrowserSheet
-        }
-#if os(iOS)
-        .onChange(of: showingPluginEditor) {
-            if !showingPluginEditor {
-                // 插件编辑器关闭时，抓取参数快照（捕获原生 UI 的修改）
-                snapshotAllPluginParameters()
-                pluginEditorController = nil
-                pluginEditorTitle = ""
-                selectedPluginID = nil
-            }
-        }
-#endif
-        .onChange(of: showingPluginBrowser) { _, isPresented in
-            if isPresented {
-                AppState.shared.setAutomationPresentedSheet("pluginBrowser")
-            } else {
-                AppState.shared.clearAutomationPresentedSheet(ifMatches: "pluginBrowser")
-            }
-        }
-#if os(iOS)
-        .onChange(of: showingPluginEditor) { _, isPresented in
-            if isPresented {
-                AppState.shared.setAutomationPresentedSheet("pluginEditor")
-            } else {
-                AppState.shared.clearAutomationPresentedSheet(ifMatches: "pluginEditor")
-            }
-        }
-#endif
+    }
+
+    /// iOS 有 pluginEditorController，macOS 没有此 state — 统一 Binding 接口
+    private var showingPluginEditorBinding: Binding<Bool> {
+        #if os(iOS)
+        return $showingPluginEditor
+        #else
+        return .constant(false)
+        #endif
+    }
+
+    private var pluginEditorControllerValue: PlatformViewController? {
+        #if os(iOS)
+        return pluginEditorController
+        #else
+        return nil
+        #endif
+    }
+
+    private var pluginEditorTitleValue: String {
+        #if os(iOS)
+        return pluginEditorTitle
+        #else
+        return ""
+        #endif
     }
 
     private func applyAutomationTrackSelection(from userInfo: [AnyHashable: Any]?) {
@@ -465,16 +451,18 @@ struct AudioPluginMixerView: View {
             switch trackKey {
             case "input":
                 selectedTrack = .input
-            case "remoteBus":
-                selectedTrack = .remoteBus
+            case "masterBus1":
+                selectedTrack = .masterBus1
+            case "masterBus2":
+                selectedTrack = .masterBus2
             default:
-                if trackKey.hasPrefix("remoteSession:"),
-                   let session = Int(trackKey.split(separator: ":").last ?? "") {
-                    selectedTrack = .remoteSession(session)
+                if trackKey.hasPrefix("remoteUser:") {
+                    let hash = String(trackKey.dropFirst("remoteUser:".count))
+                    selectedTrack = .remoteUser(hash)
                 }
             }
-        } else if let session = userInfo["session"] as? Int {
-            selectedTrack = .remoteSession(session)
+        } else if let hash = userInfo["userHash"] as? String {
+            selectedTrack = .remoteUser(hash)
         }
     }
 
@@ -487,6 +475,58 @@ struct AudioPluginMixerView: View {
             return pluginAtSlot(slotIndex)
         }
         return selectedPlugin
+    }
+
+    // MARK: - Platform Content Layout
+
+    @ViewBuilder
+    private var mixerContentView: some View {
+        #if os(macOS)
+        NavigationSplitView {
+            mixerTrackSidebar
+                .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 380)
+        } detail: {
+            VStack(alignment: .leading, spacing: 0) {
+                if !pluginOperationMessage.isEmpty {
+                    Text(pluginOperationMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 2)
+                }
+                mixerWorkspace(compact: false)
+            }
+            .navigationTitle("Audio Plugin Mixer")
+            .toolbarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .windowToolbar)
+        }
+        .navigationSplitViewStyle(.balanced)
+        #else
+        VStack(spacing: 0) {
+            mixerTransportBar
+            Divider()
+            GeometryReader { geometry in
+                let isCompact = geometry.size.width < 500
+                Group {
+                    if isCompact {
+                        VStack(spacing: 0) {
+                            compactTrackPicker
+                            Divider()
+                            mixerWorkspace(compact: true)
+                        }
+                    } else {
+                        HStack(spacing: 0) {
+                            mixerTrackSidebar
+                                .frame(width: min(340, max(260, geometry.size.width * 0.33)))
+                            Divider()
+                            mixerWorkspace(compact: false)
+                        }
+                    }
+                }
+            }
+        }
+        #endif
     }
 
     private var mixerTransportBar: some View {
@@ -585,17 +625,14 @@ struct AudioPluginMixerView: View {
                                     RoundedRectangle(cornerRadius: 4, style: .continuous)
                                         .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
                                 )
-                            Text(track.title)
+                            Text(trackTitle(track))
                                 .font(.caption.weight(isSelected ? .semibold : .regular))
                                 .foregroundColor(isSelected ? .primary : .secondary)
                                 .lineLimit(1)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-                        )
+                        .modifier(TintedGlassRowModifier(isHighlighted: isSelected, highlightColor: .accentColor, cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
                 }
@@ -603,39 +640,181 @@ struct AudioPluginMixerView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .background(.regularMaterial)
     }
 
     private var mixerTrackSidebar: some View {
+        #if os(macOS)
+        // macOS: 使用系统原生 List sidebar 风格
+        VStack(spacing: 0) {
+            List(allTracks, id: \.self, selection: selectedTrackBinding) { track in
+                mixerTrackLabel(track)
+                    .tag(track)
+            }
+            .listStyle(.sidebar)
+
+            Divider()
+            mixerSidebarControls
+        }
+        .toolbar(removing: .sidebarToggle)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    NSApp.keyWindow?.firstResponder?.tryToPerform(
+                        #selector(NSSplitViewController.toggleSidebar(_:)), with: nil
+                    )
+                } label: {
+                    Image(systemName: "sidebar.leading")
+                }
+            }
+        }
+        #else
+        // iOS: 自定义侧边栏布局
         VStack(alignment: .leading, spacing: 12) {
             Text(NSLocalizedString("Tracks", comment: ""))
                 .font(.headline)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 16)
                 .padding(.top, 12)
 
-            ScrollView {
-                VStack(spacing: 8) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 7) {
                     ForEach(allTracks, id: \.self) { track in
-                        mixerTrackRow(track)
+                        mixerTrackButton(track)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
             }
+            .scrollContentBackground(.hidden)
 
-            if remoteSessionOrder.isEmpty {
-                Text(NSLocalizedString("No active remote tracks", comment: ""))
+            if hearableUsers.isEmpty {
+                Text(NSLocalizedString("No users in channel", comment: ""))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 12)
             }
         }
-        .background(.regularMaterial)
+        .background(Color.clear)
+        #endif
     }
 
+    // MARK: - macOS Sidebar Controls & Detail Header
+
+    #if os(macOS)
+    /// 侧边栏底部：Buffer Size / Refresh / Plugin Browser
+    private var mixerSidebarControls: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Text(NSLocalizedString("Buffer", comment: ""))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Menu {
+                    ForEach([64, 128, 256, 512, 1024, 2048], id: \.self) { frames in
+                        Button("\(frames)") {
+                            pluginHostBufferFrames = frames
+                        }
+                    }
+                } label: {
+                    Text("\(pluginHostBufferFrames)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(.primary)
+                        .frame(minWidth: 44)
+                }
+                .menuStyle(.borderlessButton)
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    refreshRemoteSessionOrder()
+                } label: {
+                    Label(NSLocalizedString("Refresh", comment: ""), systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button {
+                    showingPluginBrowser = true
+                } label: {
+                    Label(NSLocalizedString("Plugins", comment: ""), systemImage: "square.grid.2x2")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    #endif
+
+    /// 轨道行内容（Label 部分，macOS List 和 iOS Button 共用）
     @ViewBuilder
-    private func mixerTrackRow(_ track: MixerTrack) -> some View {
+    private func trackTitle(_ track: MixerTrack) -> String {
+        switch track {
+        case .input: return NSLocalizedString("Input Track", comment: "")
+        case .masterBus1: return NSLocalizedString("Master Bus 1", comment: "")
+        case .masterBus2: return NSLocalizedString("Master Bus 2", comment: "")
+        case .remoteUser(let hash): return hearableUserName(for: hash)
+        }
+    }
+
+    private func trackSubtitle(_ track: MixerTrack) -> String {
+        switch track {
+        case .input: return NSLocalizedString("Local microphone before encode", comment: "")
+        case .masterBus1: return NSLocalizedString("Post-mix output bus 1", comment: "")
+        case .masterBus2: return NSLocalizedString("Post-mix output bus 2", comment: "")
+        case .remoteUser(let hash):
+            let bus = (busAssignments[hash] ?? 0) == 0 ? "M1" : "M2"
+            return "→ \(bus)"
+        }
+    }
+
+    private func mixerTrackLabel(_ track: MixerTrack) -> some View {
+        HStack(spacing: 10) {
+            Text(track.shortLabel)
+                .font(.caption.monospaced())
+                .foregroundColor(.accentColor)
+                .frame(width: 34, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.15))
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(trackTitle(track))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+                Text(trackSubtitle(track))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+
+            // 用户轨道显示总线路由选择器
+            if case .remoteUser(let hash) = track {
+                Picker("", selection: Binding(
+                    get: { busAssignments[hash] ?? 0 },
+                    set: { setBusAssignment(for: hash, busIndex: $0) }
+                )) {
+                    Text("M1").tag(0)
+                    Text("M2").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 80)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// iOS 专用：带手动选中高亮的按钮行
+    @ViewBuilder
+    private func mixerTrackButton(_ track: MixerTrack) -> some View {
         let isSelected = selectedTrack == track
         Button {
             selectedTrack = track
@@ -651,23 +830,34 @@ struct AudioPluginMixerView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(track.title)
+                    Text(trackTitle(track))
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.primary)
-                    Text(track.subtitle)
+                    Text(trackSubtitle(track))
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
+
+                // 用户轨道显示总线路由选择器
+                if case .remoteUser(let hash) = track {
+                    Picker("", selection: Binding(
+                        get: { busAssignments[hash] ?? 0 },
+                        set: { setBusAssignment(for: hash, busIndex: $0) }
+                    )) {
+                        Text("M1").tag(0)
+                        Text("M2").tag(1)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 80)
+                }
             }
-            .padding(10)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-            )
+            .modifier(TintedGlassRowModifier(isHighlighted: isSelected, highlightColor: .accentColor))
         }
         .buttonStyle(.plain)
     }
@@ -679,7 +869,6 @@ struct AudioPluginMixerView: View {
             }
             .padding(compact ? 10 : 16)
         }
-        .background(.thinMaterial)
     }
 
     private func pluginChainPanel(compact: Bool) -> some View {
@@ -704,10 +893,7 @@ struct AudioPluginMixerView: View {
             }
         }
         .padding(compact ? 10 : 14)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-        )
+        .modifier(ClearGlassModifier(cornerRadius: 12))
     }
 
     // MARK: - Wide Plugin Slot (macOS / iPad 横屏)
@@ -940,6 +1126,7 @@ struct AudioPluginMixerView: View {
             )
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
     }
 
     private var pluginBrowserPanel: some View {
@@ -947,7 +1134,7 @@ struct AudioPluginMixerView: View {
             Text(NSLocalizedString("Plugin Browser", comment: ""))
                 .font(.headline)
 
-            Text(String(format: NSLocalizedString("Selected Track: %@", comment: ""), selectedTrack.title))
+            Text(String(format: NSLocalizedString("Selected Track: %@", comment: ""), trackTitle(selectedTrack)))
                 .font(.caption)
                 .foregroundColor(.secondary)
 
@@ -1017,10 +1204,7 @@ struct AudioPluginMixerView: View {
 #endif
         }
         .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-        )
+        .modifier(ClearGlassModifier(cornerRadius: 12))
     }
 
     private var pluginBrowserSheet: some View {
@@ -1152,8 +1336,10 @@ struct AudioPluginMixerView: View {
     }
 
     private var allTracks: [MixerTrack] {
-        var tracks: [MixerTrack] = [.input, .remoteBus]
-        tracks.append(contentsOf: remoteSessionOrder.map { .remoteSession($0) })
+        var tracks: [MixerTrack] = [.input]
+        tracks.append(contentsOf: hearableUsers.map { .remoteUser($0.id) })
+        tracks.append(.masterBus1)
+        tracks.append(.masterBus2)
         return tracks
     }
 
@@ -1303,10 +1489,12 @@ struct AudioPluginMixerView: View {
         switch selectedTrack {
         case .input:
             return "input"
-        case .remoteBus:
-            return "remoteBus"
-        case .remoteSession(let session):
-            return "remoteSession:\(session)"
+        case .masterBus1:
+            return "masterBus1"
+        case .masterBus2:
+            return "masterBus2"
+        case .remoteUser(let hash):
+            return "remoteUser:\(hash)"
         }
     }
 
@@ -1355,6 +1543,16 @@ struct AudioPluginMixerView: View {
             return
         }
         pluginChainByTrack = decoded
+    }
+
+    /// 旧版使用 "remoteBus" 键，新版迁移到 "masterBus1"
+    private func migrateRemoteBusToMasterBus1() {
+        if let oldChain = pluginChainByTrack["remoteBus"], pluginChainByTrack["masterBus1"] == nil {
+            pluginChainByTrack["masterBus1"] = oldChain
+            pluginChainByTrack.removeValue(forKey: "remoteBus")
+            savePluginChainState()
+        }
+        // 同理迁移 remoteSession:xxx → 无需迁移，因为 hash-based key 是新格式
     }
 
     private func savePluginChainState() {
@@ -1500,10 +1698,10 @@ struct AudioPluginMixerView: View {
 
         guard !targets.isEmpty else { return }
 
-        let remoteBusTargets = targets.filter { plugin in
-            pluginChainByTrack["remoteBus"]?.contains(where: { $0.id == plugin.id }) == true
+        let masterBus1Targets = targets.filter { plugin in
+            pluginChainByTrack["masterBus1"]?.contains(where: { $0.id == plugin.id }) == true
         }.count
-        NSLog("MKAudioProbe: loadPersistedAudioUnits targets=\(targets.count) remoteBusTargets=\(remoteBusTargets)")
+        NSLog("MKAudioProbe: loadPersistedAudioUnits targets=\(targets.count) masterBus1Targets=\(masterBus1Targets)")
 
         isLoadingPersistedPlugins = true
         defer { isLoadingPersistedPlugins = false }
@@ -1520,8 +1718,11 @@ struct AudioPluginMixerView: View {
         if pluginChainByTrack["input"] == nil {
             applyLivePreviewForTrackKey("input")
         }
-        if pluginChainByTrack["remoteBus"] == nil {
-            applyLivePreviewForTrackKey("remoteBus")
+        if pluginChainByTrack["masterBus1"] == nil {
+            applyLivePreviewForTrackKey("masterBus1")
+        }
+        if pluginChainByTrack["masterBus2"] == nil {
+            applyLivePreviewForTrackKey("masterBus2")
         }
     }
 
@@ -1536,17 +1737,26 @@ struct AudioPluginMixerView: View {
             MKAudio.shared().setInputTrackPreviewGain(gain, enabled: enabled)
             return
         }
-        if key == "remoteBus" {
+        if key == "masterBus1" {
             let gain = Float(pluginRemoteBusGain)
             let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
             MKAudio.shared().setRemoteBusPreviewGain(gain, enabled: enabled)
             return
         }
-        if let session = parseRemoteSessionID(from: key) {
+        if key == "masterBus2" {
+            let gain = Float(pluginRemoteBus2Gain)
+            let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
+            MKAudio.shared().setRemoteBus2PreviewGain(gain, enabled: enabled)
+            return
+        }
+        if let hash = parseRemoteUserHash(from: key), let session = hashToSession[hash] {
             let gain = Float(pluginRemoteTrackGain)
             let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
-            remoteTrackSettings[session] = (enabled: enabled, gain: Double(gain))
-            MKAudio.shared().setRemoteTrackPreviewGain(gain, enabled: enabled, forSession: UInt(session))
+            remoteTrackSettings[Int(session)] = (enabled: enabled, gain: Double(gain))
+            MumbleLogger.plugin.debug("applyPreview remoteUser hash=\(hash) session=\(session) enabled=\(enabled) gain=\(gain) hasActivePlugins=\(hasActivePlugins)")
+            MKAudio.shared().setRemoteTrackPreviewGain(gain, enabled: enabled, forSession: session)
+        } else if key.hasPrefix("remoteUser:") {
+            MumbleLogger.plugin.warning("applyPreview remoteUser SKIP key=\(key) — no session mapping")
         }
     }
 
@@ -1599,24 +1809,32 @@ struct AudioPluginMixerView: View {
             MKAudio.shared().setInputTrackAudioUnitChain(activeProcessorChain(for: key))
             return
         }
-        if key == "remoteBus" {
+        if key == "masterBus1" {
             MKAudio.shared().setRemoteBusAudioUnitChain(activeProcessorChain(for: key))
             return
         }
-        if let session = parseRemoteSessionID(from: key) {
-            MKAudio.shared().setRemoteTrackAudioUnitChain(activeProcessorChain(for: key), forSession: UInt(session))
+        if key == "masterBus2" {
+            MKAudio.shared().setRemoteBus2AudioUnitChain(activeProcessorChain(for: key))
+            return
+        }
+        if let hash = parseRemoteUserHash(from: key), let session = hashToSession[hash] {
+            let chain = activeProcessorChain(for: key)
+            MumbleLogger.plugin.debug("syncDSP remoteUser hash=\(hash) session=\(session) chainCount=\(chain.count)")
+            MKAudio.shared().setRemoteTrackAudioUnitChain(chain, forSession: session)
+        } else {
+            let hash = parseRemoteUserHash(from: key)
+            MumbleLogger.plugin.warning("syncDSP remoteUser SKIP key=\(key) hash=\(hash ?? "nil") hashToSession has \(hashToSession.count) entries")
         }
     }
 
-    private func parseRemoteSessionID(from key: String) -> Int? {
-        guard key.hasPrefix("remoteSession:") else { return nil }
-        let value = key.replacingOccurrences(of: "remoteSession:", with: "")
-        return Int(value)
+    private func parseRemoteUserHash(from key: String) -> String? {
+        guard key.hasPrefix("remoteUser:") else { return nil }
+        return String(key.dropFirst("remoteUser:".count))
     }
 
     private func allTrackKeys() -> [String] {
-        var keys: [String] = ["input", "remoteBus"]
-        keys.append(contentsOf: remoteSessionOrder.map { "remoteSession:\($0)" })
+        var keys: [String] = ["input", "masterBus1", "masterBus2"]
+        keys.append(contentsOf: hearableUsers.map { "remoteUser:\($0.id)" })
         for key in pluginChainByTrack.keys where !keys.contains(key) {
             keys.append(key)
         }
@@ -1726,6 +1944,7 @@ struct AudioPluginMixerView: View {
                 parameterStateByPlugin[plugin.id] = []
             }
             pluginOperationMessage = String(format: NSLocalizedString("Loaded %@", comment: ""), plugin.name)
+            MumbleLogger.plugin.info("Plugin loaded: \(plugin.name) on trackKey=\(trackKey) loadedKey=\(loadedKey)")
             applyLivePreviewForTrackKey(trackKey)
             rebuildProcessorStateMachine()
             return true
@@ -2114,8 +2333,8 @@ struct AudioPluginMixerView: View {
         if trackKey == "input" {
             return 1  // Mono for input track
         }
-        if trackKey == "remoteBus" || trackKey.hasPrefix("remoteSession:") {
-            return 2  // Stereo for remote bus and sessions
+        if trackKey == "masterBus1" || trackKey == "masterBus2" || trackKey.hasPrefix("remoteUser:") {
+            return 2  // Stereo for master buses and user tracks
         }
         return 2  // Default to stereo
     }
@@ -2333,10 +2552,10 @@ struct AudioPluginMixerView: View {
     }
 
     private func loadSelectedTrackState() {
-        guard case .remoteSession(let session) = selectedTrack else {
+        guard case .remoteUser(let hash) = selectedTrack, let session = hashToSession[hash] else {
             return
         }
-        let trackState = remoteTrackSettings[session] ?? (enabled: false, gain: 1.0)
+        let trackState = remoteTrackSettings[Int(session)] ?? (enabled: false, gain: 1.0)
         pluginRemoteTrackGain = trackState.gain
     }
 
@@ -2429,26 +2648,139 @@ struct AudioPluginMixerView: View {
     private func refreshRemoteSessionOrder() {
         let sessions = MKAudio.shared().copyRemoteSessionOrder().map { $0.intValue }
         remoteSessionOrder = sessions
-        switch selectedTrack {
-        case .remoteSession(let session) where sessions.contains(session):
+        refreshHearableUsers()
+    }
+
+    /// 从 ServerModelManager 同步当前监听频道（Mixer 独立窗口无 EnvironmentObject）
+    private func initializeListeningChannels() {
+        listeningChannelIds = ServerModelManager.shared?.listeningChannels ?? []
+    }
+
+    private func handleListeningChannelAdd(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let user = userInfo["user"] as? MKUser,
+              let addChannels = userInfo["addChannels"] as? [NSNumber],
+              user.session() == MUConnectionController.shared()?.serverModel?.connectedUser()?.session() else { return }
+        for num in addChannels {
+            listeningChannelIds.insert(num.uintValue)
+        }
+        refreshHearableUsers()
+    }
+
+    private func handleListeningChannelRemove(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let user = userInfo["user"] as? MKUser,
+              let removeChannels = userInfo["removeChannels"] as? [NSNumber],
+              user.session() == MUConnectionController.shared()?.serverModel?.connectedUser()?.session() else { return }
+        for num in removeChannels {
+            listeningChannelIds.remove(num.uintValue)
+        }
+        refreshHearableUsers()
+    }
+
+    /// 从 ServerModel 获取所有可听见的用户（同频道 + 监听频道），构建 session↔hash 映射
+    private func refreshHearableUsers() {
+        guard let serverModel = MUConnectionController.shared()?.serverModel,
+              let connectedUser = serverModel.connectedUser() else {
+            hearableUsers = []
+            sessionToHash = [:]
+            hashToSession = [:]
             return
-        case .remoteSession:
-            selectedTrack = sessions.first.map { .remoteSession($0) } ?? .input
-        default:
-            if selectedTrack == .input || selectedTrack == .remoteBus {
-                return
+        }
+
+        var users: [HearableUser] = []
+        var newSessionToHash: [UInt: String] = [:]
+        var newHashToSession: [String: UInt] = [:]
+        var seen = Set<UInt>()
+
+        let collectUsers: (MKChannel) -> Void = { channel in
+            guard let userList = channel.users() as? [MKUser] else { return }
+            for user in userList {
+                let session = user.session()
+                if session == connectedUser.session() { continue }
+                guard !seen.contains(session) else { continue }
+                seen.insert(session)
+                let hash = user.userHash() ?? ""
+                let stableKey = hash.isEmpty ? "session:\(session)" : hash
+                let name = user.userName() ?? NSLocalizedString("Unknown", comment: "")
+                users.append(HearableUser(id: stableKey, session: session, userName: name))
+                newSessionToHash[session] = stableKey
+                newHashToSession[stableKey] = session
             }
         }
+
+        // 同频道用户
+        if let myChannel = connectedUser.channel() {
+            collectUsers(myChannel)
+        }
+
+        // 监听的频道用户
+        for channelId in listeningChannelIds {
+            if let channel = serverModel.channel(withId: channelId) {
+                collectUsers(channel)
+            }
+        }
+
+        hearableUsers = users
+        sessionToHash = newSessionToHash
+        hashToSession = newHashToSession
+
+        // 如果当前选中的用户轨已不在列表中，回到 input
+        if case .remoteUser(let hash) = selectedTrack {
+            if !users.contains(where: { $0.id == hash }) {
+                selectedTrack = .input
+            }
+        }
+
+        // 同步总线路由到 MKAudio
+        syncBusAssignments()
     }
 
     private func applyRemoteTrackPreview() {
-        guard case .remoteSession(let session) = selectedTrack else { return }
-        let trackKey = "remoteSession:\(session)"
+        guard case .remoteUser(let hash) = selectedTrack, let session = hashToSession[hash] else { return }
+        let trackKey = "remoteUser:\(hash)"
         let hasActivePlugins = (pluginChainByTrack[trackKey] ?? []).contains { !$0.bypassed }
         let gain = Float(pluginRemoteTrackGain)
         let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
-        remoteTrackSettings[session] = (enabled: enabled, gain: pluginRemoteTrackGain)
-        MKAudio.shared().setRemoteTrackPreviewGain(gain, enabled: enabled, forSession: UInt(session))
+        remoteTrackSettings[Int(session)] = (enabled: enabled, gain: pluginRemoteTrackGain)
+        MKAudio.shared().setRemoteTrackPreviewGain(gain, enabled: enabled, forSession: session)
+    }
+
+    // MARK: - Bus Assignment
+
+    private func loadBusAssignments() {
+        guard !busAssignmentsData.isEmpty,
+              let data = busAssignmentsData.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: Int].self, from: data) else {
+            busAssignments = [:]
+            return
+        }
+        busAssignments = decoded
+    }
+
+    private func saveBusAssignments() {
+        guard let data = try? JSONEncoder().encode(busAssignments),
+              let string = String(data: data, encoding: .utf8) else { return }
+        busAssignmentsData = string
+    }
+
+    private func syncBusAssignments() {
+        for user in hearableUsers {
+            let busIndex = busAssignments[user.id] ?? 0
+            MKAudio.shared().setBusAssignment(UInt(busIndex), forSession: user.session)
+        }
+    }
+
+    private func setBusAssignment(for userHash: String, busIndex: Int) {
+        busAssignments[userHash] = busIndex
+        saveBusAssignments()
+        if let session = hashToSession[userHash] {
+            MKAudio.shared().setBusAssignment(UInt(busIndex), forSession: session)
+        }
+    }
+
+    private func hearableUserName(for hash: String) -> String {
+        hearableUsers.first(where: { $0.id == hash })?.userName ?? hash.prefix(8).description
     }
 
     private func refreshInstalledAudioUnits() {
@@ -2866,3 +3198,67 @@ final class PluginEditorWindowController: NSObject {
     }
 }
 #endif
+
+// MARK: - MixerSheetsModifier（拆分 body 以减轻 type-checker 压力）
+
+private struct MixerSheetsModifier<BrowserSheet: View>: ViewModifier {
+    @Binding var showingPluginBrowser: Bool
+    @Binding var showingPluginEditor: Bool
+    let pluginEditorController: PlatformViewController?
+    let pluginEditorTitle: String
+    @ViewBuilder let pluginBrowserSheet: () -> BrowserSheet
+    let onPluginEditorDismiss: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+#if os(iOS)
+            .sheet(isPresented: $showingPluginEditor) {
+                NavigationStack {
+                    Group {
+                        if let pluginEditorController {
+                            PluginEditorHostView(controller: pluginEditorController)
+                        } else {
+                            Text(NSLocalizedString("Plugin UI is unavailable", comment: ""))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .navigationTitle(pluginEditorTitle)
+                    .toolbar {
+                        ToolbarItem(placement: .automatic) {
+                            Button(NSLocalizedString("Done", comment: "")) {
+                                showingPluginEditor = false
+                            }
+                        }
+                    }
+                }
+            }
+#endif
+            .sheet(isPresented: $showingPluginBrowser) {
+                pluginBrowserSheet()
+            }
+#if os(iOS)
+            .onChange(of: showingPluginEditor) {
+                if !showingPluginEditor {
+                    onPluginEditorDismiss()
+                }
+            }
+#endif
+            .onChange(of: showingPluginBrowser) { _, isPresented in
+                if isPresented {
+                    AppState.shared.setAutomationPresentedSheet("pluginBrowser")
+                } else {
+                    AppState.shared.clearAutomationPresentedSheet(ifMatches: "pluginBrowser")
+                }
+            }
+#if os(iOS)
+            .onChange(of: showingPluginEditor) { _, isPresented in
+                if isPresented {
+                    AppState.shared.setAutomationPresentedSheet("pluginEditor")
+                } else {
+                    AppState.shared.clearAutomationPresentedSheet(ifMatches: "pluginEditor")
+                }
+            }
+#endif
+    }
+}

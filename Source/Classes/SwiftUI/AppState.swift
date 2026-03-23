@@ -26,6 +26,7 @@ extension Notification.Name {
     static let muAutomationDismissUI     = Notification.Name("MUAutomationDismissUINotification")
     static let muAutomationNavigate      = Notification.Name("MUAutomationNavigateNotification")
     static let muAutomationUIStateChanged = Notification.Name("MUAutomationUIStateChangedNotification")
+    static let muLogFilePersistenceChanged = Notification.Name("MULogFilePersistenceChangedNotification")
 
     #if os(macOS)
     static let muMacAudioInputDevicesChanged = Notification.Name("MUMacAudioInputDevicesChanged")

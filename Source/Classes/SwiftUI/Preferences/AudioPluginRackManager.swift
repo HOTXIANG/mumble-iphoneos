@@ -71,8 +71,7 @@ final class AudioPluginRackManager: ObservableObject {
     }
 
     func currentTrackKeys() -> [String] {
-        var keys: [String] = ["input", "remoteBus"]
-        keys.append(contentsOf: MKAudio.shared().copyRemoteSessionOrder().map { "remoteSession:\($0.intValue)" })
+        var keys: [String] = ["input", "masterBus1", "masterBus2"]
         for key in pluginChainByTrack.keys where !keys.contains(key) {
             keys.append(key)
         }
@@ -434,11 +433,12 @@ final class AudioPluginRackManager: ObservableObject {
 
         if trackKey == "input" {
             MKAudio.shared().setInputTrackAudioUnitChain(chain)
-        } else if trackKey == "remoteBus" {
+        } else if trackKey == "masterBus1" {
             MKAudio.shared().setRemoteBusAudioUnitChain(chain)
-        } else if let session = parseRemoteSessionID(from: trackKey) {
-            MKAudio.shared().setRemoteTrackAudioUnitChain(chain, forSession: UInt(session))
+        } else if trackKey == "masterBus2" {
+            MKAudio.shared().setRemoteBus2AudioUnitChain(chain)
         }
+        // remoteUser: tracks are synced via AudioPluginMixerView which holds the hash→session mapping
 
         NSLog("AudioPluginRackManager: Synced DSP chain for \(trackKey) with \(chain.count) processors")
     }
@@ -764,11 +764,6 @@ final class AudioPluginRackManager: ObservableObject {
     private func pluginSampleRate(for trackKey: String) -> Double {
         let sampleRate = MKAudio.shared().pluginSampleRate(forTrackKey: trackKey)
         return sampleRate > 0 ? Double(sampleRate) : 48_000
-    }
-
-    private func parseRemoteSessionID(from key: String) -> Int? {
-        guard key.hasPrefix("remoteSession:") else { return nil }
-        return Int(key.dropFirst("remoteSession:".count))
     }
 
     // MARK: - App Sandbox Migration

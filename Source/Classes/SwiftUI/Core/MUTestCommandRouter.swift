@@ -2225,10 +2225,10 @@ final class MUTestCommandRouter {
         if let trackKey = params["trackKey"] as? String, !trackKey.isEmpty {
             return trackKey
         }
-        if let session = intValue(params["session"]) {
-            return "remoteSession:\(session)"
+        if let userHash = params["userHash"] as? String, !userHash.isEmpty {
+            return "remoteUser:\(userHash)"
         }
-        throw TestCommandError("Missing 'trackKey' or 'session'")
+        throw TestCommandError("Missing 'trackKey' or 'userHash'")
     }
 
     private func requireTrackPlugin(_ params: [String: Any]) throws -> (trackKey: String, plugin: TrackPlugin) {

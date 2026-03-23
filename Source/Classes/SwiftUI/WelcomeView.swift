@@ -1220,8 +1220,22 @@ struct AppRootView: View {
                     .background(Color.clear)
             }
             .environmentObject(sidebarNavigationManager)
-            .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
             .background(Color.clear)
+            #if os(macOS)
+            .toolbar(removing: .sidebarToggle)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        NSApp.keyWindow?.firstResponder?.tryToPerform(
+                            #selector(NSSplitViewController.toggleSidebar(_:)), with: nil
+                        )
+                    } label: {
+                        Image(systemName: "sidebar.leading")
+                    }
+                }
+            }
+            #endif
+            .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
         } detail: {
             ZStack {
                 if appState.isConnected {
