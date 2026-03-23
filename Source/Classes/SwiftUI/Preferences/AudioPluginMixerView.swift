@@ -958,6 +958,22 @@ struct AudioPluginMixerView: View {
                             .frame(width: 40, alignment: .trailing)
                     }
                     .frame(width: 220, alignment: .trailing)
+
+                    // Sidechain source picker (only visible if AU has sidechain bus)
+                    if auHasSidechainInput(plugin: plugin, trackKey: selectedTrackKey) {
+                        HStack(spacing: 4) {
+                            Text("SC")
+                                .font(.caption2)
+                                .foregroundStyle(plugin.sidechainSourceKey != nil && !plugin.sidechainSourceKey!.isEmpty ? .orange : .secondary)
+                            Picker("", selection: sidechainBinding(for: plugin, trackKey: selectedTrackKey)) {
+                                ForEach(availableSidechainSources(), id: \.key) { source in
+                                    Text(source.label).tag(source.key)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(maxWidth: 120)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
@@ -1057,6 +1073,22 @@ struct AudioPluginMixerView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundColor(.secondary)
                         .frame(width: 34, alignment: .trailing)
+
+                    // Sidechain source picker (only visible if AU has sidechain bus)
+                    if auHasSidechainInput(plugin: plugin, trackKey: selectedTrackKey) {
+                        HStack(spacing: 4) {
+                            Text("SC")
+                                .font(.caption2)
+                                .foregroundStyle(plugin.sidechainSourceKey != nil && !plugin.sidechainSourceKey!.isEmpty ? .orange : .secondary)
+                            Picker("", selection: sidechainBinding(for: plugin, trackKey: selectedTrackKey)) {
+                                ForEach(availableSidechainSources(), id: \.key) { source in
+                                    Text(source.label).tag(source.key)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 100)
+                        }
+                    }
                 }
             }
         }
@@ -1530,6 +1562,52 @@ struct AudioPluginMixerView: View {
         return loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil
     }
 
+    // MARK: - Sidechain Support
+
+    /// Checks if the Audio Unit has sidechain input capability (more than 1 input bus)
+    private func auHasSidechainInput(plugin: TrackPlugin, trackKey: String) -> Bool {
+        let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
+        guard let au = loadedAudioUnits[loadedKey] else { return false }
+        return au.auAudioUnit.inputBusses.count > 1
+    }
+
+    /// Builds the list of available sidechain sources
+    private func availableSidechainSources() -> [(key: String, label: String)] {
+        var sources: [(key: String, label: String)] = [("", "None")]
+        sources.append(("input", "Input (Mic)"))
+
+        // Active users from ServerModelManager
+        if let manager = ServerModelManager.shared {
+            for item in manager.modelItems {
+                guard item.type == .user, let user = item.object as? MKUser else { continue }
+                let name = manager.displayName(for: user)
+                sources.append(("session:\(user.session())", name))
+            }
+        }
+
+        sources.append(("masterBus1", "Master Bus 1"))
+        sources.append(("masterBus2", "Master Bus 2"))
+        return sources
+    }
+
+    /// Creates a Binding for the sidechain source picker
+    private func sidechainBinding(for plugin: TrackPlugin, trackKey: String) -> Binding<String> {
+        Binding<String>(
+            get: { plugin.sidechainSourceKey ?? "" },
+            set: { newValue in
+                let key = newValue.isEmpty ? nil : newValue
+                self.setSidechainSource(key, forPlugin: plugin, trackKey: trackKey)
+            }
+        )
+    }
+
+    private func setSidechainSource(_ sourceKey: String?, forPlugin plugin: TrackPlugin, trackKey: String) {
+        mutateSelectedTrackChain { chain in
+            guard let index = chain.firstIndex(where: { $0.id == plugin.id }) else { return }
+            chain[index].sidechainSourceKey = sourceKey
+        }
+    }
+
     private func mutateSelectedTrackChain(_ update: (inout [TrackPlugin]) -> Void) {
         var chain = pluginChainByTrack[selectedTrackKey] ?? []
         update(&chain)
@@ -1584,7 +1662,8 @@ struct AudioPluginMixerView: View {
                     bypassed: false,
                     stageGain: 1.0,
                     autoLoad: true,
-                    savedParameterValues: [:]
+                    savedParameterValues: [:],
+                    sidechainSourceKey: nil
                 )
             )
             pluginOperationMessage = String(format: NSLocalizedString("Added %@", comment: ""), plugin.name)
@@ -1613,7 +1692,8 @@ struct AudioPluginMixerView: View {
                 bypassed: false,
                 stageGain: 1.0,
                 autoLoad: true,
-                savedParameterValues: [:]
+                savedParameterValues: [:],
+                sidechainSourceKey: nil
             )
 
             if slotIndex < chain.count {
