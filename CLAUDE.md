@@ -571,7 +571,7 @@ chore: 构建/工具变动
 
 **暂缓**：Audio Wizard、Global Shortcuts、Advanced Log Config、ContextAction、Voice Recording。
 
-### DAW / AU 插件专项说明（2026-03-16 最终更新）
+### DAW / AU 插件专项说明（2026-03-23 最终更新）
 
 1. **完整的 AU DSP 架构**：Input、Remote Bus、Remote Session 三轨道全部接入真实 AU 处理链
 2. **AU 配置优化**（关键修复）：
@@ -607,6 +607,15 @@ chore: 构建/工具变动
     - 电平监控（输入/输出 peak）
     - 格式信息（interleaved/non-interleaved, channels）
     - 参见 `AU_CHAIN_FIX.md` 和 `MIXER_TROUBLESHOOTING.md`
+10. **DAW-Style 侧链路由**（2026-03-23 新增）：
+    - **预分配缓冲池**：`MKSidechainSlot` C 语言 struct 存储 pre-fader 信号
+    - **原子 ping-pong 缓冲**：输入轨道信号跨输入/输出线程安全共享
+    - **侧链源类型**：`input`（本地麦克风）、`session:N`（远程用户）、`masterBus1/2`
+    - **每插件独立配置**：每个插件槽位独立选择侧链源
+    - **AVAudioEngine 接线**：AU `inputBusses[1]` 连接第二 `AVAudioSourceNode`
+    - **可视化拾取器**：AudioPluginMixerView 显示"SC"徽章（橙色=激活）
+    - **WebSocket 命令**：`plugin.setSidechain` / `plugin.getSidechain`
+    - **边缘情况**：源断开/静音时自动填充静音，自引用侧链允许
 
 ### 工作流程
 

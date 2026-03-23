@@ -320,6 +320,8 @@ websocat ws://localhost:54296
 | `plugin.savePreset` | `trackKey` 或 `session`, `pluginID` 或 `index`, `name` | 保存 preset |
 | `plugin.applyPreset` | `trackKey` 或 `session`, `pluginID` 或 `index`, `presetID` | 应用 preset |
 | `plugin.deletePreset` | `pluginIdentifier`(必需), `presetID`(必需) | 删除 preset |
+| `plugin.setSidechain` | `trackKey` 或 `session`, `pluginID` 或 `index`, `source`(必需) | 设置插件侧链源（`"none"` 清空） |
+| `plugin.getSidechain` | `trackKey` 或 `session`, `pluginID` 或 `index` | 获取插件侧链源配置 |
 
 ### server — 管理页数据
 
