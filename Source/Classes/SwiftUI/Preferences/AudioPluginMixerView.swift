@@ -1668,6 +1668,11 @@ struct AudioPluginMixerView: View {
             )
             pluginOperationMessage = String(format: NSLocalizedString("Added %@", comment: ""), plugin.name)
         }
+
+        // Sync DSP chain first to register the plugin in the chain
+        syncAudioUnitDSPChainForTrackKey(selectedTrackKey)
+
+        // Then attempt to load if needed (VST3 or AU with filesystem source)
         if (plugin.source == .audioUnit || plugin.source == .filesystem), let latest = selectedTrackChain.last {
             _ = await loadAudioUnit(for: latest)
         }
@@ -1707,6 +1712,9 @@ struct AudioPluginMixerView: View {
             insertedPluginID = newPlugin.id
             pluginOperationMessage = String(format: NSLocalizedString("Inserted %@", comment: ""), discovered.name)
         }
+
+        // Sync DSP chain first to register the plugin in the chain
+        syncAudioUnitDSPChainForTrackKey(selectedTrackKey)
 
         guard let insertedPluginID else { return }
         if let inserted = selectedTrackChain.first(where: { $0.id == insertedPluginID }),
