@@ -103,7 +103,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        return false
+        return true
     }
     
     func applicationDidBecomeActive(_ notification: Notification) {

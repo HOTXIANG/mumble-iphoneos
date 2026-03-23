@@ -312,24 +312,46 @@ extension Notification.Name {
 }
 
 /// 通过 NSViewRepresentable 直接设置 NSWindow.minSize，确保窗口无法缩小到指定尺寸以下
+/// 同时监听主窗口关闭事件，关闭主窗口时终止整个应用
 struct WindowMinSizeSetter: NSViewRepresentable {
     let minSize: NSSize
-    
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         // 延迟到下一个 run loop，此时 view 已经被加入到 window 中
         DispatchQueue.main.async {
             if let window = view.window {
                 window.minSize = minSize
+                // 监听主窗口关闭：关闭主窗口时直接退出应用（不管其他窗口是否还开着）
+                NotificationCenter.default.addObserver(
+                    context.coordinator,
+                    selector: #selector(Coordinator.mainWindowWillClose(_:)),
+                    name: NSWindow.willCloseNotification,
+                    object: window
+                )
             }
         }
         return view
     }
-    
+
     func updateNSView(_ nsView: NSView, context: Context) {
         // 每次更新时也确保 minSize 保持设置
         if let window = nsView.window {
             window.minSize = minSize
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject {
+        @objc func mainWindowWillClose(_ notification: Notification) {
+            NSApp.terminate(nil)
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
         }
     }
 }
