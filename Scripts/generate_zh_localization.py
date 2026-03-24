@@ -97,7 +97,7 @@ MANUAL_TRANSLATIONS = {
     "Right Control": "右 Control",
     "Left Command": "左 Command",
     "Right Command": "右 Command",
-    "Space": "空格",
+    "Space": "空间",
     "Return": "回车",
     "Tab": "制表键",
     "Inherit ACLs from parent": "从父频道继承 ACL",
@@ -156,8 +156,11 @@ MANUAL_TRANSLATIONS = {
     "Categories": "分类",
     "Developer": "开发者",
     "Enable Logging": "启用日志",
+    "Enable Weak Network Mode": "启用弱网模式",
     "Environment Variables": "环境变量",
     "Environment:": "环境变量：",
+    "Expected Packet Loss": "预期丢包率",
+    "Expected Packet Loss:": "预期丢包率：",
     "Export All Logs": "导出全部日志",
     "Export:": "导出：",
     "Favourite Servers": "服务器收藏夹",
@@ -165,6 +168,8 @@ MANUAL_TRANSLATIONS = {
     "Files:": "文件：",
     "Favourites": "收藏夹",
     "Global": "全局",
+    "Bitrate Range": "码率范围",
+    "Bitrate Range:": "码率范围：",
     "Join a Server": "加入服务器",
     "Choose a favourite server to connect quickly": "选择一个收藏的服务器以快速连接",
     "Your saved servers": "你保存的服务器",
@@ -237,6 +242,8 @@ MANUAL_TRANSLATIONS = {
     "No description set.": "未设置描述。",
     "Microphone:": "麦克风：",
     "Send": "发送",
+    "Jitter Buffer": "抖动缓冲",
+    "Jitter Buffer:": "抖动缓冲：",
     "Confirm Image": "确认图片",
     "High Quality Mode": "高质量模式",
     "Less Compressed": "低压缩",
@@ -276,6 +283,10 @@ MANUAL_TRANSLATIONS = {
     "Some texts will fully update after restarting the app.": "部分文本需要重启应用后才会完全更新。",
     "Local Volume: %d%%": "本地音量：%d%%",
     "Missing": "缺失",
+    "Adaptive Bitrate": "自适应码率",
+    "Adaptive Bitrate:": "自适应码率：",
+    "Enhanced PLC": "增强丢包补偿",
+    "Enhanced PLC:": "增强丢包补偿：",
     "Someone": "某人",
     "Status:": "状态：",
     "System": "系统",
@@ -490,6 +501,9 @@ MANUAL_TRANSLATIONS = {
     "Set Nickname": "设置昵称",
     "Social": "社交",
     "The server ban list is empty.": "服务器封禁列表为空。",
+    "Weak Network Mode": "弱网模式",
+    "Weak Network Mode:": "弱网模式：",
+    "Optimize audio quality for high latency or lossy network conditions. Enables FEC, adaptive bitrate, and enhanced packet loss concealment.": "针对高延迟或高丢包网络优化音质。启用 FEC、自适应码率和增强丢包补偿。",
     "Each category can be individually \nenabled/disabled and set to a log level.": "每个分类都可以单独启用/禁用，并设置日志级别。",
     "Each category can be individually enabled/disabled and set to a log level.": "每个分类都可以单独启用/禁用，并设置日志级别。",
     "Each category can be individually enabled/disabled and set to a log level. Only messages at or above the set level will be logged.": "每个分类都可以单独启用/禁用，并设置日志级别。只有达到或高于所设级别的消息才会被记录。",
@@ -498,6 +512,9 @@ MANUAL_TRANSLATIONS = {
     "Unlink All": "取消全部链接",
     "When file logging is off, logs are only available in Console.app.": "关闭文件日志后，日志只能在 Console.app 中查看。",
     "Write Logs to File": "将日志写入文件",
+    "%d ms": "%d 毫秒",
+    "%d%%": "%d%%",
+    "%d-%d kbps": "%d-%d kbps",
     # Plural-like placeholders
     "%lu\\nppl": "%lu\\n人",
     "%u\\nppl": "%u\\n人",
@@ -538,15 +555,20 @@ def parse_strings(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
     raw = path.read_bytes()
-    text = None
-    for encoding in ("utf-8", "utf-16", "utf-16-le", "utf-16-be"):
-        try:
-            text = raw.decode(encoding)
-            break
-        except UnicodeDecodeError:
-            continue
-    if text is None:
-        raise UnicodeDecodeError("parse_strings", raw, 0, 1, f"Unable to decode {path}")
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = raw.decode("utf-16")
+    elif b"\x00" in raw and raw.count(b"\x00") / max(len(raw), 1) > 0.2:
+        text = raw.decode("utf-16")
+    else:
+        text = None
+        for encoding in ("utf-8", "utf-16", "utf-16-le", "utf-16-be"):
+            try:
+                text = raw.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        if text is None:
+            raise UnicodeDecodeError("parse_strings", raw, 0, 1, f"Unable to decode {path}")
     return {
         strings_unescape(m.group(1)): strings_unescape(m.group(2))
         for m in KEY_VALUE_RE.finditer(text)

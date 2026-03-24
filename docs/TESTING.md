@@ -4,6 +4,282 @@
 
 Mumble 内嵌了一个 WebSocket 测试服务器（`MUTestServer`），仅在 `DEBUG` 构建中编译。AI agent 或自动化脚本可通过 WebSocket 连接到运行中的 App，远程执行所有功能并验证结果。
 
+## 弱网模式测试指南
+
+### 启用弱网模式
+
+```json
+// 1. 启用弱网模式
+{"action":"audio.setWeakNetworkMode","params":{"enabled":true}}
+
+// 2. 配置弱网参数
+{"action":"audio.setWeakNetworkConfig","params":{
+    "jitterBufferMs": 150,
+    "expectedLoss": 30,
+    "adaptiveBitrate": true,
+    "enhancedPLC": true,
+    "minBitrate": 16000,
+    "maxBitrate": 48000
+}}
+
+// 3. 查看弱网状态
+{"action":"audio.weakNetworkStatus"}
+```
+
+### 弱网测试流程
+
+1. **基线测试**（不启用弱网模式）
+   - 连接服务器
+   - 发送 `audio.status` 记录正常网络状态
+   - 使用 `log.stream` 监控音频日志
+
+2. **启用弱网模式**
+   - 发送 `audio.setWeakNetworkMode` 启用
+   - 发送 `audio.setWeakNetworkConfig` 配置参数
+   - 等待 5 秒让设置生效
+
+3. **模拟弱网条件**（需外部网络条件）
+   - 使用 Network Link Conditioner 或 Clumsy 模拟：
+     - 延迟：200-500ms
+     - 丢包：10-30%
+     - 抖动：±50ms
+
+4. **监控指标**
+   - `audio.weakNetworkStatus` - 每秒查询一次
+   - 记录 `metrics.qualityScore` 变化
+   - 记录 `metrics.packetLossPercent` 和 `metrics.effectiveLatencyMs`
+
+5. **语音质量验证**
+   - 发送 `audio.forceTransmit` 持续传输
+   - 监听输出音频是否连续无断音
+   - 检查 `log.entry` 中是否有 PLC 触发日志
+
+### 弱网模式预期效果
+
+| 指标 | 普通模式 | 弱网模式 |
+|------|---------|---------|
+| Jitter Buffer | 10-30ms | 100-300ms |
+| FEC | 关闭 | 开启 |
+| 丢包隐藏 | 基础 | 增强 + 平滑 |
+| 码率 | 固定 | 16-64kbps 自适应 |
+| 20% 丢包可懂度 | ~60% | ~85% |
+
+## Agent 上手速览
+
+如果你是第一次接手这个项目，按下面顺序做，不要直接盲点 UI：
+
+1. **先确认是 Debug App**
+   - `MUTestServer` 只在 `DEBUG` 构建存在。
+   - App 启动后控制台必须出现 `TestServer: listening on ws://localhost:54296`。
+2. **使用“长连接”而不是一次性请求**
+   - `log.stream`、`ui.changed`、`connection.*` 等事件都是**推送式**。
+   - `websocat -n1` 只适合一次性 query，不适合调试流程。
+3. **先开日志，再做复现**
+   - 先调用 `log.marker` 标记本轮调试开始。
+   - 再用 `log.stream` 打开相关分类的实时日志。
+4. **先读状态，再发动作**
+   - 调试前至少执行一次：`state.get`、`ui.get`。
+   - 如果是连接态问题，再加 `connection.status`。
+   - 如果是插件/混音器问题，再加 `plugin.listTracks`、`plugin.available`。
+5. **优先走语义命令，UI 命令只做导航**
+   - 例如：插件链操作优先 `plugin.add/remove/load/unload/...`
+   - 页面打开/关闭优先 `ui.open` / `ui.dismiss`
+   - 不要把“能直接语义操作”的事情退化成模拟点击。
+6. **每次改代码后重放同一组命令**
+   - 保持复现脚本最小化，修复前后跑同一套步骤，便于确认回归。
+
+## 推荐调试流程
+
+### 1. 建立长连接
+
+推荐用 Python 或 `websocat` 保持一个常驻连接，持续接收日志和事件。
+
+### 2. 打开日志流
+
+典型调试开始前先做：
+
+```json
+{"id":"m1","action":"log.marker","params":{"message":"debug session start","category":"General","level":"info"}}
+{"id":"l1","action":"log.setLevel","params":{"category":"Plugin","level":"debug"}}
+{"id":"l2","action":"log.setLevel","params":{"category":"Audio","level":"debug"}}
+{"id":"l3","action":"log.stream","params":{"enabled":true,"categories":["Plugin","Audio","UI","General"],"minimumLevel":"debug"}}
+```
+
+### 3. 读取起始快照
+
+```json
+{"id":"s1","action":"state.get"}
+{"id":"s2","action":"ui.get"}
+{"id":"s3","action":"connection.status"}
+```
+
+### 4. 导航到目标页面
+
+页面导航统一走 `ui.*`，例如：
+
+```json
+{"id":"u1","action":"ui.root"}
+{"id":"u2","action":"ui.open","params":{"target":"audioPluginMixer"}}
+{"id":"u3","action":"ui.open","params":{"target":"pluginBrowser","trackKey":"input"}}
+```
+
+### 5. 执行功能动作
+
+进入页面后，优先使用对应语义域：
+
+- 连接问题：`connection.*`
+- 音频问题：`audio.*`
+- 频道/消息问题：`channel.*` / `message.*`
+- 插件链问题：`plugin.*`
+- 设置问题：`settings.*`
+
+### 6. 取证
+
+每轮复现至少保留这几样：
+
+- `log.entry` 实时日志
+- `ui.changed` 页面状态流
+- `state.get` 或 `state.snapshot`
+- `log.recent`
+- `log.export`
+
+如果 App 崩溃，优先保留崩溃前最后一个 `log.marker` 到断连之间的日志窗口。
+
+## 命令选择原则
+
+### 语义命令优先
+
+如果已有语义命令，不要绕去做 UI 自动化。例如：
+
+- 添加插件：用 `plugin.add`，不要靠点插件浏览器列表
+- 发送消息：用 `message.send`，不要靠编辑框输入
+- 改设置：用 `settings.set`，不要靠设置页逐项点击
+
+### UI 命令只负责“进入场景”
+
+`ui.open` / `ui.dismiss` / `ui.back` / `ui.root` 的职责是：
+
+- 打开页面
+- 关闭 sheet / alert / overlay
+- 校正当前导航状态
+- 为语义命令创造前置环境
+
+### 什么时候必须看 `ui.changed`
+
+这些场景必须订阅 `ui.changed`：
+
+- 复现 sheet / alert / overlay 相关 bug
+- 需要确认当前页面是否真的切换成功
+- 同一动作可能弹多个系统/自定义面板
+- 崩溃发生在“打开页面”而不是“执行业务动作”时
+
+## 最小可用 Agent 脚本
+
+### Python 长连接模板
+
+下面这个脚本适合新 agent 直接复制后改命令序列：
+
+```python
+import asyncio
+import json
+import websockets
+
+WS_URL = "ws://localhost:54296"
+
+async def send(ws, action, params=None, req_id=None):
+    payload = {"action": action}
+    if req_id:
+        payload["id"] = req_id
+    if params:
+        payload["params"] = params
+    await ws.send(json.dumps(payload, ensure_ascii=False))
+
+async def main():
+    async with websockets.connect(WS_URL, max_size=8 * 1024 * 1024) as ws:
+        await send(ws, "log.marker", {"message": "agent debug start", "category": "General", "level": "info"}, "m1")
+        await send(ws, "log.stream", {"enabled": True, "categories": ["Plugin", "Audio", "UI"], "minimumLevel": "debug"}, "l1")
+        await send(ws, "state.get", req_id="s1")
+        await send(ws, "ui.open", {"target": "audioPluginMixer"}, "u1")
+
+        async for raw in ws:
+            msg = json.loads(raw)
+            print(json.dumps(msg, ensure_ascii=False, indent=2))
+
+asyncio.run(main())
+```
+
+### websocat 调试方式
+
+`websocat` 适合手工调试，但注意：
+
+- `websocat ws://localhost:54296`：适合**长连接**
+- `echo ... | websocat -n1 ...`：适合**单次查询**
+- 想看 `log.stream` / `ui.changed` 时，不要用 `-n1`
+
+## 高频调试模板
+
+### 页面 / 导航类问题
+
+1. `ui.root`
+2. `ui.get`
+3. `ui.open`
+4. 观察 `ui.changed`
+5. 若失败，再查 `log.recent` 中 `UI` / `General`
+
+### 连接类问题
+
+1. `log.stream` 打开 `Connection` / `Network` / `Audio`
+2. `connection.connect`
+3. 观察 `connection.*` 事件
+4. `connection.status`
+5. 如失败，`log.export`
+
+### 插件 / Mixer 类问题
+
+1. `ui.open target=audioPluginMixer`
+2. `plugin.listTracks`
+3. `plugin.available`
+4. `plugin.add` 或 `ui.open target=pluginBrowser`
+5. `plugin.load`
+6. `plugin.parameters`
+7. 同时订阅 `Plugin` / `Audio` / `UI` 日志
+
+### 设置 / 状态类问题
+
+1. `settings.get`
+2. `settings.set`
+3. `state.get`
+4. 必要时再 `ui.open` 到对应页面核对展示
+
+## 崩溃 / 卡死排查 SOP
+
+如果自动化过程中 App 崩溃、socket 断开或页面不再响应，按这个顺序取证：
+
+1. 在复现前写 `log.marker`
+2. 保持 websocket 长连接，持续接收 `log.entry`
+3. 记录最后一个成功响应和最后一个事件
+4. 断连后立即读取：
+   - `~/Library/Logs/DiagnosticReports/`
+   - `log.export` 导出的最近日志文件
+5. 重新启动 App 后，先执行：
+   - `state.get`
+   - `ui.get`
+   - `log.recent`
+6. 使用**同一组命令**重放，不要边试边改脚本
+
+## 常见误区
+
+- **误区：直接用一次性请求跑整套流程**
+  - 结果：拿不到 `log.stream` / `ui.changed`，问题不可观测
+- **误区：只会 `ui.open`，不会用语义命令**
+  - 结果：脚本脆弱、调试成本高、回归难复现
+- **误区：每次动作前不读状态**
+  - 结果：脚本在错误上下文里执行，出现假失败
+- **误区：日志分类开太少**
+  - 结果：只看到 UI 表象，看不到音频 / 插件 / 网络根因
+- **误区：不打 `log.marker`**
+  - 结果：多轮自动化日志混在一起，难以切片分析
+
 ## 架构
 
 ```

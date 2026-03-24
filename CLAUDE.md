@@ -409,6 +409,22 @@ websocat ws://localhost:54296
 {"action": "log.getConfig"}
 ```
 
+### Agent 调试 SOP
+
+新 agent 接手时，默认按这个顺序做：
+
+1. 确认 App 是 `DEBUG` 构建，并且控制台出现 `TestServer: listening on ws://localhost:54296`
+2. 建立**长连接**，不要一开始就用 `websocat -n1`
+3. 先发：
+   - `log.marker`
+   - `log.stream`
+   - `state.get`
+   - `ui.get`
+4. 用 `ui.*` 负责导航，用对应语义域负责真正动作
+5. 每次修复后重跑同一组命令，比较 `log.entry`、`ui.changed`、`state.get`
+
+详细调试模板、Python 长连接脚本、崩溃取证流程见 `docs/TESTING.md` 顶部新增的“Agent 上手速览 / 推荐调试流程 / 崩溃排查 SOP”。
+
 ### 14 个命令域（80+ 命令）
 
 | 域 | 关键命令 | 说明 |

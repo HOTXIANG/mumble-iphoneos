@@ -1878,17 +1878,21 @@ struct AudioPluginMixerView: View {
                     return nil
                 }
                 let mix = NSNumber(value: min(max(plugin.stageGain, 0.0), 1.0))
+                var dict: [String: Any] = [:]
+
                 switch processor {
                 case .audioUnit(let audioUnit):
-                    return [
-                        "audioUnit": audioUnit,
-                        "mix": mix
-                    ] as NSDictionary
+                    dict["audioUnit"] = audioUnit
+                    dict["mix"] = mix
+                    if let sidechainSource = plugin.sidechainSourceKey, !sidechainSource.isEmpty {
+                        dict["sidechainSource"] = sidechainSource
+                    }
+                    return dict as NSDictionary
                 case .vst3(let vst3Host):
-                    return [
-                        "vst3Host": vst3Host,
-                        "mix": mix
-                    ] as NSDictionary
+                    dict["vst3Host"] = vst3Host
+                    dict["mix"] = mix
+                    // VST3 sidechain not supported yet
+                    return dict as NSDictionary
                 }
             }
     }

@@ -232,8 +232,61 @@ final class MUTestCommandRouter {
                 ] as [String: Any]
             }
 
+        // MARK: Weak Network Commands (弱网命令)
+
+        case "weakNetworkStatus":
+            let audio = MKAudio.shared()
+            var result: [String: Any] = [
+                "weakNetworkModeEnabled": audio?.isWeakNetworkModeEnabled() ?? false
+            ]
+            if let metrics = audio?.copyNetworkQualityMetrics() {
+                result["metrics"] = metrics
+            }
+            if let stats = audio?.copyWeakNetworkStatistics() {
+                result["statistics"] = stats
+            }
+            return result
+
+        case "setWeakNetworkMode":
+            guard let enabled = boolValue(params["enabled"]) else {
+                throw TestCommandError("Missing 'enabled'")
+            }
+            MKAudio.shared()?.setWeakNetworkModeEnabled(enabled)
+            return ["weakNetworkModeEnabled": MKAudio.shared()?.isWeakNetworkModeEnabled() ?? enabled]
+
+        case "setWeakNetworkConfig":
+            var settings = MKAudioSettings()
+            MKAudio.shared()?.readAudioSettings(&settings)
+
+            if let jitterBufferMs = params["jitterBufferMs"] as? Int {
+                settings.weakNetworkJitterBufferMs = jitterBufferMs
+            }
+            if let expectedLoss = params["expectedLoss"] as? Int {
+                settings.weakNetworkExpectedLoss = expectedLoss
+            }
+            if let adaptiveBitrate = params["adaptiveBitrate"] as? Bool {
+                settings.weakNetworkAdaptiveBitrate = adaptiveBitrate
+            }
+            if let enhancedPLC = params["enhancedPLC"] as? Bool {
+                settings.weakNetworkEnhancedPLC = enhancedPLC
+            }
+            if let minBitrate = params["minBitrate"] as? Int {
+                settings.weakNetworkMinBitrate = minBitrate
+            }
+            if let maxBitrate = params["maxBitrate"] as? Int {
+                settings.weakNetworkMaxBitrate = maxBitrate
+            }
+
+            settings.enableWeakNetworkMode = true
+            MKAudio.shared()?.updateAudioSettings(&settings)
+            return ["status": "configured"]
+
+        case "resetWeakNetworkStats":
+            MKAudio.shared()?.resetWeakNetworkStatistics()
+            return ["status": "reset"]
+
         default:
-            throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, toggleMute, toggleDeafen, startTest, stopTest, restart, forceTransmit, status")
+            throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, toggleMute, toggleDeafen, startTest, stopTest, restart, forceTransmit, status, weakNetworkStatus, setWeakNetworkMode, setWeakNetworkConfig, resetWeakNetworkStats")
         }
     }
 
@@ -1436,7 +1489,7 @@ final class MUTestCommandRouter {
         return [
             "domains": [
                 "connection": ["connect", "disconnect", "acceptCert", "rejectCert", "status"],
-                "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "restart", "forceTransmit", "status"],
+                "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "restart", "forceTransmit", "status", "weakNetworkStatus", "setWeakNetworkMode", "setWeakNetworkConfig", "resetWeakNetworkStats"],
                 "channel": ["list", "info", "join", "create", "edit", "move", "remove", "listen", "unlisten", "toggleCollapse", "togglePinned", "toggleHidden", "requestACL", "getACL", "setACL", "setAccessTokens", "getAccessTokens", "submitPassword", "scanPermissions", "link", "unlink", "unlinkAll", "current"],
                 "message": ["send", "sendTree", "sendPrivate", "sendImage", "sendPrivateImage", "listImages", "exportImage", "previewImage", "history", "markRead"],
                 "plugin": ["listTracks", "get", "available", "scanPaths", "addScanPath", "removeScanPath", "buffer", "setBuffer", "add", "remove", "move", "setBypass", "setGain", "load", "unload", "parameters", "setParameter", "presets", "savePreset", "applyPreset", "deletePreset", "setSidechain", "getSidechain"],
