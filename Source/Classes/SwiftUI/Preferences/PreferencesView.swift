@@ -529,8 +529,8 @@ struct AdvancedAudioSettingsView: View {
     @AppStorage("WeakNetworkExpectedLoss") var weakNetworkExpectedLoss: Int = 20
     @AppStorage("WeakNetworkAdaptiveBitrate") var weakNetworkAdaptiveBitrate: Bool = true
     @AppStorage("WeakNetworkEnhancedPLC") var weakNetworkEnhancedPLC: Bool = true
-    @AppStorage("WeakNetworkMinBitrate") var weakNetworkMinBitrate: Int = 16000
-    @AppStorage("WeakNetworkMaxBitrate") var weakNetworkMaxBitrate: Int = 64000
+    @AppStorage("WeakNetworkMinBitrate") var weakNetworkMinBitrate: Int = 32000
+    @AppStorage("WeakNetworkMaxBitrate") var weakNetworkMaxBitrate: Int = 128000
 
 #if os(iOS)
     @State private var showPluginMixer: Bool = false
