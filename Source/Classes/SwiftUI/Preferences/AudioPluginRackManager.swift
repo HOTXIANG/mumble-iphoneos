@@ -25,6 +25,18 @@ struct AudioPluginPresetInfo: Identifiable, Codable, Hashable {
     var createdAt: Date
 }
 
+enum TrackSendMode: String, Codable, CaseIterable, Hashable {
+    case audio
+    case sidechain
+}
+
+struct TrackSendRoute: Codable, Hashable, Identifiable {
+    var destination: String
+    var mode: TrackSendMode
+
+    var id: String { destination }
+}
+
 /// Manages the audio plugin rack persistence and initialization.
 /// This manager loads saved plugin chains on app startup and syncs them to MKAudio.
 @MainActor
@@ -39,10 +51,12 @@ final class AudioPluginRackManager: ObservableObject {
     @Published var loadingPluginIDs: Set<String> = []
     @Published var lastLoadErrorByPlugin: [String: String] = [:]
     @Published var parameterStateByPlugin: [String: [AudioPluginParameterInfo]] = [:]
+    @Published var trackSendRoutesBySource: [String: [TrackSendRoute]] = [:]
 
     // MARK: - Persistence Keys
 
     private let pluginTrackChainsKey = "AudioPluginTrackChainsV1"
+    private let trackSendTargetsKey = "AudioPluginTrackSendsV1"
     private let pluginPresetsKey = "AudioPluginPresetsV1"
     private let pluginCustomScanPathsKey = "AudioPluginCustomScanPaths"
 
@@ -50,6 +64,7 @@ final class AudioPluginRackManager: ObservableObject {
 
     private init() {
         loadPluginChainState()
+        loadTrackSendState()
         #if os(macOS)
         clearVST3PluginsIfSandboxRestricted()
         #endif
@@ -68,12 +83,22 @@ final class AudioPluginRackManager: ObservableObject {
 
         // Load persisted plugins
         await loadPersistedAudioUnits()
+        syncAllTrackSendRouting()
     }
 
     func currentTrackKeys() -> [String] {
-        var keys: [String] = ["input", "masterBus1", "masterBus2"]
+        var keys: [String] = ["input", "sidetone"]
+        keys.append(contentsOf: ["masterBus1", "masterBus2"])
         for key in pluginChainByTrack.keys where !keys.contains(key) {
             keys.append(key)
+        }
+        for key in trackSendRoutesBySource.keys where !keys.contains(key) {
+            keys.append(key)
+        }
+        for routes in trackSendRoutesBySource.values {
+            for key in routes.map(\.destination) where !keys.contains(key) {
+                keys.append(key)
+            }
         }
         return keys
     }
@@ -215,9 +240,59 @@ final class AudioPluginRackManager: ObservableObject {
         syncDSPChain(for: trackKey)
     }
 
+    func sendRoutes(forSourceTrackKey trackKey: String) -> [TrackSendRoute] {
+        trackSendRoutesBySource[trackKey] ?? []
+    }
+
+    func sendMode(from sourceTrackKey: String, to destinationTrackKey: String) -> TrackSendMode? {
+        trackSendRoutesBySource[sourceTrackKey]?.first(where: { $0.destination == destinationTrackKey })?.mode
+    }
+
+    func incomingSendSources(forDestinationTrackKey trackKey: String, mode: TrackSendMode? = nil) -> [String] {
+        trackSendRoutesBySource
+            .compactMap { sourceKey, targets in
+                guard let route = targets.first(where: { $0.destination == trackKey }) else {
+                    return nil
+                }
+                if let mode, route.mode != mode {
+                    return nil
+                }
+                return sourceKey
+            }
+            .sorted()
+    }
+
+    func setSendMode(_ mode: TrackSendMode?, from sourceTrackKey: String, to destinationTrackKey: String) {
+        var routes = trackSendRoutesBySource[sourceTrackKey] ?? []
+        routes.removeAll { $0.destination == destinationTrackKey }
+        if let mode {
+            routes.append(TrackSendRoute(destination: destinationTrackKey, mode: mode))
+        }
+        setSendRoutes(routes, forSourceTrackKey: sourceTrackKey)
+    }
+
+    func setSendRoutes(_ routes: [TrackSendRoute], forSourceTrackKey trackKey: String) {
+        let normalizedRoutes = Self.normalizedRoutes(routes, forSourceTrackKey: trackKey)
+
+        if trackKey == "masterBus1" || trackKey == "masterBus2" || trackKey == "sidetone" {
+            trackSendRoutesBySource.removeValue(forKey: trackKey)
+        } else if normalizedRoutes.isEmpty {
+            trackSendRoutesBySource.removeValue(forKey: trackKey)
+        } else {
+            trackSendRoutesBySource[trackKey] = normalizedRoutes
+        }
+
+        saveTrackSendState()
+        syncAllTrackSendRouting()
+    }
+
     func parameters(trackKey: String, pluginID: String) -> [AudioPluginParameterInfo] {
         refreshParameters(for: pluginID, trackKey: trackKey)
         return parameterStateByPlugin[pluginID] ?? []
+    }
+
+    func setParameterValue(trackKey: String, pluginID: String, parameterID: UInt64, newValue: Float) {
+        setParameterValue(pluginID: pluginID, trackKey: trackKey, parameterID: parameterID, newValue: newValue)
     }
 
     func setParameter(trackKey: String, pluginID: String, parameterID: UInt64, value: Float) {
@@ -374,15 +449,36 @@ final class AudioPluginRackManager: ObservableObject {
             loadingPluginIDs.remove(plugin.id)
         }
 
-        // Load VST3 or AU
         if plugin.source == .filesystem {
             return await loadVST3Plugin(plugin, loadedKey: loadedKey, trackKey: trackKey)
-        } else {
-            // For AU, we need the description - skip for now if not available
-            // AU loading requires the AudioComponentDescription which needs scanning
-            NSLog("AudioPluginRackManager: AU plugin '\(plugin.name)' needs manual loading via mixer UI")
+        }
+
+        guard let description = parseAudioUnitDescription(from: plugin.identifier) else {
+            let message = NSLocalizedString("Failed to parse Audio Unit identifier", comment: "")
+            lastLoadErrorByPlugin[plugin.id] = message
             return false
         }
+
+        let message = await instantiateAudioUnitWithFallback(
+            description: description,
+            requiredChannels: channelCount(for: trackKey),
+            sampleRate: pluginSampleRate(for: trackKey),
+            loadedKey: loadedKey
+        )
+        if let message {
+            lastLoadErrorByPlugin[plugin.id] = message
+            return false
+        }
+
+        if let unit = loadedAudioUnits[loadedKey] {
+            rebuildParameterState(pluginID: plugin.id, unit: unit)
+        } else {
+            parameterStateByPlugin[plugin.id] = []
+        }
+        lastLoadErrorByPlugin[plugin.id] = nil
+        syncDSPChain(for: trackKey)
+        NSLog("AudioPluginRackManager: Loaded AU '\(plugin.name)' for track \(trackKey)")
+        return true
     }
 
     private func loadVST3Plugin(_ plugin: TrackPlugin, loadedKey: String, trackKey: String) async -> Bool {
@@ -437,11 +533,34 @@ final class AudioPluginRackManager: ObservableObject {
         }
     }
 
+    func syncAllTrackSendRouting() {
+        let destinations = currentTrackKeys()
+        for trackKey in destinations {
+            syncTrackSendRouting(for: trackKey)
+        }
+    }
+
+    func syncTrackSendRouting(for trackKey: String) {
+        let incomingSources = incomingSendSources(forDestinationTrackKey: trackKey, mode: .audio)
+
+        if trackKey == "input" {
+            MKAudio.shared().setInputTrackSendSourceKeys(incomingSources)
+        } else if trackKey == "sidetone" {
+            MKAudio.shared().setSidetoneTrackSendSourceKeys(incomingSources)
+        } else if trackKey == "masterBus1" {
+            MKAudio.shared().setRemoteBusSendSourceKeys(incomingSources)
+        } else if trackKey == "masterBus2" {
+            MKAudio.shared().setRemoteBus2SendSourceKeys(incomingSources)
+        }
+    }
+
     func syncDSPChain(for trackKey: String) {
         let chain = activeProcessorChain(for: trackKey)
 
         if trackKey == "input" {
             MKAudio.shared().setInputTrackAudioUnitChain(chain)
+        } else if trackKey == "sidetone" {
+            MKAudio.shared().setSidetoneAudioUnitChain(chain)
         } else if trackKey == "masterBus1" {
             MKAudio.shared().setRemoteBusAudioUnitChain(chain)
         } else if trackKey == "masterBus2" {
@@ -462,7 +581,9 @@ final class AudioPluginRackManager: ObservableObject {
 
                 if let audioUnit = loadedAudioUnits[loadedKey] {
                     var dict: [String: Any] = ["audioUnit": audioUnit, "mix": mix]
-                    if let sc = plugin.sidechainSourceKey, !sc.isEmpty {
+                    if let sc = plugin.sidechainSourceKey,
+                       !sc.isEmpty,
+                       (validSidechainSourceKeys(forDestinationTrackKey: key).contains(sc) || sc.hasPrefix("session:")) {
                         dict["sidechainSource"] = sc
                     }
                     return dict as NSDictionary
@@ -535,6 +656,144 @@ final class AudioPluginRackManager: ObservableObject {
         parameterStateByPlugin[plugin.id] = nil
         lastLoadErrorByPlugin[plugin.id] = nil
         syncDSPChain(for: trackKey)
+    }
+
+    private func loadTrackSendState() {
+        guard let raw = UserDefaults.standard.string(forKey: trackSendTargetsKey),
+              !raw.isEmpty,
+              let data = raw.data(using: .utf8) else {
+            trackSendRoutesBySource = [:]
+            return
+        }
+        if let decodedRoutes = try? JSONDecoder().decode([String: [TrackSendRoute]].self, from: data) {
+            trackSendRoutesBySource = normalizedTrackSendRoutes(decodedRoutes)
+            return
+        }
+        if let decodedTargets = try? JSONDecoder().decode([String: [String]].self, from: data) {
+            trackSendRoutesBySource = normalizedLegacyTrackSendTargets(decodedTargets)
+            return
+        }
+        trackSendRoutesBySource = [:]
+    }
+
+    private func saveTrackSendState() {
+        guard let data = try? JSONEncoder().encode(trackSendRoutesBySource),
+              let string = String(data: data, encoding: .utf8) else {
+            return
+        }
+        UserDefaults.standard.set(string, forKey: trackSendTargetsKey)
+    }
+
+    private func normalizedTrackSendRoutes(_ rawTargets: [String: [TrackSendRoute]]) -> [String: [TrackSendRoute]] {
+        func normalizeTrackKey(_ key: String) -> String {
+            switch key {
+            case "remoteBus":
+                return "masterBus1"
+            case "remoteBus2":
+                return "masterBus2"
+            default:
+                return key
+            }
+        }
+
+        var normalizedRoutes: [String: [TrackSendRoute]] = [:]
+        for (rawSource, rawDestinations) in rawTargets {
+            let source = normalizeTrackKey(rawSource)
+            guard !source.isEmpty,
+                  source != "masterBus1",
+                  source != "masterBus2",
+                  source != "sidetone",
+                  !source.hasPrefix("session:") else {
+                continue
+            }
+
+            let routes = rawDestinations.map {
+                TrackSendRoute(destination: normalizeTrackKey($0.destination), mode: $0.mode)
+            }
+            let cleaned = Self.normalizedRoutes(routes, forSourceTrackKey: source)
+            if !cleaned.isEmpty {
+                normalizedRoutes[source] = cleaned
+            }
+        }
+        return normalizedRoutes
+    }
+
+    private func normalizedLegacyTrackSendTargets(_ rawTargets: [String: [String]]) -> [String: [TrackSendRoute]] {
+        func normalizeTrackKey(_ key: String) -> String {
+            switch key {
+            case "remoteBus":
+                return "masterBus1"
+            case "remoteBus2":
+                return "masterBus2"
+            default:
+                return key
+            }
+        }
+
+        var normalized: [String: [TrackSendRoute]] = [:]
+        for (rawSource, rawDestinations) in rawTargets {
+            let source = normalizeTrackKey(rawSource)
+            guard !source.isEmpty,
+                  source != "masterBus1",
+                  source != "masterBus2",
+                  source != "sidetone",
+                  !source.hasPrefix("session:") else {
+                continue
+            }
+
+            let routes = rawDestinations.map {
+                TrackSendRoute(destination: normalizeTrackKey($0), mode: .audio)
+            }
+            let cleaned = Self.normalizedRoutes(routes, forSourceTrackKey: source)
+            if !cleaned.isEmpty {
+                normalized[source] = cleaned
+            }
+        }
+        return normalized
+    }
+
+    private static func isAllowedTrackSendRoute(source: String, destination: String) -> Bool {
+        if source == "masterBus1" || source == "masterBus2" || source == "sidetone" {
+            return false
+        }
+        if destination == "sidetone" {
+            return source == "input"
+        }
+        return true
+    }
+
+    private static func normalizedRoutes(_ routes: [TrackSendRoute], forSourceTrackKey source: String) -> [TrackSendRoute] {
+        var normalized: [TrackSendRoute] = []
+        var seenDestinations: Set<String> = []
+
+        for route in routes.reversed() {
+            let destination = route.destination
+            guard !destination.isEmpty,
+                  destination != source,
+                  !destination.hasPrefix("session:"),
+                  !seenDestinations.contains(destination),
+                  isAllowedTrackSendRoute(source: source, destination: destination) else {
+                continue
+            }
+            seenDestinations.insert(destination)
+            normalized.append(TrackSendRoute(destination: destination, mode: route.mode))
+        }
+
+        return normalized.reversed()
+    }
+
+    private func validSidechainSourceKeys(forDestinationTrackKey trackKey: String) -> Set<String> {
+        Set(incomingSendSources(forDestinationTrackKey: trackKey, mode: .sidechain).compactMap { sourceKey in
+            switch sourceKey {
+            case "input", "sidetone", "masterBus1", "masterBus2":
+                return sourceKey
+            default:
+                if sourceKey.hasPrefix("session:") {
+                    return sourceKey
+                }
+                return nil
+            }
+        })
     }
 
     private func refreshParameters(for pluginID: String, trackKey: String) {
@@ -768,9 +1027,28 @@ final class AudioPluginRackManager: ObservableObject {
         "\(trackKey):\(pluginID)"
     }
 
+    private func parseAudioUnitDescription(from identifier: String) -> AudioComponentDescription? {
+        guard identifier.hasPrefix("au:") else { return nil }
+        let remainder = String(identifier.dropFirst(3))
+        let parts = remainder.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
+        guard parts.count >= 3,
+              let type = UInt32(parts[0]),
+              let subType = UInt32(parts[1]),
+              let manufacturer = UInt32(parts[2]) else {
+            return nil
+        }
+        return AudioComponentDescription(
+            componentType: type,
+            componentSubType: subType,
+            componentManufacturer: manufacturer,
+            componentFlags: 0,
+            componentFlagsMask: 0
+        )
+    }
+
     private func channelCount(for trackKey: String) -> UInt {
-        if trackKey == "input" {
-            return 1
+        if trackKey == "input" || trackKey == "sidetone" {
+            return UserDefaults.standard.bool(forKey: "AudioStereoInput") ? 2 : 1
         }
         return 2
     }
@@ -778,6 +1056,143 @@ final class AudioPluginRackManager: ObservableObject {
     private func pluginSampleRate(for trackKey: String) -> Double {
         let sampleRate = MKAudio.shared().pluginSampleRate(forTrackKey: trackKey)
         return sampleRate > 0 ? Double(sampleRate) : 48_000
+    }
+
+    private func instantiateAudioUnitWithFallback(
+        description: AudioComponentDescription,
+        requiredChannels: UInt,
+        sampleRate: Double,
+        loadedKey: String
+    ) async -> String? {
+        if let error = await tryInstantiateWithChannels(
+            description: description,
+            channels: requiredChannels,
+            sampleRate: sampleRate,
+            loadedKey: loadedKey
+        ) {
+            if requiredChannels == 2 {
+                NSLog("AudioPluginRackManager: Failed to load AU with 2 channels, trying 1 channel")
+                if let monoError = await tryInstantiateWithChannels(
+                    description: description,
+                    channels: 1,
+                    sampleRate: sampleRate,
+                    loadedKey: loadedKey
+                ) {
+                    return monoError
+                }
+                return nil
+            }
+            return error
+        }
+        return nil
+    }
+
+    private func tryInstantiateWithChannels(
+        description: AudioComponentDescription,
+        channels: UInt,
+        sampleRate: Double,
+        loadedKey: String
+    ) async -> String? {
+        let effectiveSampleRate = sampleRate > 0 ? sampleRate : 48_000
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: effectiveSampleRate,
+            channels: AVAudioChannelCount(channels)
+        ) else {
+            return NSLocalizedString("Failed to create audio format", comment: "")
+        }
+
+#if os(macOS)
+        let (unitOut, errorOut) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
+            AVAudioUnit.instantiate(with: description, options: [.loadOutOfProcess]) { unit, error in
+                c.resume(returning: (unit, error as NSError?))
+            }
+        }
+        if let unitOut, configureAudioUnit(unitOut, format: format) {
+            loadedAudioUnits[loadedKey] = unitOut
+            return nil
+        }
+
+        let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
+            AVAudioUnit.instantiate(with: description, options: []) { unit, error in
+                c.resume(returning: (unit, error as NSError?))
+            }
+        }
+        if let unitDefault, configureAudioUnit(unitDefault, format: format) {
+            loadedAudioUnits[loadedKey] = unitDefault
+            return nil
+        }
+
+        let (unitIn, errorIn) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
+            AVAudioUnit.instantiate(with: description, options: [.loadInProcess]) { unit, error in
+                c.resume(returning: (unit, error as NSError?))
+            }
+        }
+        if let unitIn, configureAudioUnit(unitIn, format: format) {
+            loadedAudioUnits[loadedKey] = unitIn
+            return nil
+        }
+
+        let finalError = errorOut ?? errorDefault ?? errorIn
+        if finalError?.domain == NSOSStatusErrorDomain, finalError?.code == -3000 {
+            return NSLocalizedString("Audio Unit host compatibility error (-3000). Try another AU or restart audio engine.", comment: "")
+        }
+        return finalError?.localizedDescription ?? NSLocalizedString("Unknown error", comment: "")
+#else
+        let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
+            AVAudioUnit.instantiate(with: description, options: []) { unit, error in
+                c.resume(returning: (unit, error as NSError?))
+            }
+        }
+        if let unitDefault, configureAudioUnit(unitDefault, format: format) {
+            loadedAudioUnits[loadedKey] = unitDefault
+            return nil
+        }
+        return errorDefault?.localizedDescription ?? NSLocalizedString("Unknown error", comment: "")
+#endif
+    }
+
+    private func configuredAudioUnitFormat(for bus: AUAudioUnitBus?, fallback: AVAudioFormat) -> AVAudioFormat {
+        let reference = bus?.format
+        let interleaved = reference?.isInterleaved ?? fallback.isInterleaved
+        let commonFormat = reference?.commonFormat == .pcmFormatFloat32 ? reference!.commonFormat : AVAudioCommonFormat.pcmFormatFloat32
+        return AVAudioFormat(
+            commonFormat: commonFormat,
+            sampleRate: fallback.sampleRate,
+            channels: fallback.channelCount,
+            interleaved: interleaved
+        ) ?? fallback
+    }
+
+    private func configureAudioUnit(_ unit: AVAudioUnit, format: AVAudioFormat) -> Bool {
+        let au = unit.auAudioUnit
+
+        if let effect = unit as? AVAudioUnitEffect {
+            effect.bypass = false
+        } else if let timeEffect = unit as? AVAudioUnitTimeEffect {
+            timeEffect.bypass = false
+        }
+        au.shouldBypassEffect = false
+
+        if au.inputBusses.count > 0 {
+            do {
+                let inputFormat = configuredAudioUnitFormat(for: au.inputBusses[0], fallback: format)
+                try au.inputBusses[0].setFormat(inputFormat)
+            } catch {
+                return false
+            }
+        }
+
+        if au.outputBusses.count > 0 {
+            do {
+                let outputFormat = configuredAudioUnitFormat(for: au.outputBusses[0], fallback: format)
+                try au.outputBusses[0].setFormat(outputFormat)
+            } catch {
+                return false
+            }
+        }
+
+        au.maximumFramesToRender = max(au.maximumFramesToRender, 4096)
+        return true
     }
 
     // MARK: - App Sandbox Migration

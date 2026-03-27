@@ -40,7 +40,7 @@
     NSTimeInterval _lastAudioRestartTime;
 
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
-    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%f|%d|%d|%d|%d|%f|%d|%f",
+    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%f",
             [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
             [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
             [defaults doubleForKey:@"AudioVADBelow"],
@@ -50,8 +50,6 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
             [defaults doubleForKey:@"AudioMicBoost"],
             [defaults boolForKey:@"AudioStereoInput"],
             [defaults boolForKey:@"AudioStereoOutput"],
-            [defaults boolForKey:@"AudioSidetone"],
-            [defaults doubleForKey:@"AudioSidetoneVolume"],
             [defaults boolForKey:@"AudioSpeakerPhoneMode"],
             [defaults boolForKey:@"AudioOpusCodecForceCELTMode"],
             [defaults boolForKey:@"AudioMixerDebug"],

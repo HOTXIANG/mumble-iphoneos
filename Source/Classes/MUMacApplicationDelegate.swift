@@ -259,8 +259,6 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             String(defaults.double(forKey: "AudioMicBoost")),
             String(defaults.bool(forKey: "AudioStereoInput")),
             String(defaults.bool(forKey: "AudioStereoOutput")),
-            String(defaults.bool(forKey: "AudioSidetone")),
-            String(defaults.double(forKey: "AudioSidetoneVolume")),
             String(defaults.bool(forKey: "AudioSpeakerPhoneMode")),
             String(defaults.bool(forKey: "AudioOpusCodecForceCELTMode")),
             String(defaults.bool(forKey: "AudioMixerDebug")),

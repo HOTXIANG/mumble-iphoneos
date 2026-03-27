@@ -203,6 +203,7 @@ struct AudioPluginMixerView: View {
 
     private enum MixerTrack: Hashable {
         case input
+        case sidetone
         case masterBus1
         case masterBus2
         case remoteUser(String)  // keyed by userHash
@@ -210,6 +211,7 @@ struct AudioPluginMixerView: View {
         var shortLabel: String {
             switch self {
             case .input:     return "IN"
+            case .sidetone:  return "MON"
             case .masterBus1: return "M1"
             case .masterBus2: return "M2"
             case .remoteUser: return "USR"
@@ -272,6 +274,7 @@ struct AudioPluginMixerView: View {
     }
 
     @AppStorage("AudioPluginInputTrackGain") private var pluginInputTrackGain: Double = 1.0
+    @AppStorage("AudioSidetone") private var audioSidetoneEnabled: Bool = false
     @AppStorage("AudioPluginRemoteBusGain") private var pluginRemoteBusGain: Double = 1.0
     @AppStorage("AudioPluginRemoteBus2Gain") private var pluginRemoteBus2Gain: Double = 1.0
     @AppStorage("AudioPluginCustomScanPaths") private var pluginCustomScanPaths: String = ""
@@ -280,7 +283,6 @@ struct AudioPluginMixerView: View {
     @AppStorage("AudioPluginHostBufferFrames") private var pluginHostBufferFrames: Int = 256
     @AppStorage("AudioPluginCategoryOverridesV1") private var pluginCategoryOverridesData: String = ""
     @AppStorage("AudioPluginCustomCategoriesV1") private var pluginCustomCategoriesData: String = ""
-    @AppStorage("AudioPluginBusAssignmentsV1") private var busAssignmentsData: String = ""
 
     @State private var pluginRemoteTrackGain: Double = 1.0
     @State private var remoteTrackSettings: [Int: (enabled: Bool, gain: Double)] = [:]
@@ -288,12 +290,12 @@ struct AudioPluginMixerView: View {
     @State private var hearableUsers: [HearableUser] = []
     @State private var sessionToHash: [UInt: String] = [:]
     @State private var hashToSession: [String: UInt] = [:]
-    @State private var busAssignments: [String: Int] = [:]  // userHash -> 0(bus1) or 1(bus2)
     @State private var listeningChannelIds: Set<UInt> = []  // 本地维护的监听频道集合
     @State private var selectedTrack: MixerTrack = .input
     @State private var installedAudioUnits: [DiscoveredPlugin] = []
     @State private var scannedFilesystemPlugins: [DiscoveredPlugin] = []
     @State private var pluginChainByTrack: [String: [TrackPlugin]] = [:]
+    @State private var trackSendRoutesBySource: [String: [TrackSendRoute]] = [:]
     @State private var customScanPathInput: String = ""
     @State private var pluginOperationMessage: String = ""
     @State private var selectedPluginID: String? = nil
@@ -364,6 +366,11 @@ struct AudioPluginMixerView: View {
         .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { n in handleAutomationDismissUI(n) }
         .onChange(of: selectedTrack) { loadSelectedTrackState(); normalizeSelectedPluginSelection(); rebuildProcessorStateMachine() }
         .onChange(of: pluginInputTrackGain) { applyLivePreviewForTrackKey("input"); PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: audioSidetoneEnabled) {
+            syncInputToSidetoneSend()
+            syncAllTrackSendRouting()
+            PreferencesModel.shared.notifySettingsChanged()
+        }
         .onChange(of: pluginRemoteBusGain) { applyLivePreviewForTrackKey("masterBus1"); PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: pluginRemoteBus2Gain) { applyLivePreviewForTrackKey("masterBus2"); PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: pluginRemoteTrackGain) { applyRemoteTrackPreview(); PreferencesModel.shared.notifySettingsChanged() }
@@ -373,8 +380,9 @@ struct AudioPluginMixerView: View {
     private func performOnAppear() {
         AppState.shared.setAutomationCurrentScreen("audioPluginMixer")
         loadPluginChainState()
+        let adoptedLiveProcessorState = syncLoadedStateFromSharedRackManager()
         migrateRemoteBusToMasterBus1()
-        loadBusAssignments()
+        UserDefaults.standard.removeObject(forKey: "AudioPluginBusAssignmentsV1")
         loadPluginCategoryConfiguration()
         loadPluginPresets()
         initializeListeningChannels()
@@ -385,10 +393,47 @@ struct AudioPluginMixerView: View {
 #endif
         loadSelectedTrackState()
         normalizeSelectedPluginSelection()
-        applyLivePreviewForAllTracks()
+        if !adoptedLiveProcessorState {
+            applyLivePreviewForAllTracks()
+        }
         rebuildProcessorStateMachine()
         syncPluginHostBufferFrames()
+        syncAllTrackSendRouting()
         Task { await loadPersistedAudioUnits() }
+    }
+
+    @discardableResult
+    private func syncLoadedStateFromSharedRackManager() -> Bool {
+        let manager = AudioPluginRackManager.shared
+        let adoptedLiveProcessorState = !manager.loadedAudioUnits.isEmpty || !manager.loadedVST3Hosts.isEmpty
+
+        if !manager.pluginChainByTrack.isEmpty {
+            pluginChainByTrack = manager.pluginChainByTrack
+        }
+        trackSendRoutesBySource = manager.trackSendRoutesBySource
+        if !manager.loadedAudioUnits.isEmpty {
+            loadedAudioUnits = manager.loadedAudioUnits
+        }
+        if !manager.loadedVST3Hosts.isEmpty {
+            loadedVST3Hosts = manager.loadedVST3Hosts
+        }
+        if !manager.lastLoadErrorByPlugin.isEmpty {
+            lastLoadErrorByPlugin = manager.lastLoadErrorByPlugin
+        }
+        if !manager.parameterStateByPlugin.isEmpty {
+            parameterStateByPlugin = manager.parameterStateByPlugin.mapValues { infos in
+                infos.map {
+                    RuntimeParameter(
+                        id: $0.id,
+                        name: $0.name,
+                        minValue: $0.minValue,
+                        maxValue: $0.maxValue,
+                        value: $0.value
+                    )
+                }
+            }
+        }
+        return adoptedLiveProcessorState
     }
 
     private func handleAutomationOpenUI(_ notification: Notification) {
@@ -456,6 +501,8 @@ struct AudioPluginMixerView: View {
             switch trackKey {
             case "input":
                 selectedTrack = .input
+            case "sidetone":
+                selectedTrack = .sidetone
             case "masterBus1":
                 selectedTrack = .masterBus1
             case "masterBus2":
@@ -762,6 +809,7 @@ struct AudioPluginMixerView: View {
     private func trackTitle(_ track: MixerTrack) -> String {
         switch track {
         case .input: return NSLocalizedString("Input Track", comment: "")
+        case .sidetone: return NSLocalizedString("Sidetone Track", comment: "")
         case .masterBus1: return NSLocalizedString("Master Bus 1", comment: "")
         case .masterBus2: return NSLocalizedString("Master Bus 2", comment: "")
         case .remoteUser(let hash): return hearableUserName(for: hash)
@@ -771,11 +819,11 @@ struct AudioPluginMixerView: View {
     private func trackSubtitle(_ track: MixerTrack) -> String {
         switch track {
         case .input: return NSLocalizedString("Local microphone before encode", comment: "")
+        case .sidetone: return NSLocalizedString("Dedicated local monitor bus after input track", comment: "")
         case .masterBus1: return NSLocalizedString("Post-mix output bus 1", comment: "")
         case .masterBus2: return NSLocalizedString("Post-mix output bus 2", comment: "")
-        case .remoteUser(let hash):
-            let bus = (busAssignments[hash] ?? 0) == 0 ? "M1" : "M2"
-            return "→ \(bus)"
+        case .remoteUser:
+            return NSLocalizedString("Remote user post-decode track", comment: "")
         }
     }
 
@@ -801,18 +849,6 @@ struct AudioPluginMixerView: View {
             }
             Spacer(minLength: 0)
 
-            // 用户轨道显示总线路由选择器
-            if case .remoteUser(let hash) = track {
-                Picker("", selection: Binding(
-                    get: { busAssignments[hash] ?? 0 },
-                    set: { setBusAssignment(for: hash, busIndex: $0) }
-                )) {
-                    Text("M1").tag(0)
-                    Text("M2").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 80)
-            }
         }
         .contentShape(Rectangle())
     }
@@ -845,18 +881,6 @@ struct AudioPluginMixerView: View {
                 }
                 Spacer(minLength: 0)
 
-                // 用户轨道显示总线路由选择器
-                if case .remoteUser(let hash) = track {
-                    Picker("", selection: Binding(
-                        get: { busAssignments[hash] ?? 0 },
-                        set: { setBusAssignment(for: hash, busIndex: $0) }
-                    )) {
-                        Text("M1").tag(0)
-                        Text("M2").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 80)
-                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -870,10 +894,127 @@ struct AudioPluginMixerView: View {
     private func mixerWorkspace(compact: Bool) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                trackSendPanel(compact: compact)
                 pluginChainPanel(compact: compact)
             }
             .padding(compact ? 10 : 16)
         }
+    }
+
+    private func trackSendPanel(compact: Bool) -> some View {
+        let sourceTrackKey = selectedTrackKey
+        let destinations = availableSendDestinations(for: sourceTrackKey)
+
+        return VStack(alignment: .leading, spacing: compact ? 8 : 10) {
+            Text(NSLocalizedString("Track Sends", comment: ""))
+                .font(.headline)
+
+            if !trackCanSend(sourceTrackKey) {
+                Text(NSLocalizedString("Master tracks are receive-only and cannot send to other tracks.", comment: ""))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else if destinations.isEmpty {
+                Text(NSLocalizedString("No available destination tracks right now.", comment: ""))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text(NSLocalizedString("Choose which tracks should receive this track, and whether each send is audible audio or sidechain-only.", comment: ""))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: compact ? 132 : 170), spacing: 8)], spacing: 8) {
+                    ForEach(destinations, id: \.self) { destinationKey in
+                        sendTargetChip(for: destinationKey, sourceTrackKey: sourceTrackKey)
+                    }
+                }
+            }
+        }
+        .padding(compact ? 10 : 14)
+        .modifier(ClearGlassModifier(cornerRadius: 12))
+    }
+
+    private func sendTargetChip(for destinationKey: String, sourceTrackKey: String) -> some View {
+        let currentMode = trackSendMode(from: sourceTrackKey, to: destinationKey)
+        let enabled = currentMode != nil
+        let cycleBlocked = currentMode == nil && wouldCreateSendCycle(source: sourceTrackKey, destination: destinationKey)
+        let disableBlocked = wouldRemoveLastRequiredMasterSend(proposedMode: nil,
+                                                               from: sourceTrackKey,
+                                                               to: destinationKey)
+        let audioModeBlocked = wouldCreateSendCycle(source: sourceTrackKey, destination: destinationKey)
+        let sidechainModeBlocked = wouldRemoveLastRequiredMasterSend(proposedMode: .sidechain,
+                                                                     from: sourceTrackKey,
+                                                                     to: destinationKey)
+
+        return HStack(spacing: 8) {
+            Button {
+                setTrackSendEnabled(!enabled, from: sourceTrackKey, to: destinationKey)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(
+                            enabled
+                                ? Color.accentColor
+                                : ((cycleBlocked || disableBlocked) ? Color.secondary : Color.primary)
+                        )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(trackLabel(forTrackKey: destinationKey))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.leading)
+                        if enabled, let currentMode {
+                            Text(currentMode == .audio
+                                 ? NSLocalizedString("Audio Send", comment: "")
+                                 : NSLocalizedString("Sidechain Only", comment: ""))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        } else if cycleBlocked {
+                            Text(NSLocalizedString("Would create a send loop", comment: ""))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        } else if disableBlocked {
+                            Text(NSLocalizedString("At least one master bus must stay enabled", comment: ""))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled((!enabled && cycleBlocked) || (enabled && disableBlocked))
+
+            if enabled {
+                Menu {
+                    Button(NSLocalizedString("Audio Send", comment: "")) {
+                        setTrackSendMode(.audio, from: sourceTrackKey, to: destinationKey)
+                    }
+                    .disabled(audioModeBlocked)
+
+                    Button(NSLocalizedString("Sidechain Only", comment: "")) {
+                        setTrackSendMode(.sidechain, from: sourceTrackKey, to: destinationKey)
+                    }
+                    .disabled(sidechainModeBlocked)
+                } label: {
+                    Text(currentMode == .sidechain ? NSLocalizedString("SC", comment: "") : NSLocalizedString("AUD", comment: ""))
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(Color.secondary.opacity(0.12))
+                        )
+                }
+                .menuStyle(.borderlessButton)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(enabled ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.08))
+        )
     }
 
     private func pluginChainPanel(compact: Bool) -> some View {
@@ -966,7 +1107,7 @@ struct AudioPluginMixerView: View {
                                 .font(.caption2)
                                 .foregroundStyle(plugin.sidechainSourceKey != nil && !plugin.sidechainSourceKey!.isEmpty ? .orange : .secondary)
                             Picker("", selection: sidechainBinding(for: plugin, trackKey: selectedTrackKey)) {
-                                ForEach(availableSidechainSources(), id: \.key) { source in
+                                ForEach(availableSidechainSources(for: selectedTrackKey, selectedSourceKey: plugin.sidechainSourceKey), id: \.key) { source in
                                     Text(source.label).tag(source.key)
                                 }
                             }
@@ -1081,7 +1222,7 @@ struct AudioPluginMixerView: View {
                                 .font(.caption2)
                                 .foregroundStyle(plugin.sidechainSourceKey != nil && !plugin.sidechainSourceKey!.isEmpty ? .orange : .secondary)
                             Picker("", selection: sidechainBinding(for: plugin, trackKey: selectedTrackKey)) {
-                                ForEach(availableSidechainSources(), id: \.key) { source in
+                                ForEach(availableSidechainSources(for: selectedTrackKey, selectedSourceKey: plugin.sidechainSourceKey), id: \.key) { source in
                                     Text(source.label).tag(source.key)
                                 }
                             }
@@ -1373,7 +1514,7 @@ struct AudioPluginMixerView: View {
     }
 
     private var allTracks: [MixerTrack] {
-        var tracks: [MixerTrack] = [.input]
+        var tracks: [MixerTrack] = [.input, .sidetone]
         tracks.append(contentsOf: hearableUsers.map { .remoteUser($0.id) })
         tracks.append(.masterBus1)
         tracks.append(.masterBus2)
@@ -1526,6 +1667,8 @@ struct AudioPluginMixerView: View {
         switch selectedTrack {
         case .input:
             return "input"
+        case .sidetone:
+            return "sidetone"
         case .masterBus1:
             return "masterBus1"
         case .masterBus2:
@@ -1571,23 +1714,28 @@ struct AudioPluginMixerView: View {
         return au.auAudioUnit.inputBusses.count > 1
     }
 
-    /// Builds the list of available sidechain sources
-    private func availableSidechainSources() -> [(key: String, label: String)] {
+    /// Builds the list of available sidechain sources from incoming sidechain sends only.
+    private func availableSidechainSources(for trackKey: String, selectedSourceKey: String?) -> [(key: String, label: String)] {
         var sources: [(key: String, label: String)] = [("", "None")]
-        sources.append(("input", "Input (Mic)"))
 
-        // Active users from ServerModelManager
-        if let manager = ServerModelManager.shared {
-            for item in manager.modelItems {
-                guard item.type == .user, let user = item.object as? MKUser else { continue }
-                let name = manager.displayName(for: user)
-                sources.append(("session:\(user.session())", name))
-            }
+        for route in incomingSendRoutes(forDestinationTrackKey: trackKey, mode: .sidechain) {
+            guard let routingKey = routingSourceKey(forTrackKey: route.source) else { continue }
+            sources.append((routingKey, trackLabel(forTrackKey: route.source)))
         }
 
-        sources.append(("masterBus1", "Master Bus 1"))
-        sources.append(("masterBus2", "Master Bus 2"))
+        if let selectedSourceKey,
+           !selectedSourceKey.isEmpty,
+           !sources.contains(where: { $0.key == selectedSourceKey }) {
+            sources.append((selectedSourceKey, NSLocalizedString("Unavailable Sidechain Source", comment: "")))
+        }
+
         return sources
+    }
+
+    private func validSidechainRoutingKeys(forDestinationTrackKey trackKey: String) -> Set<String> {
+        Set(incomingSendRoutes(forDestinationTrackKey: trackKey, mode: .sidechain).compactMap { route in
+            routingSourceKey(forTrackKey: route.source)
+        })
     }
 
     /// Creates a Binding for the sidechain source picker
@@ -1602,6 +1750,12 @@ struct AudioPluginMixerView: View {
     }
 
     private func setSidechainSource(_ sourceKey: String?, forPlugin plugin: TrackPlugin, trackKey: String) {
+        if isSharedManagedTrack(trackKey) {
+            AudioPluginRackManager.shared.setSidechainSource(sourceKey, forPluginID: plugin.id, inTrack: trackKey)
+            refreshSharedManagedTrackState()
+            return
+        }
+
         mutateSelectedTrackChain { chain in
             guard let index = chain.firstIndex(where: { $0.id == plugin.id }) else { return }
             chain[index].sidechainSourceKey = sourceKey
@@ -1647,6 +1801,23 @@ struct AudioPluginMixerView: View {
     }
 
     private func addPlugin(_ plugin: DiscoveredPlugin) async {
+        if isSharedManagedTrack(selectedTrackKey) {
+            let discovery = AudioPluginDiscovery(
+                id: plugin.id,
+                name: plugin.name,
+                subtitle: plugin.subtitle,
+                source: plugin.source,
+                categorySeedText: plugin.categorySeedText
+            )
+            _ = await AudioPluginRackManager.shared.addPlugin(discovery, to: selectedTrackKey)
+            syncLoadedStateFromSharedRackManager()
+            loadSelectedTrackState()
+            normalizeSelectedPluginSelection()
+            rebuildProcessorStateMachine()
+            pluginOperationMessage = String(format: NSLocalizedString("Added %@", comment: ""), plugin.name)
+            return
+        }
+
         mutateSelectedTrackChain { chain in
             if chain.contains(where: { $0.identifier == plugin.id }) {
                 pluginOperationMessage = NSLocalizedString("Plugin already exists on this track", comment: "")
@@ -1681,7 +1852,41 @@ struct AudioPluginMixerView: View {
     private func assignPluginToSlot(_ discovered: DiscoveredPlugin, slotIndex: Int) async {
         guard slotIndex >= 0 else { return }
 
+        if isSharedManagedTrack(selectedTrackKey) {
+            let existing = pluginAtSlot(slotIndex)
+            let reopenEditorAfterReplace = existing.map { pluginEditorWasOpen(for: $0, trackKey: selectedTrackKey) } ?? false
+            if let existing {
+                closePluginEditorIfNeeded(for: existing, trackKey: selectedTrackKey)
+            }
+            let discovery = AudioPluginDiscovery(
+                id: discovered.id,
+                name: discovered.name,
+                subtitle: discovered.subtitle,
+                source: discovered.source,
+                categorySeedText: discovered.categorySeedText
+            )
+            if let existing {
+                _ = AudioPluginRackManager.shared.removePlugin(trackKey: selectedTrackKey, pluginID: existing.id)
+            }
+            let insertedPlugin = await AudioPluginRackManager.shared.addPlugin(discovery, to: selectedTrackKey, at: slotIndex)
+            syncLoadedStateFromSharedRackManager()
+            loadSelectedTrackState()
+            normalizeSelectedPluginSelection()
+            rebuildProcessorStateMachine()
+            pluginOperationMessage = String(format: NSLocalizedString("Inserted %@", comment: ""), discovered.name)
+            if reopenEditorAfterReplace {
+                await MainActor.run {
+                    openPluginEditor(for: insertedPlugin)
+                }
+            }
+            return
+        }
+
         let existing = pluginAtSlot(slotIndex)
+        let reopenEditorAfterReplace = existing.map { pluginEditorWasOpen(for: $0, trackKey: selectedTrackKey) } ?? false
+        if let existing {
+            closePluginEditorIfNeeded(for: existing, trackKey: selectedTrackKey)
+        }
         if let existing, pluginLoaded(for: existing.id) {
             unloadAudioUnit(for: existing)
         }
@@ -1720,11 +1925,23 @@ struct AudioPluginMixerView: View {
         if let inserted = selectedTrackChain.first(where: { $0.id == insertedPluginID }),
            inserted.source == .audioUnit || inserted.source == .filesystem {
             _ = await loadAudioUnit(for: inserted)
+            if reopenEditorAfterReplace {
+                await MainActor.run {
+                    openPluginEditor(for: inserted)
+                }
+            }
         }
     }
 
     private func clearPluginSlot(slotIndex: Int) {
         guard let existing = pluginAtSlot(slotIndex) else { return }
+        if isSharedManagedTrack(selectedTrackKey) {
+            if let removed = AudioPluginRackManager.shared.removePlugin(trackKey: selectedTrackKey, pluginID: existing.id) {
+                refreshSharedManagedTrackState()
+                pluginOperationMessage = String(format: NSLocalizedString("Removed %@", comment: ""), removed.name)
+            }
+            return
+        }
         if pluginLoaded(for: existing.id) {
             unloadAudioUnit(for: existing)
         }
@@ -1736,6 +1953,15 @@ struct AudioPluginMixerView: View {
     }
 
     private func removePlugin(at index: Int) {
+        if isSharedManagedTrack(selectedTrackKey) {
+            guard selectedTrackChain.indices.contains(index) else { return }
+            let plugin = selectedTrackChain[index]
+            if let removed = AudioPluginRackManager.shared.removePlugin(trackKey: selectedTrackKey, pluginID: plugin.id) {
+                refreshSharedManagedTrackState()
+                pluginOperationMessage = String(format: NSLocalizedString("Removed %@", comment: ""), removed.name)
+            }
+            return
+        }
         mutateSelectedTrackChain { chain in
             guard chain.indices.contains(index) else { return }
             let removed = chain.remove(at: index)
@@ -1744,6 +1970,16 @@ struct AudioPluginMixerView: View {
     }
 
     private func toggleBypass(at index: Int) {
+        if isSharedManagedTrack(selectedTrackKey) {
+            guard selectedTrackChain.indices.contains(index) else { return }
+            let plugin = selectedTrackChain[index]
+            let bypassed = !plugin.bypassed
+            AudioPluginRackManager.shared.setPluginBypassed(trackKey: selectedTrackKey, pluginID: plugin.id, bypassed: bypassed)
+            refreshSharedManagedTrackState()
+            let key = bypassed ? "Plugin bypassed" : "Plugin activated"
+            pluginOperationMessage = String(format: NSLocalizedString(key, comment: ""), plugin.name)
+            return
+        }
         mutateSelectedTrackChain { chain in
             guard chain.indices.contains(index) else { return }
             chain[index].bypassed.toggle()
@@ -1753,6 +1989,14 @@ struct AudioPluginMixerView: View {
     }
 
     private func movePluginUp(at index: Int) {
+        if isSharedManagedTrack(selectedTrackKey) {
+            guard index > 0, selectedTrackChain.indices.contains(index) else { return }
+            let plugin = selectedTrackChain[index]
+            AudioPluginRackManager.shared.movePlugin(trackKey: selectedTrackKey, pluginID: plugin.id, to: index - 1)
+            refreshSharedManagedTrackState()
+            pluginOperationMessage = NSLocalizedString("Plugin order updated", comment: "")
+            return
+        }
         mutateSelectedTrackChain { chain in
             guard index > 0, chain.indices.contains(index) else { return }
             chain.swapAt(index, index - 1)
@@ -1761,6 +2005,14 @@ struct AudioPluginMixerView: View {
     }
 
     private func movePluginDown(at index: Int) {
+        if isSharedManagedTrack(selectedTrackKey) {
+            guard selectedTrackChain.indices.contains(index), index < selectedTrackChain.count - 1 else { return }
+            let plugin = selectedTrackChain[index]
+            AudioPluginRackManager.shared.movePlugin(trackKey: selectedTrackKey, pluginID: plugin.id, to: index + 1)
+            refreshSharedManagedTrackState()
+            pluginOperationMessage = NSLocalizedString("Plugin order updated", comment: "")
+            return
+        }
         mutateSelectedTrackChain { chain in
             guard chain.indices.contains(index), index < chain.count - 1 else { return }
             chain.swapAt(index, index + 1)
@@ -1769,6 +2021,17 @@ struct AudioPluginMixerView: View {
     }
 
     private func updateMixLevel(at index: Int, newValue: Float) {
+        if isSharedManagedTrack(selectedTrackKey) {
+            guard selectedTrackChain.indices.contains(index) else { return }
+            let plugin = selectedTrackChain[index]
+            AudioPluginRackManager.shared.setPluginStageGain(
+                trackKey: selectedTrackKey,
+                pluginID: plugin.id,
+                stageGain: min(max(newValue, 0.0), 1.0)
+            )
+            refreshSharedManagedTrackState()
+            return
+        }
         mutateSelectedTrackChain { chain in
             guard chain.indices.contains(index) else { return }
             chain[index].stageGain = min(max(newValue, 0.0), 1.0)
@@ -1810,6 +2073,9 @@ struct AudioPluginMixerView: View {
         }
         if pluginChainByTrack["input"] == nil {
             applyLivePreviewForTrackKey("input")
+        }
+        if pluginChainByTrack["sidetone"] == nil {
+            applyLivePreviewForTrackKey("sidetone")
         }
         if pluginChainByTrack["masterBus1"] == nil {
             applyLivePreviewForTrackKey("masterBus1")
@@ -1871,6 +2137,7 @@ struct AudioPluginMixerView: View {
 
     private func activeProcessorChain(for key: String) -> [NSDictionary] {
         let chain = pluginChainByTrack[key] ?? []
+        let validSidechainKeys = validSidechainRoutingKeys(forDestinationTrackKey: key)
         return chain
             .filter { !$0.bypassed }
             .compactMap { plugin in
@@ -1884,7 +2151,9 @@ struct AudioPluginMixerView: View {
                 case .audioUnit(let audioUnit):
                     dict["audioUnit"] = audioUnit
                     dict["mix"] = mix
-                    if let sidechainSource = plugin.sidechainSourceKey, !sidechainSource.isEmpty {
+                    if let sidechainSource = plugin.sidechainSourceKey,
+                       !sidechainSource.isEmpty,
+                       validSidechainKeys.contains(sidechainSource) {
                         dict["sidechainSource"] = sidechainSource
                     }
                     return dict as NSDictionary
@@ -1904,6 +2173,10 @@ struct AudioPluginMixerView: View {
     private func syncAudioUnitDSPChainForTrackKey(_ key: String) {
         if key == "input" {
             MKAudio.shared().setInputTrackAudioUnitChain(activeProcessorChain(for: key))
+            return
+        }
+        if key == "sidetone" {
+            MKAudio.shared().setSidetoneAudioUnitChain(activeProcessorChain(for: key))
             return
         }
         if key == "masterBus1" {
@@ -1929,11 +2202,235 @@ struct AudioPluginMixerView: View {
         return String(key.dropFirst("remoteUser:".count))
     }
 
+    private func routingSourceKey(forTrackKey key: String) -> String? {
+        switch key {
+        case "input", "sidetone", "masterBus1", "masterBus2":
+            return key
+        default:
+            guard let hash = parseRemoteUserHash(from: key),
+                  let session = hashToSession[hash] else {
+                return nil
+            }
+            return "session:\(session)"
+        }
+    }
+
+    private func trackCanSend(_ trackKey: String) -> Bool {
+        trackKey != "masterBus1" && trackKey != "masterBus2" && trackKey != "sidetone"
+    }
+
+    private func isTrackSendEnabled(from sourceTrackKey: String, to destinationTrackKey: String) -> Bool {
+        trackSendMode(from: sourceTrackKey, to: destinationTrackKey) != nil
+    }
+
+    private func trackSendMode(from sourceTrackKey: String, to destinationTrackKey: String) -> TrackSendMode? {
+        trackSendRoutesBySource[sourceTrackKey]?.first(where: { $0.destination == destinationTrackKey })?.mode
+    }
+
+    private func incomingSendRoutes(forDestinationTrackKey trackKey: String,
+                                    mode: TrackSendMode? = nil) -> [(source: String, mode: TrackSendMode)] {
+        trackSendRoutesBySource
+            .compactMap { sourceKey, routes in
+                guard let route = routes.first(where: { $0.destination == trackKey }) else {
+                    return nil
+                }
+                if let mode, route.mode != mode {
+                    return nil
+                }
+                return (source: sourceKey, mode: route.mode)
+            }
+            .sorted { lhs, rhs in
+                trackLabel(forTrackKey: lhs.source).localizedCaseInsensitiveCompare(trackLabel(forTrackKey: rhs.source)) == .orderedAscending
+            }
+    }
+
+    private func availableSendDestinations(for sourceTrackKey: String) -> [String] {
+        guard trackCanSend(sourceTrackKey) else { return [] }
+        return allTrackKeys().filter {
+            $0 != sourceTrackKey && isAllowedTrackSendRoute(from: sourceTrackKey, to: $0)
+        }
+    }
+
+    private func trackLabel(forTrackKey trackKey: String) -> String {
+        switch trackKey {
+        case "input":
+            return NSLocalizedString("Input Track", comment: "")
+        case "sidetone":
+            return NSLocalizedString("Sidetone Track", comment: "")
+        case "masterBus1":
+            return NSLocalizedString("Master Bus 1", comment: "")
+        case "masterBus2":
+            return NSLocalizedString("Master Bus 2", comment: "")
+        default:
+            if let hash = parseRemoteUserHash(from: trackKey) {
+                return hearableUserName(for: hash)
+            }
+            return trackKey
+        }
+    }
+
+    private func wouldCreateSendCycle(source sourceTrackKey: String, destination destinationTrackKey: String) -> Bool {
+        guard sourceTrackKey != destinationTrackKey else { return true }
+
+        var visited: Set<String> = []
+        var pending: [String] = [destinationTrackKey]
+        while let current = pending.popLast() {
+            if current == sourceTrackKey {
+                return true
+            }
+            if !visited.insert(current).inserted {
+                continue
+            }
+            let audioTargets = (trackSendRoutesBySource[current] ?? [])
+                .filter { $0.mode == .audio }
+                .map(\.destination)
+            pending.append(contentsOf: audioTargets)
+        }
+        return false
+    }
+
+    private func requiresMasterSendSelection(for trackKey: String) -> Bool {
+        trackKey.hasPrefix("remoteUser:")
+    }
+
+    private func isMasterBusTrackKey(_ trackKey: String) -> Bool {
+        trackKey == "masterBus1" || trackKey == "masterBus2"
+    }
+
+    private func isAllowedTrackSendRoute(from sourceTrackKey: String, to destinationTrackKey: String) -> Bool {
+        if sourceTrackKey == "sidetone" {
+            return false
+        }
+        if destinationTrackKey == "sidetone" {
+            return sourceTrackKey == "input"
+        }
+        return true
+    }
+
+    private func wouldRemoveLastRequiredMasterSend(proposedMode: TrackSendMode?,
+                                                   from sourceTrackKey: String,
+                                                   to destinationTrackKey: String) -> Bool {
+        guard requiresMasterSendSelection(for: sourceTrackKey),
+              isMasterBusTrackKey(destinationTrackKey) else {
+            return false
+        }
+
+        let currentMode = trackSendMode(from: sourceTrackKey, to: destinationTrackKey)
+        guard currentMode == .audio, proposedMode != .audio else {
+            return false
+        }
+
+        let currentMasterTargets = (trackSendRoutesBySource[sourceTrackKey] ?? [])
+            .filter { $0.mode == .audio && isMasterBusTrackKey($0.destination) }
+            .map(\.destination)
+        return currentMasterTargets.count <= 1 && currentMasterTargets.contains(destinationTrackKey)
+    }
+
+    private func setTrackSendEnabled(_ enabled: Bool, from sourceTrackKey: String, to destinationTrackKey: String) {
+        let targetMode: TrackSendMode? = enabled ? (trackSendMode(from: sourceTrackKey, to: destinationTrackKey) ?? .audio) : nil
+        setTrackSendMode(targetMode, from: sourceTrackKey, to: destinationTrackKey)
+    }
+
+    private func setTrackSendMode(_ mode: TrackSendMode?, from sourceTrackKey: String, to destinationTrackKey: String) {
+        guard trackCanSend(sourceTrackKey),
+              sourceTrackKey != destinationTrackKey,
+              isAllowedTrackSendRoute(from: sourceTrackKey, to: destinationTrackKey) else { return }
+        if mode == .audio && wouldCreateSendCycle(source: sourceTrackKey, destination: destinationTrackKey) {
+            return
+        }
+        if wouldRemoveLastRequiredMasterSend(proposedMode: mode,
+                                             from: sourceTrackKey,
+                                             to: destinationTrackKey) {
+            return
+        }
+
+        AudioPluginRackManager.shared.setSendMode(mode, from: sourceTrackKey, to: destinationTrackKey)
+        trackSendRoutesBySource = AudioPluginRackManager.shared.trackSendRoutesBySource
+        syncSidetoneToggleFromTrackSends(sourceTrackKey: sourceTrackKey)
+        syncAllTrackSendRouting()
+    }
+
+    private func syncTrackSendRoutingForTrackKey(_ key: String) {
+        let incomingSources = incomingSendRoutes(forDestinationTrackKey: key, mode: .audio)
+            .map(\.source)
+            .compactMap(routingSourceKey(forTrackKey:))
+
+        if key == "input" {
+            MKAudio.shared().setInputTrackSendSourceKeys(incomingSources)
+            return
+        }
+        if key == "sidetone" {
+            MKAudio.shared().setSidetoneTrackSendSourceKeys(incomingSources)
+            return
+        }
+        if key == "masterBus1" {
+            MKAudio.shared().setRemoteBusSendSourceKeys(incomingSources)
+            return
+        }
+        if key == "masterBus2" {
+            MKAudio.shared().setRemoteBus2SendSourceKeys(incomingSources)
+            return
+        }
+        if let hash = parseRemoteUserHash(from: key), let session = hashToSession[hash] {
+            MKAudio.shared().setRemoteTrackSendSourceKeys(incomingSources, forSession: session)
+        }
+    }
+
+    private func syncAllTrackSendRouting() {
+        for key in allTrackKeys() {
+            syncTrackSendRoutingForTrackKey(key)
+        }
+        syncInputTrackOutputRoutingMode()
+        syncRemoteTrackOutputRoutingMode()
+    }
+
+    private func syncInputTrackOutputRoutingMode() {
+        let targets = (trackSendRoutesBySource["input"] ?? [])
+            .filter { $0.mode == .audio }
+            .map(\.destination)
+        var sendBusMask: UInt = 0
+        if targets.contains("masterBus1") {
+            sendBusMask |= 0x1
+        }
+        if targets.contains("masterBus2") {
+            sendBusMask |= 0x2
+        }
+        MKAudio.shared().setInputTrackSendBusMask(sendBusMask)
+    }
+
+    private func syncRemoteTrackOutputRoutingMode() {
+        for user in hearableUsers {
+            let sourceKey = "remoteUser:\(user.id)"
+            let targets = (trackSendRoutesBySource[sourceKey] ?? [])
+                .filter { $0.mode == .audio }
+                .map(\.destination)
+            let usesTrackSendRouting = !targets.isEmpty
+            var sendBusMask: UInt = 0
+            if targets.contains("masterBus1") {
+                sendBusMask |= 0x1
+            }
+            if targets.contains("masterBus2") {
+                sendBusMask |= 0x2
+            }
+            MKAudio.shared().setRemoteTrackUsesSendRouting(usesTrackSendRouting, forSession: user.session)
+            MKAudio.shared().setRemoteTrackSendBusMask(sendBusMask, forSession: user.session)
+            MKAudio.shared().setBusAssignment(0, forSession: user.session)
+        }
+    }
+
     private func allTrackKeys() -> [String] {
-        var keys: [String] = ["input", "masterBus1", "masterBus2"]
+        var keys: [String] = ["input", "sidetone", "masterBus1", "masterBus2"]
         keys.append(contentsOf: hearableUsers.map { "remoteUser:\($0.id)" })
         for key in pluginChainByTrack.keys where !keys.contains(key) {
             keys.append(key)
+        }
+        for key in trackSendRoutesBySource.keys where !keys.contains(key) {
+            keys.append(key)
+        }
+        for routes in trackSendRoutesBySource.values {
+            for key in routes.map(\.destination) where !keys.contains(key) {
+                keys.append(key)
+            }
         }
         return keys
     }
@@ -2393,6 +2890,26 @@ struct AudioPluginMixerView: View {
         }
     }
 
+    private func pluginEditorWasOpen(for plugin: TrackPlugin, trackKey: String) -> Bool {
+#if os(iOS)
+        showingPluginEditor && selectedPluginID == plugin.id
+#else
+        PluginEditorWindowController.shared.isShowing(pluginKey: "\(trackKey):\(plugin.id)")
+#endif
+    }
+
+    private func closePluginEditorIfNeeded(for plugin: TrackPlugin, trackKey: String) {
+#if os(iOS)
+        if showingPluginEditor && selectedPluginID == plugin.id {
+            showingPluginEditor = false
+            pluginEditorController = nil
+            pluginEditorTitle = ""
+        }
+#else
+        PluginEditorWindowController.shared.close(pluginKey: "\(trackKey):\(plugin.id)")
+#endif
+    }
+
     private func unloadAudioUnit(for plugin: TrackPlugin) {
         if let trackKey = self.trackKey(containingPluginID: plugin.id) {
 #if os(macOS)
@@ -2427,8 +2944,8 @@ struct AudioPluginMixerView: View {
     private func channelCount(for trackKey: String, pluginDescription: AudioComponentDescription? = nil) -> UInt {
         _ = pluginDescription
 
-        if trackKey == "input" {
-            return 1  // Mono for input track
+        if trackKey == "input" || trackKey == "sidetone" {
+            return UserDefaults.standard.bool(forKey: "AudioStereoInput") ? 2 : 1
         }
         if trackKey == "masterBus1" || trackKey == "masterBus2" || trackKey.hasPrefix("remoteUser:") {
             return 2  // Stereo for master buses and user tracks
@@ -2443,6 +2960,36 @@ struct AudioPluginMixerView: View {
 
     private func loadedAudioUnitKey(trackKey: String, pluginID: String) -> String {
         return "\(trackKey):\(pluginID)"
+    }
+
+    private func isSharedManagedTrack(_ trackKey: String) -> Bool {
+        !trackKey.hasPrefix("remoteUser:")
+    }
+
+    private func syncInputToSidetoneSend() {
+        var routes = AudioPluginRackManager.shared.sendRoutes(forSourceTrackKey: "input")
+            .filter { $0.destination != "sidetone" }
+        if audioSidetoneEnabled {
+            routes.append(TrackSendRoute(destination: "sidetone", mode: .audio))
+        }
+        AudioPluginRackManager.shared.setSendRoutes(routes, forSourceTrackKey: "input")
+        trackSendRoutesBySource = AudioPluginRackManager.shared.trackSendRoutesBySource
+    }
+
+    private func syncSidetoneToggleFromTrackSends(sourceTrackKey: String) {
+        guard sourceTrackKey == "input" else { return }
+        let hasSidetoneSend = trackSendMode(from: "input", to: "sidetone") == .audio
+        if audioSidetoneEnabled != hasSidetoneSend {
+            audioSidetoneEnabled = hasSidetoneSend
+        }
+    }
+
+    private func refreshSharedManagedTrackState() {
+        syncLoadedStateFromSharedRackManager()
+        loadSelectedTrackState()
+        normalizeSelectedPluginSelection()
+        rebuildProcessorStateMachine()
+        syncAllTrackSendRouting()
     }
 
     private func parseAudioUnitDescription(from identifier: String) -> AudioComponentDescription? {
@@ -2561,6 +3108,17 @@ struct AudioPluginMixerView: View {
     }
 
     private func setParameterValue(pluginID: String, trackKey: String, parameterID: UInt64, newValue: Float) {
+        if isSharedManagedTrack(trackKey) {
+            AudioPluginRackManager.shared.setParameterValue(
+                trackKey: trackKey,
+                pluginID: pluginID,
+                parameterID: parameterID,
+                newValue: newValue
+            )
+            refreshSharedManagedTrackState()
+            return
+        }
+
         let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
         if let unit = loadedAudioUnits[loadedKey],
            let parameter = unit.auAudioUnit.parameterTree?.allParameters.first(where: { $0.address == parameterID }) {
@@ -2777,11 +3335,18 @@ struct AudioPluginMixerView: View {
 
     /// 从 ServerModel 获取所有可听见的用户（同频道 + 监听频道），构建 session↔hash 映射
     private func refreshHearableUsers() {
+        let previousSessions = Set(sessionToHash.keys)
+
         guard let serverModel = MUConnectionController.shared()?.serverModel,
               let connectedUser = serverModel.connectedUser() else {
             hearableUsers = []
             sessionToHash = [:]
             hashToSession = [:]
+            for session in previousSessions {
+                MKAudio.shared().setRemoteTrackUsesSendRouting(false, forSession: session)
+                MKAudio.shared().setRemoteTrackSendBusMask(0, forSession: session)
+                MKAudio.shared().setBusAssignment(0, forSession: session)
+            }
             return
         }
 
@@ -2822,6 +3387,13 @@ struct AudioPluginMixerView: View {
         sessionToHash = newSessionToHash
         hashToSession = newHashToSession
 
+        let removedSessions = previousSessions.subtracting(newSessionToHash.keys)
+        for session in removedSessions {
+            MKAudio.shared().setRemoteTrackUsesSendRouting(false, forSession: session)
+            MKAudio.shared().setRemoteTrackSendBusMask(0, forSession: session)
+            MKAudio.shared().setBusAssignment(0, forSession: session)
+        }
+
         // 如果当前选中的用户轨已不在列表中，回到 input
         if case .remoteUser(let hash) = selectedTrack {
             if !users.contains(where: { $0.id == hash }) {
@@ -2829,8 +3401,57 @@ struct AudioPluginMixerView: View {
             }
         }
 
-        // 同步总线路由到 MKAudio
-        syncBusAssignments()
+        reconcileTrackSendDefaults()
+        syncAllTrackSendRouting()
+    }
+
+    private func reconcileTrackSendDefaults() {
+        let manager = AudioPluginRackManager.shared
+        let activeRemoteTrackKeys = Set(hearableUsers.map { "remoteUser:\($0.id)" })
+        var didChange = false
+
+        for (sourceKey, routes) in manager.trackSendRoutesBySource {
+            let sourceIsRemoteTrack = sourceKey.hasPrefix("remoteUser:")
+            if sourceKey == "sidetone" || (sourceIsRemoteTrack && !activeRemoteTrackKeys.contains(sourceKey)) {
+                manager.setSendRoutes([], forSourceTrackKey: sourceKey)
+                didChange = true
+                continue
+            }
+
+            let filteredRoutes = routes.filter { route in
+                ((!route.destination.hasPrefix("remoteUser:")) || activeRemoteTrackKeys.contains(route.destination)) &&
+                (route.destination != "sidetone" || (sourceKey == "input" && route.mode == .audio))
+            }
+            if filteredRoutes != routes {
+                manager.setSendRoutes(filteredRoutes, forSourceTrackKey: sourceKey)
+                didChange = true
+            }
+        }
+
+        let currentInputRoutes = manager.sendRoutes(forSourceTrackKey: "input")
+        let hasSidetoneSend = currentInputRoutes.contains { $0.destination == "sidetone" && $0.mode == .audio }
+        if audioSidetoneEnabled != hasSidetoneSend {
+            var normalizedInputRoutes = currentInputRoutes.filter { $0.destination != "sidetone" }
+            if audioSidetoneEnabled {
+                normalizedInputRoutes.append(TrackSendRoute(destination: "sidetone", mode: .audio))
+            }
+            manager.setSendRoutes(normalizedInputRoutes, forSourceTrackKey: "input")
+            didChange = true
+        }
+
+        for user in hearableUsers {
+            let sourceKey = "remoteUser:\(user.id)"
+            let hasMasterAudioRoute = manager.sendRoutes(forSourceTrackKey: sourceKey)
+                .contains { $0.mode == .audio && $0.destination == "masterBus1" }
+            if !hasMasterAudioRoute && manager.sendRoutes(forSourceTrackKey: sourceKey).isEmpty {
+                manager.setSendRoutes([TrackSendRoute(destination: "masterBus1", mode: .audio)], forSourceTrackKey: sourceKey)
+                didChange = true
+            }
+        }
+
+        if didChange {
+            trackSendRoutesBySource = manager.trackSendRoutesBySource
+        }
     }
 
     private func applyRemoteTrackPreview() {
@@ -2841,39 +3462,6 @@ struct AudioPluginMixerView: View {
         let enabled = hasActivePlugins || abs(gain - 1.0) > 0.0001
         remoteTrackSettings[Int(session)] = (enabled: enabled, gain: pluginRemoteTrackGain)
         MKAudio.shared().setRemoteTrackPreviewGain(gain, enabled: enabled, forSession: session)
-    }
-
-    // MARK: - Bus Assignment
-
-    private func loadBusAssignments() {
-        guard !busAssignmentsData.isEmpty,
-              let data = busAssignmentsData.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String: Int].self, from: data) else {
-            busAssignments = [:]
-            return
-        }
-        busAssignments = decoded
-    }
-
-    private func saveBusAssignments() {
-        guard let data = try? JSONEncoder().encode(busAssignments),
-              let string = String(data: data, encoding: .utf8) else { return }
-        busAssignmentsData = string
-    }
-
-    private func syncBusAssignments() {
-        for user in hearableUsers {
-            let busIndex = busAssignments[user.id] ?? 0
-            MKAudio.shared().setBusAssignment(UInt(busIndex), forSession: user.session)
-        }
-    }
-
-    private func setBusAssignment(for userHash: String, busIndex: Int) {
-        busAssignments[userHash] = busIndex
-        saveBusAssignments()
-        if let session = hashToSession[userHash] {
-            MKAudio.shared().setBusAssignment(UInt(busIndex), forSession: session)
-        }
     }
 
     private func hearableUserName(for hash: String) -> String {
@@ -3252,6 +3840,10 @@ final class PluginEditorWindowController: NSObject {
             sizeObservers.removeValue(forKey: pluginKey)
             window.close()
         }
+    }
+
+    func isShowing(pluginKey: String) -> Bool {
+        windows[pluginKey] != nil
     }
 
     private func normalizedSize(from preferred: NSSize) -> NSSize {

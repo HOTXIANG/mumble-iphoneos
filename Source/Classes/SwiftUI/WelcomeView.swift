@@ -1086,13 +1086,13 @@ struct AppRootView: View {
                     },
                     onDismissWillStart: {
                         appState.isImmersiveStatusBarHidden = false
+                        scheduleImagePreviewDismissFallback(previewID: preview.id)
                     },
                     onDismiss: {
-                        appState.activeImagePreview = nil
-                        appState.isImmersiveStatusBarHidden = false
-                        appState.hiddenPreviewSourceID = nil
+                        clearIOSImagePreview()
                     }
                 )
+                .id(preview.id)
                 .transition(.opacity)
                 .zIndex(10000)
             }
@@ -1110,12 +1110,13 @@ struct AppRootView: View {
                     },
                     onDismissWillStart: {
                         // Keep source hidden until close animation finishes.
+                        scheduleMacImagePreviewDismissFallback(previewID: preview.id)
                     },
                     onDismiss: {
-                        appState.activeMacImagePreview = nil
-                        appState.hiddenMacPreviewSourceID = nil
+                        clearMacImagePreview()
                     }
                 )
+                .id(preview.id)
                 .transition(.opacity)
                 .zIndex(10000)
             }
@@ -1391,12 +1392,10 @@ struct AppRootView: View {
             appState.pendingCertTrust = nil
         case "imagePreview":
             #if os(iOS)
-            appState.activeImagePreview = nil
-            appState.hiddenPreviewSourceID = nil
+            clearIOSImagePreview()
             #endif
             #if os(macOS)
-            appState.activeMacImagePreview = nil
-            appState.hiddenMacPreviewSourceID = nil
+            clearMacImagePreview()
             #endif
         default:
             break
@@ -1453,4 +1452,33 @@ struct AppRootView: View {
         #endif
         appState.setAutomationVisibleOverlays(overlays)
     }
+
+    #if os(iOS)
+    private func clearIOSImagePreview() {
+        appState.activeImagePreview = nil
+        appState.isImmersiveStatusBarHidden = false
+        appState.hiddenPreviewSourceID = nil
+    }
+
+    private func scheduleImagePreviewDismissFallback(previewID: String) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.40) {
+            guard appState.activeImagePreview?.id == previewID else { return }
+            clearIOSImagePreview()
+        }
+    }
+    #endif
+
+    #if os(macOS)
+    private func clearMacImagePreview() {
+        appState.activeMacImagePreview = nil
+        appState.hiddenMacPreviewSourceID = nil
+    }
+
+    private func scheduleMacImagePreviewDismissFallback(previewID: String) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.40) {
+            guard appState.activeMacImagePreview?.id == previewID else { return }
+            clearMacImagePreview()
+        }
+    }
+    #endif
 }
