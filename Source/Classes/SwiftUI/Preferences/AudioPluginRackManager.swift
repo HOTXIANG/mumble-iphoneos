@@ -234,10 +234,17 @@ final class AudioPluginRackManager: ObservableObject {
     func setSidechainSource(_ sourceKey: String?, forPluginID pluginID: String, inTrack trackKey: String) {
         guard var chain = pluginChainByTrack[trackKey],
               let index = chain.firstIndex(where: { $0.id == pluginID }) else { return }
+        let previousSourceKey = chain[index].sidechainSourceKey
         chain[index].sidechainSourceKey = sourceKey
         pluginChainByTrack[trackKey] = chain
         savePluginChainState()
         syncDSPChain(for: trackKey)
+        reloadAudioUnitForSidechainChangeIfNeeded(
+            pluginID: pluginID,
+            trackKey: trackKey,
+            previousSourceKey: previousSourceKey,
+            newSourceKey: sourceKey
+        )
     }
 
     func sendRoutes(forSourceTrackKey trackKey: String) -> [TrackSendRoute] {
@@ -656,6 +663,32 @@ final class AudioPluginRackManager: ObservableObject {
         parameterStateByPlugin[plugin.id] = nil
         lastLoadErrorByPlugin[plugin.id] = nil
         syncDSPChain(for: trackKey)
+    }
+
+    private func reloadAudioUnitForSidechainChangeIfNeeded(
+        pluginID: String,
+        trackKey: String,
+        previousSourceKey: String?,
+        newSourceKey: String?
+    ) {
+#if os(macOS)
+        guard previousSourceKey != newSourceKey,
+              let plugin = pluginChainByTrack[trackKey]?.first(where: { $0.id == pluginID }),
+              plugin.source == .audioUnit else {
+            return
+        }
+
+        let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
+        guard let unit = loadedAudioUnits[loadedKey],
+              unit.auAudioUnit.inputBusses.count > 1 else {
+            return
+        }
+
+        Task { @MainActor in
+            unloadAudioUnit(for: plugin)
+            _ = await loadAudioUnit(for: plugin)
+        }
+#endif
     }
 
     private func loadTrackSendState() {
@@ -1102,16 +1135,6 @@ final class AudioPluginRackManager: ObservableObject {
         }
 
 #if os(macOS)
-        let (unitOut, errorOut) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
-            AVAudioUnit.instantiate(with: description, options: [.loadOutOfProcess]) { unit, error in
-                c.resume(returning: (unit, error as NSError?))
-            }
-        }
-        if let unitOut, configureAudioUnit(unitOut, format: format) {
-            loadedAudioUnits[loadedKey] = unitOut
-            return nil
-        }
-
         let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
             AVAudioUnit.instantiate(with: description, options: []) { unit, error in
                 c.resume(returning: (unit, error as NSError?))
@@ -1132,7 +1155,17 @@ final class AudioPluginRackManager: ObservableObject {
             return nil
         }
 
-        let finalError = errorOut ?? errorDefault ?? errorIn
+        let (unitOut, errorOut) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
+            AVAudioUnit.instantiate(with: description, options: [.loadOutOfProcess]) { unit, error in
+                c.resume(returning: (unit, error as NSError?))
+            }
+        }
+        if let unitOut, configureAudioUnit(unitOut, format: format) {
+            loadedAudioUnits[loadedKey] = unitOut
+            return nil
+        }
+
+        let finalError = errorDefault ?? errorIn ?? errorOut
         if finalError?.domain == NSOSStatusErrorDomain, finalError?.code == -3000 {
             return NSLocalizedString("Audio Unit host compatibility error (-3000). Try another AU or restart audio engine.", comment: "")
         }

@@ -302,6 +302,7 @@ struct AudioPluginMixerView: View {
     @State private var loadingPluginIDs: Set<String> = []
     @State private var loadedAudioUnits: [String: AVAudioUnit] = [:]  // Key: "\(trackKey):\(pluginID)"
     @State private var loadedVST3Hosts: [String: MKVST3PluginHost] = [:]  // Key: "\(trackKey):\(pluginID)"
+    @State private var cachedPluginEditorControllers: [String: PlatformViewController] = [:]
     @State private var parameterStateByPlugin: [String: [RuntimeParameter]] = [:]
     @State private var lastLoadErrorByPlugin: [String: String] = [:]
     @State private var processorStateByTrack: [String: TrackProcessorState] = [:]
@@ -1751,15 +1752,26 @@ struct AudioPluginMixerView: View {
 
     private func setSidechainSource(_ sourceKey: String?, forPlugin plugin: TrackPlugin, trackKey: String) {
         if isSharedManagedTrack(trackKey) {
+            if plugin.sidechainSourceKey != sourceKey {
+                closePluginEditorIfNeeded(for: plugin, trackKey: trackKey)
+                clearPluginEditorCache(for: plugin, trackKey: trackKey)
+            }
             AudioPluginRackManager.shared.setSidechainSource(sourceKey, forPluginID: plugin.id, inTrack: trackKey)
             refreshSharedManagedTrackState()
             return
         }
 
+        let previousSourceKey = plugin.sidechainSourceKey
         mutateSelectedTrackChain { chain in
             guard let index = chain.firstIndex(where: { $0.id == plugin.id }) else { return }
             chain[index].sidechainSourceKey = sourceKey
         }
+        reloadAudioUnitForSidechainChangeIfNeeded(
+            pluginID: plugin.id,
+            trackKey: trackKey,
+            previousSourceKey: previousSourceKey,
+            newSourceKey: sourceKey
+        )
     }
 
     private func mutateSelectedTrackChain(_ update: (inout [TrackPlugin]) -> Void) {
@@ -1815,6 +1827,9 @@ struct AudioPluginMixerView: View {
             normalizeSelectedPluginSelection()
             rebuildProcessorStateMachine()
             pluginOperationMessage = String(format: NSLocalizedString("Added %@", comment: ""), plugin.name)
+            if let latest = selectedTrackChain.last, loadedProcessor(for: selectedTrackKey, pluginID: latest.id) != nil {
+                openPluginEditor(for: latest)
+            }
             return
         }
 
@@ -1845,7 +1860,11 @@ struct AudioPluginMixerView: View {
 
         // Then attempt to load if needed (VST3 or AU with filesystem source)
         if (plugin.source == .audioUnit || plugin.source == .filesystem), let latest = selectedTrackChain.last {
-            _ = await loadAudioUnit(for: latest)
+            if await loadAudioUnit(for: latest) {
+                await MainActor.run {
+                    openPluginEditor(for: latest)
+                }
+            }
         }
     }
 
@@ -1857,6 +1876,7 @@ struct AudioPluginMixerView: View {
             let reopenEditorAfterReplace = existing.map { pluginEditorWasOpen(for: $0, trackKey: selectedTrackKey) } ?? false
             if let existing {
                 closePluginEditorIfNeeded(for: existing, trackKey: selectedTrackKey)
+                clearPluginEditorCache(for: existing, trackKey: selectedTrackKey)
             }
             let discovery = AudioPluginDiscovery(
                 id: discovered.id,
@@ -1874,7 +1894,7 @@ struct AudioPluginMixerView: View {
             normalizeSelectedPluginSelection()
             rebuildProcessorStateMachine()
             pluginOperationMessage = String(format: NSLocalizedString("Inserted %@", comment: ""), discovered.name)
-            if reopenEditorAfterReplace {
+            if loadedProcessor(for: selectedTrackKey, pluginID: insertedPlugin.id) != nil || reopenEditorAfterReplace {
                 await MainActor.run {
                     openPluginEditor(for: insertedPlugin)
                 }
@@ -1924,8 +1944,7 @@ struct AudioPluginMixerView: View {
         guard let insertedPluginID else { return }
         if let inserted = selectedTrackChain.first(where: { $0.id == insertedPluginID }),
            inserted.source == .audioUnit || inserted.source == .filesystem {
-            _ = await loadAudioUnit(for: inserted)
-            if reopenEditorAfterReplace {
+            if await loadAudioUnit(for: inserted) {
                 await MainActor.run {
                     openPluginEditor(for: inserted)
                 }
@@ -1935,7 +1954,9 @@ struct AudioPluginMixerView: View {
 
     private func clearPluginSlot(slotIndex: Int) {
         guard let existing = pluginAtSlot(slotIndex) else { return }
+        closePluginEditorIfNeeded(for: existing, trackKey: selectedTrackKey)
         if isSharedManagedTrack(selectedTrackKey) {
+            clearPluginEditorCache(for: existing, trackKey: selectedTrackKey)
             if let removed = AudioPluginRackManager.shared.removePlugin(trackKey: selectedTrackKey, pluginID: existing.id) {
                 refreshSharedManagedTrackState()
                 pluginOperationMessage = String(format: NSLocalizedString("Removed %@", comment: ""), removed.name)
@@ -1953,14 +1974,19 @@ struct AudioPluginMixerView: View {
     }
 
     private func removePlugin(at index: Int) {
+        guard selectedTrackChain.indices.contains(index) else { return }
+        let plugin = selectedTrackChain[index]
+        closePluginEditorIfNeeded(for: plugin, trackKey: selectedTrackKey)
         if isSharedManagedTrack(selectedTrackKey) {
-            guard selectedTrackChain.indices.contains(index) else { return }
-            let plugin = selectedTrackChain[index]
+            clearPluginEditorCache(for: plugin, trackKey: selectedTrackKey)
             if let removed = AudioPluginRackManager.shared.removePlugin(trackKey: selectedTrackKey, pluginID: plugin.id) {
                 refreshSharedManagedTrackState()
                 pluginOperationMessage = String(format: NSLocalizedString("Removed %@", comment: ""), removed.name)
             }
             return
+        }
+        if pluginLoaded(for: plugin.id) {
+            unloadAudioUnit(for: plugin)
         }
         mutateSelectedTrackChain { chain in
             guard chain.indices.contains(index) else { return }
@@ -2668,21 +2694,6 @@ struct AudioPluginMixerView: View {
         }
 
 #if os(macOS)
-        // Prefer out-of-process hosting on macOS. Third-party AUs frequently fail
-        // hardened runtime validation in-process, which creates load churn and XRuns.
-        let (unitOut, errorOut) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
-            AVAudioUnit.instantiate(with: description, options: [.loadOutOfProcess]) { unit, error in
-                c.resume(returning: (unit, error as NSError?))
-            }
-        }
-
-        if let unitOut, self.configureAudioUnit(unitOut, format: format) {
-            self.loadedAudioUnits[loadedKey] = unitOut
-            NSLog("MKAudio: AU loaded successfully with %lu channels (loadOutOfProcess)", UInt(channels))
-            return nil
-        }
-
-        // Try default load
         let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
             AVAudioUnit.instantiate(with: description, options: []) { unit, error in
                 c.resume(returning: (unit, error as NSError?))
@@ -2708,7 +2719,19 @@ struct AudioPluginMixerView: View {
             return nil
         }
 
-        let finalError = (errorOut ?? errorDefault ?? errorIn)
+        let (unitOut, errorOut) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
+            AVAudioUnit.instantiate(with: description, options: [.loadOutOfProcess]) { unit, error in
+                c.resume(returning: (unit, error as NSError?))
+            }
+        }
+
+        if let unitOut, self.configureAudioUnit(unitOut, format: format) {
+            self.loadedAudioUnits[loadedKey] = unitOut
+            NSLog("MKAudio: AU loaded successfully with %lu channels (loadOutOfProcess)", UInt(channels))
+            return nil
+        }
+
+        let finalError = (errorDefault ?? errorIn ?? errorOut)
         if finalError?.domain == NSOSStatusErrorDomain, finalError?.code == -3000 {
             return NSLocalizedString("Audio Unit host compatibility error (-3000). Try another AU or restart audio engine.", comment: "")
         }
@@ -2809,85 +2832,106 @@ struct AudioPluginMixerView: View {
             return
         }
 
+        let pluginKey = "\(trackKey):\(plugin.id)"
+
         switch loadedProcessor(for: trackKey, pluginID: plugin.id) {
         case .audioUnit(let unit):
             let targetPluginID = plugin.id
             let targetTrackKey = trackKey
+            if let cachedController = cachedPluginEditorControllers[pluginKey] {
+                presentPluginEditor(controller: cachedController,
+                                    pluginKey: pluginKey,
+                                    pluginName: plugin.name,
+                                    trackKey: targetTrackKey,
+                                    pluginID: targetPluginID)
+                return
+            }
             unit.auAudioUnit.requestViewController { viewController in
                 DispatchQueue.main.async {
                     guard let viewController else {
                         pluginOperationMessage = NSLocalizedString("Plugin UI is unavailable", comment: "")
                         return
                     }
-
-#if os(iOS)
-                    pluginEditorTitle = plugin.name
-                    pluginEditorController = viewController
-                    showingPluginEditor = true
-#else
-                    let pluginKey = "\(targetTrackKey):\(targetPluginID)"
-                    PluginEditorWindowController.shared.show(
-                        pluginKey: pluginKey,
-                        rootView: AnyView(
-                            PluginEditorWindowContentView(
-                                controller: viewController,
-                                snapshotProvider: { pluginEditorSnapshot(trackKey: targetTrackKey, pluginID: targetPluginID) },
-                                refreshAction: { refreshParameters(for: targetPluginID, trackKey: targetTrackKey) },
-                                parameterChangeAction: { parameterID, value in
-                                    setParameterValue(pluginID: targetPluginID, trackKey: targetTrackKey, parameterID: parameterID, newValue: value)
-                                }
-                            )
-                        ),
-                        observedController: viewController,
-                        preferredContentSize: viewController.preferredContentSize,
-                        title: plugin.name
-                    ) {
-                        snapshotAllPluginParameters()
-                        if selectedPluginID == targetPluginID {
-                            selectedPluginID = nil
-                        }
-                    }
-#endif
+                    cachedPluginEditorControllers[pluginKey] = viewController
+                    presentPluginEditor(controller: viewController,
+                                        pluginKey: pluginKey,
+                                        pluginName: plugin.name,
+                                        trackKey: targetTrackKey,
+                                        pluginID: targetPluginID)
                 }
             }
         case .vst3(let vst3Host):
 #if os(iOS)
             pluginOperationMessage = NSLocalizedString("Plugin UI is unavailable on iOS", comment: "")
 #else
-            let pluginKey = "\(trackKey):\(plugin.id)"
+            if let cachedController = cachedPluginEditorControllers[pluginKey] {
+                presentPluginEditor(controller: cachedController,
+                                    pluginKey: pluginKey,
+                                    pluginName: plugin.name,
+                                    trackKey: trackKey,
+                                    pluginID: plugin.id)
+                return
+            }
             // Try native VST3 editor view first
             let nativeVC: NSViewController? = try? vst3Host.requestViewController()
-            // Use plugin's preferred size, or fallback to default
-            // Add toolbar height (~49pt) to the plugin's content size
-            let toolbarHeight: CGFloat = 49.0
-            let pluginSize = nativeVC?.preferredContentSize ?? NSSize(width: 600, height: 400)
-            let editorSize = NSSize(width: max(500, pluginSize.width), height: pluginSize.height + toolbarHeight)
-            PluginEditorWindowController.shared.show(
-                pluginKey: pluginKey,
-                rootView: AnyView(
-                    PluginEditorWindowContentView(
-                        controller: nativeVC,
-                        snapshotProvider: { pluginEditorSnapshot(trackKey: trackKey, pluginID: plugin.id) },
-                        refreshAction: { refreshParameters(for: plugin.id, trackKey: trackKey) },
-                        parameterChangeAction: { parameterID, value in
-                            setParameterValue(pluginID: plugin.id, trackKey: trackKey, parameterID: parameterID, newValue: value)
-                        }
-                    )
-                ),
-                observedController: nativeVC,  // Enable size observer for dynamic resize
-                preferredContentSize: editorSize,
-                title: plugin.name
-            ) {
-                snapshotAllPluginParameters()
-                if selectedPluginID == plugin.id {
-                    selectedPluginID = nil
-                }
+            if let nativeVC {
+                cachedPluginEditorControllers[pluginKey] = nativeVC
             }
+            presentPluginEditor(controller: nativeVC,
+                                pluginKey: pluginKey,
+                                pluginName: plugin.name,
+                                trackKey: trackKey,
+                                pluginID: plugin.id)
 #endif
         case .none:
             pluginOperationMessage = NSLocalizedString("Plugin is not ready", comment: "")
             return
         }
+    }
+
+    private func presentPluginEditor(
+        controller: PlatformViewController?,
+        pluginKey: String,
+        pluginName: String,
+        trackKey: String,
+        pluginID: String
+    ) {
+#if os(iOS)
+        pluginEditorTitle = pluginName
+        pluginEditorController = controller
+        showingPluginEditor = true
+#else
+        let pluginSize = controller?.preferredContentSize ?? NSSize(width: 760, height: 540)
+        let editorSize = NSSize(width: max(760, pluginSize.width), height: max(540, pluginSize.height + 49.0))
+        PluginEditorWindowController.shared.show(
+            pluginKey: pluginKey,
+            rootView: AnyView(
+                PluginEditorWindowContentView(
+                    controller: controller,
+                    snapshotProvider: { pluginEditorSnapshot(trackKey: trackKey, pluginID: pluginID) },
+                    refreshAction: { refreshParameters(for: pluginID, trackKey: trackKey) },
+                    parameterChangeAction: { parameterID, value in
+                        setParameterValue(pluginID: pluginID, trackKey: trackKey, parameterID: parameterID, newValue: value)
+                    },
+                    sizeDidChange: { contentSize, minimumContentSize in
+                        PluginEditorWindowController.shared.updateWindowSizing(
+                            pluginKey: pluginKey,
+                            contentSize: contentSize,
+                            minimumContentSize: minimumContentSize
+                        )
+                    }
+                )
+            ),
+            observedController: controller,
+            preferredContentSize: editorSize,
+            title: pluginName
+        ) {
+            snapshotAllPluginParameters()
+            if selectedPluginID == pluginID {
+                selectedPluginID = nil
+            }
+        }
+#endif
     }
 
     private func pluginEditorWasOpen(for plugin: TrackPlugin, trackKey: String) -> Bool {
@@ -2910,11 +2954,16 @@ struct AudioPluginMixerView: View {
 #endif
     }
 
+    private func clearPluginEditorCache(for plugin: TrackPlugin, trackKey: String) {
+        cachedPluginEditorControllers.removeValue(forKey: "\(trackKey):\(plugin.id)")
+    }
+
     private func unloadAudioUnit(for plugin: TrackPlugin) {
         if let trackKey = self.trackKey(containingPluginID: plugin.id) {
 #if os(macOS)
             PluginEditorWindowController.shared.close(pluginKey: "\(trackKey):\(plugin.id)")
 #endif
+            clearPluginEditorCache(for: plugin, trackKey: trackKey)
             let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
             loadedAudioUnits[loadedKey] = nil
             loadedVST3Hosts[loadedKey] = nil
@@ -2930,6 +2979,36 @@ struct AudioPluginMixerView: View {
         }
         pluginOperationMessage = String(format: NSLocalizedString("Unloaded %@", comment: ""), plugin.name)
         rebuildProcessorStateMachine()
+    }
+
+    private func reloadAudioUnitForSidechainChangeIfNeeded(
+        pluginID: String,
+        trackKey: String,
+        previousSourceKey: String?,
+        newSourceKey: String?
+    ) {
+#if os(macOS)
+        guard previousSourceKey != newSourceKey,
+              let plugin = findPlugin(withID: pluginID, trackKey: trackKey),
+              plugin.source == .audioUnit else {
+            return
+        }
+
+        let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
+        guard let unit = loadedAudioUnits[loadedKey],
+              unit.auAudioUnit.inputBusses.count > 1 else {
+            return
+        }
+
+        let reopenEditor = pluginEditorWasOpen(for: plugin, trackKey: trackKey)
+        Task { @MainActor in
+            unloadAudioUnit(for: plugin)
+            guard await loadAudioUnit(for: plugin) else { return }
+            if reopenEditor {
+                openPluginEditor(for: plugin)
+            }
+        }
+#endif
     }
 
     private func trackKey(containingPluginID pluginID: String) -> String? {
@@ -3594,6 +3673,76 @@ private struct PluginEditorMacHostView: NSViewControllerRepresentable {
     }
 }
 
+@MainActor
+private final class PluginEditorMacSizeObserver: ObservableObject {
+    @Published private(set) var contentSize: NSSize
+    @Published private(set) var minimumContentSize: NSSize
+
+    private weak var controller: NSViewController?
+    private var preferredSizeObservation: NSKeyValueObservation?
+
+    init(controller: NSViewController?) {
+        self.controller = controller
+        let initialSize = Self.resolveSize(for: controller)
+        self.contentSize = initialSize
+        self.minimumContentSize = initialSize
+
+        guard let controller else { return }
+
+        preferredSizeObservation = controller.observe(\.preferredContentSize, options: [.initial, .new]) { [weak self] controller, _ in
+            DispatchQueue.main.async {
+                self?.recordObservedSize(Self.resolveSize(for: controller))
+            }
+        }
+
+        if let loadedView = controller.viewIfLoaded {
+            loadedView.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleObservedViewFrameDidChange(_:)),
+                name: NSView.frameDidChangeNotification,
+                object: loadedView
+            )
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private static func resolveSize(for controller: NSViewController?) -> NSSize {
+        guard let controller else {
+            return NSSize(width: 640, height: 420)
+        }
+
+        let preferred = controller.preferredContentSize
+        if preferred.width > 10, preferred.height > 10 {
+            return preferred
+        }
+
+        if let loadedView = controller.viewIfLoaded {
+            let frame = loadedView.frame.size
+            if frame.width > 10, frame.height > 10 {
+                return frame
+            }
+        }
+
+        return NSSize(width: 640, height: 420)
+    }
+
+    @objc private func handleObservedViewFrameDidChange(_ notification: Notification) {
+        recordObservedSize(Self.resolveSize(for: controller))
+    }
+
+    private func recordObservedSize(_ size: NSSize) {
+        contentSize = size
+        minimumContentSize = NSSize(
+            width: min(minimumContentSize.width, size.width),
+            height: min(minimumContentSize.height, size.height)
+        )
+    }
+}
+
 private final class PluginEditorMacContainerViewController: NSViewController {
     private weak var embeddedController: NSViewController?
 
@@ -3645,21 +3794,29 @@ private struct PluginEditorWindowContentView: View {
     let snapshotProvider: () -> PluginEditorSnapshot
     let refreshAction: () -> Void
     let parameterChangeAction: (UInt64, Float) -> Void
+    let sizeDidChange: (NSSize, NSSize) -> Void
 
     @State private var selectedTab: Tab = .pluginUI
     @State private var snapshot: PluginEditorSnapshot
+    @StateObject private var controllerSizeObserver: PluginEditorMacSizeObserver
+
+    private let pluginEditorChromeHeight: CGFloat = 49.0
+    private let parametersContentSize = NSSize(width: 640, height: 480)
 
     init(
         controller: NSViewController?,
         snapshotProvider: @escaping () -> PluginEditorSnapshot,
         refreshAction: @escaping () -> Void,
-        parameterChangeAction: @escaping (UInt64, Float) -> Void
+        parameterChangeAction: @escaping (UInt64, Float) -> Void,
+        sizeDidChange: @escaping (NSSize, NSSize) -> Void
     ) {
         self.controller = controller
         self.snapshotProvider = snapshotProvider
         self.refreshAction = refreshAction
         self.parameterChangeAction = parameterChangeAction
+        self.sizeDidChange = sizeDidChange
         _snapshot = State(initialValue: snapshotProvider())
+        _controllerSizeObserver = StateObject(wrappedValue: PluginEditorMacSizeObserver(controller: controller))
     }
 
     var body: some View {
@@ -3690,6 +3847,10 @@ private struct PluginEditorWindowContentView: View {
 
             if selectedTab == .pluginUI, let controller {
                 PluginEditorMacHostView(controller: controller)
+                    .frame(
+                        idealWidth: max(1, controllerSizeObserver.contentSize.width),
+                        idealHeight: max(1, controllerSizeObserver.contentSize.height)
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -3745,19 +3906,32 @@ private struct PluginEditorWindowContentView: View {
                     }
                     .padding(16)
                 }
+                .frame(minWidth: 520, idealWidth: parametersContentSize.width,
+                       minHeight: 360, idealHeight: parametersContentSize.height)
             }
         }
-        .frame(minWidth: 640, maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
         .onAppear {
             AppState.shared.setAutomationCurrentScreen("pluginEditor")
             if controller == nil {
                 selectedTab = .parameters
             }
             refreshSnapshot()
+            sizeDidChange(desiredWindowContentSize, minimumWindowContentSize)
         }
         .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
             guard selectedTab == .parameters else { return }
             refreshSnapshot()
+        }
+        .onChange(of: selectedTab) { _, _ in
+            sizeDidChange(desiredWindowContentSize, minimumWindowContentSize)
+        }
+        .onChange(of: controllerSizeObserver.contentSize) { _, _ in
+            guard selectedTab == .pluginUI else { return }
+            sizeDidChange(desiredWindowContentSize, minimumWindowContentSize)
+        }
+        .onChange(of: controllerSizeObserver.minimumContentSize) { _, _ in
+            guard selectedTab == .pluginUI else { return }
+            sizeDidChange(desiredWindowContentSize, minimumWindowContentSize)
         }
     }
 
@@ -3769,6 +3943,30 @@ private struct PluginEditorWindowContentView: View {
     private func snapshotValue(for parameterID: UInt64, fallback: Float) -> Float {
         snapshot.parameters.first(where: { $0.id == parameterID })?.value ?? fallback
     }
+
+    private var desiredWindowContentSize: NSSize {
+        switch selectedTab {
+        case .pluginUI:
+            return NSSize(
+                width: max(320, controllerSizeObserver.contentSize.width),
+                height: max(180, controllerSizeObserver.contentSize.height + pluginEditorChromeHeight)
+            )
+        case .parameters:
+            return parametersContentSize
+        }
+    }
+
+    private var minimumWindowContentSize: NSSize {
+        switch selectedTab {
+        case .pluginUI:
+            return NSSize(
+                width: max(320, controllerSizeObserver.minimumContentSize.width),
+                height: max(180, controllerSizeObserver.minimumContentSize.height + pluginEditorChromeHeight)
+            )
+        case .parameters:
+            return NSSize(width: 520, height: 360)
+        }
+    }
 }
 
 @MainActor
@@ -3778,6 +3976,9 @@ final class PluginEditorWindowController: NSObject {
     private var windows: [String: NSWindow] = [:]
     private var closeHandlers: [String: () -> Void] = [:]
     private var sizeObservers: [String: NSKeyValueObservation] = [:]
+    private var rememberedContentSizes: [String: NSSize] = [:]
+    private var minimumContentSizes: [String: NSSize] = [:]
+    private var rememberedMinimumContentSizes: [String: NSSize] = [:]
 
     private override init() {
         super.init()
@@ -3793,11 +3994,21 @@ final class PluginEditorWindowController: NSObject {
     ) {
         let targetSize = normalizedSize(from: preferredContentSize)
         let hostingController = NSHostingController(rootView: rootView)
+        let fittedSize = fittedContentSize(for: hostingController, fallback: targetSize)
+        let restoredSize = rememberedContentSizes[pluginKey].map(normalizedSize(from:)) ?? fittedSize
+        let minimumContentSize = rememberedMinimumContentSizes[pluginKey].map(normalizedSize(from:))
+            ?? minimumContentSizes[pluginKey].map(normalizedSize(from:))
+            ?? NSSize(width: 320, height: 180)
 
         if let window = windows[pluginKey] {
             window.title = title
             window.contentViewController = hostingController
-            resize(window: window, to: targetSize)
+            applyWindowSize(
+                pluginKey: pluginKey,
+                window: window,
+                contentSize: restoredSize,
+                minimumContentSize: minimumContentSize
+            )
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             closeHandlers[pluginKey] = onClose
@@ -3811,33 +4022,44 @@ final class PluginEditorWindowController: NSObject {
 
         let window = NSWindow(contentViewController: hostingController)
         window.title = title
-        window.styleMask = [.titled, .closable, .miniaturizable]  // Not resizable
-        window.setContentSize(targetSize)
-        window.minSize = targetSize
-        window.maxSize = targetSize
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        applyWindowSize(
+            pluginKey: pluginKey,
+            window: window,
+            contentSize: restoredSize,
+            minimumContentSize: minimumContentSize
+        )
         window.center()
         window.isReleasedWhenClosed = false
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-
+        windows[pluginKey] = window
+        closeHandlers[pluginKey] = onClose
+        if let observedController {
+            installSizeObserver(for: pluginKey, controller: observedController)
+        }
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handlePluginEditorWindowWillClose(_:)),
             name: NSWindow.willCloseNotification,
             object: window
         )
-
-        windows[pluginKey] = window
-        closeHandlers[pluginKey] = onClose
-        if let observedController {
-            installSizeObserver(for: pluginKey, controller: observedController)
-        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePluginEditorWindowDidResize(_:)),
+            name: NSWindow.didResizeNotification,
+            object: window
+        )
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func close(pluginKey: String) {
         if let window = windows.removeValue(forKey: pluginKey) {
             closeHandlers.removeValue(forKey: pluginKey)
             sizeObservers.removeValue(forKey: pluginKey)
+            rememberedContentSizes[pluginKey] = currentContentSize(for: window)
+            if let minimumContentSize = minimumContentSizes[pluginKey] {
+                rememberedMinimumContentSizes[pluginKey] = minimumContentSize
+            }
             window.close()
         }
     }
@@ -3848,8 +4070,8 @@ final class PluginEditorWindowController: NSObject {
 
     private func normalizedSize(from preferred: NSSize) -> NSSize {
         let width = preferred.width > 10 ? preferred.width : 960
-        let height = preferred.height > 10 ? preferred.height + 52 : 620
-        return NSSize(width: max(600, width), height: max(420, height))
+        let height = preferred.height > 10 ? preferred.height : 620
+        return NSSize(width: max(320, width), height: max(180, height))
     }
 
     private func resize(window: NSWindow, to contentSize: NSSize) {
@@ -3863,10 +4085,20 @@ final class PluginEditorWindowController: NSObject {
     @objc private func handlePluginEditorWindowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow,
               let pluginKey = windows.first(where: { $0.value == closing })?.key else { return }
+        rememberedContentSizes[pluginKey] = currentContentSize(for: closing)
+        if let minimumContentSize = minimumContentSizes[pluginKey] {
+            rememberedMinimumContentSizes[pluginKey] = minimumContentSize
+        }
         windows.removeValue(forKey: pluginKey)
         let handler = closeHandlers.removeValue(forKey: pluginKey)
         sizeObservers.removeValue(forKey: pluginKey)
         handler?()
+    }
+
+    @objc private func handlePluginEditorWindowDidResize(_ notification: Notification) {
+        guard let resizedWindow = notification.object as? NSWindow,
+              let pluginKey = windows.first(where: { $0.value == resizedWindow })?.key else { return }
+        rememberedContentSizes[pluginKey] = currentContentSize(for: resizedWindow)
     }
 
     private func installSizeObserver(for pluginKey: String, controller: NSViewController) {
@@ -3880,10 +4112,47 @@ final class PluginEditorWindowController: NSObject {
     private func applyPreferredSize(of controller: NSViewController, for pluginKey: String) {
         guard let window = windows[pluginKey] else { return }
         let normalized = normalizedSize(from: controller.preferredContentSize)
-        // Lock window to plugin size
-        window.minSize = normalized
-        window.maxSize = normalized
-        resize(window: window, to: normalized)
+        let minimum = minimumContentSizes[pluginKey] ?? normalized
+        applyWindowSize(pluginKey: pluginKey, window: window, contentSize: normalized, minimumContentSize: minimum)
+    }
+
+    func updateWindowSizing(pluginKey: String, contentSize: NSSize, minimumContentSize: NSSize) {
+        let normalizedMinimum = normalizedSize(from: minimumContentSize)
+        minimumContentSizes[pluginKey] = normalizedMinimum
+        rememberedMinimumContentSizes[pluginKey] = normalizedMinimum
+        guard let window = windows[pluginKey] else { return }
+        let effectiveMinimum = minimumContentSizes[pluginKey] ?? normalizedMinimum
+        applyWindowSize(
+            pluginKey: pluginKey,
+            window: window,
+            contentSize: contentSize,
+            minimumContentSize: effectiveMinimum
+        )
+    }
+
+    private func applyWindowSize(pluginKey _: String, window: NSWindow, contentSize: NSSize, minimumContentSize: NSSize) {
+        let normalizedMinimum = normalizedSize(from: minimumContentSize)
+        let normalizedContent = normalizedSize(from: contentSize)
+        let clamped = NSSize(
+            width: max(normalizedMinimum.width, normalizedContent.width),
+            height: max(normalizedMinimum.height, normalizedContent.height)
+        )
+        window.minSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: normalizedMinimum)).size
+        resize(window: window, to: clamped)
+    }
+
+    private func fittedContentSize(for hostingController: NSHostingController<AnyView>, fallback: NSSize) -> NSSize {
+        hostingController.view.layoutSubtreeIfNeeded()
+        let fitting = hostingController.view.fittingSize
+        if fitting.width > 10, fitting.height > 10 {
+            return normalizedSize(from: fitting)
+        }
+        return normalizedSize(from: fallback)
+    }
+
+    private func currentContentSize(for window: NSWindow) -> NSSize {
+        let contentRect = window.contentRect(forFrameRect: window.frame)
+        return normalizedSize(from: contentRect.size)
     }
 }
 #endif
