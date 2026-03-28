@@ -168,8 +168,9 @@ extension ServerModelManager {
             isSelfDeafened: isSelfDeafened
         )
 
+        nonisolated(unsafe) let activityToUpdate = activity
         Task {
-            await activity.update(
+            await activityToUpdate.update(
                 ActivityContent(state: contentState, staleDate: nil)
             )
         }
@@ -210,8 +211,9 @@ extension ServerModelManager {
             isSelfDeafened: false
         )
 
+        nonisolated(unsafe) let activityToEnd = activity
         Task {
-            await activity.end(
+            await activityToEnd.end(
                 ActivityContent(state: finalContentState, staleDate: nil),
                 dismissalPolicy: .immediate
             )
