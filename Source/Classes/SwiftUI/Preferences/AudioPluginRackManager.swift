@@ -47,7 +47,6 @@ final class AudioPluginRackManager: ObservableObject {
 
     @Published var pluginChainByTrack: [String: [TrackPlugin]] = [:]
     @Published var loadedAudioUnits: [String: AVAudioUnit] = [:]
-    @Published var loadedVST3Hosts: [String: MKVST3PluginHost] = [:]
     @Published var loadingPluginIDs: Set<String> = []
     @Published var lastLoadErrorByPlugin: [String: String] = [:]
     @Published var parameterStateByPlugin: [String: [AudioPluginParameterInfo]] = [:]
@@ -58,16 +57,13 @@ final class AudioPluginRackManager: ObservableObject {
     private let pluginTrackChainsKey = "AudioPluginTrackChainsV1"
     private let trackSendTargetsKey = "AudioPluginTrackSendsV1"
     private let pluginPresetsKey = "AudioPluginPresetsV1"
-    private let pluginCustomScanPathsKey = "AudioPluginCustomScanPaths"
 
     // MARK: - Initialization
 
     private init() {
         loadPluginChainState()
         loadTrackSendState()
-        #if os(macOS)
-        clearVST3PluginsIfSandboxRestricted()
-        #endif
+        removeLegacyFilesystemPlugins()
     }
 
     // MARK: - Public API
@@ -115,33 +111,16 @@ final class AudioPluginRackManager: ObservableObject {
     }
 
     func availablePlugins() -> [AudioPluginDiscovery] {
-        let plugins = availableAudioUnitPlugins() + availableFilesystemPlugins()
-        return plugins.sorted { lhs, rhs in
-            if lhs.source != rhs.source {
-                return lhs.source.rawValue < rhs.source.rawValue
-            }
-            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-        }
+        availableAudioUnitPlugins()
     }
 
     func customScanPaths() -> [String] {
-        customScanPathEntries()
+        []
     }
 
-    func addCustomScanPath(_ path: String) {
-        let candidate = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !candidate.isEmpty else { return }
-        var entries = customScanPathEntries()
-        if !entries.contains(candidate) {
-            entries.append(candidate)
-            UserDefaults.standard.set(entries.joined(separator: "\n"), forKey: pluginCustomScanPathsKey)
-        }
-    }
+    func addCustomScanPath(_ path: String) {}
 
-    func removeCustomScanPath(_ path: String) {
-        let entries = customScanPathEntries().filter { $0 != path }
-        UserDefaults.standard.set(entries.joined(separator: "\n"), forKey: pluginCustomScanPathsKey)
-    }
+    func removeCustomScanPath(_ path: String) {}
 
     func plugins(for trackKey: String) -> [TrackPlugin] {
         pluginChainByTrack[trackKey] ?? []
@@ -407,11 +386,11 @@ final class AudioPluginRackManager: ObservableObject {
         let targets = pluginChainByTrack
             .flatMap { trackKey, chain in
                 chain.filter { plugin in
-                    guard plugin.source == .audioUnit || plugin.source == .filesystem else {
+                    guard plugin.source == .audioUnit else {
                         return false
                     }
                     let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
-                    return loadedAudioUnits[loadedKey] == nil && loadedVST3Hosts[loadedKey] == nil
+                    return loadedAudioUnits[loadedKey] == nil
                 }
             }
 
@@ -433,7 +412,7 @@ final class AudioPluginRackManager: ObservableObject {
     }
 
     private func loadAudioUnit(for plugin: TrackPlugin) async -> Bool {
-        guard plugin.source == .audioUnit || plugin.source == .filesystem else {
+        guard plugin.source == .audioUnit else {
             return false
         }
 
@@ -446,7 +425,7 @@ final class AudioPluginRackManager: ObservableObject {
 
         let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
 
-        if loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil {
+        if loadedAudioUnits[loadedKey] != nil {
             return true
         }
 
@@ -454,10 +433,6 @@ final class AudioPluginRackManager: ObservableObject {
 
         defer {
             loadingPluginIDs.remove(plugin.id)
-        }
-
-        if plugin.source == .filesystem {
-            return await loadVST3Plugin(plugin, loadedKey: loadedKey, trackKey: trackKey)
         }
 
         guard let description = parseAudioUnitDescription(from: plugin.identifier) else {
@@ -485,50 +460,6 @@ final class AudioPluginRackManager: ObservableObject {
         lastLoadErrorByPlugin[plugin.id] = nil
         syncDSPChain(for: trackKey)
         NSLog("AudioPluginRackManager: Loaded AU '\(plugin.name)' for track \(trackKey)")
-        return true
-    }
-
-    private func loadVST3Plugin(_ plugin: TrackPlugin, loadedKey: String, trackKey: String) async -> Bool {
-        guard plugin.identifier.hasPrefix("fs:") else {
-            return false
-        }
-
-        let bundlePath = String(plugin.identifier.dropFirst(3))
-        let requiredChannels = channelCount(for: trackKey)
-        let sampleRate = pluginSampleRate(for: trackKey)
-
-        let host: MKVST3PluginHost
-        do {
-            host = try MKVST3PluginHost(bundlePath: bundlePath, displayName: plugin.name)
-        } catch {
-            NSLog("AudioPluginRackManager: Failed to create VST3 host for '\(plugin.name)': \(error)")
-            lastLoadErrorByPlugin[plugin.id] = error.localizedDescription
-            return false
-        }
-
-        let effectiveSampleRate = sampleRate > 0 ? sampleRate : 48_000
-        let effectiveFrames = max(UserDefaults.standard.integer(forKey: "AudioPluginHostBufferFrames"), 64)
-
-        do {
-            try host.configure(
-                withInputChannels: UInt(requiredChannels),
-                outputChannels: UInt(requiredChannels),
-                sampleRate: effectiveSampleRate,
-                maximumFramesToRender: UInt(effectiveFrames)
-            )
-        } catch {
-            NSLog("AudioPluginRackManager: Failed to configure VST3 '\(plugin.name)': \(error)")
-            lastLoadErrorByPlugin[plugin.id] = error.localizedDescription
-            return false
-        }
-
-        loadedVST3Hosts[loadedKey] = host
-        lastLoadErrorByPlugin[plugin.id] = nil
-        NSLog("AudioPluginRackManager: Loaded VST3 '\(plugin.name)' for track \(trackKey)")
-
-        // Apply saved parameters
-        applySavedParameters(pluginID: plugin.id, vst3Host: host)
-
         return true
     }
 
@@ -594,29 +525,12 @@ final class AudioPluginRackManager: ObservableObject {
                         dict["sidechainSource"] = sc
                     }
                     return dict as NSDictionary
-                } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-                    return ["vst3Host": vst3Host, "mix": mix] as NSDictionary
-                    // VST3 sidechain not supported yet
                 }
                 return nil
             }
     }
 
     // MARK: - Parameter Helpers
-
-    private func applySavedParameters(pluginID: String, vst3Host: MKVST3PluginHost) {
-        guard let plugin = findPlugin(withID: pluginID), !plugin.savedParameterValues.isEmpty else {
-            return
-        }
-
-        let snapshots = vst3Host.copyParameterSnapshots()
-        for snapshot in snapshots {
-            guard let paramID = snapshot["id"] as? NSNumber else { continue }
-            let key = String(paramID.uint64Value)
-            guard let savedValue = plugin.savedParameterValues[key] else { continue }
-            _ = vst3Host.setParameter(withID: paramID.uint64Value, normalizedValue: savedValue)
-        }
-    }
 
     private func findPlugin(withID pluginID: String) -> TrackPlugin? {
         for chain in pluginChainByTrack.values {
@@ -659,7 +573,6 @@ final class AudioPluginRackManager: ObservableObject {
 
         let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
         loadedAudioUnits[loadedKey] = nil
-        loadedVST3Hosts[loadedKey] = nil
         parameterStateByPlugin[plugin.id] = nil
         lastLoadErrorByPlugin[plugin.id] = nil
         syncDSPChain(for: trackKey)
@@ -833,8 +746,6 @@ final class AudioPluginRackManager: ObservableObject {
         let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
         if let unit = loadedAudioUnits[loadedKey] {
             rebuildParameterState(pluginID: pluginID, unit: unit)
-        } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-            rebuildParameterState(pluginID: pluginID, vst3Host: vst3Host)
         }
     }
 
@@ -850,30 +761,6 @@ final class AudioPluginRackManager: ObservableObject {
             )
         }
         applySavedParameters(pluginID: pluginID, state: &state, unit: unit)
-        parameterStateByPlugin[pluginID] = state
-    }
-
-    private func rebuildParameterState(pluginID: String, vst3Host: MKVST3PluginHost) {
-        var state = vst3Host.copyParameterSnapshots()
-            .prefix(64)
-            .compactMap { snapshot -> AudioPluginParameterInfo? in
-                guard let parameterID = snapshot["id"] as? NSNumber,
-                      let name = snapshot["name"] as? String,
-                      let minValue = snapshot["minValue"] as? NSNumber,
-                      let maxValue = snapshot["maxValue"] as? NSNumber,
-                      let value = snapshot["value"] as? NSNumber else {
-                    return nil
-                }
-
-                return AudioPluginParameterInfo(
-                    id: parameterID.uint64Value,
-                    name: name,
-                    minValue: minValue.floatValue,
-                    maxValue: maxValue.floatValue,
-                    value: value.floatValue
-                )
-            }
-        applySavedParameters(pluginID: pluginID, state: &state, vst3Host: vst3Host)
         parameterStateByPlugin[pluginID] = state
     }
 
@@ -899,32 +786,11 @@ final class AudioPluginRackManager: ObservableObject {
         }
     }
 
-    private func applySavedParameters(pluginID: String, state: inout [AudioPluginParameterInfo], vst3Host: MKVST3PluginHost) {
-        guard let plugin = findPlugin(withID: pluginID), !plugin.savedParameterValues.isEmpty else {
-            return
-        }
-        for index in state.indices {
-            let key = String(state[index].id)
-            guard let saved = plugin.savedParameterValues[key] else { continue }
-            let normalized = min(max(saved, state[index].minValue), state[index].maxValue)
-            state[index] = AudioPluginParameterInfo(
-                id: state[index].id,
-                name: state[index].name,
-                minValue: state[index].minValue,
-                maxValue: state[index].maxValue,
-                value: normalized
-            )
-            _ = vst3Host.setParameter(withID: state[index].id, normalizedValue: normalized)
-        }
-    }
-
     private func setParameterValue(pluginID: String, trackKey: String, parameterID: UInt64, newValue: Float) {
         let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
         if let unit = loadedAudioUnits[loadedKey],
            let parameter = unit.auAudioUnit.parameterTree?.allParameters.first(where: { $0.address == parameterID }) {
             parameter.value = newValue
-        } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-            _ = vst3Host.setParameter(withID: parameterID, normalizedValue: newValue)
         }
 
         guard var list = parameterStateByPlugin[pluginID],
@@ -955,12 +821,6 @@ final class AudioPluginRackManager: ObservableObject {
                 if let unit = loadedAudioUnits[loadedKey] {
                     for param in unit.auAudioUnit.parameterTree?.allParameters ?? [] {
                         captured[String(param.address)] = param.value
-                    }
-                } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-                    for snapshot in vst3Host.copyParameterSnapshots() {
-                        guard let parameterID = snapshot["id"] as? NSNumber,
-                              let value = snapshot["value"] as? NSNumber else { continue }
-                        captured[String(parameterID.uint64Value)] = value.floatValue
                     }
                 }
 
@@ -1009,49 +869,6 @@ final class AudioPluginRackManager: ObservableObject {
             }
         }
         return Array(deduped.values).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private func availableFilesystemPlugins() -> [AudioPluginDiscovery] {
-        #if os(macOS)
-        var scanRoots: [String] = [
-            "/Library/Audio/Plug-Ins/VST3",
-            NSString(string: "~/Library/Audio/Plug-Ins/VST3").expandingTildeInPath
-        ]
-        scanRoots.append(contentsOf: customScanPathEntries())
-
-        let fm = FileManager.default
-        var found: [String] = []
-        for root in scanRoots {
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: root, isDirectory: &isDir), isDir.boolValue else {
-                continue
-            }
-            let children = (try? fm.contentsOfDirectory(atPath: root)) ?? []
-            for item in children where item.hasSuffix(".vst3") {
-                found.append("\(root)/\(item)")
-            }
-        }
-        return Array(Set(found))
-            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-            .map { fullPath in
-                AudioPluginDiscovery(
-                    id: "fs:\(fullPath)",
-                    name: URL(fileURLWithPath: fullPath).deletingPathExtension().lastPathComponent,
-                    subtitle: fullPath,
-                    source: .filesystem,
-                    categorySeedText: "\(URL(fileURLWithPath: fullPath).deletingPathExtension().lastPathComponent) \(fullPath)"
-                )
-            }
-        #else
-        return []
-        #endif
-    }
-
-    private func customScanPathEntries() -> [String] {
-        UserDefaults.standard.string(forKey: pluginCustomScanPathsKey)?
-            .split(separator: "\n")
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty } ?? []
     }
 
     // MARK: - Utility
@@ -1228,36 +1045,20 @@ final class AudioPluginRackManager: ObservableObject {
         return true
     }
 
-    // MARK: - App Sandbox Migration
-
-    /// Clears VST3 plugins from persistence if running in a sandbox-restricted environment.
-    /// This prevents crashes on startup when VST3 bundles cannot be loaded due to Sandbox.
-    private func clearVST3PluginsIfSandboxRestricted() {
-        // Check if we have VST3 plugins persisted
-        let hasVST3Plugins = pluginChainByTrack.values.flatMap { $0 }.contains { $0.source == .filesystem }
-
-        guard hasVST3Plugins else {
-            return
-        }
-
-        // For TestFlight/App Store builds with Sandbox, clear VST3 plugins to prevent crashes
-        // The Sandbox prevents loading third-party bundles from /Library/Audio/Plug-Ins/
-        NSLog("AudioPluginRackManager: Detected VST3 plugins in sandbox-restricted environment, clearing VST3 entries")
-
-        // Remove VST3 plugins from the chain but keep AU plugins
+    private func removeLegacyFilesystemPlugins() {
         var modified = false
         for (trackKey, chain) in pluginChainByTrack {
             let filteredChain = chain.filter { $0.source != .filesystem }
             if filteredChain.count != chain.count {
                 pluginChainByTrack[trackKey] = filteredChain
                 modified = true
-                NSLog("AudioPluginRackManager: Removed \(chain.count - filteredChain.count) VST3 plugin(s) from track '\(trackKey)'")
+                NSLog("AudioPluginRackManager: Removed \(chain.count - filteredChain.count) legacy filesystem plugin(s) from track '\(trackKey)'")
             }
         }
 
         if modified {
             savePluginChainState()
-            NSLog("AudioPluginRackManager: Saved cleaned plugin chain (VST3 plugins removed)")
+            NSLog("AudioPluginRackManager: Saved cleaned plugin chain after removing legacy filesystem plugins")
         }
     }
 }

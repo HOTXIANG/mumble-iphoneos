@@ -277,7 +277,6 @@ struct AudioPluginMixerView: View {
     @AppStorage("AudioSidetone") private var audioSidetoneEnabled: Bool = false
     @AppStorage("AudioPluginRemoteBusGain") private var pluginRemoteBusGain: Double = 1.0
     @AppStorage("AudioPluginRemoteBus2Gain") private var pluginRemoteBus2Gain: Double = 1.0
-    @AppStorage("AudioPluginCustomScanPaths") private var pluginCustomScanPaths: String = ""
     @AppStorage("AudioPluginTrackChainsV1") private var pluginTrackChainsData: String = ""
     @AppStorage("AudioPluginPresetsV1") private var pluginPresetsData: String = ""
     @AppStorage("AudioPluginHostBufferFrames") private var pluginHostBufferFrames: Int = 256
@@ -293,15 +292,12 @@ struct AudioPluginMixerView: View {
     @State private var listeningChannelIds: Set<UInt> = []  // 本地维护的监听频道集合
     @State private var selectedTrack: MixerTrack = .input
     @State private var installedAudioUnits: [DiscoveredPlugin] = []
-    @State private var scannedFilesystemPlugins: [DiscoveredPlugin] = []
     @State private var pluginChainByTrack: [String: [TrackPlugin]] = [:]
     @State private var trackSendRoutesBySource: [String: [TrackSendRoute]] = [:]
-    @State private var customScanPathInput: String = ""
     @State private var pluginOperationMessage: String = ""
     @State private var selectedPluginID: String? = nil
     @State private var loadingPluginIDs: Set<String> = []
     @State private var loadedAudioUnits: [String: AVAudioUnit] = [:]  // Key: "\(trackKey):\(pluginID)"
-    @State private var loadedVST3Hosts: [String: MKVST3PluginHost] = [:]  // Key: "\(trackKey):\(pluginID)"
     @State private var cachedPluginEditorControllers: [String: PlatformViewController] = [:]
     @State private var parameterStateByPlugin: [String: [RuntimeParameter]] = [:]
     @State private var lastLoadErrorByPlugin: [String: String] = [:]
@@ -389,9 +385,6 @@ struct AudioPluginMixerView: View {
         initializeListeningChannels()
         refreshRemoteSessionOrder()
         refreshInstalledAudioUnits()
-#if os(macOS)
-        refreshFilesystemPluginScan()
-#endif
         loadSelectedTrackState()
         normalizeSelectedPluginSelection()
         if !adoptedLiveProcessorState {
@@ -406,7 +399,7 @@ struct AudioPluginMixerView: View {
     @discardableResult
     private func syncLoadedStateFromSharedRackManager() -> Bool {
         let manager = AudioPluginRackManager.shared
-        let adoptedLiveProcessorState = !manager.loadedAudioUnits.isEmpty || !manager.loadedVST3Hosts.isEmpty
+        let adoptedLiveProcessorState = !manager.loadedAudioUnits.isEmpty
 
         if !manager.pluginChainByTrack.isEmpty {
             pluginChainByTrack = manager.pluginChainByTrack
@@ -414,9 +407,6 @@ struct AudioPluginMixerView: View {
         trackSendRoutesBySource = manager.trackSendRoutesBySource
         if !manager.loadedAudioUnits.isEmpty {
             loadedAudioUnits = manager.loadedAudioUnits
-        }
-        if !manager.loadedVST3Hosts.isEmpty {
-            loadedVST3Hosts = manager.loadedVST3Hosts
         }
         if !manager.lastLoadErrorByPlugin.isEmpty {
             lastLoadErrorByPlugin = manager.lastLoadErrorByPlugin
@@ -1247,33 +1237,16 @@ struct AudioPluginMixerView: View {
     @ViewBuilder
     private func pluginSelectMenu(slotIndex: Int, plugin: TrackPlugin?, minWidth: CGFloat, compact: Bool = false) -> some View {
         Menu {
-            if installedAudioUnits.isEmpty && scannedFilesystemPlugins.isEmpty {
+            if installedAudioUnits.isEmpty {
                 Text(NSLocalizedString("No plugins available", comment: ""))
             }
             if !installedAudioUnits.isEmpty {
-                Menu(NSLocalizedString("Audio Units", comment: "")) {
-                    ForEach(groupedPluginsByCategory(installedAudioUnits), id: \.category) { group in
-                        Menu(group.category) {
-                            ForEach(group.plugins, id: \.id) { discovered in
-                                Button(discovered.name) {
-                                    Task {
-                                        await assignPluginToSlot(discovered, slotIndex: slotIndex)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if !scannedFilesystemPlugins.isEmpty {
-                Menu(NSLocalizedString("VST3", comment: "")) {
-                    ForEach(groupedPluginsByCategory(scannedFilesystemPlugins), id: \.category) { group in
-                        Menu(group.category) {
-                            ForEach(group.plugins, id: \.id) { discovered in
-                                Button(discovered.name) {
-                                    Task {
-                                        await assignPluginToSlot(discovered, slotIndex: slotIndex)
-                                    }
+                ForEach(groupedPluginsByCategory(installedAudioUnits), id: \.category) { group in
+                    Menu(group.category) {
+                        ForEach(group.plugins, id: \.id) { discovered in
+                            Button(discovered.name) {
+                                Task {
+                                    await assignPluginToSlot(discovered, slotIndex: slotIndex)
                                 }
                             }
                         }
@@ -1332,55 +1305,6 @@ struct AudioPluginMixerView: View {
                     }
                 }
             }
-
-#if os(macOS)
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(NSLocalizedString("Custom Scan Paths", comment: ""))
-                    .font(.subheadline.weight(.semibold))
-                HStack(spacing: 8) {
-                    TextField("/Library/Audio/Plug-Ins/VST3", text: $customScanPathInput)
-                    Button(NSLocalizedString("Add", comment: "")) {
-                        addCustomScanPath()
-                    }
-                    .disabled(customScanPathInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-
-                if customScanPathEntries.isEmpty {
-                    Text(NSLocalizedString("No custom scan paths", comment: ""))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(customScanPathEntries, id: \.self) { path in
-                        HStack {
-                            Text(path)
-                                .font(.caption)
-                                .lineLimit(1)
-                            Spacer()
-                            Button(NSLocalizedString("Remove", comment: "")) {
-                                removeCustomScanPath(path)
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-                }
-            }
-
-            if scannedFilesystemPlugins.isEmpty {
-                Text(NSLocalizedString("No VST3 bundles found in scan paths", comment: ""))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(NSLocalizedString("VST3", comment: ""))
-                        .font(.subheadline.weight(.semibold))
-                    ForEach(groupedPluginsByCategory(scannedFilesystemPlugins), id: \.category) { group in
-                        pluginBrowserCategorySection(group)
-                    }
-                }
-            }
-#endif
         }
         .padding(14)
         .modifier(ClearGlassModifier(cornerRadius: 12))
@@ -1398,11 +1322,6 @@ struct AudioPluginMixerView: View {
                     Button(NSLocalizedString("Refresh Audio Units", comment: "")) {
                         refreshInstalledAudioUnits()
                     }
-#if os(macOS)
-                    Button(NSLocalizedString("Scan Plugin Bundles", comment: "")) {
-                        refreshFilesystemPluginScan()
-                    }
-#endif
                     Button(NSLocalizedString("Done", comment: "")) {
                         showingPluginBrowser = false
                     }
@@ -1507,7 +1426,7 @@ struct AudioPluginMixerView: View {
                     .frame(minWidth: 88, alignment: .trailing)
             }
             .menuStyle(.borderlessButton)
-            Text(plugin.source == .audioUnit ? NSLocalizedString("AU", comment: "") : NSLocalizedString("VST", comment: ""))
+            Text(NSLocalizedString("AU", comment: ""))
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
@@ -1703,7 +1622,7 @@ struct AudioPluginMixerView: View {
 
     private func pluginLoaded(for pluginID: String) -> Bool {
         let loadedKey = loadedAudioUnitKey(trackKey: selectedTrackKey, pluginID: pluginID)
-        return loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil
+        return loadedAudioUnits[loadedKey] != nil
     }
 
     // MARK: - Sidechain Support
@@ -1792,6 +1711,7 @@ struct AudioPluginMixerView: View {
             return
         }
         pluginChainByTrack = decoded
+        removeLegacyFilesystemPlugins()
     }
 
     /// 旧版使用 "remoteBus" 键，新版迁移到 "masterBus1"
@@ -1810,6 +1730,20 @@ struct AudioPluginMixerView: View {
             return
         }
         pluginTrackChainsData = string
+    }
+
+    private func removeLegacyFilesystemPlugins() {
+        var modified = false
+        for (trackKey, chain) in pluginChainByTrack {
+            let filteredChain = chain.filter { $0.source != .filesystem }
+            if filteredChain.count != chain.count {
+                pluginChainByTrack[trackKey] = filteredChain
+                modified = true
+            }
+        }
+        if modified {
+            savePluginChainState()
+        }
     }
 
     private func addPlugin(_ plugin: DiscoveredPlugin) async {
@@ -1858,8 +1792,7 @@ struct AudioPluginMixerView: View {
         // Sync DSP chain first to register the plugin in the chain
         syncAudioUnitDSPChainForTrackKey(selectedTrackKey)
 
-        // Then attempt to load if needed (VST3 or AU with filesystem source)
-        if (plugin.source == .audioUnit || plugin.source == .filesystem), let latest = selectedTrackChain.last {
+        if plugin.source == .audioUnit, let latest = selectedTrackChain.last {
             if await loadAudioUnit(for: latest) {
                 await MainActor.run {
                     openPluginEditor(for: latest)
@@ -1943,7 +1876,7 @@ struct AudioPluginMixerView: View {
 
         guard let insertedPluginID else { return }
         if let inserted = selectedTrackChain.first(where: { $0.id == insertedPluginID }),
-           inserted.source == .audioUnit || inserted.source == .filesystem {
+           inserted.source == .audioUnit {
             if await loadAudioUnit(for: inserted) {
                 await MainActor.run {
                     openPluginEditor(for: inserted)
@@ -2070,11 +2003,11 @@ struct AudioPluginMixerView: View {
         let targets = pluginChainByTrack
             .flatMap { trackKey, chain in
                 chain.filter { plugin in
-                    guard plugin.source == .audioUnit || plugin.source == .filesystem else {
+                    guard plugin.source == .audioUnit else {
                         return false
                     }
                     let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
-                    return loadedAudioUnits[loadedKey] == nil && loadedVST3Hosts[loadedKey] == nil
+                    return loadedAudioUnits[loadedKey] == nil
                 }
             }
 
@@ -2145,20 +2078,9 @@ struct AudioPluginMixerView: View {
         }
     }
 
-    private enum LoadedPluginProcessor {
-        case audioUnit(AVAudioUnit)
-        case vst3(MKVST3PluginHost)
-    }
-
-    private func loadedProcessor(for trackKey: String, pluginID: String) -> LoadedPluginProcessor? {
+    private func loadedProcessor(for trackKey: String, pluginID: String) -> AVAudioUnit? {
         let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
-        if let audioUnit = loadedAudioUnits[loadedKey] {
-            return .audioUnit(audioUnit)
-        }
-        if let vst3Host = loadedVST3Hosts[loadedKey] {
-            return .vst3(vst3Host)
-        }
-        return nil
+        return loadedAudioUnits[loadedKey]
     }
 
     private func activeProcessorChain(for key: String) -> [NSDictionary] {
@@ -2171,24 +2093,16 @@ struct AudioPluginMixerView: View {
                     return nil
                 }
                 let mix = NSNumber(value: min(max(plugin.stageGain, 0.0), 1.0))
-                var dict: [String: Any] = [:]
-
-                switch processor {
-                case .audioUnit(let audioUnit):
-                    dict["audioUnit"] = audioUnit
-                    dict["mix"] = mix
-                    if let sidechainSource = plugin.sidechainSourceKey,
-                       !sidechainSource.isEmpty,
-                       validSidechainKeys.contains(sidechainSource) {
-                        dict["sidechainSource"] = sidechainSource
-                    }
-                    return dict as NSDictionary
-                case .vst3(let vst3Host):
-                    dict["vst3Host"] = vst3Host
-                    dict["mix"] = mix
-                    // VST3 sidechain not supported yet
-                    return dict as NSDictionary
+                var dict: [String: Any] = [
+                    "audioUnit": processor,
+                    "mix": mix
+                ]
+                if let sidechainSource = plugin.sidechainSourceKey,
+                   !sidechainSource.isEmpty,
+                   validSidechainKeys.contains(sidechainSource) {
+                    dict["sidechainSource"] = sidechainSource
                 }
+                return dict as NSDictionary
             }
     }
 
@@ -2476,7 +2390,7 @@ struct AudioPluginMixerView: View {
                 state = .bypassed
             } else if loadingPluginIDs.contains(plugin.id) {
                 state = .loading
-            } else if loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil {
+            } else if loadedAudioUnits[loadedKey] != nil {
                 state = .loaded
             } else if lastLoadErrorByPlugin[plugin.id] != nil {
                 state = .failed
@@ -2500,8 +2414,8 @@ struct AudioPluginMixerView: View {
     }
 
     private func loadAudioUnit(for plugin: TrackPlugin) async -> Bool {
-        guard plugin.source == .audioUnit || plugin.source == .filesystem else {
-            pluginOperationMessage = NSLocalizedString("Only Audio Unit and filesystem plugins can be loaded", comment: "")
+        guard plugin.source == .audioUnit else {
+            pluginOperationMessage = NSLocalizedString("Only Audio Unit plugins can be loaded", comment: "")
             return false
         }
 
@@ -2518,23 +2432,12 @@ struct AudioPluginMixerView: View {
         if loadingPluginIDs.contains(plugin.id) {
             return false
         }
-        if loadedAudioUnits[loadedKey] != nil || loadedVST3Hosts[loadedKey] != nil {
+        if loadedAudioUnits[loadedKey] != nil {
             return true
         }
 
         let requiredChannels = channelCount(for: trackKey)
         let requiredSampleRate = pluginSampleRate(for: trackKey)
-
-        // For filesystem plugins (VST3), use dedicated VST3 loading
-        if plugin.source == .filesystem {
-            return await loadVST3Plugin(
-                plugin,
-                loadedKey: loadedKey,
-                requiredChannels: requiredChannels,
-                sampleRate: requiredSampleRate,
-                trackKey: trackKey
-            )
-        }
 
         // For Audio Unit plugins, use the component description lookup
         let description = audioUnitDescriptionByIdentifier[plugin.identifier] ?? parseAudioUnitDescription(from: plugin.identifier)
@@ -2575,76 +2478,6 @@ struct AudioPluginMixerView: View {
         pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, errorText!)
         rebuildProcessorStateMachine()
         return false
-    }
-
-    private func loadVST3Plugin(
-        _ plugin: TrackPlugin,
-        loadedKey: String,
-        requiredChannels: UInt,
-        sampleRate: Double,
-        trackKey: String
-    ) async -> Bool {
-        guard plugin.identifier.hasPrefix("fs:") else {
-            let message = NSLocalizedString("Invalid filesystem plugin identifier", comment: "")
-            lastLoadErrorByPlugin[plugin.id] = message
-            pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, message)
-            rebuildProcessorStateMachine()
-            return false
-        }
-
-        loadingPluginIDs.insert(plugin.id)
-        lastLoadErrorByPlugin[plugin.id] = nil
-        rebuildProcessorStateMachine()
-
-        let bundlePath = String(plugin.identifier.dropFirst(3))
-
-        let host: MKVST3PluginHost
-        do {
-            host = try MKVST3PluginHost(bundlePath: bundlePath, displayName: plugin.name)
-        } catch {
-            loadingPluginIDs.remove(plugin.id)
-            parameterStateByPlugin[plugin.id] = nil
-            let message = error.localizedDescription.isEmpty
-                ? NSLocalizedString("Failed to create VST3 host", comment: "")
-                : error.localizedDescription
-            lastLoadErrorByPlugin[plugin.id] = message
-            pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, message)
-            NSLog("MKVST3-Swift: init FAILED for '\(plugin.name)': \(message)")
-            rebuildProcessorStateMachine()
-            return false
-        }
-
-        let effectiveSampleRate = sampleRate > 0 ? sampleRate : 48_000
-        let effectiveFrames = max(pluginHostBufferFrames, 64)
-        do {
-            try host.configure(
-                withInputChannels: UInt(requiredChannels),
-                outputChannels: UInt(requiredChannels),
-                sampleRate: effectiveSampleRate,
-                maximumFramesToRender: UInt(effectiveFrames)
-            )
-        } catch {
-            loadingPluginIDs.remove(plugin.id)
-            parameterStateByPlugin[plugin.id] = nil
-            let message = error.localizedDescription.isEmpty
-                ? NSLocalizedString("Failed to configure VST3 plug-in", comment: "")
-                : error.localizedDescription
-            lastLoadErrorByPlugin[plugin.id] = message
-            pluginOperationMessage = String(format: NSLocalizedString("Failed to load %@: %@", comment: ""), plugin.name, message)
-            NSLog("MKVST3-Swift: configure FAILED for '\(plugin.name)': \(message)")
-            rebuildProcessorStateMachine()
-            return false
-        }
-
-        loadingPluginIDs.remove(plugin.id)
-        loadedVST3Hosts[loadedKey] = host
-        NSLog("MKVST3-Swift: fully loaded '\(plugin.name)' key=\(loadedKey)")
-        rebuildParameterState(pluginID: plugin.id, vst3Host: host)
-        lastLoadErrorByPlugin[plugin.id] = nil
-        pluginOperationMessage = String(format: NSLocalizedString("Loaded %@", comment: ""), plugin.name)
-        applyLivePreviewForTrackKey(trackKey)
-        rebuildProcessorStateMachine()
-        return true
     }
 
     private func instantiateAudioUnitWithFallback(
@@ -2834,11 +2667,15 @@ struct AudioPluginMixerView: View {
 
         let pluginKey = "\(trackKey):\(plugin.id)"
 
-        switch loadedProcessor(for: trackKey, pluginID: plugin.id) {
-        case .audioUnit(let unit):
+        if let unit = loadedProcessor(for: trackKey, pluginID: plugin.id) {
             let targetPluginID = plugin.id
             let targetTrackKey = trackKey
-            if let cachedController = cachedPluginEditorControllers[pluginKey] {
+            #if os(macOS)
+            let sharedCachedController = PluginEditorWindowController.shared.cachedController(for: pluginKey)
+            #else
+            let sharedCachedController: PlatformViewController? = nil
+            #endif
+            if let cachedController = cachedPluginEditorControllers[pluginKey] ?? sharedCachedController {
                 presentPluginEditor(controller: cachedController,
                                     pluginKey: pluginKey,
                                     pluginName: plugin.name,
@@ -2853,6 +2690,9 @@ struct AudioPluginMixerView: View {
                         return
                     }
                     cachedPluginEditorControllers[pluginKey] = viewController
+                    #if os(macOS)
+                    PluginEditorWindowController.shared.cacheController(viewController, for: pluginKey)
+                    #endif
                     presentPluginEditor(controller: viewController,
                                         pluginKey: pluginKey,
                                         pluginName: plugin.name,
@@ -2860,30 +2700,7 @@ struct AudioPluginMixerView: View {
                                         pluginID: targetPluginID)
                 }
             }
-        case .vst3(let vst3Host):
-#if os(iOS)
-            pluginOperationMessage = NSLocalizedString("Plugin UI is unavailable on iOS", comment: "")
-#else
-            if let cachedController = cachedPluginEditorControllers[pluginKey] {
-                presentPluginEditor(controller: cachedController,
-                                    pluginKey: pluginKey,
-                                    pluginName: plugin.name,
-                                    trackKey: trackKey,
-                                    pluginID: plugin.id)
-                return
-            }
-            // Try native VST3 editor view first
-            let nativeVC: NSViewController? = try? vst3Host.requestViewController()
-            if let nativeVC {
-                cachedPluginEditorControllers[pluginKey] = nativeVC
-            }
-            presentPluginEditor(controller: nativeVC,
-                                pluginKey: pluginKey,
-                                pluginName: plugin.name,
-                                trackKey: trackKey,
-                                pluginID: plugin.id)
-#endif
-        case .none:
+        } else {
             pluginOperationMessage = NSLocalizedString("Plugin is not ready", comment: "")
             return
         }
@@ -2956,6 +2773,9 @@ struct AudioPluginMixerView: View {
 
     private func clearPluginEditorCache(for plugin: TrackPlugin, trackKey: String) {
         cachedPluginEditorControllers.removeValue(forKey: "\(trackKey):\(plugin.id)")
+#if os(macOS)
+        PluginEditorWindowController.shared.removeCachedController(for: "\(trackKey):\(plugin.id)")
+#endif
     }
 
     private func unloadAudioUnit(for plugin: TrackPlugin) {
@@ -2966,7 +2786,6 @@ struct AudioPluginMixerView: View {
             clearPluginEditorCache(for: plugin, trackKey: trackKey)
             let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id)
             loadedAudioUnits[loadedKey] = nil
-            loadedVST3Hosts[loadedKey] = nil
         }
 
         parameterStateByPlugin[plugin.id] = nil
@@ -3107,38 +2926,12 @@ struct AudioPluginMixerView: View {
         parameterStateByPlugin[pluginID] = state
     }
 
-    private func rebuildParameterState(pluginID: String, vst3Host: MKVST3PluginHost) {
-        var state = vst3Host.copyParameterSnapshots()
-            .prefix(64)
-            .compactMap { snapshot -> RuntimeParameter? in
-                guard let parameterID = snapshot["id"] as? NSNumber,
-                      let name = snapshot["name"] as? String,
-                      let minValue = snapshot["minValue"] as? NSNumber,
-                      let maxValue = snapshot["maxValue"] as? NSNumber,
-                      let value = snapshot["value"] as? NSNumber else {
-                    return nil
-                }
-
-                return RuntimeParameter(
-                    id: parameterID.uint64Value,
-                    name: name,
-                    minValue: minValue.floatValue,
-                    maxValue: maxValue.floatValue,
-                    value: value.floatValue
-                )
-            }
-        applySavedParameters(pluginID: pluginID, state: &state, vst3Host: vst3Host)
-        parameterStateByPlugin[pluginID] = state
-    }
-
     private func refreshParameters(for pluginID: String, trackKey: String? = nil) {
         let tk = trackKey ?? selectedTrackKey
         let loadedKey = loadedAudioUnitKey(trackKey: tk, pluginID: pluginID)
         DispatchQueue.main.async {
             if let unit = loadedAudioUnits[loadedKey] {
                 rebuildParameterState(pluginID: pluginID, unit: unit)
-            } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-                rebuildParameterState(pluginID: pluginID, vst3Host: vst3Host)
             }
         }
     }
@@ -3156,25 +2949,6 @@ struct AudioPluginMixerView: View {
             guard let saved = plugin.savedParameterValues[key] else { continue }
             state[index].value = saved
             lookup[state[index].id]?.value = saved
-        }
-    }
-
-    private func applySavedParameters(pluginID: String, state: inout [RuntimeParameter], vst3Host: MKVST3PluginHost) {
-        guard let plugin = findPlugin(withID: pluginID), !plugin.savedParameterValues.isEmpty else {
-            // No saved values - this is normal for newly added plugins, don't log
-            return
-        }
-        var restoredCount = 0
-        for index in state.indices {
-            let key = String(state[index].id)
-            guard let saved = plugin.savedParameterValues[key] else { continue }
-            let normalized = min(max(saved, state[index].minValue), state[index].maxValue)
-            state[index].value = normalized
-            _ = vst3Host.setParameter(withID: state[index].id, normalizedValue: normalized)
-            restoredCount += 1
-        }
-        if restoredCount > 0 {
-            NSLog("MKVST3-Swift: restored \(restoredCount) saved params for \(plugin.name)")
         }
     }
 
@@ -3202,8 +2976,6 @@ struct AudioPluginMixerView: View {
         if let unit = loadedAudioUnits[loadedKey],
            let parameter = unit.auAudioUnit.parameterTree?.allParameters.first(where: { $0.address == parameterID }) {
             parameter.value = newValue
-        } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-            _ = vst3Host.setParameter(withID: parameterID, normalizedValue: newValue)
         }
 
         guard var list = parameterStateByPlugin[pluginID],
@@ -3222,7 +2994,7 @@ struct AudioPluginMixerView: View {
         }
     }
 
-    /// 从所有已加载的 AU/VST3 实例中抓取当前参数值，写入 savedParameterValues 并持久化。
+    /// 从所有已加载的 AU 实例中抓取当前参数值，写入 savedParameterValues 并持久化。
     /// 用于捕获通过原生插件 UI 修改的参数（这些参数不经过 setParameterValue 回调）。
     private func snapshotAllPluginParameters() {
         var didChange = false
@@ -3234,12 +3006,6 @@ struct AudioPluginMixerView: View {
                 if let unit = loadedAudioUnits[loadedKey] {
                     for param in unit.auAudioUnit.parameterTree?.allParameters ?? [] {
                         captured[String(param.address)] = param.value
-                    }
-                } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-                    for snapshot in vst3Host.copyParameterSnapshots() {
-                        guard let parameterID = snapshot["id"] as? NSNumber,
-                              let value = snapshot["value"] as? NSNumber else { continue }
-                        captured[String(parameterID.uint64Value)] = value.floatValue
                     }
                 }
 
@@ -3346,12 +3112,6 @@ struct AudioPluginMixerView: View {
                 if let paramID = UInt64(paramIDString),
                    let param = au.parameterTree?.parameter(withAddress: AUParameterAddress(paramID)) {
                     param.value = value
-                }
-            }
-        } else if let vst3Host = loadedVST3Hosts[loadedKey] {
-            for (paramIDString, value) in preset.parameterValues {
-                if let paramID = UInt64(paramIDString) {
-                    _ = vst3Host.setParameter(withID: paramID, normalizedValue: value)
                 }
             }
         }
@@ -3586,66 +3346,6 @@ struct AudioPluginMixerView: View {
         audioUnitDescriptionByIdentifier = descriptionLookup
     }
 
-    private var customScanPathEntries: [String] {
-        pluginCustomScanPaths
-            .split(separator: "\n")
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-
-    private func addCustomScanPath() {
-        let candidate = customScanPathInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !candidate.isEmpty else { return }
-        var entries = customScanPathEntries
-        if !entries.contains(candidate) {
-            entries.append(candidate)
-            pluginCustomScanPaths = entries.joined(separator: "\n")
-        }
-        customScanPathInput = ""
-        refreshFilesystemPluginScan()
-    }
-
-    private func removeCustomScanPath(_ path: String) {
-        let entries = customScanPathEntries.filter { $0 != path }
-        pluginCustomScanPaths = entries.joined(separator: "\n")
-        refreshFilesystemPluginScan()
-    }
-
-    private func refreshFilesystemPluginScan() {
-#if os(macOS)
-        var scanRoots: [String] = [
-            "/Library/Audio/Plug-Ins/VST3",
-            NSString(string: "~/Library/Audio/Plug-Ins/VST3").expandingTildeInPath
-        ]
-        scanRoots.append(contentsOf: customScanPathEntries)
-
-        let fm = FileManager.default
-        var found: [String] = []
-        for root in scanRoots {
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: root, isDirectory: &isDir), isDir.boolValue else {
-                continue
-            }
-            let children = (try? fm.contentsOfDirectory(atPath: root)) ?? []
-            for item in children {
-                if item.hasSuffix(".vst3") {
-                    found.append("\(root)/\(item)")
-                }
-            }
-        }
-        scannedFilesystemPlugins = Array(Set(found))
-            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-            .map { fullPath in
-                DiscoveredPlugin(
-                    id: "fs:\(fullPath)",
-                    name: URL(fileURLWithPath: fullPath).deletingPathExtension().lastPathComponent,
-                    subtitle: fullPath,
-                    source: .filesystem,
-                    categorySeedText: "\(URL(fileURLWithPath: fullPath).deletingPathExtension().lastPathComponent) \(fullPath)"
-                )
-            }
-#endif
-    }
 }
 
 #if os(iOS)
@@ -3976,6 +3676,7 @@ final class PluginEditorWindowController: NSObject {
     private var windows: [String: NSWindow] = [:]
     private var closeHandlers: [String: () -> Void] = [:]
     private var sizeObservers: [String: NSKeyValueObservation] = [:]
+    private var cachedControllers: [String: NSViewController] = [:]
     private var rememberedContentSizes: [String: NSSize] = [:]
     private var minimumContentSizes: [String: NSSize] = [:]
     private var rememberedMinimumContentSizes: [String: NSSize] = [:]
@@ -4066,6 +3767,18 @@ final class PluginEditorWindowController: NSObject {
 
     func isShowing(pluginKey: String) -> Bool {
         windows[pluginKey] != nil
+    }
+
+    func cachedController(for pluginKey: String) -> NSViewController? {
+        cachedControllers[pluginKey]
+    }
+
+    func cacheController(_ controller: NSViewController, for pluginKey: String) {
+        cachedControllers[pluginKey] = controller
+    }
+
+    func removeCachedController(for pluginKey: String) {
+        cachedControllers.removeValue(forKey: pluginKey)
     }
 
     private func normalizedSize(from preferred: NSSize) -> NSSize {

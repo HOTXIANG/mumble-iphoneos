@@ -1696,7 +1696,7 @@ final class MUTestCommandRouter {
     private func serializeTrackPlugin(trackKey: String, plugin: TrackPlugin) -> [String: Any] {
         let manager = AudioPluginRackManager.shared
         let loadedKey = "\(trackKey):\(plugin.id)"
-        let isLoaded = manager.loadedAudioUnits[loadedKey] != nil || manager.loadedVST3Hosts[loadedKey] != nil
+        let isLoaded = manager.loadedAudioUnits[loadedKey] != nil
         return [
             "id": plugin.id,
             "trackKey": trackKey,
