@@ -13,4 +13,5 @@
 
 #ifdef __OBJC__
     #import "Mumble-Bridging-Header.h"
+    #import "MumbleLogger.h"
 #endif

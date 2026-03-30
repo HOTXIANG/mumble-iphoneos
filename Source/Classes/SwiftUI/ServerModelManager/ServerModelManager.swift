@@ -42,6 +42,9 @@ final class DelegateToken {
 
 @MainActor
 class ServerModelManager: ObservableObject {
+    /// 弱引用单例，供 Mixer 等独立窗口在无 EnvironmentObject 时访问
+    static weak var shared: ServerModelManager?
+
     @Published var modelItems: [ChannelNavigationItem] = []
     @Published var viewMode: ViewMode = .server
     @Published var isConnected: Bool = false
@@ -146,6 +149,7 @@ class ServerModelManager: ObservableObject {
     
     init() {
         MumbleLogger.model.debug("ServerModelManager init")
+        ServerModelManager.shared = self
     }
 
     deinit {

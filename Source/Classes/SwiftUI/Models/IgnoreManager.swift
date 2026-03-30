@@ -21,11 +21,13 @@ final class IgnoreManager: ObservableObject {
     }
     
     func ignoreUser(userHash: String) {
+        MumbleLogger.model.info("Ignoring user: \(userHash.prefix(8))...")
         ignoredHashes.insert(userHash)
         save()
     }
-    
+
     func unignoreUser(userHash: String) {
+        MumbleLogger.model.info("Unignoring user: \(userHash.prefix(8))...")
         ignoredHashes.remove(userHash)
         save()
     }

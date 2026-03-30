@@ -103,7 +103,61 @@ struct CertificatePreferencesView: View {
                 )
             })
             .onAppear {
+                AppState.shared.setAutomationCurrentScreen("certificateSettings")
                 certModel.refreshCertificates()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+                guard let target = notification.userInfo?["target"] as? String else { return }
+                switch target {
+                case "certificateDelete":
+                    if let cert = automationCertificate(from: notification.userInfo) {
+                        prepareDelete(cert)
+                    }
+                case "certificateExportPassword":
+                    if let cert = automationCertificate(from: notification.userInfo) {
+                        prepareExport(cert)
+                    }
+                default:
+                    break
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+                let target = notification.userInfo?["target"] as? String
+                switch target {
+                case nil:
+                    showingImportPasswordAlert = false
+                    showingImportErrorAlert = false
+                    showingExportPasswordAlert = false
+                    showingExportResultAlert = false
+                    showingShareSheet = false
+                    showingDeleteConfirmation = false
+                case "certificateImportPassword":
+                    showingImportPasswordAlert = false
+                case "certificateImportError":
+                    showingImportErrorAlert = false
+                case "certificateExportPassword":
+                    showingExportPasswordAlert = false
+                case "certificateExportResult":
+                    showingExportResultAlert = false
+                case "certificateExportShare":
+                    showingShareSheet = false
+                case "certificateDelete":
+                    showingDeleteConfirmation = false
+                default:
+                    break
+                }
+            }
+            .onChange(of: showingImportPasswordAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingImportErrorAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingExportPasswordAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingExportResultAlert) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingDeleteConfirmation) { _, _ in syncAutomationAlertState() }
+            .onChange(of: showingShareSheet) { _, isPresented in
+                if isPresented {
+                    AppState.shared.setAutomationPresentedSheet("certificateExportShare")
+                } else {
+                    AppState.shared.clearAutomationPresentedSheet(ifMatches: "certificateExportShare")
+                }
             }
     }
     
@@ -216,7 +270,7 @@ struct CertificatePreferencesView: View {
                 }
             }
         case .failure(let error):
-            print("Import picker failed: \(error.localizedDescription)")
+            MumbleLogger.certificate.error("Import picker failed: \(error.localizedDescription)")
         }
     }
     
@@ -253,7 +307,7 @@ struct CertificatePreferencesView: View {
         guard let cert = certToExport else { return }
 
         guard let tempURL = certModel.exportCertificate(cert, password: exportPassword) else {
-            print("❌ Export failed: unable to generate PKCS12 for \(cert.name)")
+            MumbleLogger.certificate.error("Export failed: unable to generate PKCS12 for \(cert.name)")
             exportResultMessage = "Failed to export certificate. Please verify this identity still contains a valid private key."
             showingExportResultAlert = true
             return
@@ -270,7 +324,7 @@ struct CertificatePreferencesView: View {
 
             let response = savePanel.runModal()
             guard response == .OK, let destinationURL = savePanel.url else {
-                print("ℹ️ Export cancelled by user for \(cert.name)")
+                MumbleLogger.certificate.info("Export cancelled by user for \(cert.name)")
                 try? FileManager.default.removeItem(at: tempURL)
                 return
             }
@@ -280,11 +334,11 @@ struct CertificatePreferencesView: View {
             }
             try FileManager.default.copyItem(at: tempURL, to: destinationURL)
 
-            print("✅ Export succeeded: \(destinationURL.path)")
+            MumbleLogger.certificate.info("Export succeeded: \(destinationURL.path)")
             exportResultMessage = "Certificate exported to:\n\(destinationURL.path)"
             showingExportResultAlert = true
         } catch {
-            print("❌ Export save failed: \(error.localizedDescription)")
+            MumbleLogger.certificate.error("Export save failed: \(error.localizedDescription)")
             exportResultMessage = "Failed to save exported file:\n\(error.localizedDescription)"
             showingExportResultAlert = true
         }
@@ -296,7 +350,7 @@ struct CertificatePreferencesView: View {
         do {
             try FileManager.default.removeItem(at: tempURL)
         } catch {
-            print("ℹ️ Failed to remove temporary export file: \(error.localizedDescription)")
+            MumbleLogger.certificate.warning("Failed to remove temporary export file: \(error.localizedDescription)")
         }
     }
 
@@ -319,7 +373,7 @@ struct CertificatePreferencesView: View {
 
         let response = panel.runModal()
         guard response == .OK, let url = panel.url else {
-            print("ℹ️ Import cancelled by user")
+            MumbleLogger.certificate.info("Import cancelled by user")
             return
         }
 
@@ -340,6 +394,34 @@ struct CertificatePreferencesView: View {
         #else
         showingImportPicker = true
         #endif
+    }
+
+    private func automationCertificate(from userInfo: [AnyHashable: Any]?) -> CertificateItem? {
+        if let id = userInfo?["id"] as? Data,
+           let cert = certModel.certificates.first(where: { $0.id == id }) {
+            return cert
+        }
+        if let name = userInfo?["name"] as? String,
+           let cert = certModel.certificates.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            return cert
+        }
+        return nil
+    }
+
+    private func syncAutomationAlertState() {
+        if showingDeleteConfirmation {
+            AppState.shared.setAutomationPresentedAlert("certificateDelete")
+        } else if showingExportResultAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateExportResult")
+        } else if showingExportPasswordAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateExportPassword")
+        } else if showingImportErrorAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateImportError")
+        } else if showingImportPasswordAlert {
+            AppState.shared.setAutomationPresentedAlert("certificateImportPassword")
+        } else if ["certificateDelete", "certificateExportResult", "certificateExportPassword", "certificateImportError", "certificateImportPassword"].contains(AppState.shared.automationPresentedAlert ?? "") {
+            AppState.shared.setAutomationPresentedAlert(nil)
+        }
     }
 }
 

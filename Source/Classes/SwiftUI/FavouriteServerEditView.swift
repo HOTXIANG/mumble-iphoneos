@@ -235,6 +235,7 @@ struct FavouriteServerEditView: View {
         }
         .onAppear {
             // 确保证书状态是最新的
+            AppState.shared.setAutomationCurrentScreen(isEditMode ? "favouriteEdit" : "favouriteNew")
             certModel.refreshCertificates()
             reconcileSelectedCertificateTagIfNeeded()
         }
@@ -513,7 +514,7 @@ struct FavouriteServerEditView: View {
             
             // 尝试在证书库里找找有没有同名的（大小写不敏感）
             if let matchRef = certModel.findCertificateReference(name: potentialCertName) {
-                print("♻️ Auto-matched existing certificate for \(potentialCertName)")
+                MumbleLogger.certificate.info("Auto-matched existing certificate for \(potentialCertName)")
                 serverToSave.certificateRef = matchRef
             }
         }
@@ -522,10 +523,14 @@ struct FavouriteServerEditView: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        FavouriteServerEditView(server: nil) { server in
-            print("Server saved: \(server.displayName ?? "")")
+#if DEBUG
+struct FavouriteServerEditView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            FavouriteServerEditView(server: nil) { server in
+                MumbleLogger.database.debug("Server saved: \(server.displayName ?? "")")
+            }
         }
     }
 }
+#endif

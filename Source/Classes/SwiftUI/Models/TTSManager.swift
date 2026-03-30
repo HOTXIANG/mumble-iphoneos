@@ -33,7 +33,8 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         // Must run on main thread if accessed from different threads
         DispatchQueue.main.async {
             guard UserDefaults.standard.bool(forKey: self.enableTTSKey), !text.isEmpty else { return }
-            
+            MumbleLogger.audio.debug("TTS speaking: \(text.prefix(50))")
+
             #if os(iOS)
             self.prepareAudioSessionForSpeech()
             #endif
@@ -56,12 +57,14 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        MumbleLogger.audio.debug("TTS finished speaking")
         #if os(iOS)
         restoreAudioAfterSpeechIfNeeded()
         #endif
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        MumbleLogger.audio.debug("TTS cancelled")
         #if os(iOS)
         restoreAudioAfterSpeechIfNeeded()
         #endif
@@ -77,7 +80,7 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
             )
             try session.setActive(true, options: [])
         } catch {
-            // Do not block speaking on session setup failure.
+            MumbleLogger.audio.error("TTS audio session setup failed: \(error)")
         }
     }
 
@@ -96,7 +99,7 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
             try session.setCategory(.playAndRecord, mode: .voiceChat, options: options)
             try session.setActive(true, options: [])
         } catch {
-            // Do not block TTS flow on restore failure.
+            MumbleLogger.audio.error("TTS voice chat session restore failed: \(error)")
         }
     }
 
@@ -112,11 +115,13 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         // 如果本来就闭麦/闭听，则不做 stop/start，避免误触发麦克风自动开启；
         // 但仍需切到可播报的会话，否则首次连接时可能无声。
         if mumbleAudioRunning && !isSelfMutedOrDeafened {
+            MumbleLogger.audio.debug("TTS: pausing VPIO for speech")
             savedSelfMutedStateBeforeSpeech = connectedUser?.isSelfMuted()
             savedSelfDeafenedStateBeforeSpeech = connectedUser?.isSelfDeafened()
             audio?.stop()
             speechAudioTransition = .pausedVPIO
         } else {
+            MumbleLogger.audio.debug("TTS: session-only transition for speech")
             speechAudioTransition = .sessionOnly
         }
 

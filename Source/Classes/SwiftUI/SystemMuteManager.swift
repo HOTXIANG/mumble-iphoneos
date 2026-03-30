@@ -29,7 +29,7 @@ class SystemMuteManager {
         
         cleanup()
         
-        print("🎙️ SystemMuteManager: Activating (AVAudioApplication only)...")
+        MumbleLogger.audio.info("SystemMuteManager: Activating (AVAudioApplication only)")
         
         // 注册官方通知
         observer = NotificationCenter.default.addObserver(
@@ -48,7 +48,7 @@ class SystemMuteManager {
         
         // 初始状态同步
         let currentSystemState = AVAudioApplication.shared.isInputMuted
-        print("🎙️ SystemMuteManager: Activation initial state -> \(currentSystemState)")
+        MumbleLogger.audio.debug("SystemMuteManager: Activation initial state -> \(currentSystemState)")
         #endif
     }
     
@@ -57,7 +57,7 @@ class SystemMuteManager {
         if let observer = observer {
             NotificationCenter.default.removeObserver(observer)
             self.observer = nil
-            print("🎙️ SystemMuteManager: Cleanup (Observer Removed)")
+            MumbleLogger.audio.debug("SystemMuteManager: Cleanup (Observer Removed)")
         }
     }
     
@@ -77,9 +77,9 @@ class SystemMuteManager {
         
         do {
             try AVAudioApplication.shared.setInputMuted(isMuted)
-            print("✅ SystemMuteManager: setInputMuted(\(isMuted)) success")
+            MumbleLogger.audio.debug("SystemMuteManager: setInputMuted(\(isMuted)) success")
         } catch {
-            print("❌ SystemMuteManager: setInputMuted failed: \(error.localizedDescription)")
+            MumbleLogger.audio.error("SystemMuteManager: setInputMuted failed: \(error.localizedDescription)")
         }
         #endif
     }
@@ -88,7 +88,7 @@ class SystemMuteManager {
     
     // ✅ 参数改为 Bool，不再接收 Notification 对象
     private func handleMuteStateUpdate(isMuted: Bool) {
-        print("🎧 SystemMuteManager: Received notification. New state muted=\(isMuted)")
+        MumbleLogger.audio.info("SystemMuteManager: Received notification. New state muted=\(isMuted)")
         // 通知外部更新 (ServerModelManager)
         onSystemMuteChanged?(isMuted)
     }

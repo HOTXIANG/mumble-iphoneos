@@ -33,7 +33,7 @@ static void *serverThread(void *udata) {
             goto out;
         }
         if (nread == -1) {
-            NSLog(@"MURemoteControlServer: aborted server thread: %s", strerror(errno));
+            MULogError(Network, @"Aborted server thread: %s", strerror(errno));
             goto out;
         }
         

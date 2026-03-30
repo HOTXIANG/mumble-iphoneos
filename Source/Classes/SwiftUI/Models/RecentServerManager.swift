@@ -47,6 +47,7 @@ class RecentServerManager: NSObject, ObservableObject {
         recents.removeAll { $0.id == newEntry.id }
         
         // 3. 插入新的（包含最新名字的）记录到头部
+        MumbleLogger.database.info("Adding recent server: \(nameToSave) (\(hostname):\(port))")
         recents.insert(newEntry, at: 0)
         
         // 4. 限制数量
@@ -92,6 +93,7 @@ class RecentServerManager: NSObject, ObservableObject {
         if let data = UserDefaults.standard.data(forKey: storageKey),
            let list = try? JSONDecoder().decode([RecentServer].self, from: data) {
             recents = list
+            MumbleLogger.database.debug("Loaded \(list.count) recent servers")
         }
     }
 }

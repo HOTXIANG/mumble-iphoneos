@@ -30,16 +30,19 @@ class LanDiscoveryModel: NSObject, ObservableObject, NetServiceBrowserDelegate, 
         super.init()
         netServiceBrowser.delegate = self
         // Mumble 使用 _mumble._tcp 服务类型
+        MumbleLogger.discovery.info("LAN discovery initialized, searching for _mumble._tcp services")
         netServiceBrowser.searchForServices(ofType: "_mumble._tcp.", inDomain: "local.")
     }
     
     func start() {
+        MumbleLogger.discovery.info("Restarting LAN discovery")
         netServiceBrowser.stop()
         servers.removeAll()
         netServiceBrowser.searchForServices(ofType: "_mumble._tcp.", inDomain: "local.")
     }
-    
+
     func stop() {
+        MumbleLogger.discovery.debug("Stopping LAN discovery")
         netServiceBrowser.stop()
         pendingServices.removeAll()
     }
@@ -67,6 +70,7 @@ class LanDiscoveryModel: NSObject, ObservableObject, NetServiceBrowserDelegate, 
         
         Task { @MainActor in
             let srv = safeService.service
+            MumbleLogger.discovery.info("Service removed: '\(srv.name)'")
             self.servers.removeAll { $0.name == srv.name }
         }
     }
@@ -74,7 +78,7 @@ class LanDiscoveryModel: NSObject, ObservableObject, NetServiceBrowserDelegate, 
     // MARK: - NetServiceDelegate
     
     nonisolated func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {
-        // 解析失败，忽略
+        MumbleLogger.discovery.warning("Failed to resolve service '\(sender.name)': \(errorDict)")
     }
     
     nonisolated func netServiceDidResolveAddress(_ sender: NetService) {
@@ -92,6 +96,7 @@ class LanDiscoveryModel: NSObject, ObservableObject, NetServiceBrowserDelegate, 
             
             // 避免重复添加
             if !self.servers.contains(where: { $0.name == name }) {
+                MumbleLogger.discovery.info("Discovered server '\(name)' at \(host):\(port)")
                 let newServer = DiscoveredServer(name: name, hostname: host, port: port)
                 self.servers.append(newServer)
             }

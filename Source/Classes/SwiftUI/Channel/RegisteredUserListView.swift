@@ -36,6 +36,7 @@ struct RegisteredUserListView: View {
                 }
         }
         .onAppear {
+            AppState.shared.setAutomationCurrentScreen("registeredUsers")
             users = []
             hasReceivedUserList = false
             serverManager.requestRegisteredUserList()

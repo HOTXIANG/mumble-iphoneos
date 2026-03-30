@@ -2,40 +2,77 @@
 //  MumbleLogger.h
 //  Mumble
 //
-//  Created by Claude on 2026/3/4.
+//  统一日志系统 ObjC 桥接层
+//  所有日志通过 MumbleLogBridge() C 函数路由到 Swift LogManager
+//  支持 5 级日志：verbose(0) / debug(1) / info(2) / warning(3) / error(4)
 //
 
+#ifndef MumbleLogger_h
+#define MumbleLogger_h
+
+#pragma mark - Log Level Constants
+
+#define MU_LOG_LEVEL_VERBOSE 0
+#define MU_LOG_LEVEL_DEBUG   1
+#define MU_LOG_LEVEL_INFO    2
+#define MU_LOG_LEVEL_WARNING 3
+#define MU_LOG_LEVEL_ERROR   4
+
+#pragma mark - C Bridge Declaration
+
+/// Swift 侧 @_cdecl 导出的 C 函数
+/// MumbleLogFormatted 通过 dlsym 动态查找此符号
+/// MumbleKit 独立构建时自动回退到 os_log
+
+#ifdef __OBJC__
+
 #import <Foundation/Foundation.h>
-#import <os/log.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// ObjC 日志宏定义，与 Swift Logger 对应
-/// 使用方式：MULogInfo(@"connection", @"连接成功");
-/// 分类：connection, audio, database, certificate, notification, ui
+/// ObjC 格式化辅助函数（在 .m 文件中实现）
+extern void MumbleLogFormatted(int level, const char *category,
+                               const char *file, const char *function, int line,
+                               NSString *format, ...) NS_FORMAT_FUNCTION(6, 7);
 
-#pragma mark - 日志宏
+#pragma mark - Application Layer Macros (MU*)
+/// 用法：MULogInfo(Connection, @"连接成功: %@", hostname);
 
-/// 信息级别日志
-#define MULogInfo(category, format, ...) \
-    os_log_info(OS_LOG_CATEGORY_##category, format, ##__VA_ARGS__)
+#define MULogVerbose(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_VERBOSE, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
 
-/// 错误级别日志
-#define MULogError(category, format, ...) \
-    os_log_error(OS_LOG_CATEGORY_##category, format, ##__VA_ARGS__)
-
-/// 调试级别日志
 #define MULogDebug(category, format, ...) \
-    os_log_debug(OS_LOG_CATEGORY_##category, format, ##__VA_ARGS__)
+    MumbleLogFormatted(MU_LOG_LEVEL_DEBUG, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
 
-#pragma mark - 日志分类
+#define MULogInfo(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_INFO, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
 
-// 预定义日志分类
-extern os_log_t OS_LOG_CATEGORY_connection;
-extern os_log_t OS_LOG_CATEGORY_audio;
-extern os_log_t OS_LOG_CATEGORY_database;
-extern os_log_t OS_LOG_CATEGORY_certificate;
-extern os_log_t OS_LOG_CATEGORY_notification;
-extern os_log_t OS_LOG_CATEGORY_ui;
+#define MULogWarning(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_WARNING, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
+
+#define MULogError(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_ERROR, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
+
+#pragma mark - MumbleKit Layer Macros (MK*)
+/// 用法：MKLogInfo(Audio, @"音频引擎启动: sampleRate=%f", rate);
+
+#define MKLogVerbose(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_VERBOSE, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
+
+#define MKLogDebug(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_DEBUG, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
+
+#define MKLogInfo(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_INFO, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
+
+#define MKLogWarning(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_WARNING, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
+
+#define MKLogError(category, format, ...) \
+    MumbleLogFormatted(MU_LOG_LEVEL_ERROR, #category, __FILE__, __FUNCTION__, __LINE__, format, ##__VA_ARGS__)
 
 NS_ASSUME_NONNULL_END
+
+#endif /* __OBJC__ */
+
+#endif /* MumbleLogger_h */

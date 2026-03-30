@@ -35,7 +35,7 @@ extension NotificationSettingsView {
             }
             .padding(.bottom, 4)
         }
-
+        
         LabeledContent("User Messages:") {
             VStack(alignment: .leading, spacing: 8) {
                 Toggle("User Messages", isOn: $notifyNormalUserMessages)
@@ -352,16 +352,129 @@ extension AdvancedAudioSettingsView {
             }
         }
         LabeledContent("Audio Plugin Mixer:") {
-            Button("Open Mixer") {
-                openPluginMixer()
+            VStack(alignment: .leading, spacing: 6) {
+                Button("Open Mixer") {
+                    openPluginMixer()
+                }
+                Text("Open a dedicated mixer page for track and plugin management.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 400, alignment: .leading)
             }
         }
+        
+        // MARK: Weak Network Mode Section
+        Section() {
+            LabeledContent("Weak Network Mode:") {
+                Toggle("", isOn: $weakNetworkModeEnabled)
+                    .labelsHidden()
+                    .onChange(of: weakNetworkModeEnabled) { _, newValue in
+                        applyWeakNetworkSettings()
+                    }
+            }
+            
+            if weakNetworkModeEnabled {
+                LabeledContent("Jitter Buffer:") {
+                    HStack(spacing: 10) {
+                        Slider(value: Binding(
+                            get: { Double(weakNetworkJitterBufferMs) },
+                            set: {
+                                weakNetworkJitterBufferMs = Int($0)
+                                applyWeakNetworkSettings()
+                            }
+                        ), in: 30...500, step: 10)
+                        .frame(maxWidth: 180)
+                        Text(
+                            String(
+                                format: NSLocalizedString("%d ms", comment: "Jitter buffer unit suffix"),
+                                weakNetworkJitterBufferMs
+                            )
+                        )
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 50, alignment: .trailing)
+                    }
+                }
+                
+                LabeledContent("Expected Packet Loss:") {
+                    HStack(spacing: 10) {
+                        Slider(value: Binding(
+                            get: { Double(weakNetworkExpectedLoss) },
+                            set: {
+                                weakNetworkExpectedLoss = Int($0)
+                                applyWeakNetworkSettings()
+                            }
+                        ), in: 0...60, step: 5)
+                        .frame(maxWidth: 180)
+                        Text(
+                            String(
+                                format: NSLocalizedString("%d%%", comment: "Expected packet loss percentage"),
+                                weakNetworkExpectedLoss
+                            )
+                        )
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 42, alignment: .trailing)
+                    }
+                }
+                
+                LabeledContent("Adaptive Bitrate:") {
+                    Toggle("", isOn: $weakNetworkAdaptiveBitrate)
+                        .labelsHidden()
+                        .onChange(of: weakNetworkAdaptiveBitrate) { _, _ in
+                            applyWeakNetworkSettings()
+                        }
+                }
+                
+                LabeledContent("Enhanced PLC:") {
+                    Toggle("", isOn: $weakNetworkEnhancedPLC)
+                        .labelsHidden()
+                        .onChange(of: weakNetworkEnhancedPLC) { _, _ in
+                            applyWeakNetworkSettings()
+                        }
+                }
+                
+                LabeledContent("Bitrate Range:") {
+                    HStack(spacing: 8) {
+                        VStack(spacing: 8) {
+                            Slider(value: Binding(
+                                get: { Double(weakNetworkMinBitrate) },
+                                set: {
+                                    weakNetworkMinBitrate = min(Int($0), weakNetworkMaxBitrate - 16000)
+                                    applyWeakNetworkSettings()
+                                }
+                            ), in: 32000...80000, step: 8000)
+                            .frame(maxWidth: 180)
+                            
+                            Slider(value: Binding(
+                                get: { Double(weakNetworkMaxBitrate) },
+                                set: {
+                                    weakNetworkMaxBitrate = max(Int($0), weakNetworkMinBitrate + 16000)
+                                    applyWeakNetworkSettings()
+                                }
+                            ), in: 96000...192000, step: 8000)
+                            .frame(maxWidth: 180)
+                        }
+                        Text(
+                            String(
+                                format: NSLocalizedString("%d-%d kbps", comment: "Bitrate range"),
+                                weakNetworkMinBitrate/1000, weakNetworkMaxBitrate/1000
+                            )
+                        )
+                        .font(.system(.body, design: .monospaced))
+                    }
+                }
+            }
+        }
+        Text("Optimize audio quality for high latency or lossy network conditions. Enables FEC, adaptive bitrate, and enhanced packet loss concealment.")
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 350, alignment: .leading)
         Text("Network changes require reconnection to take effect.")
             .font(.caption)
             .foregroundColor(.secondary)
-        Text("Open a dedicated mixer page for track and plugin management.")
-            .font(.caption)
-            .foregroundColor(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 400, alignment: .leading)
     }
 }
 
@@ -580,6 +693,40 @@ private struct MacGeneralSettingsTabView: View {
         } message: {
             Text(NSLocalizedString("Language changes are applied immediately.", comment: ""))
         }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            if target == "about" {
+                showingAboutSheet = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            switch target {
+            case nil:
+                showingAboutSheet = false
+                showingLanguageChangedAlert = false
+            case "about":
+                showingAboutSheet = false
+            case "preferencesLanguageChanged":
+                showingLanguageChangedAlert = false
+            default:
+                break
+            }
+        }
+        .onChange(of: showingAboutSheet) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedSheet("about")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "about")
+            }
+        }
+        .onChange(of: showingLanguageChangedAlert) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedAlert("preferencesLanguageChanged")
+            } else if AppState.shared.automationPresentedAlert == "preferencesLanguageChanged" {
+                AppState.shared.setAutomationPresentedAlert(nil)
+            }
+        }
     }
 }
 
@@ -594,7 +741,7 @@ private struct MacHandoffSettingsTabView: View {
                 Toggle("", isOn: $handoffSyncLocalAudioSettings)
                     .labelsHidden()
             }
-            Text("Choose which profile to use when continuing a session from another device. 'Automatic' will match by server address.")
+            Text("Choose which profile to use when continuing a session from another device. \n'Automatic' will match by server address.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -611,25 +758,28 @@ struct MacSettingsRootView: View {
         case handoff
         case certificates
         case advanced
+        case logging
         
         var preferredContentSize: NSSize {
             switch self {
             case .general:
-                return NSSize(width: 550, height: 220)
+                return NSSize(width: 650, height: 220)
             case .input:
-                return NSSize(width: 550, height: 520)
+                return NSSize(width: 650, height: 520)
             case .output:
-                return NSSize(width: 550, height: 220)
+                return NSSize(width: 650, height: 220)
             case .notifications:
-                return NSSize(width: 550, height: 380)
+                return NSSize(width: 650, height: 380)
             case .tts:
-                return NSSize(width: 550, height: 450)
+                return NSSize(width: 650, height: 450)
             case .handoff:
-                return NSSize(width: 550, height: 220)
+                return NSSize(width: 650, height: 220)
             case .certificates:
-                return NSSize(width: 550, height: 600)
+                return NSSize(width: 650, height: 600)
             case .advanced:
-                return NSSize(width: 550, height: 340)
+                return NSSize(width: 650, height: 420)
+            case .logging:
+                return NSSize(width: 650, height: 600)
             }
         }
     }
@@ -637,10 +787,18 @@ struct MacSettingsRootView: View {
     @EnvironmentObject var serverManager: ServerModelManager
     @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
+    @AppStorage("WeakNetworkModeEnabled") private var weakNetworkModeEnabled: Bool = false
     @State private var selectedTab: MacSettingsTab = .general
-    
     private var selectedAppColorScheme: AppColorSchemeOption {
         AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
+    }
+
+    private var currentTabContentSize: NSSize {
+        // 根据弱网模式开关状态动态调整 advanced 标签页的高度
+        if selectedTab == .advanced && weakNetworkModeEnabled {
+            return NSSize(width: 650, height: 520)
+        }
+        return selectedTab.preferredContentSize
     }
     
     var body: some View {
@@ -672,7 +830,7 @@ struct MacSettingsRootView: View {
                     Label("Notifications", systemImage: "bell.badge")
                 }
                 .tag(MacSettingsTab.notifications)
-
+            
             TTSSettingsView()
                 .macSettingsCenteredPageStyle()
                 .tabItem {
@@ -699,14 +857,81 @@ struct MacSettingsRootView: View {
                     Label("Advanced", systemImage: "slider.horizontal.3")
                 }
                 .tag(MacSettingsTab.advanced)
+            
+            LogSettingsView()
+                .macSettingsCenteredPageStyle()
+                .tabItem {
+                    Label("Logging", systemImage: "ladybug")
+                }
+                .tag(MacSettingsTab.logging)
         }
-        .background(MacSettingsWindowSizeAdaptor(targetSize: selectedTab.preferredContentSize))
+        .background(MacSettingsWindowSizeAdaptor(targetSize: currentTabContentSize))
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .id(languageManager.localeIdentifier)
         .modifier(SettingsColorSchemeOverrideModifier(option: selectedAppColorScheme))
         .toggleStyle(.checkbox)
         .onAppear {
             languageManager.reapplyCurrentLanguage()
+            syncAutomationCurrentScreen(for: selectedTab)
+        }
+        .onChange(of: selectedTab) { _, newValue in
+            syncAutomationCurrentScreen(for: newValue)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String,
+                  let tab = automationTab(for: target) else { return }
+            selectedTab = tab
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            guard let target,
+                  let tab = automationTab(for: target),
+                  selectedTab == tab else { return }
+            selectedTab = .general
+        }
+    }
+    
+    private func automationTab(for target: String) -> MacSettingsTab? {
+        switch target {
+        case "preferences":
+            return .general
+        case "audioTransmissionSettings":
+            return .input
+        case "notificationSettings":
+            return .notifications
+        case "ttsSettings":
+            return .tts
+        case "certificateSettings":
+            return .certificates
+        case "advancedAudioSettings":
+            return .advanced
+        case "logSettings":
+            return .logging
+        default:
+            return nil
+        }
+    }
+    
+    private func syncAutomationCurrentScreen(for tab: MacSettingsTab) {
+        switch tab {
+        case .general:
+            AppState.shared.setAutomationCurrentScreen("preferences")
+        case .input:
+            AppState.shared.setAutomationCurrentScreen("audioTransmissionSettings")
+        case .output:
+            AppState.shared.setAutomationCurrentScreen("preferencesOutputSettings")
+        case .notifications:
+            AppState.shared.setAutomationCurrentScreen("notificationSettings")
+        case .tts:
+            AppState.shared.setAutomationCurrentScreen("ttsSettings")
+        case .handoff:
+            AppState.shared.setAutomationCurrentScreen("preferencesHandoffSettings")
+        case .certificates:
+            AppState.shared.setAutomationCurrentScreen("certificateSettings")
+        case .advanced:
+            AppState.shared.setAutomationCurrentScreen("advancedAudioSettings")
+        case .logging:
+            AppState.shared.setAutomationCurrentScreen("logSettings")
         }
     }
 }

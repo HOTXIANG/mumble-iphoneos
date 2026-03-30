@@ -1007,10 +1007,25 @@ struct MessagesView: View {
             appState.isImmersiveStatusBarHidden = false
         }
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "imageSendConfirm" {
+                selectedImageForSend = nil
+            }
+        }
+        .onChange(of: selectedImageForSend?.id) { _, value in
+            if value != nil {
+                AppState.shared.setAutomationPresentedSheet("imageSendConfirm")
+            } else {
+                AppState.shared.clearAutomationPresentedSheet(ifMatches: "imageSendConfirm")
+            }
+        }
     }
     
     private func handleImageTap(payload: MessageImageTapPayload) {
         #if os(macOS)
+        // 防止快速连续点击导致预览状态错乱
+        guard appState.activeMacImagePreview == nil else { return }
         appState.hiddenMacPreviewSourceID = nil
         let preview = MessageImagePreviewItem(
             id: payload.sourceID,
@@ -1789,7 +1804,7 @@ struct MessagesList: View {
         let elapsedMs = (CACurrentMediaTime() - start) * 1000.0
         if elapsedMs >= 1.0 || serverManager.messages.count >= 80 {
             MumbleLogger.ui.debug(
-                "PERF message_render_blocks reason=\(reason, privacy: .public) messages=\(serverManager.messages.count) blocks=\(blocks.count) elapsed_ms=\(elapsedMs, format: .fixed(precision: 2))"
+                "PERF message_render_blocks reason=\(reason) messages=\(serverManager.messages.count) blocks=\(blocks.count) elapsed_ms=\(String(format: "%.2f", elapsedMs))"
             )
         }
     }
@@ -2480,6 +2495,9 @@ struct ImageConfirmationView: View {
         }
         .padding(.bottom)
         .interactiveDismissDisabled(isSending)
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("imageSendConfirm")
+        }
     }
 }
 

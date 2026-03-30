@@ -56,6 +56,11 @@ MANUAL_TRANSLATIONS = {
     "Audio Output:": "音频输出：",
     "Audio Processing:": "音频处理：",
     "Audio Quality:": "音频质量：",
+    "Audio Send": "音频发送",
+    "Audio Units": "音频单元",
+    "AUD": "AUD",
+    "At least one master bus must stay enabled": "至少需要保留一个主总线处于启用状态",
+    "Buffer Size": "缓冲区大小",
     "Clear Messages": "清空消息",
     "(Message with image attachment)": "（含图片附件的消息）",
     "(Message with image attachments)": "（含图片附件的消息）",
@@ -97,7 +102,7 @@ MANUAL_TRANSLATIONS = {
     "Right Control": "右 Control",
     "Left Command": "左 Command",
     "Right Command": "右 Command",
-    "Space": "空格",
+    "Space": "空间",
     "Return": "回车",
     "Tab": "制表键",
     "Inherit ACLs from parent": "从父频道继承 ACL",
@@ -152,8 +157,24 @@ MANUAL_TRANSLATIONS = {
     "Mode": "模式",
     "Transmission Method": "传输方式",
     "Transmission Method:": "传输方式：",
+    "Buffer": "缓冲区",
+    "Categories": "分类",
+    "Developer": "开发者",
+    "Enable Logging": "启用日志",
+    "Enable Weak Network Mode": "启用弱网模式",
+    "Environment Variables": "环境变量",
+    "Environment:": "环境变量：",
+    "Expected Packet Loss": "预期丢包率",
+    "Expected Packet Loss:": "预期丢包率：",
+    "Export All Logs": "导出全部日志",
+    "Export:": "导出：",
     "Favourite Servers": "服务器收藏夹",
+    "File Output:": "文件输出：",
+    "Files:": "文件：",
     "Favourites": "收藏夹",
+    "Global": "全局",
+    "Bitrate Range": "码率范围",
+    "Bitrate Range:": "码率范围：",
     "Join a Server": "加入服务器",
     "Choose a favourite server to connect quickly": "选择一个收藏的服务器以快速连接",
     "Your saved servers": "你保存的服务器",
@@ -205,7 +226,18 @@ MANUAL_TRANSLATIONS = {
     "OK": "确定",
     "Done": "完成",
     "Enable": "启用",
+    "Log Files": "日志文件",
+    "Log files are stored locally and rotated every 7 days.": "日志文件会保存在本地，并每 7 天轮换一次。",
+    "Logging": "日志",
+    "Logging:": "日志：",
     "Level:": "电平：",
+    "No log files yet.": "还没有日志文件。",
+    "Plugins": "插件",
+    "Refresh": "刷新",
+    "Reset": "重置",
+    "Reset All to Defaults": "全部重置为默认值",
+    "Reset Logging Settings": "重置日志设置",
+    "Reset:": "重置：",
     "Save": "保存",
     "Edit": "编辑",
     "Comment": "备注",
@@ -215,6 +247,8 @@ MANUAL_TRANSLATIONS = {
     "No description set.": "未设置描述。",
     "Microphone:": "麦克风：",
     "Send": "发送",
+    "Jitter Buffer": "抖动缓冲",
+    "Jitter Buffer:": "抖动缓冲：",
     "Confirm Image": "确认图片",
     "High Quality Mode": "高质量模式",
     "Less Compressed": "低压缩",
@@ -254,7 +288,12 @@ MANUAL_TRANSLATIONS = {
     "Some texts will fully update after restarting the app.": "部分文本需要重启应用后才会完全更新。",
     "Local Volume: %d%%": "本地音量：%d%%",
     "Missing": "缺失",
+    "Adaptive Bitrate": "自适应码率",
+    "Adaptive Bitrate:": "自适应码率：",
+    "Enhanced PLC": "增强丢包补偿",
+    "Enhanced PLC:": "增强丢包补偿：",
     "Someone": "某人",
+    "Status:": "状态：",
     "System": "系统",
     "Unknown": "未知",
     "Unknown Channel": "未知频道",
@@ -270,6 +309,8 @@ MANUAL_TRANSLATIONS = {
     "this server": "此服务器",
     "this channel": "此频道",
     "Channel": "频道",
+    "Choose a plugin for each insert, enable it when needed, open its editor, and set its mix.": "为每个插入槽选择插件，按需启用、打开编辑器，并设置混合比例。",
+    "Choose which tracks should receive this track, and whether each send is audible audio or sidechain-only.": "选择哪些轨道接收当前轨道，以及每条发送是可听音频还是仅侧链。",
     "User": "用户",
     "user": "用户",
     "Root": "根频道",
@@ -420,6 +461,7 @@ MANUAL_TRANSLATIONS = {
     "Text-to-Speech:": "文字转语音：",
     "When enabled, selected notification types will be spoken. During TTS playback, speaking may be temporarily unavailable.": "启用后，将朗读所选通知类型。在 TTS 播放期间，发言可能会暂时不可用。",
     "Add access tokens to enter password-protected channels.": "添加访问令牌以进入受密码保护的频道。",
+    "Add category": "添加分类",
     "Channel Management": "频道管理",
     "Channels:": "频道：",
     "Link Channel": "链接频道",
@@ -436,39 +478,80 @@ MANUAL_TRANSLATIONS = {
     "Add": "添加",
     "Add Ban": "添加封禁",
     "Add Friend": "添加好友",
+    "All logging categories will be reset to default levels and enabled state.": "所有日志分类都将重置为默认级别和启用状态。",
     "Audio & Links": "音频与链接",
     "Auto Reconnect": "自动重连",
     "Ban": "封禁",
     "Ban List": "封禁列表",
     "Change Avatar": "更换头像",
     "Copy URL": "复制 URL",
+    "Dedicated local monitor bus after input track": "输入轨道后的本地监听总线",
     "Enable QoS": "启用 QoS",
+    "Failed to create audio format": "创建音频格式失败",
     "IP Address (e.g. 192.168.1.1)": "IP 地址（例如 192.168.1.1）",
     "Ignore Messages": "忽略消息",
+    "Input Track": "输入轨道",
     "Kick": "踢出",
     "Loading ban list…": "正在加载封禁列表…",
     "Loading tokens…": "正在加载令牌…",
     "Mask": "掩码",
+    "Master Bus 1": "主总线 1",
+    "Master Bus 2": "主总线 2",
+    "Master tracks are receive-only and cannot send to other tracks.": "主总线轨道仅接收，不能发送到其他轨道。",
+    "Mix": "混合",
     "Moderation": "管理",
     "Mumble iOS v%@": "Mumble iOS 版 v%@",
     "Mumble macOS v%@": "Mumble macOS 版 v%@",
     "Network changes require reconnection to take effect.": "网络设置变更需要重连后生效。",
     "Network:": "网络：",
     "Nickname": "昵称",
+    "No available destination tracks right now.": "当前没有可用的目标轨道。",
+    "No categories configured": "尚未配置分类。",
+    "No installed Audio Units found": "未找到已安装的 Audio Units。",
+    "No users in channel": "频道中没有用户",
     "Other System Messages": "其他系统消息",
+    "Only Audio Unit plugins can be loaded": "当前仅支持加载 Audio Unit 插件",
+    "Other": "其他",
+    "Plugin UI is unavailable": "插件界面不可用",
+    "Plugin is not ready": "插件尚未就绪",
+    "Plugin not found in any track": "未在任何轨道中找到该插件",
+    "Post-mix output bus 1": "混音后输出总线 1",
+    "Post-mix output bus 2": "混音后输出总线 2",
+    "Preset '%@' deleted": "预设“%@”已删除",
+    "Preset '%@' loaded": "已加载预设“%@”",
+    "Preset '%@' saved": "预设“%@”已保存",
     "Priority Speaker": "优先发言者",
     "Reason": "原因",
+    "Remote user post-decode track": "远端用户解码后轨道",
     "Remove Avatar": "移除头像",
     "Remove Friend": "移除好友",
     "Remove Priority Speaker": "移除优先发言者",
+    "SC": "SC",
     "Reset Comment": "重置备注",
     "Seconds (0 = permanent)": "秒数（0 = 永久）",
     "Set Nickname": "设置昵称",
+    "Sidechain Only": "仅侧链",
+    "Sidetone Track": "返听轨道",
     "Social": "社交",
     "The server ban list is empty.": "服务器封禁列表为空。",
+    "Track Sends": "轨道发送",
+    "Unavailable Sidechain Source": "不可用的侧链源",
+    "Use Suggested Category": "使用建议分类",
+    "Weak Network Mode": "弱网模式",
+    "Weak Network Mode:": "弱网模式：",
+    "Would create a send loop": "这会形成发送环路",
+    "Optimize audio quality for high latency or lossy network conditions. Enables FEC, adaptive bitrate, and enhanced packet loss concealment.": "针对高延迟或高丢包网络优化音质。启用 FEC、自适应码率和增强丢包补偿。",
+    "Each category can be individually \nenabled/disabled and set to a log level.": "每个分类都可以单独启用/禁用，并设置日志级别。",
+    "Each category can be individually enabled/disabled and set to a log level.": "每个分类都可以单独启用/禁用，并设置日志级别。",
+    "Each category can be individually enabled/disabled and set to a log level. Only messages at or above the set level will be logged.": "每个分类都可以单独启用/禁用，并设置日志级别。只有达到或高于所设级别的消息才会被记录。",
     "Token": "令牌",
     "Unignore Messages": "取消忽略消息",
     "Unlink All": "取消全部链接",
+    "When file logging is off, logs are only available in Console.app.": "关闭文件日志后，日志只能在 Console.app 中查看。",
+    "Write Logs to File": "将日志写入文件",
+    "%d ms": "%d 毫秒",
+    "%d%%": "%d%%",
+    "%d-%d kbps": "%d-%d kbps",
     # Plural-like placeholders
     "%lu\\nppl": "%lu\\n人",
     "%u\\nppl": "%u\\n人",
@@ -508,11 +591,21 @@ def strings_unescape(value: str) -> str:
 def parse_strings(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
-    try:
-        text = path.read_text(encoding="utf-16")
-    except UnicodeDecodeError:
-        # Backward compatibility: handle legacy UTF-16LE files without BOM.
-        text = path.read_text(encoding="utf-16-le")
+    raw = path.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = raw.decode("utf-16")
+    elif b"\x00" in raw and raw.count(b"\x00") / max(len(raw), 1) > 0.2:
+        text = raw.decode("utf-16")
+    else:
+        text = None
+        for encoding in ("utf-8", "utf-16", "utf-16-le", "utf-16-be"):
+            try:
+                text = raw.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        if text is None:
+            raise UnicodeDecodeError("parse_strings", raw, 0, 1, f"Unable to decode {path}")
     return {
         strings_unescape(m.group(1)): strings_unescape(m.group(2))
         for m in KEY_VALUE_RE.finditer(text)
@@ -595,6 +688,7 @@ def collect_swiftui_literals() -> set[str]:
                 literal = match.group(1)
                 if "\\(" in literal:
                     continue
+                literal = strings_unescape(literal)
                 if literal == "":
                     continue
                 keys.add(literal)
@@ -637,6 +731,21 @@ def normalize_value(value: str, term_rules: list[tuple[str, str]]) -> str:
     return value
 
 
+def lookup_key_variants(key: str) -> list[str]:
+    variants: list[str] = []
+
+    def add(candidate: str) -> None:
+        if candidate and candidate not in variants:
+            variants.append(candidate)
+
+    add(key)
+    collapsed_newlines = re.sub(r"[ \t]*\n[ \t]*", "\n", key)
+    add(collapsed_newlines)
+    add(collapsed_newlines.replace("\n", " "))
+    add(re.sub(r"\s+", " ", key).strip())
+    return variants
+
+
 def get_translation(key: str, seed_map: dict[str, str], term_rules: list[tuple[str, str]]) -> str:
     if key == "%lu\\nppl":
         return "%lu\\n人"
@@ -645,19 +754,25 @@ def get_translation(key: str, seed_map: dict[str, str], term_rules: list[tuple[s
     if key.startswith("Below: input under this level is treated as silence."):
         return "静音阈值：低于此值会被视为静音。\\n语音阈值：高于此值会被视为语音。\\n静音保持：当输入持续低于静音阈值达到该时长后，才会切换为静音。"
 
-    if key in MANUAL_TRANSLATIONS:
-        return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[key]), term_rules)
-    escaped_key = strings_escape(key)
-    if escaped_key in MANUAL_TRANSLATIONS:
-        return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[escaped_key]), term_rules)
-    if key in VALUE_FIXUPS:
-        return normalize_value(strings_unescape(VALUE_FIXUPS[key]), term_rules)
+    candidates = lookup_key_variants(key)
 
-    seed = seed_map.get(key)
-    if seed:
-        seed = restore_placeholder_tokens(seed, key)
-        seed = normalize_value(seed, term_rules)
-        return seed
+    for candidate in candidates:
+        if candidate in MANUAL_TRANSLATIONS:
+            return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[candidate]), term_rules)
+
+        escaped_candidate = strings_escape(candidate)
+        if escaped_candidate in MANUAL_TRANSLATIONS:
+            return normalize_value(strings_unescape(MANUAL_TRANSLATIONS[escaped_candidate]), term_rules)
+
+        if candidate in VALUE_FIXUPS:
+            return normalize_value(strings_unescape(VALUE_FIXUPS[candidate]), term_rules)
+
+    for candidate in candidates:
+        seed = seed_map.get(candidate)
+        if seed:
+            seed = restore_placeholder_tokens(seed, key)
+            seed = normalize_value(seed, term_rules)
+            return seed
 
     # 无翻译时 fallback 原文，避免生成空值
     return normalize_value(key, term_rules)

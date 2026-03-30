@@ -203,10 +203,10 @@ class FavouriteServerListViewModel: ObservableObject {
             let sorted = loaded.sorted {
                 ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
             }
-            print("📋 FavouriteServers: loaded \(sorted.count) visible servers from database")
+            MumbleLogger.database.debug("FavouriteServers: loaded \(sorted.count) visible servers from database")
             self.servers = sorted
         } else {
-            print("⚠️ FavouriteServers: fetchVisibleFavourites returned nil")
+            MumbleLogger.database.warning("FavouriteServers: fetchVisibleFavourites returned nil")
             self.servers = []
         }
     }
@@ -239,11 +239,11 @@ struct FavouriteServerListContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .task {
-            print("📋 FavouriteServers: .task fired")
+            MumbleLogger.ui.verbose("FavouriteServers: .task fired")
             viewModel.loadServers()
         }
         .onAppear {
-            print("📋 FavouriteServers: .onAppear fired")
+            MumbleLogger.ui.verbose("FavouriteServers: .onAppear fired")
             viewModel.loadServers()
             if !didRefreshCertificates {
                 didRefreshCertificates = true
@@ -259,6 +259,28 @@ struct FavouriteServerListContentView: View {
             Button("Delete", role: .destructive) { deleteFavouriteServer(server) }
         } message: { server in
             Text("Are you sure you want to delete '\(server.displayName ?? NSLocalizedString("this server", comment: ""))'?")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String, target == "favouriteDelete" else { return }
+            if let primaryKey = notification.userInfo?["primaryKey"] as? Int,
+               let server = viewModel.servers.first(where: { $0.primaryKey == primaryKey }) {
+                serverToDelete = server
+                showingDeleteAlert = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "favouriteDelete" {
+                showingDeleteAlert = false
+                serverToDelete = nil
+            }
+        }
+        .onChange(of: showingDeleteAlert) { _, isPresented in
+            if isPresented {
+                AppState.shared.setAutomationPresentedAlert("favouriteDelete")
+            } else if AppState.shared.automationPresentedAlert == "favouriteDelete" {
+                AppState.shared.setAutomationPresentedAlert(nil)
+            }
         }
     }
     
@@ -383,7 +405,7 @@ struct FavouriteServerListContentView: View {
 
         // 现在统一使用真实删除，不再保留 hidden profile
         MUDatabase.deleteFavourite(server)
-        print("🗑️ Deleted favourite '\(server.displayName ?? "")'")
+        MumbleLogger.database.info("Deleted favourite '\(server.displayName ?? "")'")
         viewModel.loadServers()
     }
     
@@ -446,6 +468,7 @@ struct FavouriteServerListContentView: View {
 struct FavouriteServerListView: MumbleContentView {
     @EnvironmentObject var navigationManager: NavigationManager
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appState = AppState.shared
 
     var isModalPresentation: Bool = false
     
@@ -465,6 +488,50 @@ struct FavouriteServerListView: MumbleContentView {
             refreshTrigger: refreshTrigger,
             dismissOnConnect: isModalPresentation
         )
+        .onAppear {
+            appState.setAutomationCurrentScreen("favouriteList")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "favouriteNew":
+                showingNewSheet = true
+            case "favouriteEdit":
+                let primaryKey =
+                    (notification.userInfo?["primaryKey"] as? NSNumber)?.intValue
+                    ?? (notification.userInfo?["primaryKey"] as? Int)
+                guard let primaryKey,
+                      let server = (MUDatabase.fetchAllFavourites() as? [MUFavouriteServer])?.first(where: { $0.primaryKey == primaryKey }) else {
+                    return
+                }
+                serverToEdit = EditableServer(server)
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "favouriteNew" {
+                showingNewSheet = false
+            }
+            if target == nil || target == "favouriteEdit" {
+                serverToEdit = nil
+            }
+        }
+        .onChange(of: showingNewSheet) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("favouriteNew")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "favouriteNew")
+            }
+        }
+        .onChange(of: serverToEdit?.id) { _, newValue in
+            if newValue != nil {
+                appState.setAutomationPresentedSheet("favouriteEdit")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "favouriteEdit")
+            }
+        }
         // 新建收藏
         .sheet(isPresented: $showingNewSheet, onDismiss: {
             // Sheet 完全关闭后再刷新列表，避免 macOS 上 SwiftUI 在 sheet 动画期间不传播状态

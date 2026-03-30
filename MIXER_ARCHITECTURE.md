@@ -253,6 +253,95 @@ func syncAudioUnitDSPChainForTrackKey(_ key: String) {
 3. **并行处理**：多个 Remote Track 可以并行处理
 4. **零拷贝**：某些情况下可以避免数据复制
 
+## 🔌 DAW-Style 侧链路由（Sidechain Routing）
+
+### 架构概述
+
+侧链路由功能允许 AU 插件通过 `inputBusses[1]` 接收来自其他轨道的预衰减（pre-fader）音频信号作为控制信号。这实现了：
+
+- **压缩器 Ducking**: 当特定用户说话时，自动降低其他音频的音量
+- **门限触发**: 使用外部信号触发噪声门
+- **动态 EQ**: 基于外部信号的频率响应调整
+
+### 侧chain 信号源类型
+
+| 源类型 | 键值 | 描述 |
+|--------|------|------|
+| 无 | `none` | 不启用侧链（默认） |
+| 本地麦克风 | `input` | 本地麦克风信号（Int16→Float 转换后，预处理后） |
+| 远程用户 | `session:<N>` | 远程用户 N 的解码音频（每用户，混音前） |
+| 主总线 1 | `masterBus1` | 主总线 1 混音信号（混音后，总线插件前） |
+| 主总线 2 | `masterBus2` | 主总线 2 混音信号（混音后，总线插件前） |
+
+### 信号流
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │          Sidechain Buffer Pool           │
+                    │  (MKAudioOutput,每 mixFrames 周期填充)    │
+                    │                                         │
+                    │  "input"      → [float*] 麦克风预 AU     │
+                    │  "session:5"  → [float*] 用户 5 预 AU     │
+                    │  "masterBus1" → [float*] 总线 1 预 AU     │
+                    └──────────┬──────────────────────────────┘
+                               │ 读取 by AU sidechain bus
+    ┌──────────────────────────┼──────────────────────────┐
+    │                          ▼                          │
+    │  Master Bus 1 Track                                 │
+    │  ┌─────────┐   ┌──────────────────┐   ┌─────────┐ │
+    │  │ Mixed   │──▶│ Compressor (AU)  │──▶│ Output  │ │
+    │  │ Bus 1   │   │ SC: "session:5"  │   │         │ │
+    │  └─────────┘   │ bus0: 混音信号    │   └─────────┘ │
+    │                 │ bus1: 用户 5 信号  │                │
+    │                 └──────────────────┘                │
+    └─────────────────────────────────────────────────────┘
+```
+
+### 实现细节
+
+**Layer 1: 侧链缓冲池（MKAudioOutput.m）**
+- 预分配 C 语言数组存储音频（`struct MKSidechainSlot`）
+- 每 `mixFrames:amount:` 周期填充：
+  - 每用户 pre-fader 缓冲区（解码后，插件前）
+  - 主总线 1/2 pre-fader 缓冲区（混音后，总线插件前）
+- 原子 ping-pong 双缓冲用于输入轨道信号（跨输入/输出线程）
+
+**Layer 2-3: StageHost AVAudioEngine 接线（Rack.swift）**
+- 检查 AU 是否有 `inputBusses.count > 1`
+- 创建第二个 `AVAudioSourceNode` 连接到 AU bus 1
+- 侧链提供者回调从缓冲池读取数据
+
+**Layer 4: 桥接层（Bridge.m）**
+- ObjC 桥接类包装 `MKAudioOutput` 查找为 Swift 闭包
+- MRC 安全：不持有音频指针，仅传递原始指针
+
+**Layer 5: 持久化与 UI（AudioPluginMixerView.swift）**
+- 每插件槽位独立侧链源配置
+- 可视化拾取器：None / Input / 活跃用户 / Master Bus 1/2
+- "SC" 徽章指示（橙色=激活，灰色=未激活）
+
+### WebSocket 测试命令
+
+```bash
+# 设置侧链源
+{"action": "plugin.setSidechain", "params": {"trackKey": "masterBus1", "index": 0, "source": "session:5"}}
+
+# 获取侧链源
+{"action": "plugin.getSidechain", "params": {"trackKey": "masterBus1", "index": 0}}
+
+# 查看轨道插件链（包含 sidechainSource）
+{"action": "plugin.listTracks"}
+```
+
+### 边缘情况处理
+
+- **AU 无侧链总线**: `inputBusses.count <= 1` → UI 隐藏，不接线
+- **源用户断开**: 源键失效 → 提供者返回 nil → 填充静音
+- **源自引用**: 允许用户选择自己轨道作为侧链源（pre-fader 反馈，无无限循环）
+- **VAD 静音**: 源停止说话 → 缓冲未填充 → 填充静音（正确行为）
+
+---
+
 ## 📝 测试清单
 
 - [ ] 单声道插件（压缩器、门限）
@@ -263,9 +352,12 @@ func syncAudioUnitDSPChainForTrackKey(_ key: String) {
 - [ ] 预设保存/加载
 - [ ] 多用户场景（Remote Track）
 - [ ] 高负载场景（多个插件 + 多个用户）
+- [ ] 侧链路由（压缩器 ducking）
+- [ ] 侧链源切换（None → Input → Session → Master Bus）
+- [ ] 自引用侧链（用户选择自己轨道）
 
 ---
 
-**最后更新**: 2026-03-16
-**架构版本**: v2.0
-**状态**: ✅ 链路正确，格式自适应已实现
+**最后更新**: 2026-03-23
+**架构版本**: v2.1 (DAW-Style Sidechain Routing)
+**状态**: ✅ 链路正确，格式自适应已实现，侧链路由完整实现

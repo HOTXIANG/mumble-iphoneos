@@ -80,7 +80,8 @@ struct ChannelListView: View {
         .toolbarBackground(.hidden, for: .windowToolbar)
         #endif
         #if os(iOS)
-        .searchable(text: $channelSearchText, prompt: "Search channels and users")
+        // iPad 上不显示搜索框，避免占用服务器界面空间
+        .modifier(ChannelSearchModifier(searchText: $channelSearchText))
         #endif
         .toolbar {
             leadingToolbarItems
@@ -134,6 +135,79 @@ struct ChannelListView: View {
             guard appState.isConnected else { return }
             guard serverManager.hasRootPermission(MKPermissionRegister) else { return }
             showingUserList = true
+        }
+        #endif
+        .onAppear {
+            appState.setAutomationCurrentScreen("channelList")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
+            guard let target = notification.userInfo?["target"] as? String else { return }
+            switch target {
+            case "serverCertificate":
+                showingCertInfo = true
+            case "banList":
+                if serverManager.hasRootPermission(MKPermissionBan) {
+                    showingBanList = true
+                }
+            case "registeredUsers":
+                if serverManager.hasRootPermission(MKPermissionRegister) {
+                    showingUserList = true
+                }
+            case "accessTokens":
+                showingTokens = true
+            case "preferences":
+                #if os(iOS)
+                showingPrefs = true
+                #endif
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
+            let target = notification.userInfo?["target"] as? String
+            if target == nil || target == "serverCertificate" { showingCertInfo = false }
+            if target == nil || target == "banList" { showingBanList = false }
+            if target == nil || target == "registeredUsers" { showingUserList = false }
+            if target == nil || target == "accessTokens" { showingTokens = false }
+            #if os(iOS)
+            if target == nil || target == "preferences" { showingPrefs = false }
+            #endif
+        }
+        .onChange(of: showingCertInfo) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("serverCertificate")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "serverCertificate")
+            }
+        }
+        .onChange(of: showingBanList) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("banList")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "banList")
+            }
+        }
+        .onChange(of: showingUserList) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("registeredUsers")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "registeredUsers")
+            }
+        }
+        .onChange(of: showingTokens) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("accessTokens")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "accessTokens")
+            }
+        }
+        #if os(iOS)
+        .onChange(of: showingPrefs) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("preferences")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "preferences")
+            }
         }
         #endif
     }
@@ -319,13 +393,13 @@ struct ChannelListView: View {
     @State private var disconnectObserver: Any?
     
     private func initiateDisconnect() {
-        guard disconnectObserver == nil else { print("🟡 Disconnect sequence already in progress."); return }
+        guard disconnectObserver == nil else { MumbleLogger.connection.debug("Disconnect sequence already in progress"); return }
         notificationHaptic.prepare()
         notificationHaptic.notificationOccurred(.warning)
-        print("🟡 Initiating disconnect sequence...")
+        MumbleLogger.connection.info("Initiating disconnect sequence")
         disconnectObserver = NotificationCenter.default.addObserver(forName: .muConnectionClosed, object: nil, queue: .main) { [self] _ in
             Task { @MainActor in
-                print("✅ Disconnection confirmed by notification.")
+                MumbleLogger.connection.info("Disconnection confirmed by notification")
                 withAnimation(.spring()) { AppState.shared.isConnected = false }
                 if let observer = self.disconnectObserver { NotificationCenter.default.removeObserver(observer); self.disconnectObserver = nil }
             }
@@ -337,3 +411,20 @@ struct ChannelListView: View {
         serverManager.registerSelf()
     }
 }
+
+// MARK: - iPad 上隐藏搜索框
+
+#if os(iOS)
+private struct ChannelSearchModifier: ViewModifier {
+    @Binding var searchText: String
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    func body(content: Content) -> some View {
+        if sizeClass == .compact {
+            content.searchable(text: $searchText, prompt: "Search channels and users")
+        } else {
+            content
+        }
+    }
+}
+#endif

@@ -149,13 +149,13 @@ extension ServerModelManager {
     /// 重连后恢复之前保存的监听频道
     func reRegisterListeningChannels() {
         guard !savedListeningChannelIds.isEmpty else { return }
-        print("🔄 Re-registering \(savedListeningChannelIds.count) listening channels after reconnect")
+        MumbleLogger.model.info("Re-registering \(savedListeningChannelIds.count) listening channels after reconnect")
         for channelId in savedListeningChannelIds {
             if let channel = serverModel?.channel(withId: channelId) {
                 startListening(to: channel)
-                print("  👂 Re-registered listening on channel: \(channel.channelName() ?? "?")")
+                MumbleLogger.model.debug("Re-registered listening on channel: \(channel.channelName() ?? "?")")
             } else {
-                print("  ⚠️ Channel \(channelId) no longer exists, skipping")
+                MumbleLogger.model.warning("Channel \(channelId) no longer exists, skipping")
             }
         }
         savedListeningChannelIds.removeAll()

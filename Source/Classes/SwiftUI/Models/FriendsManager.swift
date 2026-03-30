@@ -21,11 +21,13 @@ final class FriendsManager: ObservableObject {
     }
     
     func addFriend(userHash: String) {
+        MumbleLogger.model.info("Adding friend: \(userHash.prefix(8))...")
         friends.insert(userHash)
         save()
     }
-    
+
     func removeFriend(userHash: String) {
+        MumbleLogger.model.info("Removing friend: \(userHash.prefix(8))...")
         friends.remove(userHash)
         save()
     }

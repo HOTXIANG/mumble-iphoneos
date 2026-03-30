@@ -81,7 +81,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         // Initialize database
         MUDatabase.initializeDatabase()
         
-        print("🖥️ MUMacApplicationDelegate: Initialization complete (Opus enabled, database initialized)")
+        MumbleLogger.general.info("MUMacApplicationDelegate: Initialization complete (Opus enabled, database initialized)")
         
         // Setup macOS menu bar status item
         statusBarController.setup()
@@ -124,7 +124,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     
     /// 当系统准备接收 Handoff 活动时调用，返回 true 表示本应用可以处理该活动类型
     func application(_ application: NSApplication, willContinueUserActivityWithType userActivityType: String) -> Bool {
-        print("📲 MUMacApplicationDelegate: willContinueUserActivityWithType → \(userActivityType)")
+        MumbleLogger.handoff.info("MUMacApplicationDelegate: willContinueUserActivityWithType: \(userActivityType)")
         return userActivityType == MumbleHandoffActivityType
     }
     
@@ -133,18 +133,18 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     /// 由 NSApplicationDelegate 保底处理
     func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
         guard userActivity.activityType == MumbleHandoffActivityType else {
-            print("⚠️ MUMacApplicationDelegate: Unknown activity type: \(userActivity.activityType)")
+            MumbleLogger.handoff.warning("MUMacApplicationDelegate: Unknown activity type: \(userActivity.activityType)")
             return false
         }
         
-        print("📲 MUMacApplicationDelegate: Received Handoff activity via NSApplicationDelegate")
+        MumbleLogger.handoff.info("MUMacApplicationDelegate: Received Handoff activity via NSApplicationDelegate")
         HandoffManager.shared.handleIncomingActivity(userActivity)
         return true
     }
     
     /// Handoff 活动接收失败时调用
     func application(_ application: NSApplication, didFailToContinueUserActivityWithType userActivityType: String, error: any Error) {
-        print("⚠️ MUMacApplicationDelegate: Failed to continue activity type \(userActivityType): \(error.localizedDescription)")
+        MumbleLogger.handoff.error("MUMacApplicationDelegate: Failed to continue activity type \(userActivityType): \(error.localizedDescription)")
     }
     
     @objc private func reloadPreferences() {
@@ -259,8 +259,6 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             String(defaults.double(forKey: "AudioMicBoost")),
             String(defaults.bool(forKey: "AudioStereoInput")),
             String(defaults.bool(forKey: "AudioStereoOutput")),
-            String(defaults.bool(forKey: "AudioSidetone")),
-            String(defaults.double(forKey: "AudioSidetoneVolume")),
             String(defaults.bool(forKey: "AudioSpeakerPhoneMode")),
             String(defaults.bool(forKey: "AudioOpusCodecForceCELTMode")),
             String(defaults.bool(forKey: "AudioMixerDebug")),

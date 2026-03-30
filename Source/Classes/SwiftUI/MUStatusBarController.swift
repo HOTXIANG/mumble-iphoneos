@@ -54,7 +54,7 @@ final class MUStatusBarController: NSObject {
         // Register for all relevant notifications
         registerNotifications()
 
-        print("🔵 MUStatusBarController: Status bar item created")
+        MumbleLogger.ui.info("MUStatusBarController: Status bar item created")
     }
 
     func teardown() {

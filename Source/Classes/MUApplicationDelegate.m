@@ -40,7 +40,7 @@
     NSTimeInterval _lastAudioRestartTime;
 
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
-    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%f|%d|%d|%d|%d|%f|%d|%f",
+    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%f",
             [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
             [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
             [defaults doubleForKey:@"AudioVADBelow"],
@@ -50,8 +50,6 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
             [defaults doubleForKey:@"AudioMicBoost"],
             [defaults boolForKey:@"AudioStereoInput"],
             [defaults boolForKey:@"AudioStereoOutput"],
-            [defaults boolForKey:@"AudioSidetone"],
-            [defaults doubleForKey:@"AudioSidetoneVolume"],
             [defaults boolForKey:@"AudioSpeakerPhoneMode"],
             [defaults boolForKey:@"AudioOpusCodecForceCELTMode"],
             [defaults boolForKey:@"AudioMixerDebug"],
@@ -70,7 +68,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
     [center setBadgeCount:0 withCompletionHandler:^(NSError * _Nullable error) {
         if (error) {
-            NSLog(@"Error setting badge count: %@", error.localizedDescription);
+            MULogError(General, @"Error setting badge count: %@", error.localizedDescription);
         }
     }];
     
@@ -293,7 +291,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     if (now - _lastAudioRestartTime < 0.5) {
-        MULogDebug(audio, "Audio restart ignored (too frequent)");
+        MULogDebug(audio, @"Audio restart ignored (too frequent)");
         return;
     }
     _lastAudioRestartTime = now;
@@ -394,14 +392,14 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     [audio setRemoteBusPreviewGain:[defaults floatForKey:@"AudioPluginRemoteBusGain"]
                            enabled:[defaults boolForKey:@"AudioPluginRemoteBusEnabled"]];
     if (shouldRestart) {
-        MULogInfo(audio, "Settings changed while active. Restarting audio engine.");
+        MULogInfo(audio, @"Settings changed while active. Restarting audio engine.");
         [audio restart];
     } else {
-        MULogDebug(audio, "Settings updated without restart.");
+        MULogDebug(audio, @"Settings updated without restart.");
     }
     _lastAudioRestartSignature = [restartSignature copy];
 
-    MULogInfo(audio, "Audio setup completed.");
+    MULogInfo(audio, @"Audio setup completed.");
 }
 
 // Reload application preferences...
@@ -451,7 +449,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     // In case we've been backgrounded by a phone call, MKAudio will
     // already have shut itself down.
     if (!_connectionActive) {
-        NSLog(@"MumbleApplicationDelegate: Not connected to a server. Stopping MKAudio.");
+        MULogInfo(General, @"Not connected to a server. Stopping MKAudio.");
         [[MKAudio sharedAudio] stop];
         
 #ifdef ENABLE_REMOTE_CONTROL
@@ -470,7 +468,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     // For regular backgrounding, we usually don't turn off the audio system, and
     // we won't have to start it again.
     if (_connectionActive && ![[MKAudio sharedAudio] isRunning]) {
-        NSLog(@"MumbleApplicationDelegate: Connection active but MKAudio not running. Starting it.");
+        MULogInfo(General, @"Connection active but MKAudio not running. Starting it.");
         [[MKAudio sharedAudio] start];
         
 #if ENABLE_REMOTE_CONTROL

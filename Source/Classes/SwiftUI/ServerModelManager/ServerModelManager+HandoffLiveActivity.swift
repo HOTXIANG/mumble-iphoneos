@@ -127,13 +127,13 @@ extension ServerModelManager {
                 pushType: nil
             )
             self.liveActivity = activity
-            print("🏝️ Live Activity Started")
+            MumbleLogger.handoff.info("Live Activity Started")
 
             restartLiveActivityKeepAliveTimer()
             // 立即更新一次准确数据
             updateLiveActivity()
         } catch {
-            print("❌ Failed to start Live Activity: \(error)")
+            MumbleLogger.handoff.error("Failed to start Live Activity: \(error)")
         }
         #endif
     }
@@ -168,8 +168,9 @@ extension ServerModelManager {
             isSelfDeafened: isSelfDeafened
         )
 
+        nonisolated(unsafe) let activityToUpdate = activity
         Task {
-            await activity.update(
+            await activityToUpdate.update(
                 ActivityContent(state: contentState, staleDate: nil)
             )
         }
@@ -210,8 +211,9 @@ extension ServerModelManager {
             isSelfDeafened: false
         )
 
+        nonisolated(unsafe) let activityToEnd = activity
         Task {
-            await activity.end(
+            await activityToEnd.end(
                 ActivityContent(state: finalContentState, staleDate: nil),
                 dismissalPolicy: .immediate
             )

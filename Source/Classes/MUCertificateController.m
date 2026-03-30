@@ -153,7 +153,7 @@
         // 如果类型不对，也释放
         if (thing) CFRelease(thing);
     } else {
-        NSLog(@"MUCertificateController: Failed to load certificate from keychain. Status: %d", (int)status);
+        MULogError(Certificate, @"Failed to load certificate from keychain. Status: %d", (int)status);
     }
     
     return nil;
@@ -219,7 +219,7 @@
 
 // OpenSSL 生成逻辑 (保持不变，这部分是正确的)
 + (NSData *) generateSelfSignedCertificateWithName:(NSString *)name email:(NSString *)email {
-    NSLog(@"Generating OpenSSL Self-Signed Certificate for %@ <%@>", name, email);
+    MULogInfo(Certificate, @"Generating OpenSSL Self-Signed Certificate for %@ <%@>", name, email);
     
     OpenSSL_add_all_algorithms();
     ERR_load_crypto_strings();
@@ -230,7 +230,7 @@
     BN_set_word(e, RSA_F4);
     RSA *rsa = RSA_new();
     if (!RSA_generate_key_ex(rsa, 2048, e, NULL)) {
-        NSLog(@"OpenSSL: Failed to generate RSA key");
+        MULogError(Certificate, @"OpenSSL: Failed to generate RSA key");
         return nil;
     }
     EVP_PKEY_assign_RSA(pkey, rsa);
@@ -251,7 +251,7 @@
     X509_set_issuer_name(x509, subject);
     
     if (!X509_sign(x509, pkey, EVP_sha256())) {
-        NSLog(@"OpenSSL: Failed to sign certificate");
+        MULogError(Certificate, @"OpenSSL: Failed to sign certificate");
         return nil;
     }
     
@@ -259,7 +259,7 @@
     char *pass = "password";
     PKCS12 *p12 = PKCS12_create(pass, (char *)[name UTF8String], pkey, x509, NULL, 0, 0, 0, 0, 0);
     if (!p12) {
-        NSLog(@"OpenSSL: Failed to create PKCS12");
+        MULogError(Certificate, @"OpenSSL: Failed to create PKCS12");
         return nil;
     }
     
@@ -304,15 +304,15 @@
                 } else if (addErr == errSecDuplicateItem) {
                     returnRef = [self persistentRefForIdentity:identity];
                     if (!returnRef) {
-                        NSLog(@"Identity already exists but persistent ref lookup failed.");
+                        MULogWarning(Certificate, @"Identity already exists but persistent ref lookup failed.");
                     }
                 } else {
-                    NSLog(@"SecItemAdd failed: %d", (int)addErr);
+                    MULogError(Certificate, @"SecItemAdd failed: %d", (int)addErr);
                 }
             }
         }
     } else {
-        NSLog(@"SecPKCS12Import failed: %d", (int)status);
+        MULogError(Certificate, @"SecPKCS12Import failed: %d", (int)status);
     }
     
     if (items) CFRelease(items);
@@ -324,7 +324,7 @@
     // 1. 从 Persistent Ref 获取 Identity（兼容历史 ref 类型）
     SecIdentityRef identity = [self copyIdentityForPersistentRef:ref];
     if (!identity) {
-        NSLog(@"MUCertificateController: export failed, cannot resolve identity from persistent ref.");
+        MULogError(Certificate, @"Export failed, cannot resolve identity from persistent ref.");
         return nil;
     }
 
@@ -343,7 +343,7 @@
         CFRelease(identity);
         return result;
     } else {
-        NSLog(@"MUCertificateController: SecItemExport PKCS12 failed: %d, falling back to OpenSSL path.", (int)exportStatus);
+        MULogWarning(Certificate, @"SecItemExport PKCS12 failed: %d, falling back to OpenSSL path.", (int)exportStatus);
         if (exportedData) CFRelease(exportedData);
     }
 #endif
@@ -353,12 +353,12 @@
     SecKeyRef privateKey = NULL;
 
     if (SecIdentityCopyCertificate(identity, &cert) != errSecSuccess) {
-        NSLog(@"MUCertificateController: export fallback failed at SecIdentityCopyCertificate.");
+        MULogError(Certificate, @"Export fallback failed at SecIdentityCopyCertificate.");
         CFRelease(identity);
         return nil;
     }
     if (SecIdentityCopyPrivateKey(identity, &privateKey) != errSecSuccess) {
-        NSLog(@"MUCertificateController: export fallback failed at SecIdentityCopyPrivateKey.");
+        MULogError(Certificate, @"Export fallback failed at SecIdentityCopyPrivateKey.");
         CFRelease(cert);
         CFRelease(identity);
         return nil;

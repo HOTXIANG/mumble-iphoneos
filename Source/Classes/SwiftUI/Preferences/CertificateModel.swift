@@ -72,15 +72,15 @@ class CertificateModel: ObservableObject {
     }
     
     func generateNewCertificate(name: String, email: String) {
-        print("🔐 Generating certificate for \(name) <\(email)>")
+        MumbleLogger.certificate.info("Generating certificate for \(name) <\(email)>")
         
         // 调用 OC 控制器生成 (生成后会自动存入 Keychain)
         if let _ = MUCertificateController.generateSelfSignedCertificate(withName: name, email: email) {
-            print("✅ Certificate generated successfully.")
+            MumbleLogger.certificate.info("Certificate generated successfully")
             // 生成成功后刷新列表，界面上就会出现新证书
             refreshCertificates()
         } else {
-            print("❌ Failed to generate certificate.")
+            MumbleLogger.certificate.error("Failed to generate certificate")
         }
     }
     
@@ -106,7 +106,7 @@ class CertificateModel: ObservableObject {
             return true
         } catch {
             // 将捕获到的具体错误信息 (例如 "Incorrect password" 或 "Certificate already exists") 显示给用户
-            print("Import Error: \(error.localizedDescription)")
+            MumbleLogger.certificate.error("Import error: \(error.localizedDescription)")
             self.importError = error.localizedDescription
             return false
         }
@@ -128,7 +128,7 @@ class CertificateModel: ObservableObject {
             try p12Data.write(to: tempURL)
             return tempURL
         } catch {
-            print("Export write error: \(error)")
+            MumbleLogger.certificate.error("Export write error: \(error)")
             return nil
         }
     }
