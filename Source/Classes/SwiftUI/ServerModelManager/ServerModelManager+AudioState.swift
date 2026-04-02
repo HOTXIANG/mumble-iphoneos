@@ -35,6 +35,9 @@ extension ServerModelManager {
         }
 
         systemMuteManager.activate()
+        #if os(iOS)
+        syncCurrentAppMuteStateToSystem(reason: "system_mute_activation")
+        #endif
     }
 
     #if os(iOS)
@@ -180,6 +183,65 @@ extension ServerModelManager {
             MumbleLogger.audio.debug("Audio restart state lock released.")
         }
     }
+
+    #if os(iOS)
+    private func setSystemMuteIfSessionReady(_ targetState: Bool, reason: String) -> Bool {
+        guard #available(iOS 17.0, *) else { return false }
+
+        let session = AVAudioSession.sharedInstance()
+        guard session.category == .playAndRecord else {
+            MumbleLogger.audio.debug("Deferring system input mute sync (\(reason)) because session category is \(session.category.rawValue)")
+            return false
+        }
+
+        MumbleLogger.audio.debug("Applying system input mute=\(targetState) (\(reason))")
+        systemMuteManager.setSystemMute(targetState)
+        return true
+    }
+
+    private func applySystemMuteWithRetry(_ targetState: Bool, reason: String, attemptsRemaining: Int = 8) {
+        if setSystemMuteIfSessionReady(targetState, reason: reason) {
+            return
+        }
+
+        guard attemptsRemaining > 0 else {
+            MumbleLogger.audio.warning("Failed to apply system input mute=\(targetState) after retries (\(reason))")
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.applySystemMuteWithRetry(targetState, reason: reason, attemptsRemaining: attemptsRemaining - 1)
+        }
+    }
+
+    func syncCurrentAppMuteStateToSystem(reason: String) {
+        guard let user = serverModel?.connectedUser() else { return }
+        applySystemMuteWithRetry(user.isSelfMuted() || user.isSelfDeafened(), reason: reason)
+    }
+
+    func captureLocalAudioTestSystemMuteStateIfNeeded() {
+        guard #available(iOS 17.0, *) else { return }
+        guard localAudioTestRestoreSystemMute == nil else { return }
+
+        localAudioTestRestoreSystemMute = AVAudioApplication.shared.isInputMuted
+        MumbleLogger.audio.debug("Captured local audio test system mute state: \(localAudioTestRestoreSystemMute ?? false)")
+    }
+
+    func applyLocalAudioTestSystemMuteOverrideIfNeeded() {
+        guard #available(iOS 17.0, *) else { return }
+        guard localAudioTestRestoreSystemMute != nil else { return }
+
+        applySystemMuteWithRetry(false, reason: "local_audio_test_start")
+    }
+
+    func restoreLocalAudioTestSystemMuteIfNeeded() {
+        guard #available(iOS 17.0, *) else { return }
+        guard let restoreState = localAudioTestRestoreSystemMute else { return }
+
+        localAudioTestRestoreSystemMute = nil
+        _ = setSystemMuteIfSessionReady(restoreState, reason: "local_audio_test_stop")
+    }
+    #endif
 
     func toggleSelfMute() {
         guard let user = serverModel?.connectedUser() else { return }

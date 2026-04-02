@@ -57,6 +57,11 @@ final class AudioPluginRackManager: ObservableObject {
     private let pluginTrackChainsKey = "AudioPluginTrackChainsV1"
     private let trackSendTargetsKey = "AudioPluginTrackSendsV1"
     private let pluginPresetsKey = "AudioPluginPresetsV1"
+    private let dspPendingVerificationKey = "AudioPluginDSPPendingVerification"
+    private let cleanExitKey = "AudioPluginCleanExit"
+
+    /// Tracks that have been synced to DSP but not yet verified as running safely.
+    private var dspVerificationTimer: Timer?
 
     // MARK: - Initialization
 
@@ -73,6 +78,10 @@ final class AudioPluginRackManager: ObservableObject {
     func initializeOnStartup() async {
         NSLog("AudioPluginRackManager: Initializing on startup")
 
+        // Crash sentinel: if the previous session crashed with plugins in DSP,
+        // clear those plugin chains to prevent repeated crashes.
+        recoverFromPluginCrashIfNeeded()
+
         // Sync buffer frames setting
         let bufferFrames = UserDefaults.standard.integer(forKey: "AudioPluginHostBufferFrames")
         MKAudio.shared().setPluginHostBufferFrames(UInt(max(bufferFrames, 64)))
@@ -80,6 +89,47 @@ final class AudioPluginRackManager: ObservableObject {
         // Load persisted plugins
         await loadPersistedAudioUnits()
         syncAllTrackSendRouting()
+    }
+
+    /// Checks if the previous session crashed with plugins active in the DSP chain.
+    /// If so, clears those tracks' plugin chains to prevent a crash loop.
+    private func recoverFromPluginCrashIfNeeded() {
+        // Check 1: DSP pending verification sentinel (set by new code)
+        if let pendingTracks = UserDefaults.standard.stringArray(forKey: dspPendingVerificationKey),
+           !pendingTracks.isEmpty {
+            NSLog("AudioPluginRackManager: Previous session crashed with plugins active on: \(pendingTracks). Clearing chains.")
+            for trackKey in pendingTracks {
+                pluginChainByTrack[trackKey] = []
+            }
+            savePluginChainState()
+            UserDefaults.standard.removeObject(forKey: dspPendingVerificationKey)
+            return
+        }
+
+        // Check 2: Clean exit flag.
+        // object(forKey:) returns nil on first-ever run → skip (don't clear on first install).
+        // Returns false if previous session set it to false and never marked it true → crash detected.
+        let cleanExitValue = UserDefaults.standard.object(forKey: cleanExitKey) as? Bool
+        let hasPlugins = pluginChainByTrack.values.contains { !$0.isEmpty }
+
+        if let wasClean = cleanExitValue, !wasClean, hasPlugins {
+            NSLog("AudioPluginRackManager: Previous session did not exit cleanly with plugins present. Clearing all chains.")
+            for trackKey in pluginChainByTrack.keys {
+                pluginChainByTrack[trackKey] = []
+            }
+            savePluginChainState()
+        }
+
+        // Mark this session as not yet clean (will be marked clean after DSP verification)
+        UserDefaults.standard.set(false, forKey: cleanExitKey)
+    }
+
+    /// Marks tracks as verified after audio has been running successfully.
+    func markDSPVerified() {
+        UserDefaults.standard.removeObject(forKey: dspPendingVerificationKey)
+        UserDefaults.standard.set(true, forKey: cleanExitKey)
+        dspVerificationTimer?.invalidate()
+        dspVerificationTimer = nil
     }
 
     func currentTrackKeys() -> [String] {
@@ -495,6 +545,18 @@ final class AudioPluginRackManager: ObservableObject {
     func syncDSPChain(for trackKey: String) {
         let chain = activeProcessorChain(for: trackKey)
 
+        // Crash sentinel: mark this track as pending verification before syncing to DSP.
+        // If the app crashes before markDSPVerified() is called, the next launch
+        // will detect the crash and clear these tracks' chains.
+        if !chain.isEmpty {
+            var pending = UserDefaults.standard.stringArray(forKey: dspPendingVerificationKey) ?? []
+            if !pending.contains(trackKey) {
+                pending.append(trackKey)
+                UserDefaults.standard.set(pending, forKey: dspPendingVerificationKey)
+            }
+            scheduleDSPVerification()
+        }
+
         if trackKey == "input" {
             MKAudio.shared().setInputTrackAudioUnitChain(chain)
         } else if trackKey == "sidetone" {
@@ -507,6 +569,18 @@ final class AudioPluginRackManager: ObservableObject {
         // remoteUser: tracks are synced via AudioPluginMixerView which holds the hash→session mapping
 
         NSLog("AudioPluginRackManager: Synced DSP chain for \(trackKey) with \(chain.count) processors")
+    }
+
+    /// Schedules a delayed verification that clears the crash sentinel.
+    /// If audio runs for 5 seconds without crashing, the plugins are considered safe.
+    private func scheduleDSPVerification() {
+        dspVerificationTimer?.invalidate()
+        dspVerificationTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.markDSPVerified()
+                NSLog("AudioPluginRackManager: DSP verified safe after 5s")
+            }
+        }
     }
 
     private func activeProcessorChain(for key: String) -> [NSDictionary] {

@@ -907,6 +907,9 @@ struct AppRootView: View {
  
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
+    #if os(macOS)
+    @State private var preservedDisconnectWindowFrame: NSRect?
+    #endif
 
     #if os(iOS)
     private let narrowWindowThreshold: CGFloat = 700
@@ -939,6 +942,9 @@ struct AppRootView: View {
         .preferredColorScheme(selectedAppColorScheme.preferredColorScheme)
         .environmentObject(serverManager)
         .focusedValue(\.serverManager, serverManager)
+        #if os(macOS)
+        .background(WindowFramePreserver(targetFrame: preservedDisconnectWindowFrame))
+        #endif
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
         .overlay(alignment: .top) {
             if let toast = appState.activeToast {
@@ -1198,7 +1204,9 @@ struct AppRootView: View {
         }
         #endif
         .animation(.default, value: appState.isConnecting)
+        #if os(iOS)
         .animation(.spring(), value: appState.isConnected)
+        #endif
         .animation(.easeInOut(duration: 0.2), value: showVADOnboarding)
     }
     
@@ -1252,11 +1260,12 @@ struct AppRootView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.clear)
         }
         .onChange(of: appState.isConnected) { _, isConnected in
             preferredCompactColumn = isConnected ? .detail : .sidebar
-            updateSplitVisibility(width: geo.size.width, connectionChanged: true)
+            handleConnectionStateChange(isConnected: isConnected, width: geo.size.width)
         }
         .onChange(of: geo.size.width) { _, width in
             updateSplitVisibility(width: width, connectionChanged: false)
@@ -1272,26 +1281,85 @@ struct AppRootView: View {
         #else
         .navigationSplitViewStyle(.prominentDetail)
         #endif
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
+    }
+
+    private func handleConnectionStateChange(isConnected: Bool, width: CGFloat) {
+        #if os(macOS)
+        if isConnected {
+            preservedDisconnectWindowFrame = nil
+            updateSplitVisibility(width: width, connectionChanged: true)
+            return
+        }
+
+        let shouldPreserveWindowFrame = splitVisibility == .detailOnly
+        if shouldPreserveWindowFrame {
+            preservedDisconnectWindowFrame = currentMainWindow()?.frame
+        } else {
+            preservedDisconnectWindowFrame = nil
+        }
+
+        // Let the disconnected placeholder replace the channel view first.
+        // Otherwise AppKit may preserve the old detail width and expand the window
+        // by the sidebar width during the same layout pass.
+        DispatchQueue.main.async {
+            guard !appState.isConnected else { return }
+            updateSplitVisibility(width: width, connectionChanged: true)
+            if preservedDisconnectWindowFrame != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    preservedDisconnectWindowFrame = nil
+                }
+            }
+        }
+        #else
+        updateSplitVisibility(width: width, connectionChanged: true)
+        #endif
     }
 
     private func updateSplitVisibility(width: CGFloat, connectionChanged: Bool) {
         #if os(iOS)
         if appState.isConnected {
             if width < 960 {
-                splitVisibility = .detailOnly
+                setSplitVisibility(.detailOnly)
             } else if connectionChanged {
-                splitVisibility = .detailOnly
+                setSplitVisibility(.detailOnly)
             }
         } else if connectionChanged {
-            splitVisibility = .all
+            setSplitVisibility(.all)
         }
         #else
         if appState.isConnected && width < narrowWindowThreshold {
-            splitVisibility = .detailOnly
+            setSplitVisibility(.detailOnly)
         } else {
-            splitVisibility = .all
+            setSplitVisibility(.all)
         }
+        #endif
+    }
+
+    #if os(macOS)
+    private func currentMainWindow() -> NSWindow? {
+        if let mainWindow = NSApp.mainWindow {
+            return mainWindow
+        }
+        if let keyWindow = NSApp.keyWindow {
+            return keyWindow
+        }
+        return NSApp.windows.first { $0.isVisible }
+    }
+    #endif
+
+    private func setSplitVisibility(_ visibility: NavigationSplitViewVisibility) {
+        guard splitVisibility != visibility else { return }
+
+        #if os(macOS)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            splitVisibility = visibility
+        }
+        #else
+        splitVisibility = visibility
         #endif
     }
     
@@ -1482,3 +1550,74 @@ struct AppRootView: View {
     }
     #endif
 }
+
+#if os(macOS)
+private struct WindowFramePreserver: NSViewRepresentable {
+    let targetFrame: NSRect?
+
+    final class Coordinator: NSObject {
+        weak var window: NSWindow?
+        var resizeObserver: NSObjectProtocol?
+        var activeTargetFrame: NSRect?
+        var isRestoring = false
+
+        deinit {
+            if let resizeObserver {
+                NotificationCenter.default.removeObserver(resizeObserver)
+            }
+        }
+
+        func attach(to window: NSWindow) {
+            guard self.window !== window else { return }
+            if let resizeObserver {
+                NotificationCenter.default.removeObserver(resizeObserver)
+            }
+            self.window = window
+            resizeObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResizeNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                self?.restoreIfNeeded()
+            }
+        }
+
+        func updateTargetFrame(_ frame: NSRect?) {
+            activeTargetFrame = frame
+            restoreIfNeeded()
+        }
+
+        private func restoreIfNeeded() {
+            guard !isRestoring else { return }
+            guard let window, let targetFrame = activeTargetFrame else { return }
+
+            let currentFrame = window.frame
+            let widthChanged = abs(currentFrame.width - targetFrame.width) > 0.5
+            let heightChanged = abs(currentFrame.height - targetFrame.height) > 0.5
+            let originChanged = abs(currentFrame.origin.x - targetFrame.origin.x) > 0.5
+                || abs(currentFrame.origin.y - targetFrame.origin.y) > 0.5
+            guard widthChanged || heightChanged || originChanged else { return }
+
+            isRestoring = true
+            defer { isRestoring = false }
+            window.setFrame(targetFrame, display: true, animate: false)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = nsView.window else { return }
+            context.coordinator.attach(to: window)
+            context.coordinator.updateTargetFrame(targetFrame)
+        }
+    }
+}
+#endif

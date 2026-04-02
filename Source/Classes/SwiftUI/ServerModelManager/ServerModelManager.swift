@@ -120,6 +120,8 @@ class ServerModelManager: ObservableObject {
     var isInputSettingsPreviewOverrideActive = false
     /// 记录进入输入设置前系统层 input mute 目标值，用于退出时恢复
     var inputSettingsRestoreSystemMute: Bool?
+    /// 未连接时，本地音频测试前的系统层 input mute 状态
+    var localAudioTestRestoreSystemMute: Bool?
     /// 音频重启前保存的闭麦/不听状态（防止系统回调覆盖）
     var savedMuteBeforeRestart: Bool?
     var savedDeafenBeforeRestart: Bool?

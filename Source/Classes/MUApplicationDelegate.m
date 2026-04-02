@@ -40,7 +40,7 @@
     NSTimeInterval _lastAudioRestartTime;
 
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
-    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%f",
+    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%f|%d|%d|%d|%d|%d|%d|%d",
             [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
             [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
             [defaults doubleForKey:@"AudioVADBelow"],
@@ -56,7 +56,15 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
             [defaults boolForKey:@"AudioPluginInputTrackEnabled"],
             [defaults doubleForKey:@"AudioPluginInputTrackGain"],
             [defaults boolForKey:@"AudioPluginRemoteBusEnabled"],
-            [defaults doubleForKey:@"AudioPluginRemoteBusGain"]];
+            [defaults doubleForKey:@"AudioPluginRemoteBusGain"],
+            // 弱网模式参数变化需要重建 Opus 编码器
+            [defaults boolForKey:@"WeakNetworkModeEnabled"],
+            (int)[defaults integerForKey:@"WeakNetworkExpectedLoss"],
+            [defaults boolForKey:@"WeakNetworkAdaptiveBitrate"],
+            [defaults boolForKey:@"WeakNetworkEnhancedPLC"],
+            (int)[defaults integerForKey:@"WeakNetworkJitterBufferMs"],
+            (int)[defaults integerForKey:@"WeakNetworkMinBitrate"],
+            (int)[defaults integerForKey:@"WeakNetworkMaxBitrate"]];
 }
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
@@ -379,7 +387,23 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     
     settings.opusForceCELTMode = [defaults boolForKey:@"AudioOpusCodecForceCELTMode"];
     settings.audioMixerDebug = [defaults boolForKey:@"AudioMixerDebug"];
-    
+
+    // 弱网模式：从 UserDefaults 恢复设置，防止 audio restart 后丢失
+    settings.enableWeakNetworkMode = [defaults boolForKey:@"WeakNetworkModeEnabled"];
+    if (settings.enableWeakNetworkMode) {
+        settings.weakNetworkJitterBufferMs = (int)[defaults integerForKey:@"WeakNetworkJitterBufferMs"];
+        settings.weakNetworkExpectedLoss = (int)[defaults integerForKey:@"WeakNetworkExpectedLoss"];
+        settings.weakNetworkAdaptiveBitrate = [defaults boolForKey:@"WeakNetworkAdaptiveBitrate"];
+        settings.weakNetworkEnhancedPLC = [defaults boolForKey:@"WeakNetworkEnhancedPLC"];
+        settings.weakNetworkMinBitrate = (int)[defaults integerForKey:@"WeakNetworkMinBitrate"];
+        settings.weakNetworkMaxBitrate = (int)[defaults integerForKey:@"WeakNetworkMaxBitrate"];
+        // 确保有合理默认值
+        if (settings.weakNetworkJitterBufferMs <= 0) settings.weakNetworkJitterBufferMs = 100;
+        if (settings.weakNetworkExpectedLoss <= 0) settings.weakNetworkExpectedLoss = 20;
+        if (settings.weakNetworkMinBitrate <= 0) settings.weakNetworkMinBitrate = 32000;
+        if (settings.weakNetworkMaxBitrate <= 0) settings.weakNetworkMaxBitrate = 128000;
+    }
+
     MKAudio *audio = [MKAudio sharedAudio];
     BOOL audioActive = _connectionActive || [audio isRunning];
     BOOL shouldRestart = audioActive

@@ -52,7 +52,12 @@ struct MumbleApp: App {
                 #endif
                 #if os(macOS)
                 .frame(minWidth: 480, minHeight: 400)
-                .background(WindowMinSizeSetter(minSize: NSSize(width: 480, height: 400)))
+                .background(
+                    WindowMinSizeSetter(
+                        minSize: NSSize(width: 480, height: 400),
+                        autosaveName: "MumbleMainWindowFrame"
+                    )
+                )
                 #endif
                 .onAppear {
                     MumbleLogger.general.info("SwiftUI lifecycle started")
@@ -312,16 +317,17 @@ extension Notification.Name {
 }
 
 /// 通过 NSViewRepresentable 直接设置 NSWindow.minSize，确保窗口无法缩小到指定尺寸以下
-/// 同时监听主窗口关闭事件，关闭主窗口时终止整个应用
+/// 同时为主窗口启用 frame autosave，让下次启动时恢复到上次关闭时的窗口尺寸与位置
 struct WindowMinSizeSetter: NSViewRepresentable {
     let minSize: NSSize
+    let autosaveName: String
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         // 延迟到下一个 run loop，此时 view 已经被加入到 window 中
         DispatchQueue.main.async {
             if let window = view.window {
-                window.minSize = minSize
+                configure(window: window, context: context)
                 // 监听主窗口关闭：关闭主窗口时直接退出应用（不管其他窗口是否还开着）
                 NotificationCenter.default.addObserver(
                     context.coordinator,
@@ -337,16 +343,42 @@ struct WindowMinSizeSetter: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         // 每次更新时也确保 minSize 保持设置
         if let window = nsView.window {
-            window.minSize = minSize
+            configure(window: window, context: context)
         }
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(autosaveName: autosaveName)
+    }
+
+    private func configure(window: NSWindow, context: Context) {
+        context.coordinator.restoreFrameIfNeeded(for: window)
+        window.minSize = minSize
+        if window.frameAutosaveName != autosaveName {
+            window.setFrameAutosaveName(autosaveName)
+        }
     }
 
     class Coordinator: NSObject {
+        private let autosaveName: String
+        private var hasRestoredFrame = false
+
+        init(autosaveName: String) {
+            self.autosaveName = autosaveName
+        }
+
+        func restoreFrameIfNeeded(for window: NSWindow) {
+            guard !hasRestoredFrame else { return }
+            if UserDefaults.standard.string(forKey: "NSWindow Frame \(autosaveName)") != nil {
+                window.setFrameUsingName(autosaveName)
+            }
+            hasRestoredFrame = true
+        }
+
         @objc func mainWindowWillClose(_ notification: Notification) {
+            if let window = notification.object as? NSWindow {
+                window.saveFrame(usingName: autosaveName)
+            }
             NSApp.terminate(nil)
         }
 

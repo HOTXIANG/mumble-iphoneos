@@ -685,17 +685,9 @@ struct AdvancedAudioSettingsView: View {
         UserDefaults.standard.set(weakNetworkMinBitrate, forKey: "WeakNetworkMinBitrate")
         UserDefaults.standard.set(weakNetworkMaxBitrate, forKey: "WeakNetworkMaxBitrate")
 
-        // 更新 MKAudio 设置
-        var settings = MKAudioSettings()
-        MKAudio.shared()?.read(&settings)
-        settings.enableWeakNetworkMode = ObjCBool(weakNetworkModeEnabled)
-        settings.weakNetworkJitterBufferMs = Int32(weakNetworkJitterBufferMs)
-        settings.weakNetworkExpectedLoss = Int32(weakNetworkExpectedLoss)
-        settings.weakNetworkAdaptiveBitrate = ObjCBool(weakNetworkAdaptiveBitrate)
-        settings.weakNetworkEnhancedPLC = ObjCBool(weakNetworkEnhancedPLC)
-        settings.weakNetworkMinBitrate = Int32(weakNetworkMinBitrate)
-        settings.weakNetworkMaxBitrate = Int32(weakNetworkMaxBitrate)
-        MKAudio.shared()?.update(&settings)
+        // Opus 编码器的 FEC/DTX/complexity 参数只在初始化时配置，
+        // 仅更新 settings 结构体不够，需要通过 notifySettingsChanged 触发音频引擎重启
+        PreferencesModel.shared.notifySettingsChanged()
 
         MumbleLogger.audio.info("Weak network settings applied: enabled=\(weakNetworkModeEnabled ? "1" : "0"), jitter=\(weakNetworkJitterBufferMs)ms, loss=\(weakNetworkExpectedLoss)%, bitrate=\(weakNetworkMinBitrate)-\(weakNetworkMaxBitrate)")
     }

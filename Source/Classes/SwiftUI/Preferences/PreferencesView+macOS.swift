@@ -392,7 +392,7 @@ extension AdvancedAudioSettingsView {
                             )
                         )
                         .font(.system(.body, design: .monospaced))
-                        .frame(width: 50, alignment: .trailing)
+                        .frame(width: 62, alignment: .trailing)
                     }
                 }
                 

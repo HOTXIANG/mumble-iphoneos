@@ -99,6 +99,9 @@ extension ServerModelManager {
 
         MumbleLogger.audio.info("Stopping Local Audio (Settings closed)")
         isLocalAudioTestRunning = false
+        #if os(iOS)
+        restoreLocalAudioTestSystemMuteIfNeeded()
+        #endif
         // 关闭引擎并释放 AudioSession
         Task.detached(priority: .userInitiated) {
             if MUConnectionController.shared()?.isConnected() == true {
@@ -121,8 +124,16 @@ extension ServerModelManager {
     private func startLocalAudioEngineForSettings() {
         MumbleLogger.audio.info("Starting Local Audio for Settings/Testing")
         isLocalAudioTestRunning = true
+        #if os(iOS)
+        captureLocalAudioTestSystemMuteStateIfNeeded()
+        #endif
         Task.detached(priority: .userInitiated) {
             MKAudio.shared().start()
+            #if os(iOS)
+            Task { @MainActor [weak self] in
+                self?.applyLocalAudioTestSystemMuteOverrideIfNeeded()
+            }
+            #endif
         }
     }
 
