@@ -36,10 +36,13 @@ struct MumbleApp: App {
     @Environment(\.scenePhase) var scenePhase
     @StateObject private var serverManager = ServerModelManager()
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var audioPluginRackManager = AudioPluginRackManager.shared
     
     /// 处理用户点击系统通知后跳转到聊天界面
     @StateObject private var notificationDelegate = NotificationDelegate()
     @State private var pendingDeepLinkChannelPath: [String] = []
+    @State private var didBootstrapAudioPluginRack = false
+    @State private var pendingAudioPluginRecoveryContext: AudioPluginStartupRecoveryContext?
 
     @SceneBuilder
     private var mainWindowScene: some Scene {
@@ -63,10 +66,7 @@ struct MumbleApp: App {
                     MumbleLogger.general.info("SwiftUI lifecycle started")
                     UNUserNotificationCenter.current().delegate = notificationDelegate
 
-                    // Initialize audio plugin rack on startup
-                    Task {
-                        await AudioPluginRackManager.shared.initializeOnStartup()
-                    }
+                    bootstrapAudioPluginRackIfNeeded()
 
                     #if DEBUG
                     MUTestServer.shared.start(serverManager: serverManager)
@@ -83,6 +83,51 @@ struct MumbleApp: App {
                 // Widget 深链接：用户从 Widget 点击服务器直接连接
                 .onOpenURL { url in
                     handleMumbleURL(url)
+                }
+                .alert(
+                    NSLocalizedString("Start in Safe Mode?", comment: ""),
+                    isPresented: Binding(
+                        get: { pendingAudioPluginRecoveryContext != nil },
+                        set: { newValue in
+                            if !newValue {
+                                pendingAudioPluginRecoveryContext = nil
+                            }
+                        }
+                    ),
+                    presenting: pendingAudioPluginRecoveryContext
+                ) { _ in
+                    Button(NSLocalizedString("Use Safe Mode", comment: "")) {
+                        let recoveryContext = pendingAudioPluginRecoveryContext
+                        pendingAudioPluginRecoveryContext = nil
+                        Task {
+                            await audioPluginRackManager.initializeOnStartup(useSafeMode: true)
+                            if recoveryContext != nil {
+                                MumbleLogger.plugin.warning("Audio plugins launched in safe mode after abnormal termination")
+                            }
+                        }
+                    }
+                    Button(NSLocalizedString("Continue Normally", comment: "")) {
+                        pendingAudioPluginRecoveryContext = nil
+                        Task {
+                            await audioPluginRackManager.initializeOnStartup(useSafeMode: false)
+                        }
+                    }
+                } message: { recoveryContext in
+                    let baseMessage = NSLocalizedString(
+                        "Mumble did not exit normally last time while mixer plugins were configured. Safe Mode will skip loading all mixer plugins for this launch, so you can remove problematic plugins without entering a crash loop.",
+                        comment: ""
+                    )
+                    if recoveryContext.pendingTrackKeys.isEmpty {
+                        Text(baseMessage)
+                    } else {
+                        Text(
+                            baseMessage + " " +
+                            String(
+                                format: NSLocalizedString("Affected tracks: %d.", comment: ""),
+                                recoveryContext.pendingTrackKeys.count
+                            )
+                        )
+                    }
                 }
         }
         #if os(macOS)
@@ -176,6 +221,21 @@ struct MumbleApp: App {
             if self.joinChannel(path: self.pendingDeepLinkChannelPath) {
                 self.pendingDeepLinkChannelPath.removeAll()
             }
+        }
+    }
+
+    private func bootstrapAudioPluginRackIfNeeded() {
+        guard !didBootstrapAudioPluginRack else { return }
+        didBootstrapAudioPluginRack = true
+
+        let recoveryContext = audioPluginRackManager.startupRecoveryContext()
+        if recoveryContext.shouldOfferSafeMode {
+            pendingAudioPluginRecoveryContext = recoveryContext
+            return
+        }
+
+        Task {
+            await audioPluginRackManager.initializeOnStartup(useSafeMode: false)
         }
     }
 

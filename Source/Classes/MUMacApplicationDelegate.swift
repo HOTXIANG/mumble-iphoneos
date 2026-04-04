@@ -51,6 +51,10 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioSpeakerPhoneMode": true,
             "AudioFollowSystemInputDevice": true,
             "AudioPreferredInputDeviceUID": "",
+            "AudioCaptureAllInputChannels": false,
+            "AudioSelectedInputChannel": 1,
+            "AudioSelectedInputChannelLeft": 1,
+            "AudioSelectedInputChannelRight": 2,
             "AudioOpusCodecForceCELTMode": true,
             "AudioPluginInputTrackEnabled": false,
             "AudioPluginInputTrackGain": 1.0,
@@ -115,6 +119,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        AudioPluginRackManager.shared.markCleanExit()
         statusBarController.teardown()
         MUDatabase.teardown()
         NotificationCenter.default.removeObserver(self)
@@ -264,6 +269,10 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             String(defaults.bool(forKey: "AudioMixerDebug")),
             String(defaults.bool(forKey: "AudioFollowSystemInputDevice")),
             defaults.string(forKey: "AudioPreferredInputDeviceUID") ?? "",
+            String(defaults.bool(forKey: "AudioCaptureAllInputChannels")),
+            String(defaults.integer(forKey: "AudioSelectedInputChannel")),
+            String(defaults.integer(forKey: "AudioSelectedInputChannelLeft")),
+            String(defaults.integer(forKey: "AudioSelectedInputChannelRight")),
             String(defaults.bool(forKey: "AudioPluginInputTrackEnabled")),
             String(defaults.double(forKey: "AudioPluginInputTrackGain")),
             String(defaults.bool(forKey: "AudioPluginRemoteBusEnabled")),

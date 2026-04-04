@@ -45,6 +45,7 @@ let pttHotkeyOptions: [PTTHotkeyOption] = [
 struct MacInputDeviceOption: Identifiable, Hashable {
     let uid: String
     let name: String
+    let inputChannels: Int
     var id: String { uid }
 }
 
@@ -412,6 +413,10 @@ struct AudioTransmissionSettingsView: View {
     @AppStorage("PTTHotkeyCode") var pttHotkeyCode: Int = 49
     @AppStorage("AudioFollowSystemInputDevice") var followSystemInputDevice: Bool = true
     @AppStorage("AudioPreferredInputDeviceUID") var preferredInputDeviceUID: String = ""
+    @AppStorage("AudioCaptureAllInputChannels") var captureAllInputChannels: Bool = false
+    @AppStorage("AudioSelectedInputChannel") var selectedInputChannel: Int = 1
+    @AppStorage("AudioSelectedInputChannelLeft") var selectedInputChannelLeft: Int = 1
+    @AppStorage("AudioSelectedInputChannelRight") var selectedInputChannelRight: Int = 2
     @State var devices: [MacInputDeviceOption] = []
     @State var systemDefaultUID: String = ""
     let followSystemToken = "__follow_system__"
@@ -453,7 +458,17 @@ struct AudioTransmissionSettingsView: View {
             PreferencesModel.shared.notifySettingsChanged()
         }
         .onChange(of: vadHoldSeconds) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: enableStereoInput) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: enableStereoInput) {
+            platformRefreshDevices()
+            PreferencesModel.shared.notifySettingsChanged()
+        }
+        .onChange(of: captureAllInputChannels) {
+            platformRefreshDevices()
+            PreferencesModel.shared.notifySettingsChanged()
+        }
+        .onChange(of: selectedInputChannel) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: selectedInputChannelLeft) { PreferencesModel.shared.notifySettingsChanged() }
+        .onChange(of: selectedInputChannelRight) { PreferencesModel.shared.notifySettingsChanged() }
         .onAppear {
             AppState.shared.setAutomationCurrentScreen("audioTransmissionSettings")
             serverManager.startAudioTest()

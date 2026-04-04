@@ -37,6 +37,12 @@ struct TrackSendRoute: Codable, Hashable, Identifiable {
     var id: String { destination }
 }
 
+struct AudioPluginStartupRecoveryContext: Sendable {
+    let shouldOfferSafeMode: Bool
+    let pendingTrackKeys: [String]
+    let hadUncleanExitWithPlugins: Bool
+}
+
 /// Manages the audio plugin rack persistence and initialization.
 /// This manager loads saved plugin chains on app startup and syncs them to MKAudio.
 @MainActor
@@ -51,6 +57,7 @@ final class AudioPluginRackManager: ObservableObject {
     @Published var lastLoadErrorByPlugin: [String: String] = [:]
     @Published var parameterStateByPlugin: [String: [AudioPluginParameterInfo]] = [:]
     @Published var trackSendRoutesBySource: [String: [TrackSendRoute]] = [:]
+    @Published private(set) var isSafeModeActive: Bool = false
 
     // MARK: - Persistence Keys
 
@@ -59,6 +66,7 @@ final class AudioPluginRackManager: ObservableObject {
     private let pluginPresetsKey = "AudioPluginPresetsV1"
     private let dspPendingVerificationKey = "AudioPluginDSPPendingVerification"
     private let cleanExitKey = "AudioPluginCleanExit"
+    private var pendingPluginChainSaveWorkItem: DispatchWorkItem?
 
     /// Tracks that have been synced to DSP but not yet verified as running safely.
     private var dspVerificationTimer: Timer?
@@ -73,59 +81,50 @@ final class AudioPluginRackManager: ObservableObject {
 
     // MARK: - Public API
 
-    /// Called on app startup to initialize the audio rack.
-    /// Loads persisted plugins and syncs the DSP chain to MKAudio.
-    func initializeOnStartup() async {
-        NSLog("AudioPluginRackManager: Initializing on startup")
+    func startupRecoveryContext() -> AudioPluginStartupRecoveryContext {
+        let pendingTracks = UserDefaults.standard.stringArray(forKey: dspPendingVerificationKey) ?? []
+        let cleanExitValue = UserDefaults.standard.object(forKey: cleanExitKey) as? Bool
+        let hasPlugins = pluginChainByTrack.values.contains { !$0.isEmpty }
+        let hadUncleanExitWithPlugins = (cleanExitValue == false) && hasPlugins
+        return AudioPluginStartupRecoveryContext(
+            shouldOfferSafeMode: !pendingTracks.isEmpty || hadUncleanExitWithPlugins,
+            pendingTrackKeys: pendingTracks,
+            hadUncleanExitWithPlugins: hadUncleanExitWithPlugins
+        )
+    }
 
-        // Crash sentinel: if the previous session crashed with plugins in DSP,
-        // clear those plugin chains to prevent repeated crashes.
-        recoverFromPluginCrashIfNeeded()
+    /// Called on app startup to initialize the audio rack.
+    /// Loads persisted plugins and syncs them to MKAudio unless safe mode is enabled.
+    func initializeOnStartup(useSafeMode: Bool) async {
+        NSLog("AudioPluginRackManager: Initializing on startup")
+        isSafeModeActive = useSafeMode
+        UserDefaults.standard.set(false, forKey: cleanExitKey)
 
         // Sync buffer frames setting
         let bufferFrames = UserDefaults.standard.integer(forKey: "AudioPluginHostBufferFrames")
         MKAudio.shared().setPluginHostBufferFrames(UInt(max(bufferFrames, 64)))
 
-        // Load persisted plugins
+        if useSafeMode {
+            loadedAudioUnits = [:]
+            loadingPluginIDs = []
+            syncAllDSPChains()
+            syncAllTrackSendRouting()
+            NSLog("AudioPluginRackManager: Safe mode active, skipped loading persisted plugins")
+            return
+        }
+
         await loadPersistedAudioUnits()
         syncAllTrackSendRouting()
     }
 
-    /// Checks if the previous session crashed with plugins active in the DSP chain.
-    /// If so, clears those tracks' plugin chains to prevent a crash loop.
-    private func recoverFromPluginCrashIfNeeded() {
-        // Check 1: DSP pending verification sentinel (set by new code)
-        if let pendingTracks = UserDefaults.standard.stringArray(forKey: dspPendingVerificationKey),
-           !pendingTracks.isEmpty {
-            NSLog("AudioPluginRackManager: Previous session crashed with plugins active on: \(pendingTracks). Clearing chains.")
-            for trackKey in pendingTracks {
-                pluginChainByTrack[trackKey] = []
-            }
-            savePluginChainState()
-            UserDefaults.standard.removeObject(forKey: dspPendingVerificationKey)
-            return
-        }
-
-        // Check 2: Clean exit flag.
-        // object(forKey:) returns nil on first-ever run → skip (don't clear on first install).
-        // Returns false if previous session set it to false and never marked it true → crash detected.
-        let cleanExitValue = UserDefaults.standard.object(forKey: cleanExitKey) as? Bool
-        let hasPlugins = pluginChainByTrack.values.contains { !$0.isEmpty }
-
-        if let wasClean = cleanExitValue, !wasClean, hasPlugins {
-            NSLog("AudioPluginRackManager: Previous session did not exit cleanly with plugins present. Clearing all chains.")
-            for trackKey in pluginChainByTrack.keys {
-                pluginChainByTrack[trackKey] = []
-            }
-            savePluginChainState()
-        }
-
-        // Mark this session as not yet clean (will be marked clean after DSP verification)
-        UserDefaults.standard.set(false, forKey: cleanExitKey)
-    }
-
     /// Marks tracks as verified after audio has been running successfully.
     func markDSPVerified() {
+        UserDefaults.standard.removeObject(forKey: dspPendingVerificationKey)
+        dspVerificationTimer?.invalidate()
+        dspVerificationTimer = nil
+    }
+
+    func markCleanExit() {
         UserDefaults.standard.removeObject(forKey: dspPendingVerificationKey)
         UserDefaults.standard.set(true, forKey: cleanExitKey)
         dspVerificationTimer?.invalidate()
@@ -216,6 +215,22 @@ final class AudioPluginRackManager: ObservableObject {
         savePluginChainState()
         syncDSPChain(for: trackKey)
         return plugin
+    }
+
+    func replaceTrackChain(trackKey: String, with plugins: [TrackPlugin]) async {
+        let existingChain = pluginChainByTrack[trackKey] ?? []
+        for plugin in existingChain {
+            unloadAudioUnit(for: plugin)
+        }
+
+        pluginChainByTrack[trackKey] = plugins
+        savePluginChainState()
+        syncDSPChain(for: trackKey)
+
+        for plugin in plugins where plugin.source == .audioUnit && plugin.autoLoad {
+            _ = await loadAudioUnit(for: plugin)
+        }
+        syncDSPChain(for: trackKey)
     }
 
     func movePlugin(trackKey: String, pluginID: String, to targetIndex: Int) {
@@ -431,6 +446,10 @@ final class AudioPluginRackManager: ObservableObject {
     // MARK: - Plugin Loading
 
     private func loadPersistedAudioUnits() async {
+        guard !isSafeModeActive else {
+            syncAllDSPChains()
+            return
+        }
         guard loadingPluginIDs.isEmpty else { return }
 
         let targets = pluginChainByTrack
@@ -462,6 +481,10 @@ final class AudioPluginRackManager: ObservableObject {
     }
 
     private func loadAudioUnit(for plugin: TrackPlugin) async -> Bool {
+        guard !isSafeModeActive else {
+            lastLoadErrorByPlugin[plugin.id] = NSLocalizedString("Safe Mode is active. Restart normally to load plugins.", comment: "")
+            return false
+        }
         guard plugin.source == .audioUnit else {
             return false
         }
@@ -543,6 +566,19 @@ final class AudioPluginRackManager: ObservableObject {
     }
 
     func syncDSPChain(for trackKey: String) {
+        if isSafeModeActive {
+            if trackKey == "input" {
+                MKAudio.shared().setInputTrackAudioUnitChain([])
+            } else if trackKey == "sidetone" {
+                MKAudio.shared().setSidetoneAudioUnitChain([])
+            } else if trackKey == "masterBus1" {
+                MKAudio.shared().setRemoteBusAudioUnitChain([])
+            } else if trackKey == "masterBus2" {
+                MKAudio.shared().setRemoteBus2AudioUnitChain([])
+            }
+            NSLog("AudioPluginRackManager: Safe mode active, synced empty DSP chain for \(trackKey)")
+            return
+        }
         let chain = activeProcessorChain(for: trackKey)
 
         // Crash sentinel: mark this track as pending verification before syncing to DSP.
@@ -880,9 +916,12 @@ final class AudioPluginRackManager: ObservableObject {
             value: newValue
         )
         parameterStateByPlugin[pluginID] = list
-        mutatePlugin(withID: pluginID) { plugin in
-            plugin.savedParameterValues[String(parameterID)] = newValue
+        if var chain = pluginChainByTrack[trackKey],
+           let pluginIndex = chain.firstIndex(where: { $0.id == pluginID }) {
+            chain[pluginIndex].savedParameterValues[String(parameterID)] = newValue
+            pluginChainByTrack[trackKey] = chain
         }
+        schedulePluginChainPersistence()
     }
 
     private func snapshotAllPluginParameters() {
@@ -911,6 +950,15 @@ final class AudioPluginRackManager: ObservableObject {
         if didChange {
             savePluginChainState()
         }
+    }
+
+    private func schedulePluginChainPersistence() {
+        pendingPluginChainSaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.savePluginChainState()
+        }
+        pendingPluginChainSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
     }
 
     private func availableAudioUnitPlugins() -> [AudioPluginDiscovery] {
@@ -972,7 +1020,13 @@ final class AudioPluginRackManager: ObservableObject {
 
     private func channelCount(for trackKey: String) -> UInt {
         if trackKey == "input" || trackKey == "sidetone" {
+#if os(macOS)
+            let stereoEnabled = UserDefaults.standard.bool(forKey: "AudioCaptureAllInputChannels")
+                && UserDefaults.standard.bool(forKey: "AudioStereoInput")
+            return stereoEnabled ? 2 : 1
+#else
             return UserDefaults.standard.bool(forKey: "AudioStereoInput") ? 2 : 1
+#endif
         }
         return 2
     }

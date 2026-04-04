@@ -7,6 +7,7 @@
 
 import SwiftUI
 @preconcurrency import AVFoundation
+import UniformTypeIdentifiers
 #if os(iOS)
 import UIKit
 import CoreAudioKit
@@ -23,13 +24,89 @@ private struct PluginEditorParameterSnapshot: Identifiable, Hashable {
     var value: Float
 }
 
+private struct TrackChainPresetPlugin: Codable, Hashable {
+    let name: String
+    let subtitle: String
+    let source: PluginSource
+    let identifier: String
+    let bypassed: Bool
+    let stageGain: Float
+    let autoLoad: Bool
+    let savedParameterValues: [String: Float]
+    let sidechainSourceKey: String?
+
+    init(plugin: TrackPlugin) {
+        name = plugin.name
+        subtitle = plugin.subtitle
+        source = plugin.source
+        identifier = plugin.identifier
+        bypassed = plugin.bypassed
+        stageGain = plugin.stageGain
+        autoLoad = plugin.autoLoad
+        savedParameterValues = plugin.savedParameterValues
+        sidechainSourceKey = plugin.sidechainSourceKey
+    }
+
+    func makeTrackPlugin() -> TrackPlugin {
+        TrackPlugin(
+            id: UUID().uuidString,
+            name: name,
+            subtitle: subtitle,
+            source: source,
+            identifier: identifier,
+            bypassed: bypassed,
+            stageGain: stageGain,
+            autoLoad: autoLoad,
+            savedParameterValues: savedParameterValues,
+            sidechainSourceKey: sidechainSourceKey
+        )
+    }
+}
+
+private struct TrackChainPresetFile: Codable, Hashable {
+    let version: Int
+    let exportedAt: Date
+    let name: String
+    let sourceTrackKey: String
+    let sourceTrackTitle: String
+    let slotCount: Int
+    let plugins: [TrackChainPresetPlugin]
+}
+
+private struct TrackChainPresetDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+
+    var preset: TrackChainPresetFile
+
+    init(preset: TrackChainPresetFile) {
+        self.preset = preset
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        preset = try decoder.decode(TrackChainPresetFile.self, from: data)
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(preset)
+        return .init(regularFileWithContents: data)
+    }
+}
+
 private struct PluginEditorSnapshot {
     let name: String
     let subtitle: String
     let isLoading: Bool
     let isLoaded: Bool
     let errorDescription: String?
-    let parameters: [PluginEditorParameterSnapshot]
+    var parameters: [PluginEditorParameterSnapshot]
 }
 
 #if os(macOS)
@@ -193,7 +270,9 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
 }
 
 struct AudioPluginMixerView: View {
-    private let maxInsertSlots: Int = 8
+    private let defaultInsertSlots: Int = 8
+    private let maxInsertSlots: Int = 100
+    @ObservedObject private var sharedRackManager = AudioPluginRackManager.shared
 
     private struct HearableUser: Identifiable, Hashable {
         let id: String       // userHash（持久化键）
@@ -278,6 +357,7 @@ struct AudioPluginMixerView: View {
     @AppStorage("AudioPluginRemoteBusGain") private var pluginRemoteBusGain: Double = 1.0
     @AppStorage("AudioPluginRemoteBus2Gain") private var pluginRemoteBus2Gain: Double = 1.0
     @AppStorage("AudioPluginTrackChainsV1") private var pluginTrackChainsData: String = ""
+    @AppStorage("AudioPluginSlotCountsV1") private var pluginSlotCountsData: String = ""
     @AppStorage("AudioPluginPresetsV1") private var pluginPresetsData: String = ""
     @AppStorage("AudioPluginHostBufferFrames") private var pluginHostBufferFrames: Int = 256
     @AppStorage("AudioPluginCategoryOverridesV1") private var pluginCategoryOverridesData: String = ""
@@ -293,6 +373,7 @@ struct AudioPluginMixerView: View {
     @State private var selectedTrack: MixerTrack = .input
     @State private var installedAudioUnits: [DiscoveredPlugin] = []
     @State private var pluginChainByTrack: [String: [TrackPlugin]] = [:]
+    @State private var slotCountByTrack: [String: Int] = [:]
     @State private var trackSendRoutesBySource: [String: [TrackSendRoute]] = [:]
     @State private var pluginOperationMessage: String = ""
     @State private var selectedPluginID: String? = nil
@@ -314,9 +395,14 @@ struct AudioPluginMixerView: View {
     @State private var showingPresetSaveDialog: Bool = false
     @State private var presetNameInput: String = ""
     @State private var selectedPresetID: String? = nil
+    @State private var showingTrackPresetImporter: Bool = false
+    @State private var showingTrackPresetExporter: Bool = false
+    @State private var trackPresetExportDocument: TrackChainPresetDocument? = nil
+    @State private var trackPresetExportFilename: String = "mumble-track-preset"
     @State private var pluginCategoryOverrides: [String: String] = [:]
     @State private var customPluginCategories: [String] = []
     @State private var customCategoryInput: String = ""
+    @State private var pendingPluginChainSaveWorkItem: DispatchWorkItem? = nil
 
     #if os(macOS)
     /// 将非 Optional 的 selectedTrack 桥接为 Optional Binding（List selection 需要）
@@ -347,6 +433,19 @@ struct AudioPluginMixerView: View {
                     #endif
                 }
             ))
+            .fileImporter(
+                isPresented: $showingTrackPresetImporter,
+                allowedContentTypes: [.json, .data],
+                allowsMultipleSelection: false,
+                onCompletion: handleTrackPresetImportSelection
+            )
+            .fileExporter(
+                isPresented: $showingTrackPresetExporter,
+                document: trackPresetExportDocument,
+                contentType: .json,
+                defaultFilename: trackPresetExportFilename,
+                onCompletion: handleTrackPresetExportResult
+            )
     }
 
     /// body 拆分：核心 onAppear / onReceive / onChange（减轻 type-checker 压力）
@@ -379,6 +478,7 @@ struct AudioPluginMixerView: View {
         loadPluginChainState()
         let adoptedLiveProcessorState = syncLoadedStateFromSharedRackManager()
         migrateRemoteBusToMasterBus1()
+        loadPluginSlotCountState()
         UserDefaults.standard.removeObject(forKey: "AudioPluginBusAssignmentsV1")
         loadPluginCategoryConfiguration()
         loadPluginPresets()
@@ -424,6 +524,7 @@ struct AudioPluginMixerView: View {
                 }
             }
         }
+        normalizePluginSlotCountsPersistingIfNeeded()
         return adoptedLiveProcessorState
     }
 
@@ -1010,15 +1111,57 @@ struct AudioPluginMixerView: View {
 
     private func pluginChainPanel(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: compact ? 8 : 10) {
-            Text(NSLocalizedString("Plugin Chain", comment: ""))
-                .font(.headline)
+            HStack(spacing: 8) {
+                Text(NSLocalizedString("Plugin Chain", comment: ""))
+                    .font(.headline)
+                Spacer(minLength: 0)
+                if compact {
+                    Button {
+                        showingTrackPresetImporter = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        prepareTrackPresetExport()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Button {
+                        showingTrackPresetImporter = true
+                    } label: {
+                        Label(NSLocalizedString("Import Track Preset", comment: ""), systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        prepareTrackPresetExport()
+                    } label: {
+                        Label(NSLocalizedString("Export Track Preset", comment: ""), systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            if sharedRackManager.isSafeModeActive {
+                Text(
+                    NSLocalizedString(
+                        "Safe Mode is active. Mixer plugins will not be loaded this session, but you can still remove problematic plugins.",
+                        comment: ""
+                    )
+                )
+                .font(.caption)
+                .foregroundColor(.orange)
+            }
             if !compact {
                 Text(NSLocalizedString("Choose a plugin for each insert, enable it when needed, open its editor, and set its mix.", comment: ""))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            ForEach(0..<maxInsertSlots, id: \.self) { slotIndex in
+            ForEach(0..<selectedTrackSlotCount, id: \.self) { slotIndex in
                 let plugin = pluginAtSlot(slotIndex)
                 let isSelected = selectedPluginID == plugin?.id
 
@@ -1028,6 +1171,15 @@ struct AudioPluginMixerView: View {
                     widePluginSlotRow(slotIndex: slotIndex, plugin: plugin, isSelected: isSelected)
                 }
             }
+
+            Button {
+                addPluginSlot()
+            } label: {
+                Label(NSLocalizedString("Add Slot", comment: ""), systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(selectedTrackSlotCount >= maxInsertSlots)
         }
         .padding(compact ? 10 : 14)
         .modifier(ClearGlassModifier(cornerRadius: 12))
@@ -1110,6 +1262,15 @@ struct AudioPluginMixerView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
                 Spacer(minLength: 0)
+
+                Button(role: .destructive) {
+                    removeEmptyPluginSlot(slotIndex: slotIndex)
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(.body)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!canRemoveEmptyPluginSlot(at: slotIndex))
             }
         }
         .padding(.horizontal, 10)
@@ -1161,6 +1322,18 @@ struct AudioPluginMixerView: View {
                     .buttonStyle(.plain)
                 } else {
                     Spacer(minLength: 0)
+
+                    Button(role: .destructive) {
+                        removeEmptyPluginSlot(slotIndex: slotIndex)
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .font(.body)
+                            .foregroundColor(canRemoveEmptyPluginSlot(at: slotIndex) ? .red : .secondary)
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canRemoveEmptyPluginSlot(at: slotIndex))
                 }
             }
 
@@ -1602,9 +1775,198 @@ struct AudioPluginMixerView: View {
         pluginChainByTrack[selectedTrackKey] ?? []
     }
 
+    private var selectedTrackSlotCount: Int {
+        normalizedSlotCount(for: selectedTrackKey, requested: slotCountByTrack[selectedTrackKey])
+    }
+
     private func pluginAtSlot(_ slotIndex: Int) -> TrackPlugin? {
         guard slotIndex >= 0, slotIndex < selectedTrackChain.count else { return nil }
         return selectedTrackChain[slotIndex]
+    }
+
+    private func normalizedSlotCount(for trackKey: String, requested: Int?) -> Int {
+        let minimum = max(defaultInsertSlots, pluginChainByTrack[trackKey]?.count ?? 0)
+        let requestedCount = requested ?? minimum
+        let clampedRequested = min(maxInsertSlots, requestedCount)
+        return max(minimum, clampedRequested)
+    }
+
+    private func canRemoveEmptyPluginSlot(at slotIndex: Int) -> Bool {
+        guard slotIndex >= selectedTrackChain.count else { return false }
+        return selectedTrackSlotCount > max(defaultInsertSlots, selectedTrackChain.count)
+    }
+
+    private func addPluginSlot() {
+        let nextCount = min(maxInsertSlots, selectedTrackSlotCount + 1)
+        guard nextCount != selectedTrackSlotCount else { return }
+        updateSlotCount(nextCount, for: selectedTrackKey)
+        pluginOperationMessage = NSLocalizedString("Added empty plugin slot", comment: "")
+    }
+
+    private func removeEmptyPluginSlot(slotIndex: Int) {
+        guard canRemoveEmptyPluginSlot(at: slotIndex) else { return }
+        let nextCount = max(max(defaultInsertSlots, selectedTrackChain.count), selectedTrackSlotCount - 1)
+        guard nextCount != selectedTrackSlotCount else { return }
+        updateSlotCount(nextCount, for: selectedTrackKey)
+        pluginOperationMessage = NSLocalizedString("Removed empty plugin slot", comment: "")
+    }
+
+    private func updateSlotCount(_ requestedCount: Int, for trackKey: String) {
+        let normalized = normalizedSlotCount(for: trackKey, requested: requestedCount)
+        if normalized == defaultInsertSlots {
+            slotCountByTrack.removeValue(forKey: trackKey)
+        } else {
+            slotCountByTrack[trackKey] = normalized
+        }
+        savePluginSlotCountState()
+    }
+
+    private func normalizePluginSlotCountsPersistingIfNeeded() {
+        var normalizedCounts: [String: Int] = [:]
+        let knownTrackKeys = Set(slotCountByTrack.keys).union(pluginChainByTrack.keys)
+        for trackKey in knownTrackKeys {
+            let normalized = normalizedSlotCount(for: trackKey, requested: slotCountByTrack[trackKey])
+            if normalized != defaultInsertSlots {
+                normalizedCounts[trackKey] = normalized
+            }
+        }
+
+        guard normalizedCounts != slotCountByTrack else { return }
+        slotCountByTrack = normalizedCounts
+        savePluginSlotCountState()
+    }
+
+    private func sanitizedPresetFilename(from rawTitle: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(.init(charactersIn: "-_ "))
+        let filteredScalars = rawTitle.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }
+        let filtered = String(filteredScalars)
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return filtered.isEmpty ? "mumble-track-preset" : filtered
+    }
+
+    private func makeCurrentTrackPresetFile() -> TrackChainPresetFile {
+        snapshotAllPluginParameters()
+        return TrackChainPresetFile(
+            version: 1,
+            exportedAt: Date(),
+            name: trackTitle(selectedTrack),
+            sourceTrackKey: selectedTrackKey,
+            sourceTrackTitle: trackTitle(selectedTrack),
+            slotCount: selectedTrackSlotCount,
+            plugins: selectedTrackChain.map(TrackChainPresetPlugin.init(plugin:))
+        )
+    }
+
+    private func prepareTrackPresetExport() {
+        let preset = makeCurrentTrackPresetFile()
+        trackPresetExportDocument = TrackChainPresetDocument(preset: preset)
+        trackPresetExportFilename = sanitizedPresetFilename(from: "\(preset.sourceTrackTitle)-track-preset.mumbletrackpreset")
+        showingTrackPresetExporter = true
+    }
+
+    private func handleTrackPresetExportResult(_ result: Result<URL, Error>) {
+        switch result {
+        case .success:
+            pluginOperationMessage = String(
+                format: NSLocalizedString("Exported track preset for %@", comment: ""),
+                trackTitle(selectedTrack)
+            )
+        case .failure(let error):
+            pluginOperationMessage = String(
+                format: NSLocalizedString("Failed to export track preset: %@", comment: ""),
+                error.localizedDescription
+            )
+        }
+    }
+
+    private func handleTrackPresetImportSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            pluginOperationMessage = String(
+                format: NSLocalizedString("Failed to import track preset: %@", comment: ""),
+                error.localizedDescription
+            )
+        case .success(let urls):
+            guard let fileURL = urls.first else { return }
+            let didAccess = fileURL.startAccessingSecurityScopedResource()
+            defer {
+                if didAccess {
+                    fileURL.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                let preset = try decoder.decode(TrackChainPresetFile.self, from: data)
+                Task {
+                    await importTrackPreset(preset)
+                }
+            } catch {
+                pluginOperationMessage = String(
+                    format: NSLocalizedString("Failed to read track preset: %@", comment: ""),
+                    error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func replaceLocalTrackChain(trackKey: String, with plugins: [TrackPlugin]) async {
+        let existingChain = pluginChainByTrack[trackKey] ?? []
+        for plugin in existingChain {
+            closePluginEditorIfNeeded(for: plugin, trackKey: trackKey)
+            clearPluginEditorCache(for: plugin, trackKey: trackKey)
+            if pluginLoaded(for: plugin.id) {
+                unloadAudioUnit(for: plugin)
+            }
+        }
+
+        pluginChainByTrack[trackKey] = plugins
+        savePluginChainState()
+        normalizePluginSlotCountsPersistingIfNeeded()
+        normalizeSelectedPluginSelection()
+        applyLivePreviewForTrackKey(trackKey)
+        rebuildProcessorState(for: trackKey)
+
+        for plugin in plugins where plugin.source == .audioUnit && plugin.autoLoad {
+            _ = await loadAudioUnit(for: plugin)
+        }
+        rebuildProcessorState(for: trackKey)
+    }
+
+    private func importTrackPreset(_ preset: TrackChainPresetFile) async {
+        let importedPlugins = preset.plugins.map { $0.makeTrackPlugin() }
+        let trackKey = selectedTrackKey
+
+        if isSharedManagedTrack(trackKey) {
+            for plugin in selectedTrackChain {
+                closePluginEditorIfNeeded(for: plugin, trackKey: trackKey)
+                clearPluginEditorCache(for: plugin, trackKey: trackKey)
+            }
+            await AudioPluginRackManager.shared.replaceTrackChain(trackKey: trackKey, with: importedPlugins)
+            await MainActor.run {
+                updateSlotCount(preset.slotCount, for: trackKey)
+                refreshSharedManagedTrackState()
+                pluginOperationMessage = String(
+                    format: NSLocalizedString("Imported track preset '%@'", comment: ""),
+                    preset.name
+                )
+            }
+            return
+        }
+
+        await MainActor.run {
+            updateSlotCount(preset.slotCount, for: trackKey)
+        }
+        await replaceLocalTrackChain(trackKey: trackKey, with: importedPlugins)
+        await MainActor.run {
+            pluginOperationMessage = String(
+                format: NSLocalizedString("Imported track preset '%@'", comment: ""),
+                preset.name
+            )
+        }
     }
 
     private var selectedPlugin: TrackPlugin? {
@@ -1698,6 +2060,7 @@ struct AudioPluginMixerView: View {
         update(&chain)
         pluginChainByTrack[selectedTrackKey] = chain
         savePluginChainState()
+        normalizePluginSlotCountsPersistingIfNeeded()
         normalizeSelectedPluginSelection()
         applyLivePreviewForTrackKey(selectedTrackKey)
         rebuildProcessorState(for: selectedTrackKey)
@@ -1712,6 +2075,19 @@ struct AudioPluginMixerView: View {
         }
         pluginChainByTrack = decoded
         removeLegacyFilesystemPlugins()
+        normalizePluginSlotCountsPersistingIfNeeded()
+    }
+
+    private func loadPluginSlotCountState() {
+        guard !pluginSlotCountsData.isEmpty,
+              let data = pluginSlotCountsData.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: Int].self, from: data) else {
+            slotCountByTrack = [:]
+            normalizePluginSlotCountsPersistingIfNeeded()
+            return
+        }
+        slotCountByTrack = decoded
+        normalizePluginSlotCountsPersistingIfNeeded()
     }
 
     /// 旧版使用 "remoteBus" 键，新版迁移到 "masterBus1"
@@ -1732,6 +2108,14 @@ struct AudioPluginMixerView: View {
         pluginTrackChainsData = string
     }
 
+    private func savePluginSlotCountState() {
+        guard let data = try? JSONEncoder().encode(slotCountByTrack),
+              let string = String(data: data, encoding: .utf8) else {
+            return
+        }
+        pluginSlotCountsData = string
+    }
+
     private func removeLegacyFilesystemPlugins() {
         var modified = false
         for (trackKey, chain) in pluginChainByTrack {
@@ -1743,6 +2127,7 @@ struct AudioPluginMixerView: View {
         }
         if modified {
             savePluginChainState()
+            normalizePluginSlotCountsPersistingIfNeeded()
         }
     }
 
@@ -1998,6 +2383,10 @@ struct AudioPluginMixerView: View {
     }
 
     private func loadPersistedAudioUnits() async {
+        guard !sharedRackManager.isSafeModeActive else {
+            applyLivePreviewForAllTracks()
+            return
+        }
         guard !isLoadingPersistedPlugins else { return }
 
         let targets = pluginChainByTrack
@@ -2047,7 +2436,7 @@ struct AudioPluginMixerView: View {
     private func applyLivePreviewForTrackKey(_ key: String) {
         syncAudioUnitDSPChainForTrackKey(key)
         let chain = pluginChainByTrack[key] ?? []
-        let hasActivePlugins = chain.contains { !$0.bypassed }
+        let hasActivePlugins = !sharedRackManager.isSafeModeActive && chain.contains { !$0.bypassed }
 
         if key == "input" {
             let gain = Float(pluginInputTrackGain)
@@ -2084,6 +2473,7 @@ struct AudioPluginMixerView: View {
     }
 
     private func activeProcessorChain(for key: String) -> [NSDictionary] {
+        guard !sharedRackManager.isSafeModeActive else { return [] }
         let chain = pluginChainByTrack[key] ?? []
         let validSidechainKeys = validSidechainRoutingKeys(forDestinationTrackKey: key)
         return chain
@@ -2111,6 +2501,28 @@ struct AudioPluginMixerView: View {
     }
 
     private func syncAudioUnitDSPChainForTrackKey(_ key: String) {
+        if sharedRackManager.isSafeModeActive {
+            if key == "input" {
+                MKAudio.shared().setInputTrackAudioUnitChain([])
+                return
+            }
+            if key == "sidetone" {
+                MKAudio.shared().setSidetoneAudioUnitChain([])
+                return
+            }
+            if key == "masterBus1" {
+                MKAudio.shared().setRemoteBusAudioUnitChain([])
+                return
+            }
+            if key == "masterBus2" {
+                MKAudio.shared().setRemoteBus2AudioUnitChain([])
+                return
+            }
+            if let hash = parseRemoteUserHash(from: key), let session = hashToSession[hash] {
+                MKAudio.shared().setRemoteTrackAudioUnitChain([], forSession: session)
+            }
+            return
+        }
         if key == "input" {
             MKAudio.shared().setInputTrackAudioUnitChain(activeProcessorChain(for: key))
             return
@@ -2414,6 +2826,10 @@ struct AudioPluginMixerView: View {
     }
 
     private func loadAudioUnit(for plugin: TrackPlugin) async -> Bool {
+        guard !sharedRackManager.isSafeModeActive else {
+            lastLoadErrorByPlugin[plugin.id] = NSLocalizedString("Safe Mode is active. Restart normally to load plugins.", comment: "")
+            return false
+        }
         guard plugin.source == .audioUnit else {
             pluginOperationMessage = NSLocalizedString("Only Audio Unit plugins can be loaded", comment: "")
             return false
@@ -2658,6 +3074,13 @@ struct AudioPluginMixerView: View {
     }
 
     private func openPluginEditor(for plugin: TrackPlugin) {
+        if sharedRackManager.isSafeModeActive {
+            pluginOperationMessage = NSLocalizedString(
+                "Safe Mode is active. Restart normally to load plugin editors.",
+                comment: ""
+            )
+            return
+        }
         selectedPluginID = plugin.id
 
         guard let trackKey = self.trackKey(containingPluginID: plugin.id) else {
@@ -2843,7 +3266,13 @@ struct AudioPluginMixerView: View {
         _ = pluginDescription
 
         if trackKey == "input" || trackKey == "sidetone" {
+#if os(macOS)
+            let stereoEnabled = UserDefaults.standard.bool(forKey: "AudioCaptureAllInputChannels")
+                && UserDefaults.standard.bool(forKey: "AudioStereoInput")
+            return stereoEnabled ? 2 : 1
+#else
             return UserDefaults.standard.bool(forKey: "AudioStereoInput") ? 2 : 1
+#endif
         }
         if trackKey == "masterBus1" || trackKey == "masterBus2" || trackKey.hasPrefix("remoteUser:") {
             return 2  // Stereo for master buses and user tracks
@@ -2968,7 +3397,17 @@ struct AudioPluginMixerView: View {
                 parameterID: parameterID,
                 newValue: newValue
             )
-            refreshSharedManagedTrackState()
+            if let sharedParameters = AudioPluginRackManager.shared.parameterStateByPlugin[pluginID] {
+                parameterStateByPlugin[pluginID] = sharedParameters.map {
+                    RuntimeParameter(
+                        id: $0.id,
+                        name: $0.name,
+                        minValue: $0.minValue,
+                        maxValue: $0.maxValue,
+                        value: $0.value
+                    )
+                }
+            }
             return
         }
 
@@ -2984,14 +3423,17 @@ struct AudioPluginMixerView: View {
         }
         list[index].value = newValue
         parameterStateByPlugin[pluginID] = list
-        updateSavedParameter(pluginID: pluginID, parameterID: parameterID, value: newValue)
-        rebuildProcessorStateMachine()
+        updateSavedParameter(pluginID: pluginID, trackKey: trackKey, parameterID: parameterID, value: newValue)
     }
 
-    private func updateSavedParameter(pluginID: String, parameterID: UInt64, value: Float) {
-        mutatePlugin(withID: pluginID) { plugin in
-            plugin.savedParameterValues[String(parameterID)] = value
+    private func updateSavedParameter(pluginID: String, trackKey: String, parameterID: UInt64, value: Float) {
+        guard var chain = pluginChainByTrack[trackKey],
+              let index = chain.firstIndex(where: { $0.id == pluginID }) else {
+            return
         }
+        chain[index].savedParameterValues[String(parameterID)] = value
+        pluginChainByTrack[trackKey] = chain
+        schedulePluginChainPersistence()
     }
 
     /// 从所有已加载的 AU 实例中抓取当前参数值，写入 savedParameterValues 并持久化。
@@ -3049,6 +3491,15 @@ struct AudioPluginMixerView: View {
             rebuildProcessorState(for: key)
             return
         }
+    }
+
+    private func schedulePluginChainPersistence() {
+        pendingPluginChainSaveWorkItem?.cancel()
+        let workItem = DispatchWorkItem {
+            savePluginChainState()
+        }
+        pendingPluginChainSaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
     }
 
     private func loadSelectedTrackState() {
@@ -3447,8 +3898,13 @@ private final class PluginEditorMacContainerViewController: NSViewController {
     private weak var embeddedController: NSViewController?
 
     override func loadView() {
-        view = NSView()
+        view = PluginEditorMacContainerView()
         view.translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        focusEmbeddedPluginViewIfPossible()
     }
 
     func setEmbeddedController(_ controller: NSViewController) {
@@ -3470,6 +3926,32 @@ private final class PluginEditorMacContainerViewController: NSViewController {
             childView.topAnchor.constraint(equalTo: view.topAnchor),
             childView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+
+        focusEmbeddedPluginViewIfPossible()
+    }
+
+    private func focusEmbeddedPluginViewIfPossible() {
+        guard let childView = embeddedController?.view else { return }
+        DispatchQueue.main.async { [weak self, weak childView] in
+            guard let self, let childView else { return }
+            self.view.window?.makeFirstResponder(childView)
+        }
+    }
+}
+
+private final class PluginEditorMacContainerView: NSView {
+    override var acceptsFirstResponder: Bool { true }
+
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.acceptsMouseMovedEvents = true
+        window?.isMovableByWindowBackground = false
     }
 }
 
@@ -3498,6 +3980,8 @@ private struct PluginEditorWindowContentView: View {
 
     @State private var selectedTab: Tab = .pluginUI
     @State private var snapshot: PluginEditorSnapshot
+    @State private var liveParameterValues: [UInt64: Float] = [:]
+    @State private var isEditingParameters = false
     @StateObject private var controllerSizeObserver: PluginEditorMacSizeObserver
 
     private let pluginEditorChromeHeight: CGFloat = 49.0
@@ -3594,11 +4078,17 @@ private struct PluginEditorWindowContentView: View {
                                         value: Binding(
                                             get: { Double(snapshotValue(for: parameter.id, fallback: parameter.value)) },
                                             set: { newValue in
+                                                liveParameterValues[parameter.id] = Float(newValue)
                                                 parameterChangeAction(parameter.id, Float(newValue))
-                                                refreshSnapshot()
                                             }
                                         ),
-                                        in: Double(parameter.minValue)...Double(parameter.maxValue)
+                                        in: Double(parameter.minValue)...Double(parameter.maxValue),
+                                        onEditingChanged: { editing in
+                                            isEditingParameters = editing
+                                            if !editing {
+                                                refreshSnapshot()
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -3619,7 +4109,7 @@ private struct PluginEditorWindowContentView: View {
             sizeDidChange(desiredWindowContentSize, minimumWindowContentSize)
         }
         .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
-            guard selectedTab == .parameters else { return }
+            guard selectedTab == .parameters, !isEditingParameters else { return }
             refreshSnapshot()
         }
         .onChange(of: selectedTab) { _, _ in
@@ -3638,10 +4128,14 @@ private struct PluginEditorWindowContentView: View {
     private func refreshSnapshot() {
         refreshAction()
         snapshot = snapshotProvider()
+        liveParameterValues = [:]
     }
 
     private func snapshotValue(for parameterID: UInt64, fallback: Float) -> Float {
-        snapshot.parameters.first(where: { $0.id == parameterID })?.value ?? fallback
+        if let liveValue = liveParameterValues[parameterID] {
+            return liveValue
+        }
+        return snapshot.parameters.first(where: { $0.id == parameterID })?.value ?? fallback
     }
 
     private var desiredWindowContentSize: NSSize {
@@ -3724,6 +4218,8 @@ final class PluginEditorWindowController: NSObject {
         let window = NSWindow(contentViewController: hostingController)
         window.title = title
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.acceptsMouseMovedEvents = true
+        window.isMovableByWindowBackground = false
         applyWindowSize(
             pluginKey: pluginKey,
             window: window,

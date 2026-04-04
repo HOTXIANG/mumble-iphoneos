@@ -53,7 +53,6 @@ struct AudioBarView: View {
                             .frame(width: min(1.0, max(0, CGFloat(level))) * w)
                         Spacer(minLength: 0)
                     }
-                    .animation(.linear(duration: 0.05), value: level)
                 )
 
                 // 3. 阈值分割线 (指示器)

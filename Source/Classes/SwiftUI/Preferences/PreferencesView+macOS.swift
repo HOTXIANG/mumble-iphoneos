@@ -108,7 +108,50 @@ extension AudioTransmissionSettingsView {
     var platformProcessingSection: some View {
         LabeledContent("Audio Processing:") {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Stereo Input", isOn: $enableStereoInput)
+                Toggle("Capture All Input Channels", isOn: $captureAllInputChannels)
+                Text("Enable this only for multi-channel USB microphones that otherwise show no input. It may affect macOS voice modes and expose Wide Spectrum.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 360, alignment: .leading)
+                if captureAllInputChannels {
+                    Toggle("Stereo Input", isOn: $enableStereoInput)
+                }
+                if activeInputChannelCount > 1 && !captureAllInputChannels {
+                    Picker("Input Channel:", selection: $selectedInputChannel) {
+                        ForEach(1...activeInputChannelCount, id: \.self) { channel in
+                            Text(String(format: NSLocalizedString("Channel %d", comment: ""), channel)).tag(channel)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text("Choose the hardware channel to use as the mono input source for this microphone.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 360, alignment: .leading)
+                }
+                if captureAllInputChannels && enableStereoInput && activeInputChannelCount > 1 {
+                    Picker("Left Channel:", selection: $selectedInputChannelLeft) {
+                        ForEach(1...activeInputChannelCount, id: \.self) { channel in
+                            Text(String(format: NSLocalizedString("Channel %d", comment: ""), channel)).tag(channel)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Picker("Right Channel:", selection: $selectedInputChannelRight) {
+                        ForEach(1...activeInputChannelCount, id: \.self) { channel in
+                            Text(String(format: NSLocalizedString("Channel %d", comment: ""), channel)).tag(channel)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text("Choose which hardware channels feed the left and right sides of the stereo input.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 360, alignment: .leading)
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(
                         String(
@@ -253,6 +296,18 @@ extension AudioTransmissionSettingsView {
         }
         return NSLocalizedString("Unknown", comment: "")
     }
+
+    var activeInputDeviceUID: String {
+        followSystemInputDevice ? systemDefaultUID : preferredInputDeviceUID
+    }
+
+    var activeInputDevice: MacInputDeviceOption? {
+        devices.first(where: { $0.uid == activeInputDeviceUID })
+    }
+
+    var activeInputChannelCount: Int {
+        max(activeInputDevice?.inputChannels ?? 1, 1)
+    }
     
     func refreshDevices() {
         devices = MacInputDeviceCatalog.inputDevices()
@@ -270,6 +325,10 @@ extension AudioTransmissionSettingsView {
                 preferredInputDeviceUID = ""
                 changed = true
             }
+            if enableStereoInput {
+                enableStereoInput = false
+                changed = true
+            }
             if changed {
                 PreferencesModel.shared.notifySettingsChanged()
             }
@@ -280,6 +339,31 @@ extension AudioTransmissionSettingsView {
            (preferredInputDeviceUID.isEmpty || !devices.contains(where: { $0.uid == preferredInputDeviceUID })) {
             followSystemInputDevice = true
             preferredInputDeviceUID = ""
+            changed = true
+        }
+
+        if !captureAllInputChannels && enableStereoInput {
+            enableStereoInput = false
+            changed = true
+        }
+
+        let clampedMonoChannel = min(max(selectedInputChannel, 1), activeInputChannelCount)
+        if selectedInputChannel != clampedMonoChannel {
+            selectedInputChannel = clampedMonoChannel
+            changed = true
+        }
+
+        let clampedLeftChannel = min(max(selectedInputChannelLeft, 1), activeInputChannelCount)
+        if selectedInputChannelLeft != clampedLeftChannel {
+            selectedInputChannelLeft = clampedLeftChannel
+            changed = true
+        }
+
+        let defaultRightChannel = min(max(activeInputChannelCount, 1), 2)
+        let clampedRightChannel = min(max(selectedInputChannelRight, 1), activeInputChannelCount)
+        let normalizedRightChannel = captureAllInputChannels && enableStereoInput ? clampedRightChannel : defaultRightChannel
+        if selectedInputChannelRight != normalizedRightChannel {
+            selectedInputChannelRight = normalizedRightChannel
             changed = true
         }
         
@@ -546,7 +630,7 @@ enum MacInputDeviceCatalog {
             guard hasInputStream(deviceID),
                   let uid = deviceUID(for: deviceID),
                   let name = deviceName(for: deviceID) else { continue }
-            options.append(MacInputDeviceOption(uid: uid, name: name))
+            options.append(MacInputDeviceOption(uid: uid, name: name, inputChannels: inputChannelCount(for: deviceID)))
         }
         
         return options.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -582,6 +666,33 @@ enum MacInputDeviceCatalog {
         var size: UInt32 = 0
         let err = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
         return err == noErr && size > 0
+    }
+
+    private static func inputChannelCount(for deviceID: AudioDeviceID) -> Int {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size) == noErr,
+              size >= UInt32(MemoryLayout<AudioBufferList>.size) else {
+            return 1
+        }
+
+        let rawBuffer = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { rawBuffer.deallocate() }
+
+        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, rawBuffer) == noErr else {
+            return 1
+        }
+
+        let audioBufferListPointer = rawBuffer.bindMemory(to: AudioBufferList.self, capacity: 1)
+        let audioBuffers = UnsafeMutableAudioBufferListPointer(audioBufferListPointer)
+        let channelCount = audioBuffers.reduce(0) { partialResult, buffer in
+            partialResult + Int(buffer.mNumberChannels)
+        }
+        return max(channelCount, 1)
     }
     
     private static func deviceUID(for deviceID: AudioDeviceID) -> String? {
@@ -765,7 +876,7 @@ struct MacSettingsRootView: View {
             case .general:
                 return NSSize(width: 650, height: 220)
             case .input:
-                return NSSize(width: 650, height: 520)
+                return NSSize(width: 650, height: 600)
             case .output:
                 return NSSize(width: 650, height: 220)
             case .notifications:
@@ -787,6 +898,8 @@ struct MacSettingsRootView: View {
     @EnvironmentObject var serverManager: ServerModelManager
     @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
+    @AppStorage("AudioCaptureAllInputChannels") private var captureAllInputChannels: Bool = false
+    @AppStorage("AudioStereoInput") private var enableStereoInput: Bool = false
     @AppStorage("WeakNetworkModeEnabled") private var weakNetworkModeEnabled: Bool = false
     @State private var selectedTab: MacSettingsTab = .general
     private var selectedAppColorScheme: AppColorSchemeOption {
@@ -794,6 +907,9 @@ struct MacSettingsRootView: View {
     }
 
     private var currentTabContentSize: NSSize {
+        if selectedTab == .input && captureAllInputChannels && enableStereoInput {
+            return NSSize(width: 650, height: 680)
+        }
         // 根据弱网模式开关状态动态调整 advanced 标签页的高度
         if selectedTab == .advanced && weakNetworkModeEnabled {
             return NSSize(width: 650, height: 520)

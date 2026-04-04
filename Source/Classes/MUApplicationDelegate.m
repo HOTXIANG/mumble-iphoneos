@@ -283,6 +283,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 }
 
 - (void) applicationWillTerminate:(UIApplication *)application {
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"AudioPluginDSPPendingVerification"];
+    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"AudioPluginCleanExit"];
     [MUDatabase teardown];
     
     if (@available(iOS 16.1, *)) {
