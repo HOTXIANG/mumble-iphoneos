@@ -19,6 +19,9 @@ struct UserStatsView: View {
     @State private var udpPing: String = "—"
     @State private var isOpus: Bool = false
     @State private var strongCertText: String = "—"
+    @State private var fromClientText: String = "—"
+    @State private var fromServerText: String = "—"
+    @State private var addressText: String? = nil
     
     private let refreshTimer = Timer.publish(every: 6, on: .main, in: .common).autoconnect()
     
@@ -27,20 +30,25 @@ struct UserStatsView: View {
             List {
                 Section("Connection") {
                     row("User", user.userName() ?? "Unknown")
+                    if let addressText {
+                        row("Address", addressText)
+                    }
                     row("Version", version)
                     row("OS", os)
                     row("Online", onlineTime)
                     row("Idle", idleTime)
                 }
-                
+
                 Section("Audio") {
-                    row("TCP Packets", tcpPackets)
+                    row("From Client", fromClientText)
+                    row("From Server", fromServerText)
                     row("UDP Packets", udpPackets)
-                    row("TCP Ping", tcpPing)
+                    row("TCP Packets", tcpPackets)
                     row("UDP Ping", udpPing)
+                    row("TCP Ping", tcpPing)
                     row("Opus", isOpus ? "Yes" : "No")
                 }
-                
+
                 Section("Bandwidth") {
                     row("Bandwidth", bandwidth)
                     row("Strong Certificate", strongCertText)
@@ -141,6 +149,17 @@ struct UserStatsView: View {
         if let p = uint32Value(from: stats.value(forKey: "udpPackets")) {
             udpPackets = "\(p)"
         }
+        // fromClient / fromServer 详细包统计（good/late/lost/resync）
+        if let fc = stats.value(forKey: "fromClient") as? NSObject {
+            fromClientText = formatPacketStats(fc)
+        }
+        if let fs = stats.value(forKey: "fromServer") as? NSObject {
+            fromServerText = formatPacketStats(fs)
+        }
+        // IP 地址（仅管理员可见）
+        if let addrData = stats.value(forKey: "address") as? Data, !addrData.isEmpty {
+            addressText = parseAddress(addrData)
+        }
         if let avg = floatValue(from: stats.value(forKey: "tcpPingAvg")),
            let v = floatValue(from: stats.value(forKey: "tcpPingVar")) {
             tcpPing = String(format: "%.1f ms (±%.1f)", avg, sqrt(v))
@@ -191,6 +210,39 @@ struct UserStatsView: View {
     private func boolValue(from raw: Any?) -> Bool? {
         if let value = raw as? Bool { return value }
         if let value = raw as? NSNumber { return value.boolValue }
+        return nil
+    }
+
+    /// 格式化 MPUserStats_Stats（good/late/lost/resync）
+    private func formatPacketStats(_ obj: NSObject) -> String {
+        let good = uint32Value(from: obj.value(forKey: "good")) ?? 0
+        let late = uint32Value(from: obj.value(forKey: "late")) ?? 0
+        let lost = uint32Value(from: obj.value(forKey: "lost")) ?? 0
+        let resync = uint32Value(from: obj.value(forKey: "resync")) ?? 0
+        return "\(good) good, \(late) late, \(lost) lost, \(resync) resync"
+    }
+
+    /// 解析 IP 地址（IPv4 / IPv6-mapped IPv4 / IPv6）
+    private func parseAddress(_ data: Data) -> String? {
+        if data.count == 4 {
+            // IPv4
+            return data.map { String($0) }.joined(separator: ".")
+        } else if data.count == 16 {
+            // 检查是否为 IPv6-mapped IPv4（前 12 字节为 00...00:ffff，后 4 字节为 IPv4）
+            let prefix = data.prefix(12)
+            let mappedPrefix = Data([0,0,0,0, 0,0,0,0, 0,0, 0xff,0xff])
+            if prefix == mappedPrefix {
+                let ipv4 = data.suffix(4)
+                return ipv4.map { String($0) }.joined(separator: ".")
+            }
+            // 完整 IPv6
+            var parts: [String] = []
+            for i in stride(from: 0, to: 16, by: 2) {
+                let val = UInt16(data[i]) << 8 | UInt16(data[i + 1])
+                parts.append(String(val, radix: 16))
+            }
+            return parts.joined(separator: ":")
+        }
         return nil
     }
 }

@@ -167,7 +167,7 @@ final class MUStatusBarController: NSObject {
 
         // Disconnect item
         if let disconnectItem = m.items.first(where: { $0.action == #selector(disconnect) }) {
-            disconnectItem.title = NSLocalizedString("Disconnect", comment: "")
+            disconnectItem.isHidden = !isConnected
             disconnectItem.isEnabled = isConnected
             disconnectItem.image = makeMenuItemImage(symbolName: "xmark.circle")
         }

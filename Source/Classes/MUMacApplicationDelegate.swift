@@ -11,7 +11,7 @@ import UserNotifications
 
 @MainActor
 class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
-    private let minimumWindowSize = NSSize(width: 980, height: 680)
+    private let minimumWindowSize = NSSize(width: 480, height: 400)
     private var connectionActive = false
     private let statusBarController = MUStatusBarController()
     private var lastAudioRestartSignature: String?
