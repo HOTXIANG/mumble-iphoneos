@@ -205,8 +205,8 @@ extension AudioTransmissionSettingsView {
     @ViewBuilder
     var platformVADDetailControlsContent: some View {
         LabeledContent {
-            AudioBarView(
-                level: audioMeter.currentLevel,
+            LiveAudioBarView(
+                meter: audioMeter,
                 lower: Float(vadBelow),
                 upper: Float(vadAbove)
             )
@@ -767,7 +767,7 @@ struct MacSettingsRootView: View {
         var preferredContentSize: NSSize {
             switch self {
             case .general:
-                return NSSize(width: 650, height: 220)
+                return NSSize(width: 650, height: 240)
             case .input:
                 return NSSize(width: 650, height: 600)
             case .output:
@@ -869,6 +869,7 @@ struct MacSettingsRootView: View {
                 }
                 .tag(MacSettingsTab.logging)
         }
+        .frame(width: currentTabContentSize.width, height: currentTabContentSize.height)
         .background(MacSettingsWindowSizeAdaptor(targetSize: currentTabContentSize))
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .id(languageManager.localeIdentifier)

@@ -30,10 +30,9 @@ class LanDiscoveryModel: NSObject, ObservableObject, NetServiceBrowserDelegate, 
         super.init()
         netServiceBrowser.delegate = self
         // Mumble 使用 _mumble._tcp 服务类型
-        MumbleLogger.discovery.info("LAN discovery initialized, searching for _mumble._tcp services")
-        netServiceBrowser.searchForServices(ofType: "_mumble._tcp.", inDomain: "local.")
+        MumbleLogger.discovery.info("LAN discovery initialized")
     }
-    
+
     func start() {
         MumbleLogger.discovery.info("Restarting LAN discovery")
         netServiceBrowser.stop()

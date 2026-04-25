@@ -220,6 +220,7 @@ MANUAL_TRANSLATIONS = {
     "Silence Hold: when input stays below Silence Below for this duration, it finally switches to silent.": "静音保持：当输入持续低于静音阈值达到该时长后，才会切换为静音。",
     "Below: input under this level is treated as silence.\\\\nAbove: input over this level is treated as speech.\\\\nSilence Hold: when input stays below Below for this duration, it finally switches to silent.": "静音阈值：低于此值会被视为静音。\\\\n语音阈值：高于此值会被视为语音。\\\\n静音保持：当输入持续低于静音阈值达到该时长后，才会切换为静音。",
     "Continue": "继续",
+    "Continue Normally": "正常继续",
     "No Server Connected": "未连接服务器",
     "Select a server from the sidebar to start chatting.": "从侧边栏选择一个服务器开始聊天。",
     "Cancel": "取消",
@@ -548,6 +549,10 @@ MANUAL_TRANSLATIONS = {
     "Safe Mode is active. Mixer plugins will not be loaded this session, but you can still remove problematic plugins.": "安全模式已启用。本次会话不会加载混音器插件，但你仍然可以移除有问题的插件。",
     "Safe Mode is active. Restart normally to load plugin editors.": "安全模式已启用。请正常重启以加载插件编辑器。",
     "Safe Mode is active. Restart normally to load plugins.": "安全模式已启用。请正常重启以加载插件。",
+    "Start in Safe Mode?": "以安全模式启动？",
+    "Use Safe Mode": "使用安全模式",
+    "Mumble did not exit normally last time while mixer plugins were configured. Safe Mode will skip loading all mixer plugins for this launch, so you can remove problematic plugins without entering a crash loop.": "Mumble 上次在已配置混音器插件的情况下未正常退出。安全模式会在本次启动时跳过加载所有混音器插件，让你可以移除有问题的插件，避免反复崩溃。",
+    "Affected tracks: %d.": "受影响的轨道：%d。",
     "Set Nickname": "设置昵称",
     "Sidechain Only": "仅侧链",
     "Sidetone Track": "返听轨道",
@@ -565,6 +570,14 @@ MANUAL_TRANSLATIONS = {
     "Token": "令牌",
     "Unignore Messages": "取消忽略消息",
     "Unlink All": "取消全部链接",
+    "Disconnected reason: %@": "断开原因：%@",
+    "Re-establishing UDP channel...": "正在重新建立 UDP 连接...",
+    "Reconnect attempt %d/%d": "重连尝试 %d/%d",
+    "Search bans": "搜索封禁",
+    "Search users": "搜索用户",
+    "UDP channel restored": "UDP 连接已恢复",
+    "UDP stalled, recovering audio channel...": "UDP 停滞，正在恢复音频连接...",
+    "UDP unavailable, using TCP tunnel": "UDP 不可用，正在使用 TCP 隧道",
     "When file logging is off, logs are only available in Console.app.": "关闭文件日志后，日志只能在 Console.app 中查看。",
     "Write Logs to File": "将日志写入文件",
     "%d ms": "%d 毫秒",
@@ -597,13 +610,32 @@ def strings_escape(value: str) -> str:
 
 
 def strings_unescape(value: str) -> str:
-    # Decode common .strings escape sequences to runtime string form.
-    return (
-        value
-        .replace("\\n", "\n")
-        .replace("\\\"", "\"")
-        .replace("\\\\", "\\")
-    )
+    # Decode common .strings/Swift escape sequences without collapsing "\\n"
+    # into a backslash followed by a real newline.
+    result: list[str] = []
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char != "\\" or index + 1 >= len(value):
+            result.append(char)
+            index += 1
+            continue
+
+        escaped = value[index + 1]
+        if escaped == "n":
+            result.append("\n")
+        elif escaped == "r":
+            result.append("\r")
+        elif escaped == "t":
+            result.append("\t")
+        elif escaped in {'"', "\\"}:
+            result.append(escaped)
+        else:
+            result.append("\\")
+            result.append(escaped)
+        index += 2
+
+    return "".join(result)
 
 
 def parse_strings(path: Path) -> dict[str, str]:

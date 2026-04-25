@@ -11,18 +11,12 @@ import AVFAudio
 
 extension ServerModelManager {
     func setupServerModel() {
-        guard let connectionController = MUConnectionController.shared(),
+        guard let connectionController = MUConnectionController.existingShared(),
               let model = connectionController.serverModel else {
             return
         }
 
-        guard let newModel = connectionController.serverModel else {
-            MumbleLogger.connection.debug("ServerModel not ready. Retrying in 0.5s...")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.setupServerModel()
-            }
-            return
-        }
+        let newModel = model
 
         if self.serverModel === newModel {
             MumbleLogger.connection.debug("ServerModel identity match. Skipping setup to prevent duplicates.")
@@ -114,6 +108,7 @@ extension ServerModelManager {
         aclUserNamesById.removeAll()
         pendingACLUserNameQueries.removeAll()
         userAvatars.removeAll()
+        userAvatarFingerprints.removeAll()
         pendingAvatarFetchSessions.removeAll()
         // 保存当前监听频道以便重连后恢复
         if !listeningChannels.isEmpty {

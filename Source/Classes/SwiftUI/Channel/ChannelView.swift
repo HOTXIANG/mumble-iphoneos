@@ -49,22 +49,14 @@ struct ChannelView: View {
     @StateObject private var languageManager = AppLanguageManager.shared
     @Environment(\.colorScheme) private var colorScheme
     
-    @State private var userPreferredChatWidth: CGFloat = -1
+    @State private var splitHandlePositionRatio: CGFloat = 0.5
     private let minChatWidth: CGFloat = 300
-    private let minServerListWidth: CGFloat = {
-        #if os(macOS)
-        350
-        #else
-        400
-        #endif
-    }()
-    private let splitThreshold: CGFloat = {
-        #if os(macOS)
-        return 550
-        #else
-        return 600
-        #endif
-    }()
+    private let splitHandleWidth: CGFloat = 24
+    private let minServerListWidth: CGFloat = 300
+
+    private var splitThreshold: CGFloat {
+        minChatWidth + splitHandleWidth + minServerListWidth
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -79,11 +71,10 @@ struct ChannelView: View {
                             .gesture(
                                 DragGesture(minimumDistance: 1, coordinateSpace: .named("ChannelViewSpace"))
                                     .onChanged { value in
-                                        let handleHalfWidth: CGFloat = 12
-                                        let newWidth = geo.size.width - value.location.x - handleHalfWidth
-                                        let maxSafe = geo.size.width - minServerListWidth
-                                        let limit = min(geo.size.width * 0.7, maxSafe)
-                                        userPreferredChatWidth = min(max(newWidth, minChatWidth), limit)
+                                        updateSplitHandleRatio(
+                                            dragLocationX: value.location.x,
+                                            totalWidth: geo.size.width
+                                        )
                                     }
                             )
                             .zIndex(10)
@@ -129,11 +120,17 @@ struct ChannelView: View {
         .id(languageManager.localeIdentifier)
         .onAppear {
             serverManager.activate()
-            appState.isInChannelView = true
+            if !appState.isInChannelView {
+                appState.isInChannelView = true
+            }
         }
         .onDisappear {
-            appState.isInChannelView = false
-            appState.isChannelSplitLayout = false
+            if appState.isInChannelView {
+                appState.isInChannelView = false
+            }
+            if appState.isChannelSplitLayout {
+                appState.isChannelSplitLayout = false
+            }
             let shouldCleanup = !appState.isConnected && !appState.isConnecting && !appState.isReconnecting
             if shouldCleanup {
                 serverManager.cleanup()
@@ -142,6 +139,10 @@ struct ChannelView: View {
     }
     
     private var globalGradient: some View {
+        #if os(macOS)
+        Color.clear
+            .ignoresSafeArea()
+        #else
         LinearGradient(
             colors: [
                 Color(red: 0.30, green: 0.30, blue: 0.62).opacity(0.07),
@@ -151,16 +152,28 @@ struct ChannelView: View {
             endPoint: .bottom
         )
         .ignoresSafeArea()
+        #endif
     }
     
     private func calculateEffectiveChatWidth(totalWidth: CGFloat) -> CGFloat {
-        let handleWidth: CGFloat = 24
-        let preferred = userPreferredChatWidth < 0
-            ? (totalWidth - handleWidth) / 2
-            : userPreferredChatWidth
-        let maxSafeWidth = totalWidth - minServerListWidth
-        let effective = min(preferred, maxSafeWidth)
-        return max(effective, minChatWidth)
+        let preferred = totalWidth * (1 - splitHandlePositionRatio) - splitHandleWidth / 2
+        return clampedChatWidth(preferred, totalWidth: totalWidth)
+    }
+
+    private func updateSplitHandleRatio(dragLocationX: CGFloat, totalWidth: CGFloat) {
+        guard totalWidth > 0 else { return }
+
+        let proposedChatWidth = totalWidth - dragLocationX - splitHandleWidth / 2
+        let chatWidth = clampedChatWidth(proposedChatWidth, totalWidth: totalWidth)
+        let handleCenterX = totalWidth - chatWidth - splitHandleWidth / 2
+        splitHandlePositionRatio = min(max(handleCenterX / totalWidth, 0), 1)
+    }
+
+    private func clampedChatWidth(_ width: CGFloat, totalWidth: CGFloat) -> CGFloat {
+        let maxWidthForServerList = totalWidth - splitHandleWidth - minServerListWidth
+        let maxWidthForProportion = totalWidth * 0.7
+        let maximum = max(minChatWidth, min(maxWidthForServerList, maxWidthForProportion))
+        return min(max(width, minChatWidth), maximum)
     }
     
     private func configureTabBarAppearance() {
@@ -179,7 +192,10 @@ struct ChannelView: View {
 
     private func updateChannelLayoutState(for width: CGFloat) {
         if width > 0 {
-            appState.isChannelSplitLayout = width > splitThreshold
+            let isSplitLayout = width > splitThreshold
+            if appState.isChannelSplitLayout != isSplitLayout {
+                appState.isChannelSplitLayout = isSplitLayout
+            }
         }
     }
 }
@@ -201,74 +217,78 @@ struct ServerChannelView: View {
     @State private var pendingNicknameInput: String = ""
     
     var body: some View {
-        let baseView = AnyView(channelContent)
-        let overlayView = AnyView(
-            baseView
-                .overlay(alignment: .bottom, content: movingUserOverlay)
-                .animation(.easeInOut(duration: 0.25), value: serverManager.movingUser != nil)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-        )
-        let sheetView = AnyView(
-            overlayView
-                .sheet(item: $selectedUserForConfig, content: userAudioSettingsSheet)
-                .sheet(item: $selectedUserForInfo, content: userInfoSheet)
-                .sheet(item: $selectedUserForStats, content: userStatsSheet)
-                .sheet(item: $selectedChannelForInfo, content: channelInfoSheet)
-                .sheet(item: $selectedUserForPM, content: privateMessageSheet)
-                .sheet(item: $selectedChannelForEdit, content: editChannelSheet)
-                .sheet(item: $selectedChannelForCreate, content: createChannelSheet)
-        )
-        let alertView = AnyView(
-            sheetView
-                .alert("Set Nickname", isPresented: renameAlertBinding, actions: renameAlertActions, message: renameAlertMessage)
-                .alert("Channel Password", isPresented: channelPasswordAlertBinding, actions: channelPasswordAlertActions, message: channelPasswordAlertMessage)
-        )
-        let notificationView = AnyView(
-            alertView
-                .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI), perform: handleAutomationOpenUI)
-                .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI), perform: handleAutomationDismissUI)
-        )
-        let sheetStateView = AnyView(
-            notificationView
-                .onChange(of: selectedUserForConfig?.session()) { _, newValue in
-                    syncAutomationSheet(newValue != nil ? "userAudioSettings" : nil, clearing: "userAudioSettings")
-                }
-                .onChange(of: selectedUserForInfo?.session()) { _, newValue in
-                    syncAutomationSheet(newValue != nil ? "userInfo" : nil, clearing: "userInfo")
-                }
-                .onChange(of: selectedUserForStats?.session()) { _, newValue in
-                    syncAutomationSheet(newValue != nil ? "userStats" : nil, clearing: "userStats")
-                }
-                .onChange(of: selectedChannelForInfo?.channelId()) { _, newValue in
-                    syncAutomationSheet(newValue != nil ? "channelInfo" : nil, clearing: "channelInfo")
-                }
-        )
-        let remainingStateView = AnyView(
-            sheetStateView
-                .onChange(of: selectedUserForPM?.session()) { _, newValue in
-                    syncAutomationSheet(newValue != nil ? "privateMessage" : nil, clearing: "privateMessage")
-                }
-                .onChange(of: selectedChannelForEdit?.channelId()) { _, newValue in
-                    syncAutomationSheet(newValue != nil ? "channelEdit" : nil, clearing: "channelEdit")
-                }
-                .onChange(of: selectedChannelForCreate?.channelId()) { _, newValue in
-                    syncAutomationSheet(newValue != nil ? "channelCreate" : nil, clearing: "channelCreate")
-                }
-                .onChange(of: selectedUserForRename?.session()) { _, newValue in
-                    syncAutomationAlert(newValue != nil ? "userRename" : nil, clearing: "userRename")
-                }
-        )
-        return AnyView(
-            remainingStateView
-                .onChange(of: serverManager.passwordPromptChannel?.channelId()) { _, newValue in
-                    syncAutomationAlert(newValue != nil ? "channelPassword" : nil, clearing: "channelPassword")
-                }
-                .onChange(of: serverManager.movingUser?.session()) { _, _ in
-                    syncMovingOverlayState()
-                }
-                .onAppear(perform: syncMovingOverlayState)
-        )
+        let base = channelContent
+            .overlay(alignment: .bottom, content: movingUserOverlay)
+            .animation(.easeInOut(duration: 0.25), value: serverManager.movingUser != nil)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+        return transientAutomationState(remainingSheetAutomationState(sheetAutomationState(automationNotifications(alerts(sheets(base))))))
+    }
+
+    private func sheets<Content: View>(_ content: Content) -> some View {
+        content
+            .sheet(item: $selectedUserForConfig, content: userAudioSettingsSheet)
+            .sheet(item: $selectedUserForInfo, content: userInfoSheet)
+            .sheet(item: $selectedUserForStats, content: userStatsSheet)
+            .sheet(item: $selectedChannelForInfo, content: channelInfoSheet)
+            .sheet(item: $selectedUserForPM, content: privateMessageSheet)
+            .sheet(item: $selectedChannelForEdit, content: editChannelSheet)
+            .sheet(item: $selectedChannelForCreate, content: createChannelSheet)
+    }
+
+    private func alerts<Content: View>(_ content: Content) -> some View {
+        content
+            .alert("Set Nickname", isPresented: renameAlertBinding, actions: renameAlertActions, message: renameAlertMessage)
+            .alert("Channel Password", isPresented: channelPasswordAlertBinding, actions: channelPasswordAlertActions, message: channelPasswordAlertMessage)
+    }
+
+    private func automationNotifications<Content: View>(_ content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI), perform: handleAutomationOpenUI)
+            .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI), perform: handleAutomationDismissUI)
+    }
+
+    private func sheetAutomationState<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: selectedUserForConfig?.session()) { _, newValue in
+                syncAutomationSheet(newValue != nil ? "userAudioSettings" : nil, clearing: "userAudioSettings")
+            }
+            .onChange(of: selectedUserForInfo?.session()) { _, newValue in
+                syncAutomationSheet(newValue != nil ? "userInfo" : nil, clearing: "userInfo")
+            }
+            .onChange(of: selectedUserForStats?.session()) { _, newValue in
+                syncAutomationSheet(newValue != nil ? "userStats" : nil, clearing: "userStats")
+            }
+            .onChange(of: selectedChannelForInfo?.channelId()) { _, newValue in
+                syncAutomationSheet(newValue != nil ? "channelInfo" : nil, clearing: "channelInfo")
+            }
+    }
+
+    private func remainingSheetAutomationState<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: selectedUserForPM?.session()) { _, newValue in
+                syncAutomationSheet(newValue != nil ? "privateMessage" : nil, clearing: "privateMessage")
+            }
+            .onChange(of: selectedChannelForEdit?.channelId()) { _, newValue in
+                syncAutomationSheet(newValue != nil ? "channelEdit" : nil, clearing: "channelEdit")
+            }
+            .onChange(of: selectedChannelForCreate?.channelId()) { _, newValue in
+                syncAutomationSheet(newValue != nil ? "channelCreate" : nil, clearing: "channelCreate")
+            }
+    }
+
+    private func transientAutomationState<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: selectedUserForRename?.session()) { _, newValue in
+                syncAutomationAlert(newValue != nil ? "userRename" : nil, clearing: "userRename")
+            }
+            .onChange(of: serverManager.passwordPromptChannel?.channelId()) { _, newValue in
+                syncAutomationAlert(newValue != nil ? "channelPassword" : nil, clearing: "channelPassword")
+            }
+            .onChange(of: serverManager.movingUser?.session()) { _, _ in
+                syncMovingOverlayState()
+            }
+            .onAppear(perform: syncMovingOverlayState)
     }
 
     private var channelContent: some View {
@@ -287,10 +307,13 @@ struct ServerChannelView: View {
 
     @ViewBuilder
     private var channelTreeContent: some View {
-        if let root = MUConnectionController.shared()?.serverModel?.rootChannel() {
+        let connectionModel = MUConnectionController.shared()?.serverModel
+        let currentChannelId = connectionModel?.connectedUser()?.channel()?.channelId()
+        if let root = connectionModel?.rootChannel() {
             ChannelTreeRow(
                 channel: root,
                 level: 0,
+                currentChannelId: currentChannelId,
                 serverManager: serverManager,
                 onUserTap: { user in
                     selectedUserForConfig = user
@@ -356,8 +379,12 @@ struct ServerChannelView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            #if os(macOS)
+            .modifier(GlassEffectModifier(cornerRadius: 12))
+            #else
             .background(.ultraThinMaterial)
             .background(Color.accentColor.opacity(0.6))
+            #endif
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
             .padding(.horizontal, 16)
@@ -619,6 +646,7 @@ struct ServerChannelView: View {
 struct ChannelTreeRow: View {
     let channel: MKChannel
     let level: Int
+    let currentChannelId: UInt?
     @ObservedObject var serverManager: ServerModelManager
     
     let onUserTap: (MKUser) -> Void
@@ -635,10 +663,22 @@ struct ChannelTreeRow: View {
     
     var body: some View {
         Group {
+            let users = serverManager.getSortedUsers(for: channel)
+            let listeners = serverManager.getListeners(for: channel)
+            let childChannelCount = (channel.channels() as? [MKChannel])?.count ?? 0
+            let rowHasContent = !users.isEmpty || childChannelCount > 0 || !listeners.isEmpty
+
             // A. 频道行 (Logic + UI)
             ZStack(alignment: .leading) {
                 // 1. 底层：纯 UI 视图 (负责渲染外观)
-                ChannelRowView(channel: channel, level: level, serverManager: serverManager)
+                ChannelRowView(
+                    channel: channel,
+                    level: level,
+                    currentChannelId: currentChannelId,
+                    hasChildren: rowHasContent,
+                    userCount: users.count,
+                    serverManager: serverManager
+                )
                 
                 // 2. 顶层：交互控制层
                 if isInMoveMode {
@@ -935,9 +975,8 @@ struct ChannelTreeRow: View {
             .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
             
             // B. 子内容区域
-            if hasContent && !serverManager.isChannelCollapsed(Int(channel.channelId())) {
+            if rowHasContent && !serverManager.isChannelCollapsed(Int(channel.channelId())) {
                 // 1. 用户
-                let users = serverManager.getSortedUsers(for: channel)
                 ForEach(users, id: \.self) { user in
                     UserRowView(
                         user: user,
@@ -956,7 +995,6 @@ struct ChannelTreeRow: View {
                 }
                 
                 // 1.5. 频道监听者行
-                let listeners = serverManager.getListeners(for: channel)
                 ForEach(listeners, id: \.self) { listener in
                     ListenerRow(
                         listener: listener,
@@ -977,6 +1015,7 @@ struct ChannelTreeRow: View {
                     ChannelTreeRow(
                         channel: subChannel,
                         level: level + 1,
+                        currentChannelId: currentChannelId,
                         serverManager: serverManager,
                         onUserTap: onUserTap,
                         onUserInfoTap: onUserInfoTap,
@@ -1157,6 +1196,9 @@ struct ChannelTreeRow: View {
 struct ChannelRowView: View {
     let channel: MKChannel
     let level: Int
+    let currentChannelId: UInt?
+    let hasChildren: Bool
+    let userCount: Int
     @ObservedObject var serverManager: ServerModelManager
     
     private let haptic = PlatformSelectionFeedback()
@@ -1257,25 +1299,13 @@ struct ChannelRowView: View {
     }
     
     private var isCurrentChannel: Bool {
-        let current = MUConnectionController.shared()?.serverModel?.connectedUser()?.channel()
-        return current == channel
+        currentChannelId == channel.channelId()
     }
     
     private var isCollapsed: Bool {
         serverManager.isChannelCollapsed(Int(channel.channelId()))
     }
     
-    private var hasChildren: Bool {
-        let uCount = serverManager.getSortedUsers(for: channel).count
-        let cCount = (channel.channels() as? [MKChannel])?.count ?? 0
-        let lCount = serverManager.channelListeners[channel.channelId()]?.count ?? 0
-        return uCount > 0 || cCount > 0 || lCount > 0
-    }
-    
-    private var userCount: Int {
-        return serverManager.getSortedUsers(for: channel).count
-    }
-
     private var isPinnedChannel: Bool {
         serverManager.isChannelPinned(channel)
     }
@@ -1840,8 +1870,13 @@ struct ResizeHandle: View {
                 .padding(.bottom, 8)
                 .contentShape(Rectangle())
             Rectangle()
+                #if os(macOS)
+                .fill(Color.secondary.opacity(0.45))
+                .frame(width: isHovering ? 3 : 1)
+                #else
                 .fill(isHovering ? Color.primary.opacity(0.35) : Color.primary.opacity(0.12))
                 .frame(width: 4)
+                #endif
                 .padding(.bottom, 8)
                 .cornerRadius(2)
         }

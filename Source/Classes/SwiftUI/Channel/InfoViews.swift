@@ -16,6 +16,8 @@ import UniformTypeIdentifiers
 struct HTMLContentView: PlatformViewRepresentable {
     let html: String
     @Binding var dynamicHeight: CGFloat
+
+    private static let heightMessageHandlerName = "heightChanged"
     
     #if os(macOS)
     typealias NSViewType = WKWebView
@@ -25,7 +27,12 @@ struct HTMLContentView: PlatformViewRepresentable {
     }
     
     func updateNSView(_ webView: WKWebView, context: Context) {
+        context.coordinator.parent = self
         loadHTML(in: webView)
+    }
+
+    static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
+        coordinator.detach(from: nsView, messageHandlerName: heightMessageHandlerName)
     }
     #else
     typealias UIViewType = WKWebView
@@ -35,7 +42,12 @@ struct HTMLContentView: PlatformViewRepresentable {
     }
     
     func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.parent = self
         loadHTML(in: webView)
+    }
+
+    static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
+        coordinator.detach(from: uiView, messageHandlerName: heightMessageHandlerName)
     }
     #endif
     
@@ -47,6 +59,7 @@ struct HTMLContentView: PlatformViewRepresentable {
         let config = WKWebViewConfiguration()
         // 允许内联播放、data URI 图片等
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        config.userContentController.add(context.coordinator, name: Self.heightMessageHandlerName)
         
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -150,11 +163,6 @@ struct HTMLContentView: PlatformViewRepresentable {
         </html>
         """
         
-        // 添加高度回调 handler
-        let controller = webView.configuration.userContentController
-        controller.removeAllScriptMessageHandlers()
-        controller.add(webView.navigationDelegate as! WKScriptMessageHandler, name: "heightChanged")
-        
         webView.loadHTMLString(fullHTML, baseURL: nil)
     }
     
@@ -166,11 +174,18 @@ struct HTMLContentView: PlatformViewRepresentable {
         init(_ parent: HTMLContentView) {
             self.parent = parent
         }
+
+        func detach(from webView: WKWebView, messageHandlerName: String) {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: messageHandlerName)
+        }
         
         // 接收 JS 回报的高度
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "heightChanged", let height = message.body as? CGFloat {
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
                     if height > 0 && abs(self.parent.dynamicHeight - height) > 1 {
                         self.parent.dynamicHeight = height
                     }

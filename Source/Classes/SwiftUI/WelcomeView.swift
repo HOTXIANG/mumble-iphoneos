@@ -79,6 +79,14 @@ struct WelcomeContentView: View {
         )
         #endif
     }
+
+    private var lanServerRowBackground: AnyView {
+        #if os(macOS)
+        return AnyView(Color.clear)
+        #else
+        return AnyView(Rectangle().fill(.regularMaterial))
+        #endif
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -170,10 +178,17 @@ struct WelcomeContentView: View {
                         }
                     }
                     .padding(.horizontal, 20)
+                    #if os(macOS)
+                    .padding(.vertical, 9)
+                    #else
                     .padding(.vertical, 16)
+                    #endif
                     .contentShape(Rectangle())
                     #if os(macOS)
-                    .modifier(GlassEffectModifier(cornerRadius: 20))
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.primary.opacity(0.06))
+                    )
                     #else
                     .modifier(GlassEffectModifier(cornerRadius: 27))
                     #endif
@@ -181,7 +196,7 @@ struct WelcomeContentView: View {
                 .padding(.horizontal, 20)
                 .buttonStyle(.plain)
             }
-            .padding(.bottom, 20)
+            .padding(.bottom, 12)
             
             List {
                 // --- 最近访问 ---
@@ -239,7 +254,7 @@ struct WelcomeContentView: View {
                             }
                         }
                     }
-                    .listRowBackground(Rectangle().fill(.regularMaterial))
+                    .listRowBackground(lanServerRowBackground)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -358,7 +373,11 @@ struct ServerListRow: View {
                 Spacer()
             }
             .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
+        #if os(macOS)
+        .buttonStyle(.plain)
+        #endif
     }
 }
 
@@ -612,9 +631,6 @@ private struct VADOnboardingSplashView: View {
     private var belowPercentLabel: String { "\(Int((vadBelow * 100).rounded()))%" }
     private var abovePercentLabel: String { "\(Int((vadAbove * 100).rounded()))%" }
     private var holdMillisLabel: String { "\(Int((vadHoldSeconds * 1000).rounded())) ms" }
-    private var inputPercentLabel: String {
-        "\(Int((Double(audioMeter.currentLevel) * 100).rounded()))%"
-    }
     private var holdBinding: Binding<Double> {
         Binding(
             get: { min(max(vadHoldSeconds, 0.0), 0.3) },
@@ -726,12 +742,12 @@ private struct VADOnboardingSplashView: View {
                         Text("Live Input Level")
                             .font(.headline)
                         Spacer()
-                        Text(inputPercentLabel)
+                        LiveAudioMeterPercentText(meter: audioMeter)
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
-                    AudioBarView(
-                        level: audioMeter.currentLevel,
+                    LiveAudioBarView(
+                        meter: audioMeter,
                         lower: Float(vadBelow),
                         upper: Float(vadAbove)
                     )
@@ -802,7 +818,7 @@ private struct VADOnboardingSplashView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 onStartAudioTest()
             }
-            audioMeter.startMonitoring()
+            audioMeter.startMonitoring(vadKind: vadKind)
         }
         .onDisappear {
             audioMeter.stopMonitoring()
@@ -825,6 +841,7 @@ private struct VADOnboardingSplashView: View {
         }
         #endif
         .onChange(of: vadKind) { _, newValue in
+            audioMeter.updateVADKind(newValue)
             // Keep splash behavior aligned with Input Setting.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 PreferencesModel.shared.notifySettingsChanged()
@@ -898,6 +915,13 @@ private struct VADOnboardingSplashView: View {
     #endif
 }
 
+#if os(macOS)
+private enum SplitWidthBucket: Equatable {
+    case narrow
+    case wide
+}
+#endif
+
 struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -913,20 +937,13 @@ struct AppRootView: View {
     
     // iPad 使用的侧边栏导航管理器 (让 Detail 独立变化)
     @StateObject private var sidebarNavigationManager = NavigationManager()
+    @StateObject private var channelNavigationManager = NavigationManager()
  
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
-    #if os(macOS)
-    // macOS 启动时直接设为 .all，避免从 .automatic 切换到 .all 时窗口被撑宽一个侧边栏的宽度
-    @State private var splitVisibility: NavigationSplitViewVisibility = .all
-    #else
     @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
-    #endif
     #if os(macOS)
-    @State private var initialSplitLayoutWindowFrame: NSRect?
-    @State private var didCaptureInitialSplitLayoutFrame = false
-    @State private var preservedDisconnectWindowFrame: NSRect?
+    @State private var lastSplitWidthBucket: SplitWidthBucket?
     #endif
-
     #if os(iOS)
     private let narrowWindowThreshold: CGFloat = 700
     #else
@@ -958,9 +975,6 @@ struct AppRootView: View {
         .preferredColorScheme(selectedAppColorScheme.preferredColorScheme)
         .environmentObject(serverManager)
         .focusedValue(\.serverManager, serverManager)
-        #if os(macOS)
-        .background(WindowFramePreserver(targetFrame: preservedDisconnectWindowFrame ?? initialSplitLayoutWindowFrame))
-        #endif
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
         .overlay(alignment: .top) {
             if let toast = appState.activeToast {
@@ -1197,9 +1211,6 @@ struct AppRootView: View {
             languageManager.reapplyCurrentLanguage()
             serverManager.activate()
             appState.setAutomationCurrentScreen("welcome")
-            #if os(macOS)
-            preserveInitialSplitLayoutWindowFrame()
-            #endif
             if !hasCompletedVADOnboarding {
                 showVADOnboarding = true
             }
@@ -1261,27 +1272,13 @@ struct AppRootView: View {
             }
             .environmentObject(sidebarNavigationManager)
             .background(Color.clear)
-            #if os(macOS)
-            .toolbar(removing: .sidebarToggle)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        NSApp.keyWindow?.firstResponder?.tryToPerform(
-                            #selector(NSSplitViewController.toggleSidebar(_:)), with: nil
-                        )
-                    } label: {
-                        Image(systemName: "sidebar.leading")
-                    }
-                }
-            }
-            #endif
             .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
         } detail: {
             ZStack {
                 if appState.isConnected {
                     NavigationStack {
                         ChannelListView()
-                            .environmentObject(NavigationManager())
+                            .environmentObject(channelNavigationManager)
                     }
                 } else {
                     ContentUnavailableView {
@@ -1319,16 +1316,8 @@ struct AppRootView: View {
     private func handleConnectionStateChange(isConnected: Bool, width: CGFloat) {
         #if os(macOS)
         if isConnected {
-            preservedDisconnectWindowFrame = nil
             updateSplitVisibility(width: width, connectionChanged: true)
             return
-        }
-
-        let shouldPreserveWindowFrame = splitVisibility == .detailOnly
-        if shouldPreserveWindowFrame {
-            preservedDisconnectWindowFrame = currentMainWindow()?.frame
-        } else {
-            preservedDisconnectWindowFrame = nil
         }
 
         // Let the disconnected placeholder replace the channel view first.
@@ -1337,11 +1326,6 @@ struct AppRootView: View {
         DispatchQueue.main.async {
             guard !appState.isConnected else { return }
             updateSplitVisibility(width: width, connectionChanged: true)
-            if preservedDisconnectWindowFrame != nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    preservedDisconnectWindowFrame = nil
-                }
-            }
         }
         #else
         updateSplitVisibility(width: width, connectionChanged: true)
@@ -1360,43 +1344,19 @@ struct AppRootView: View {
             setSplitVisibility(.all)
         }
         #else
-        if appState.isConnected && width < narrowWindowThreshold {
-            setSplitVisibility(.detailOnly)
-        } else {
+        let widthBucket: SplitWidthBucket = width < narrowWindowThreshold ? .narrow : .wide
+        if !connectionChanged && lastSplitWidthBucket == widthBucket {
+            return
+        }
+        lastSplitWidthBucket = widthBucket
+
+        if widthBucket == .narrow {
+            setSplitVisibility(appState.isConnected ? .detailOnly : .automatic)
+        } else if splitVisibility != .all {
             setSplitVisibility(.all)
         }
         #endif
     }
-
-    #if os(macOS)
-    private func currentMainWindow() -> NSWindow? {
-        if let mainWindow = NSApp.mainWindow {
-            return mainWindow
-        }
-        if let keyWindow = NSApp.keyWindow {
-            return keyWindow
-        }
-        return NSApp.windows.first { $0.isVisible }
-    }
-
-    private func preserveInitialSplitLayoutWindowFrame() {
-        guard !didCaptureInitialSplitLayoutFrame else { return }
-
-        DispatchQueue.main.async {
-            guard !didCaptureInitialSplitLayoutFrame else { return }
-            guard let windowFrame = currentMainWindow()?.frame else { return }
-
-            didCaptureInitialSplitLayoutFrame = true
-            initialSplitLayoutWindowFrame = windowFrame
-
-            // NavigationSplitView can mount the detail first and reveal the sidebar
-            // shortly after launch. Keep the restored frame stable through that pass.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                initialSplitLayoutWindowFrame = nil
-            }
-        }
-    }
-    #endif
 
     private func setSplitVisibility(_ visibility: NavigationSplitViewVisibility) {
         guard splitVisibility != visibility else { return }
@@ -1599,74 +1559,3 @@ struct AppRootView: View {
     }
     #endif
 }
-
-#if os(macOS)
-private struct WindowFramePreserver: NSViewRepresentable {
-    let targetFrame: NSRect?
-
-    final class Coordinator: NSObject {
-        weak var window: NSWindow?
-        var resizeObserver: NSObjectProtocol?
-        var activeTargetFrame: NSRect?
-        var isRestoring = false
-
-        deinit {
-            if let resizeObserver {
-                NotificationCenter.default.removeObserver(resizeObserver)
-            }
-        }
-
-        func attach(to window: NSWindow) {
-            guard self.window !== window else { return }
-            if let resizeObserver {
-                NotificationCenter.default.removeObserver(resizeObserver)
-            }
-            self.window = window
-            resizeObserver = NotificationCenter.default.addObserver(
-                forName: NSWindow.didResizeNotification,
-                object: window,
-                queue: .main
-            ) { [weak self] _ in
-                self?.restoreIfNeeded()
-            }
-        }
-
-        func updateTargetFrame(_ frame: NSRect?) {
-            activeTargetFrame = frame
-            restoreIfNeeded()
-        }
-
-        private func restoreIfNeeded() {
-            guard !isRestoring else { return }
-            guard let window, let targetFrame = activeTargetFrame else { return }
-
-            let currentFrame = window.frame
-            let widthChanged = abs(currentFrame.width - targetFrame.width) > 0.5
-            let heightChanged = abs(currentFrame.height - targetFrame.height) > 0.5
-            let originChanged = abs(currentFrame.origin.x - targetFrame.origin.x) > 0.5
-                || abs(currentFrame.origin.y - targetFrame.origin.y) > 0.5
-            guard widthChanged || heightChanged || originChanged else { return }
-
-            isRestoring = true
-            defer { isRestoring = false }
-            window.setFrame(targetFrame, display: true, animate: false)
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        NSView(frame: .zero)
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            guard let window = nsView.window else { return }
-            context.coordinator.attach(to: window)
-            context.coordinator.updateTargetFrame(targetFrame)
-        }
-    }
-}
-#endif

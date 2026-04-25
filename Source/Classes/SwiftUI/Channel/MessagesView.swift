@@ -1601,6 +1601,7 @@ struct MessagesList: View {
     @State private var isDragTargeted = false
     @State private var cachedRenderBlocks: [RenderBlock] = []
     @State private var pendingAutoScrollWorkItem: DispatchWorkItem?
+    @State private var autoScrollGeneration = 0
     
     private let bottomID = "bottomOfMessages"
 
@@ -1647,7 +1648,8 @@ struct MessagesList: View {
                             case .senderRun(let run):
                                 Section {
                                     VStack(alignment: .leading, spacing: 6) {
-                                        ForEach(Array(run.messages.enumerated()), id: \.element.id) { index, message in
+                                        ForEach(run.messages.indices, id: \.self) { index in
+                                            let message = run.messages[index]
                                             switch run.type {
                                             case .userMessage:
                                                 MessageBubbleView(
@@ -1680,10 +1682,12 @@ struct MessagesList: View {
                                 }
                             }
                         }
-                        Color.clear.frame(height: 1).id(bottomID)
+                        Color.clear
+                            .frame(height: 1)
+                            .padding(.bottom, 4)
+                            .id(bottomID)
                     }
                     .padding(.top, 16)
-                    .padding(.bottom, 4)
                     .padding(.leading, isSplitLayout ? 4 : 16)
                     .padding(.trailing, 16)
                     .offset(y: layoutCompensationY)
@@ -1823,9 +1827,16 @@ struct MessagesList: View {
 
     private func scheduleAutoScrollToBottom(proxy: ScrollViewProxy) {
         pendingAutoScrollWorkItem?.cancel()
+        autoScrollGeneration += 1
+        let generation = autoScrollGeneration
 
         let work = DispatchWorkItem {
             scrollToBottom(proxy: proxy)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                guard autoScrollGeneration == generation else { return }
+                scrollToBottom(proxy: proxy, animated: false)
+            }
         }
 
         pendingAutoScrollWorkItem = work
@@ -1932,6 +1943,8 @@ private typealias MessagePlatformColor = UIColor
 private typealias MessagePlatformFont = UIFont
 #endif
 
+private let messageLinkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
 private func makeMessageBodyAttributedString(
     text: String,
     baseColor: MessagePlatformColor,
@@ -1952,7 +1965,7 @@ private func makeMessageBodyAttributedString(
         range: fullRange
     )
     
-    if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
+    if let detector = messageLinkDetector {
         detector.enumerateMatches(in: text, options: [], range: fullRange) { result, _, _ in
             guard let result, let url = result.url else { return }
             mutable.addAttributes(
@@ -2038,7 +2051,9 @@ private struct PlatformMessageTextView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UITextView, context: Context) {
-        uiView.attributedText = attributedText
+        if !uiView.attributedText.isEqual(to: attributedText) {
+            uiView.attributedText = attributedText
+        }
     }
     
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
@@ -2095,7 +2110,9 @@ private struct PlatformMessageTextView: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: NSTextView, context: Context) {
-        nsView.textStorage?.setAttributedString(attributedText)
+        if !nsView.attributedString().isEqual(to: attributedText) {
+            nsView.textStorage?.setAttributedString(attributedText)
+        }
     }
     
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSTextView, context: Context) -> CGSize? {

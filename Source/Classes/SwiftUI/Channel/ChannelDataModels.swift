@@ -19,7 +19,10 @@ struct UserState {
 
 // 3. ChannelNavigationItem 中添加 talkingState 属性
 class ChannelNavigationItem: ObservableObject, Identifiable {
-    let id = UUID(); let title: String; let subtitle: String?; let type: ItemType; let indentLevel: Int; let object: Any
+    let title: String; let subtitle: String?; let type: ItemType; let indentLevel: Int; let object: Any
+    var id: String {
+        "\(type.rawValue)-\(objectId)"
+    }
     
     @Published var isConnectedUserChannel: Bool = false
     @Published var isConnectedUser: Bool = false
@@ -29,7 +32,7 @@ class ChannelNavigationItem: ObservableObject, Identifiable {
     // --- 核心修改：添加 talkingState 属性 ---
     @Published var talkingState: TalkingState = .passive
     
-    enum ItemType {
+    enum ItemType: String {
         case channel,
              user
     }
@@ -92,6 +95,7 @@ struct ChatMessage: Identifiable, Equatable {
     let type: ChatMessageType
     let senderName: String
     let attributedMessage: AttributedString
+    let plainTextMessage: String
     let images: [PlatformImage]
     let timestamp: Date
     let isSentBySelf: Bool
@@ -104,15 +108,11 @@ struct ChatMessage: Identifiable, Equatable {
         self.type = type
         self.senderName = senderName
         self.attributedMessage = attributedMessage
+        self.plainTextMessage = String(attributedMessage.characters)
         self.images = images
         self.timestamp = timestamp
         self.isSentBySelf = isSentBySelf
         self.senderSession = senderSession
         self.privatePeerName = privatePeerName
-    }
-    
-    // 为了方便，我们保留一个纯文本的计算属性
-    var plainTextMessage: String {
-        String(attributedMessage.characters)
     }
 }

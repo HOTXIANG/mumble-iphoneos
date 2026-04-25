@@ -104,7 +104,11 @@ extension ServerModelManager {
         }
         #endif
 
-        let connectionController = MUConnectionController.shared()
+        if !isLocalAudioTestRunning {
+            return
+        }
+
+        let connectionController = MUConnectionController.existingShared()
         let connectionInProgressOrActive = connectionController?.isConnected() ?? false
         
         // 如果当前连接着服务器，绝对不能关麦，否则通话断了
@@ -117,10 +121,6 @@ extension ServerModelManager {
             return
         }
 
-        if !isLocalAudioTestRunning {
-            return
-        }
-
         MumbleLogger.audio.info("Stopping Local Audio (Settings closed)")
         isLocalAudioTestRunning = false
         isLocalAudioTestStarting = false
@@ -130,7 +130,7 @@ extension ServerModelManager {
         #endif
         // 关闭引擎并释放 AudioSession
         Task.detached(priority: .userInitiated) {
-            if MUConnectionController.shared()?.isConnected() == true {
+            if MUConnectionController.existingShared()?.isConnected() == true {
                 // A server connection was started right after dismissal; keep engine alive.
                 return
             }

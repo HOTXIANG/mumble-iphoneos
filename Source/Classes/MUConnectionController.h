@@ -25,6 +25,7 @@ extern NSString *MUCertificateTrustFailureNotification;
 
 @interface MUConnectionController : NSObject
 + (MUConnectionController *) sharedController;
++ (MUConnectionController *) existingSharedController;
 - (void) connectToHostname:(NSString *)hostName
                      port:(NSUInteger)port
              withUsername:(NSString *)userName

@@ -351,18 +351,33 @@ extension ServerModelManager {
     func updateAvatarCache(for user: MKUser) {
         let session = user.session()
         let textureData = objcData(from: user.texture())
+        let textureHashData = objcData(from: user.textureHash())
+        let fingerprint = (!(textureHashData?.isEmpty ?? true) ? textureHashData : textureData)
 
-        if let textureData, !textureData.isEmpty, let image = PlatformImage(data: textureData) {
+        if let textureData, !textureData.isEmpty {
+            if let fingerprint,
+               userAvatarFingerprints[session] == fingerprint,
+               userAvatars[session] != nil {
+                pendingAvatarFetchSessions.remove(session)
+                return
+            }
+            guard let image = PlatformImage(data: textureData) else { return }
+            if let fingerprint {
+                userAvatarFingerprints[session] = fingerprint
+            }
             userAvatars[session] = image
             pendingAvatarFetchSessions.remove(session)
             return
         }
 
-        let hasTextureHash = !(objcData(from: user.textureHash())?.isEmpty ?? true)
+        let hasTextureHash = !(textureHashData?.isEmpty ?? true)
         if hasTextureHash {
             requestUserTextureIfNeeded(for: user)
         } else {
-            userAvatars.removeValue(forKey: session)
+            if userAvatars[session] != nil {
+                userAvatars.removeValue(forKey: session)
+            }
+            userAvatarFingerprints.removeValue(forKey: session)
             pendingAvatarFetchSessions.remove(session)
         }
     }

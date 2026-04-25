@@ -276,16 +276,22 @@ struct ChannelListView: View {
             trailingButtonsContent
         }
         #else
-        ToolbarItemGroup(placement: .primaryAction) {
-            trailingButtonsContent
+        ToolbarItem(placement: .primaryAction) {
+            deafenToolbarButton
+        }
+        ToolbarItem(placement: .primaryAction) {
+            muteToolbarButton
+        }
+        ToolbarItem(placement: .primaryAction) {
+            disconnectToolbarButton
         }
         #endif
     }
     
+    #if os(iOS)
     @ViewBuilder
     private var trailingButtonsContent: some View {
         HStack(alignment: .center, spacing: 16) {
-            #if os(iOS)
             // iOS: 三个点菜单（包含注册/证书/设置）
             Menu {
                 menuContent
@@ -294,32 +300,6 @@ struct ChannelListView: View {
                     .frame(width: 30, height: 30)
                     .contentShape(Rectangle())
             }
-            #else
-            // macOS: 不听+闭麦放在右上角（无三个点菜单）
-            Button(action: {
-                hapticGenerator.impactOccurred()
-                serverManager.toggleSelfDeafen()
-            }) {
-                Image(systemName: serverManager.connectedUserState?.isSelfDeafened == true ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.borderless)
-            
-            Button(action: {
-                hapticGenerator.impactOccurred()
-                serverManager.toggleSelfMute()
-            }) {
-                Image(systemName: serverManager.connectedUserState?.isSelfMuted == true ? "mic.slash.fill" : "mic.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : (serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary))
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.borderless)
-            #endif
             
             // 断开连接按钮（两个平台都有）
             Button(action: {
@@ -328,18 +308,81 @@ struct ChannelListView: View {
             }) {
                 Image(systemName: "phone.down.fill")
                     .foregroundColor(.red)
-                    #if os(macOS)
-                    .font(.system(size: 18))
-                    .frame(width: 28, height: 28)
-                    #endif
             }
-            #if os(macOS)
-            .buttonStyle(.borderless)
-            #endif
         }
         .tint(.primary)
         .padding(.horizontal, 8)
     }
+    #endif
+
+    #if os(macOS)
+    private var deafenToolbarTitle: String {
+        serverManager.connectedUserState?.isSelfDeafened == true ? "Undeafen" : "Deafen"
+    }
+
+    private var muteToolbarTitle: String {
+        serverManager.connectedUserState?.isSelfMuted == true ? "Unmute" : "Mute"
+    }
+
+    private var deafenToolbarButton: some View {
+        Button(action: {
+            hapticGenerator.impactOccurred()
+            serverManager.toggleSelfDeafen()
+        }) {
+            Label(
+                deafenToolbarTitle,
+                systemImage: serverManager.connectedUserState?.isSelfDeafened == true
+                    ? "speaker.slash.fill"
+                    : "speaker.wave.2.fill"
+            )
+            .labelStyle(.iconOnly)
+            .font(.system(size: 18))
+            .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
+            .contentTransition(.symbolEffect(.replace))
+            .frame(width: 40, height: 28)
+        }
+        .buttonStyle(.borderless)
+        .help(deafenToolbarTitle)
+    }
+
+    private var muteToolbarButton: some View {
+        Button(action: {
+            hapticGenerator.impactOccurred()
+            serverManager.toggleSelfMute()
+        }) {
+            Label(
+                muteToolbarTitle,
+                systemImage: serverManager.connectedUserState?.isSelfMuted == true ? "mic.slash.fill" : "mic.fill"
+            )
+            .labelStyle(.iconOnly)
+            .font(.system(size: 18))
+            .foregroundColor(
+                serverManager.connectedUserState?.isSelfDeafened == true
+                    ? .red
+                    : (serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary)
+            )
+            .contentTransition(.symbolEffect(.replace))
+            .frame(width: 40, height: 28)
+        }
+        .buttonStyle(.borderless)
+        .help(muteToolbarTitle)
+    }
+
+    private var disconnectToolbarButton: some View {
+        Button(action: {
+            hapticGenerator.impactOccurred()
+            initiateDisconnect()
+        }) {
+            Label("Disconnect", systemImage: "phone.down.fill")
+                .labelStyle(.iconOnly)
+                .font(.system(size: 18))
+                .foregroundColor(.red)
+                .frame(width: 40, height: 28)
+        }
+        .buttonStyle(.borderless)
+        .help("Disconnect")
+    }
+    #endif
     
     // 菜单内容 (进一步提取以降低复杂度)
     @ViewBuilder

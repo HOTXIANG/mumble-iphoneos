@@ -11,32 +11,55 @@ import Combine
 final class AudioMeterModel: ObservableObject, @unchecked Sendable {
     @Published var currentLevel: Float = 0.0
     private var timer: DispatchSourceTimer?
-    private let samplingQueue = DispatchQueue(label: "cn.hotxiang.mumble.audio-meter", qos: .userInteractive)
+    private let samplingQueue = DispatchQueue(label: "cn.hotxiang.mumble.audio-meter", qos: .userInitiated)
     private let stateLock = NSLock()
-    private let updateInterval: TimeInterval = 0.03
+    static let refreshInterval: TimeInterval = 1.0 / 60.0
+    private let updateInterval: TimeInterval = AudioMeterModel.refreshInterval
+    private let legacyPublishIntervalNanos: UInt64 = 100_000_000
+    private let minimumPublishedLevelDelta: Float = 0.015
     private var monitorSessionID: UInt = 0
     private var mainThreadUpdatePending = false
+    private var latestLevel: Float = 0.0
+    private var lastPublishedLevel: Float = 0.0
+    private var lastPublishedUptimeNanos: UInt64 = 0
+    private var vadKind = UserDefaults.standard.string(forKey: "AudioVADKind") ?? "amplitude"
 
-    // 后台任务负责节拍，采样与 UI 更新在主线程执行（MKAudio 线程安全要求）
-    func startMonitoring() {
+    deinit {
         stopMonitoring()
+    }
+
+    // 后台任务负责节拍与采样；UI 通过快照在显示刷新时读取，避免主线程等待音频队列。
+    func startMonitoring(vadKind: String? = nil) {
+        stopMonitoring()
+        stateLock.lock()
+        if let vadKind {
+            self.vadKind = vadKind
+        }
         monitorSessionID &+= 1
         let sessionID = monitorSessionID
+        lastPublishedUptimeNanos = 0
+        stateLock.unlock()
 
         let source = DispatchSource.makeTimerSource(queue: samplingQueue)
-        source.schedule(deadline: .now(), repeating: updateInterval, leeway: .milliseconds(10))
+        source.schedule(deadline: .now(), repeating: updateInterval, leeway: .milliseconds(1))
         source.setEventHandler { [weak self] in
-            guard let self else { return }
-            guard self.beginPendingMainThreadUpdate() else { return }
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                defer { self.endPendingMainThreadUpdate() }
-                guard self.monitorSessionID == sessionID else { return }
-                self.currentLevel = Self.sampleLevel()
-            }
+            self?.sampleAndStoreLevel(sessionID: sessionID)
         }
         timer = source
         source.resume()
+    }
+
+    func updateVADKind(_ vadKind: String) {
+        stateLock.lock()
+        self.vadKind = vadKind
+        stateLock.unlock()
+    }
+
+    func levelSnapshot() -> Float {
+        stateLock.lock()
+        let level = latestLevel
+        stateLock.unlock()
+        return level
     }
 
     // 停止监听（节省资源）
@@ -44,7 +67,12 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
         timer?.setEventHandler {}
         timer?.cancel()
         timer = nil
+        stateLock.lock()
         monitorSessionID &+= 1
+        latestLevel = 0.0
+        lastPublishedLevel = 0.0
+        lastPublishedUptimeNanos = 0
+        stateLock.unlock()
         endPendingMainThreadUpdate()
         if Thread.isMainThread {
             currentLevel = 0.0
@@ -55,10 +83,43 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
         }
     }
 
-    private static func sampleLevel() -> Float {
-        guard let audio = MKAudio.shared() else { return 0.0 }
+    private func sampleAndStoreLevel(sessionID: UInt) {
+        stateLock.lock()
+        guard monitorSessionID == sessionID else {
+            stateLock.unlock()
+            return
+        }
+        let currentVADKind = vadKind
+        stateLock.unlock()
 
-        let vadKind = UserDefaults.standard.string(forKey: "AudioVADKind") ?? "amplitude"
+        let level = Self.sampleLevel(vadKind: currentVADKind)
+        let now = DispatchTime.now().uptimeNanoseconds
+
+        stateLock.lock()
+        guard monitorSessionID == sessionID else {
+            stateLock.unlock()
+            return
+        }
+        latestLevel = level
+        let shouldPublishLegacyLevel = now - lastPublishedUptimeNanos >= legacyPublishIntervalNanos
+            && abs(level - lastPublishedLevel) >= minimumPublishedLevelDelta
+        if shouldPublishLegacyLevel {
+            lastPublishedUptimeNanos = now
+            lastPublishedLevel = level
+        }
+        stateLock.unlock()
+
+        guard shouldPublishLegacyLevel, beginPendingMainThreadUpdate() else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            defer { self.endPendingMainThreadUpdate() }
+            guard self.isSessionActive(sessionID) else { return }
+            self.currentLevel = self.levelSnapshot()
+        }
+    }
+
+    private static func sampleLevel(vadKind: String) -> Float {
+        guard let audio = MKAudio.shared() else { return 0.0 }
 
         let rawLevel: Float
         if vadKind == "snr" {
@@ -69,6 +130,13 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
         }
 
         return min(max(rawLevel, 0.0), 1.0)
+    }
+
+    private func isSessionActive(_ sessionID: UInt) -> Bool {
+        stateLock.lock()
+        let active = monitorSessionID == sessionID
+        stateLock.unlock()
+        return active
     }
 
     private func beginPendingMainThreadUpdate() -> Bool {

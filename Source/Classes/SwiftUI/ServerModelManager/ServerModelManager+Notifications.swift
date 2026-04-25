@@ -273,6 +273,7 @@ extension ServerModelManager {
                 )
                 self.lastKnownChannelIdByUserSession.removeValue(forKey: session)
                 self.userAvatars.removeValue(forKey: session)
+                self.userAvatarFingerprints.removeValue(forKey: session)
                 self.pendingAvatarFetchSessions.remove(session)
                 // 清除离开用户的监听状态
                 for (channelId, var listeners) in self.channelListeners {

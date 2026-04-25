@@ -490,13 +490,14 @@ struct AudioTransmissionSettingsView: View {
     
     private func syncAudioMeter(for method: String) {
         if method == "vad" {
-            audioMeter.startMonitoring()
+            audioMeter.startMonitoring(vadKind: vadKind)
         } else {
             audioMeter.stopMonitoring()
         }
     }
 
     func handleVADKindSelectionChange(_ newValue: String) {
+        audioMeter.updateVADKind(newValue)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             PreferencesModel.shared.notifySettingsChanged()
         }

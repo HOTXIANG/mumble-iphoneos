@@ -87,8 +87,8 @@ extension AudioTransmissionSettingsView {
                 Spacer()
             }
             
-            AudioBarView(
-                level: audioMeter.currentLevel,
+            LiveAudioBarView(
+                meter: audioMeter,
                 lower: Float(vadBelow),
                 upper: Float(vadAbove)
             )

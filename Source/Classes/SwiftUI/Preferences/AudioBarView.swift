@@ -12,62 +12,28 @@ struct AudioBarView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let w = geometry.size.width
-            let h = geometry.size.height
+            Canvas { context, size in
+                let width = size.width
+                let height = size.height
+                let safeLevel = min(1.0, max(0, CGFloat(level)))
+                let safeLower = max(0, min(1, CGFloat(lower)))
+                let safeUpper = max(safeLower, min(1, CGFloat(upper)))
+                let lowerX = safeLower * width
+                let upperX = safeUpper * width
+                let levelX = safeLevel * width
 
-            // 安全限制，防止 crash
-            let safeLower = max(0, min(1, CGFloat(lower)))
-            let safeUpper = max(safeLower, min(1, CGFloat(upper)))
+                fillBand(in: &context, x: 0, width: lowerX, height: height, color: .red.opacity(0.2))
+                fillBand(in: &context, x: lowerX, width: upperX - lowerX, height: height, color: .yellow.opacity(0.2))
+                fillBand(in: &context, x: upperX, width: width - upperX, height: height, color: .green.opacity(0.2))
 
-            ZStack(alignment: .leading) {
-                // 1. 底层：暗色背景 (显示阈值区间)
-                HStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.red.opacity(0.2))
-                        .frame(width: safeLower * w)
+                fillBand(in: &context, x: 0, width: min(lowerX, levelX), height: height, color: .red)
+                fillBand(in: &context, x: lowerX, width: min(max(levelX - lowerX, 0), upperX - lowerX), height: height, color: .yellow)
+                fillBand(in: &context, x: upperX, width: max(levelX - upperX, 0), height: height, color: .green)
 
-                    Rectangle()
-                        .fill(Color.yellow.opacity(0.2))
-                        .frame(width: (safeUpper - safeLower) * w)
-
-                    Rectangle()
-                        .fill(Color.green.opacity(0.2))
-                }
-
-                // 2. 顶层：亮色前景 (被 mask 裁剪)
-                HStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.red)
-                        .frame(width: safeLower * w)
-
-                    Rectangle()
-                        .fill(Color.yellow)
-                        .frame(width: (safeUpper - safeLower) * w)
-
-                    Rectangle()
-                        .fill(Color.green)
-                }
-                .mask(
-                    HStack {
-                        Rectangle()
-                            .frame(width: min(1.0, max(0, CGFloat(level))) * w)
-                        Spacer(minLength: 0)
-                    }
-                )
-
-                // 3. 阈值分割线 (指示器)
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.5))
-                        .frame(width: 2, height: h)
-                        .offset(x: safeLower * w)
-
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.5))
-                        .frame(width: 2, height: h)
-                        .offset(x: safeUpper * w)
-                }
+                fillBand(in: &context, x: lowerX, width: 2, height: height, color: .primary.opacity(0.5))
+                fillBand(in: &context, x: upperX, width: 2, height: height, color: .primary.opacity(0.5))
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .frame(height: 24)
         .cornerRadius(4)
@@ -76,5 +42,39 @@ struct AudioBarView: View {
                 .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
         )
         .clipped()
+    }
+
+    private func fillBand(in context: inout GraphicsContext, x: CGFloat, width: CGFloat, height: CGFloat, color: Color) {
+        guard width > 0 else { return }
+        context.fill(
+            Path(CGRect(x: x, y: 0, width: width, height: height)),
+            with: .color(color)
+        )
+    }
+}
+
+struct LiveAudioBarView: View {
+    let meter: AudioMeterModel
+    let lower: Float
+    let upper: Float
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: AudioMeterModel.refreshInterval)) { _ in
+            AudioBarView(
+                level: meter.levelSnapshot(),
+                lower: lower,
+                upper: upper
+            )
+        }
+    }
+}
+
+struct LiveAudioMeterPercentText: View {
+    let meter: AudioMeterModel
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: AudioMeterModel.refreshInterval)) { _ in
+            Text("\(Int((Double(meter.levelSnapshot()) * 100).rounded()))%")
+        }
     }
 }

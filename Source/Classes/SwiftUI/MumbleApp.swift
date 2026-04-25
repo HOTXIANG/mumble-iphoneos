@@ -149,7 +149,7 @@ struct MumbleApp: App {
         Settings {
             MacSettingsRootView()
                 .environmentObject(serverManager)
-                .frame(minWidth: 400, idealWidth: 500, minHeight: 100, idealHeight: 200)
+                .frame(minWidth: 400, idealWidth: 650, minHeight: 100, idealHeight: 240)
         }
         #endif
     }
@@ -374,7 +374,7 @@ extension Notification.Name {
 }
 
 /// 通过 NSViewRepresentable 直接设置 NSWindow.minSize，确保窗口无法缩小到指定尺寸以下
-/// 同时为主窗口启用 frame autosave，让下次启动时恢复到上次关闭时的窗口尺寸与位置
+/// 同时为主窗口启用 frame autosave，避免在 SwiftUI 约束更新期间手动改 frame
 struct WindowMinSizeSetter: NSViewRepresentable {
     let minSize: NSSize
     let autosaveName: String
@@ -411,7 +411,6 @@ struct WindowMinSizeSetter: NSViewRepresentable {
     private func configure(window: NSWindow, context: Context) {
         // 禁用 macOS 系统状态恢复，防止隔很长时间后重新打开时系统用缓存的旧尺寸覆盖窗口
         window.isRestorable = false
-        context.coordinator.restoreFrameIfNeeded(for: window)
         window.minSize = minSize
         if window.frameAutosaveName != autosaveName {
             window.setFrameAutosaveName(autosaveName)
@@ -420,18 +419,9 @@ struct WindowMinSizeSetter: NSViewRepresentable {
 
     class Coordinator: NSObject {
         private let autosaveName: String
-        private var hasRestoredFrame = false
 
         init(autosaveName: String) {
             self.autosaveName = autosaveName
-        }
-
-        func restoreFrameIfNeeded(for window: NSWindow) {
-            guard !hasRestoredFrame else { return }
-            if UserDefaults.standard.string(forKey: "NSWindow Frame \(autosaveName)") != nil {
-                window.setFrameUsingName(autosaveName)
-            }
-            hasRestoredFrame = true
         }
 
         @objc func mainWindowWillClose(_ notification: Notification) {

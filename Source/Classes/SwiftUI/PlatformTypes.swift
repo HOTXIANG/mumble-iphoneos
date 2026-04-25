@@ -131,7 +131,13 @@ struct TintedGlassRowModifier: ViewModifier {
     var cornerRadius: CGFloat = 12
     #endif
 
+    @ViewBuilder
     func body(content: Content) -> some View {
+        standardBody(content: content)
+    }
+
+    @ViewBuilder
+    private func standardBody(content: Content) -> some View {
         let highlightTint: Color = colorScheme == .light
             ? highlightColor.opacity(0.28)
             : highlightColor.opacity(0.5)
@@ -167,6 +173,7 @@ struct TintedGlassRowModifier: ViewModifier {
                 )
         }
     }
+
 }
 
 /// Clear glass effect with rounded rect shape.

@@ -154,13 +154,18 @@ static CFTimeInterval MUMonotonicNow(void) {
 
 @synthesize connection = _connection;
 
+static MUConnectionController *sSharedConnectionController;
+
 + (MUConnectionController *) sharedController {
-    static MUConnectionController *nc;
     static dispatch_once_t token;
     dispatch_once(&token, ^{
-        nc = [[MUConnectionController alloc] init];
+        sSharedConnectionController = [[MUConnectionController alloc] init];
     });
-    return nc;
+    return sSharedConnectionController;
+}
+
++ (MUConnectionController *) existingSharedController {
+    return sSharedConnectionController;
 }
 
 - (id) init {

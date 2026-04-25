@@ -8,7 +8,37 @@
 import SwiftUI
 
 private final class NotificationObserverBox: @unchecked Sendable {
-    var token: NSObjectProtocol?
+    private let lock = NSLock()
+    private var token: NSObjectProtocol?
+
+    func store(_ token: NSObjectProtocol) {
+        lock.lock()
+        self.token = token
+        lock.unlock()
+    }
+
+    func invalidate() {
+        lock.lock()
+        let token = self.token
+        self.token = nil
+        lock.unlock()
+
+        if let token {
+            NotificationCenter.default.removeObserver(token)
+        }
+    }
+
+    func scheduleAutoRemoval(after seconds: TimeInterval = 10) {
+        Task { [weak self] in
+            let nanoseconds = UInt64(seconds * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            self?.invalidate()
+        }
+    }
+
+    deinit {
+        invalidate()
+    }
 }
 
 // MARK: - Create Channel View
@@ -133,7 +163,7 @@ struct CreateChannelView: View {
             let mgr = serverManager
             
             let observerBox = NotificationObserverBox()
-            observerBox.token = NotificationCenter.default.addObserver(
+            let token = NotificationCenter.default.addObserver(
                 forName: ServerModelNotificationManager.channelAddedNotification,
                 object: nil,
                 queue: .main
@@ -143,11 +173,7 @@ struct CreateChannelView: View {
                       newChannel.channelName() == trimmedName,
                       newChannel.parent()?.channelId() == parentId else { return }
                 
-                // 移除一次性监听
-                if let obs = observerBox.token {
-                    NotificationCenter.default.removeObserver(obs)
-                    observerBox.token = nil
-                }
+                observerBox.invalidate()
                 
                 let channelRef = UnsafeTransfer(value: newChannel)
                 
@@ -169,6 +195,8 @@ struct CreateChannelView: View {
                     }
                 }
             }
+            observerBox.store(token)
+            observerBox.scheduleAutoRemoval()
         }
         
         serverManager.createChannel(name: trimmedName, parent: parentChannel, temporary: isTemporary)
@@ -182,7 +210,7 @@ struct CreateChannelView: View {
         let channelId = channel.channelId()
         let channelRef = UnsafeTransfer(value: channel)
         let observerBox = NotificationObserverBox()
-        observerBox.token = NotificationCenter.default.addObserver(
+        let token = NotificationCenter.default.addObserver(
             forName: ServerModelNotificationManager.aclReceivedNotification,
             object: nil,
             queue: .main
@@ -192,10 +220,7 @@ struct CreateChannelView: View {
                   let chan = userInfo["channel"] as? MKChannel,
                   chan.channelId() == channelId else { return }
             
-            if let obs = observerBox.token {
-                NotificationCenter.default.removeObserver(obs)
-                observerBox.token = nil
-            }
+            observerBox.invalidate()
             
             let aclTransfer = UnsafeTransfer(value: accessControl)
             
@@ -241,6 +266,8 @@ struct CreateChannelView: View {
                 serverManager.markChannelHasPassword(ch.channelId())
             }
         }
+        observerBox.store(token)
+        observerBox.scheduleAutoRemoval()
     }
 }
 

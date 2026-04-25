@@ -65,6 +65,7 @@ class ServerModelManager: ObservableObject {
     
     /// User avatars cache: session -> image
     @Published var userAvatars: [UInt: PlatformImage] = [:]
+    var userAvatarFingerprints: [UInt: Data] = [:]
     
     /// 跟踪哪些频道有密码保护（通过 ACL 检测到 deny Enter for @all + grant Enter for #token）
     @Published var channelsWithPassword: Set<UInt> = []

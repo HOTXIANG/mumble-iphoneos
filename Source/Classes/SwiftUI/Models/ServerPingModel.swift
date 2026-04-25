@@ -16,7 +16,7 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
     @Published var pingColor: Color = .gray
     @Published var userCountColor: Color = .secondary
     
-    private var pinger: MKServerPinger?
+    nonisolated(unsafe) private var pinger: MKServerPinger?
     private var startTask: Task<Void, Never>?
     private let hostname: String
     private let port: UInt
@@ -25,6 +25,11 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
         self.hostname = hostname
         self.port = port
         super.init()
+    }
+
+    deinit {
+        startTask?.cancel()
+        pinger?.setDelegate(nil)
     }
     
     func startPinging() {

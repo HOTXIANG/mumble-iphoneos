@@ -64,6 +64,13 @@ struct RichTextEditor: View {
 struct WYSIWYGEditorView: PlatformViewRepresentable {
     @Binding var htmlText: String
     @Binding var editorHeight: CGFloat
+
+    private static let scriptMessageHandlerNames = [
+        "htmlChanged",
+        "heightChanged",
+        "editorReady",
+        "imagePasted"
+    ]
     
     #if os(macOS)
     typealias NSViewType = WKWebView
@@ -76,6 +83,10 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
         // 每次 SwiftUI 驱动的更新都把最新值传入 coordinator
         context.coordinator.externalHTMLUpdate(htmlText)
     }
+
+    static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
+        coordinator.detach(from: nsView, messageHandlerNames: scriptMessageHandlerNames)
+    }
     #else
     typealias UIViewType = WKWebView
     
@@ -86,6 +97,10 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.externalHTMLUpdate(htmlText)
     }
+
+    static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
+        coordinator.detach(from: uiView, messageHandlerNames: scriptMessageHandlerNames)
+    }
     #endif
     
     func makeCoordinator() -> Coordinator {
@@ -95,10 +110,9 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
     private func createWebView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         let userController = WKUserContentController()
-        userController.add(context.coordinator, name: "htmlChanged")
-        userController.add(context.coordinator, name: "heightChanged")
-        userController.add(context.coordinator, name: "editorReady")
-        userController.add(context.coordinator, name: "imagePasted")
+        Self.scriptMessageHandlerNames.forEach { name in
+            userController.add(context.coordinator, name: name)
+        }
         config.userContentController = userController
         
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -123,7 +137,7 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         private var htmlBinding: Binding<String>
         private var heightBinding: Binding<CGFloat>
-        var webView: WKWebView?
+        weak var webView: WKWebView?
         
         /// 编辑器是否已就绪（JS 脚本已加载完成）
         private var isReady = false
@@ -139,6 +153,22 @@ struct WYSIWYGEditorView: PlatformViewRepresentable {
         init(htmlBinding: Binding<String>, heightBinding: Binding<CGFloat>) {
             self.htmlBinding = htmlBinding
             self.heightBinding = heightBinding
+        }
+
+        deinit {
+            embeddedImageNormalizeTask?.cancel()
+        }
+
+        func detach(from webView: WKWebView, messageHandlerNames: [String]) {
+            embeddedImageNormalizeTask?.cancel()
+            embeddedImageNormalizeTask = nil
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.uiDelegate = nil
+            messageHandlerNames.forEach { name in
+                webView.configuration.userContentController.removeScriptMessageHandler(forName: name)
+            }
+            self.webView = nil
         }
         
         /// 从 SwiftUI 的 updateView 调用 — 传入最新的绑定值
