@@ -843,9 +843,7 @@ private struct VADOnboardingSplashView: View {
         .onChange(of: vadKind) { _, newValue in
             audioMeter.updateVADKind(newValue)
             // Keep splash behavior aligned with Input Setting.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                PreferencesModel.shared.notifySettingsChanged()
-            }
+            PreferencesModel.shared.notifySettingsChanged()
         }
     }
     
@@ -940,14 +938,18 @@ struct AppRootView: View {
     @StateObject private var channelNavigationManager = NavigationManager()
  
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
+    #if os(macOS)
+    @State private var splitVisibility: NavigationSplitViewVisibility = MacMainWindowConfiguration.initialSplitVisibility
+    #else
     @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
+    #endif
     #if os(macOS)
     @State private var lastSplitWidthBucket: SplitWidthBucket?
     #endif
     #if os(iOS)
     private let narrowWindowThreshold: CGFloat = 700
     #else
-    private let narrowWindowThreshold: CGFloat = 900
+    private let narrowWindowThreshold: CGFloat = MacMainWindowConfiguration.narrowWindowThreshold
     #endif
 
     private var selectedAppColorScheme: AppColorSchemeOption {

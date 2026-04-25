@@ -498,9 +498,7 @@ struct AudioTransmissionSettingsView: View {
 
     func handleVADKindSelectionChange(_ newValue: String) {
         audioMeter.updateVADKind(newValue)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            PreferencesModel.shared.notifySettingsChanged()
-        }
+        PreferencesModel.shared.notifySettingsChanged()
     }
 
     @ViewBuilder

@@ -944,14 +944,6 @@ struct MacSettingsRootView: View {
 private struct MacSettingsWindowSizeAdaptor: NSViewRepresentable {
     let targetSize: NSSize
     
-    final class Coordinator {
-        var hasAppliedInitialSize = false
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-    
     func makeNSView(context: Context) -> NSView {
         NSView(frame: .zero)
     }
@@ -962,9 +954,8 @@ private struct MacSettingsWindowSizeAdaptor: NSViewRepresentable {
             resize(
                 window: window,
                 to: targetSize,
-                animate: context.coordinator.hasAppliedInitialSize
+                animate: true
             )
-            context.coordinator.hasAppliedInitialSize = true
         }
     }
     

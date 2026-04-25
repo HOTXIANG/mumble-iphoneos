@@ -16,12 +16,14 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
     static let refreshInterval: TimeInterval = 1.0 / 60.0
     private let updateInterval: TimeInterval = AudioMeterModel.refreshInterval
     private let legacyPublishIntervalNanos: UInt64 = 100_000_000
+    private let reconfigurationPauseNanos: UInt64 = 900_000_000
     private let minimumPublishedLevelDelta: Float = 0.015
     private var monitorSessionID: UInt = 0
     private var mainThreadUpdatePending = false
     private var latestLevel: Float = 0.0
     private var lastPublishedLevel: Float = 0.0
     private var lastPublishedUptimeNanos: UInt64 = 0
+    private var samplingPausedUntilUptimeNanos: UInt64 = 0
     private var vadKind = UserDefaults.standard.string(forKey: "AudioVADKind") ?? "amplitude"
 
     deinit {
@@ -52,7 +54,11 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
     func updateVADKind(_ vadKind: String) {
         stateLock.lock()
         self.vadKind = vadKind
+        latestLevel = 0.0
+        lastPublishedLevel = 0.0
+        samplingPausedUntilUptimeNanos = DispatchTime.now().uptimeNanoseconds + reconfigurationPauseNanos
         stateLock.unlock()
+        publishCurrentLevel(0.0)
     }
 
     func levelSnapshot() -> Float {
@@ -72,20 +78,21 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
         latestLevel = 0.0
         lastPublishedLevel = 0.0
         lastPublishedUptimeNanos = 0
+        samplingPausedUntilUptimeNanos = 0
         stateLock.unlock()
         endPendingMainThreadUpdate()
-        if Thread.isMainThread {
-            currentLevel = 0.0
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                self?.currentLevel = 0.0
-            }
-        }
+        publishCurrentLevel(0.0)
     }
 
     private func sampleAndStoreLevel(sessionID: UInt) {
         stateLock.lock()
+        let now = DispatchTime.now().uptimeNanoseconds
         guard monitorSessionID == sessionID else {
+            stateLock.unlock()
+            return
+        }
+        if now < samplingPausedUntilUptimeNanos {
+            latestLevel = 0.0
             stateLock.unlock()
             return
         }
@@ -93,7 +100,6 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
         stateLock.unlock()
 
         let level = Self.sampleLevel(vadKind: currentVADKind)
-        let now = DispatchTime.now().uptimeNanoseconds
 
         stateLock.lock()
         guard monitorSessionID == sessionID else {
@@ -115,6 +121,16 @@ final class AudioMeterModel: ObservableObject, @unchecked Sendable {
             defer { self.endPendingMainThreadUpdate() }
             guard self.isSessionActive(sessionID) else { return }
             self.currentLevel = self.levelSnapshot()
+        }
+    }
+
+    private func publishCurrentLevel(_ level: Float) {
+        if Thread.isMainThread {
+            currentLevel = level
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.currentLevel = level
+            }
         }
     }
 
