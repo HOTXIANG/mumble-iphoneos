@@ -447,113 +447,6 @@ extension AdvancedAudioSettingsView {
                     .frame(maxWidth: 400, alignment: .leading)
             }
         }
-        
-        // MARK: Weak Network Mode Section
-        Section() {
-            LabeledContent("Weak Network Mode:") {
-                Toggle("", isOn: $weakNetworkModeEnabled)
-                    .labelsHidden()
-                    .onChange(of: weakNetworkModeEnabled) { _, newValue in
-                        applyWeakNetworkSettings()
-                    }
-            }
-            
-            if weakNetworkModeEnabled {
-                LabeledContent("Jitter Buffer:") {
-                    HStack(spacing: 10) {
-                        Slider(value: Binding(
-                            get: { Double(weakNetworkJitterBufferMs) },
-                            set: {
-                                weakNetworkJitterBufferMs = Int($0)
-                                applyWeakNetworkSettings()
-                            }
-                        ), in: 30...500, step: 10)
-                        .frame(maxWidth: 180)
-                        Text(
-                            String(
-                                format: NSLocalizedString("%d ms", comment: "Jitter buffer unit suffix"),
-                                weakNetworkJitterBufferMs
-                            )
-                        )
-                        .font(.system(.body, design: .monospaced))
-                        .frame(width: 62, alignment: .trailing)
-                    }
-                }
-                
-                LabeledContent("Expected Packet Loss:") {
-                    HStack(spacing: 10) {
-                        Slider(value: Binding(
-                            get: { Double(weakNetworkExpectedLoss) },
-                            set: {
-                                weakNetworkExpectedLoss = Int($0)
-                                applyWeakNetworkSettings()
-                            }
-                        ), in: 0...60, step: 5)
-                        .frame(maxWidth: 180)
-                        Text(
-                            String(
-                                format: NSLocalizedString("%d%%", comment: "Expected packet loss percentage"),
-                                weakNetworkExpectedLoss
-                            )
-                        )
-                        .font(.system(.body, design: .monospaced))
-                        .frame(width: 42, alignment: .trailing)
-                    }
-                }
-                
-                LabeledContent("Adaptive Bitrate:") {
-                    Toggle("", isOn: $weakNetworkAdaptiveBitrate)
-                        .labelsHidden()
-                        .onChange(of: weakNetworkAdaptiveBitrate) { _, _ in
-                            applyWeakNetworkSettings()
-                        }
-                }
-                
-                LabeledContent("Enhanced PLC:") {
-                    Toggle("", isOn: $weakNetworkEnhancedPLC)
-                        .labelsHidden()
-                        .onChange(of: weakNetworkEnhancedPLC) { _, _ in
-                            applyWeakNetworkSettings()
-                        }
-                }
-                
-                LabeledContent("Bitrate Range:") {
-                    HStack(spacing: 8) {
-                        VStack(spacing: 8) {
-                            Slider(value: Binding(
-                                get: { Double(weakNetworkMinBitrate) },
-                                set: {
-                                    weakNetworkMinBitrate = min(Int($0), weakNetworkMaxBitrate - 16000)
-                                    applyWeakNetworkSettings()
-                                }
-                            ), in: 32000...80000, step: 8000)
-                            .frame(maxWidth: 180)
-                            
-                            Slider(value: Binding(
-                                get: { Double(weakNetworkMaxBitrate) },
-                                set: {
-                                    weakNetworkMaxBitrate = max(Int($0), weakNetworkMinBitrate + 16000)
-                                    applyWeakNetworkSettings()
-                                }
-                            ), in: 96000...192000, step: 8000)
-                            .frame(maxWidth: 180)
-                        }
-                        Text(
-                            String(
-                                format: NSLocalizedString("%d-%d kbps", comment: "Bitrate range"),
-                                weakNetworkMinBitrate/1000, weakNetworkMaxBitrate/1000
-                            )
-                        )
-                        .font(.system(.body, design: .monospaced))
-                    }
-                }
-            }
-        }
-        Text("Optimize audio quality for high latency or lossy network conditions. Enables FEC, adaptive bitrate, and enhanced packet loss concealment.")
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: 350, alignment: .leading)
         Text("Network changes require reconnection to take effect.")
             .font(.caption)
             .foregroundColor(.secondary)
@@ -888,7 +781,7 @@ struct MacSettingsRootView: View {
             case .certificates:
                 return NSSize(width: 650, height: 600)
             case .advanced:
-                return NSSize(width: 650, height: 420)
+                return NSSize(width: 650, height: 360)
             case .logging:
                 return NSSize(width: 650, height: 600)
             }
@@ -900,7 +793,6 @@ struct MacSettingsRootView: View {
     @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
     @AppStorage("AudioCaptureAllInputChannels") private var captureAllInputChannels: Bool = false
     @AppStorage("AudioStereoInput") private var enableStereoInput: Bool = false
-    @AppStorage("WeakNetworkModeEnabled") private var weakNetworkModeEnabled: Bool = false
     @State private var selectedTab: MacSettingsTab = .general
     private var selectedAppColorScheme: AppColorSchemeOption {
         AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
@@ -909,10 +801,6 @@ struct MacSettingsRootView: View {
     private var currentTabContentSize: NSSize {
         if selectedTab == .input && captureAllInputChannels && enableStereoInput {
             return NSSize(width: 650, height: 680)
-        }
-        // 根据弱网模式开关状态动态调整 advanced 标签页的高度
-        if selectedTab == .advanced && weakNetworkModeEnabled {
-            return NSSize(width: 650, height: 520)
         }
         return selectedTab.preferredContentSize
     }

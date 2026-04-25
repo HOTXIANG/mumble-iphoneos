@@ -260,6 +260,60 @@ LogManager.shared.resetToDefaults()
 }
 ```
 
+## 当前关键日志点（2026-04-25）
+
+音频生命周期和连接性能排查时，优先关注这些日志：
+
+### 本地音频测试 / 欢迎引导
+
+正常首次 VAD onboarding 应看到：
+
+```text
+[Audio] Starting Local Audio for Settings/Testing
+[Audio] MKAudioInput: ... Opus (... constrained VBR, DTX, FEC)
+[Audio] MKVoiceProcessingDevice: AudioUnit started.
+[Audio] MKVoiceProcessingDevice: No buffer allocated. Allocating for ...
+```
+
+从 Input Setting 打开 VAD onboarding 时，设置页关闭与 onboarding 出现之间不应看到：
+
+```text
+[Audio] Stopping Local Audio (Settings closed)
+```
+
+如果看到这条日志，说明转场保留逻辑失效，可能会造成麦克风先关再开。
+
+### 普通欢迎页空闲
+
+普通欢迎页和前后台切换不应出现：
+
+```text
+[Audio] Starting Local Audio for Settings/Testing
+[Audio] MKVoiceProcessingDevice: AudioUnit started.
+```
+
+除非当前正在展示 VAD onboarding、Input Setting、Mixer，或已经连接服务器。
+
+### Opus 网络配置
+
+Opus encoder 初始化日志应包含：
+
+```text
+constrained VBR, DTX, FEC
+```
+
+弱网模式已经删除，不应再出现 `WeakNetwork`、`weakNetworkMode`、`setWeakNetworkMode` 相关日志。
+
+### 连接首帧性能
+
+连接性能调试建议同时打开 `Connection`、`Audio`、`Model`、`UI` 分类，关注：
+
+- `PERF connect_begin`
+- `PERF connect_opened`
+- `PERF connect_ready`
+- `PERF rebuild_model_array` / model rebuild timing
+- `Starting Audio Engine` / audio engine async startup timing
+
 ## 新增模块日志规范
 
 为新功能添加日志时遵循以下原则：

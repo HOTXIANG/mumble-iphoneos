@@ -32,7 +32,9 @@ struct LogSettingsView: View {
                     LogManager.shared.resetToDefaults()
                     loadCurrentState()
                 }
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) {
+                    InteractionFeedback.cancel()
+                }
             } message: {
                 Text("All logging categories will be reset to default levels and enabled state.")
             }

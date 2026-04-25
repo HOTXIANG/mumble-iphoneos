@@ -46,6 +46,7 @@ struct CertificatePreferencesView: View {
             .alert("Import Certificate", isPresented: $showingImportPasswordAlert, actions: {
                 SecureField("Password", text: $importPassword)
                 Button("Cancel", role: .cancel) {
+                    InteractionFeedback.cancel()
                     #if os(iOS)
                     selectedFileForImport?.stopAccessingSecurityScopedResource()
                     #endif
@@ -64,7 +65,9 @@ struct CertificatePreferencesView: View {
             // --- 导出功能 ---
             .alert("Export Certificate", isPresented: $showingExportPasswordAlert, actions: {
                 SecureField("Password", text: $exportPassword)
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) {
+                    InteractionFeedback.cancel()
+                }
                 Button("Export") {
                     performExport()
                 }
@@ -90,7 +93,9 @@ struct CertificatePreferencesView: View {
                 Button("Delete", role: .destructive) {
                     certModel.deleteCertificate(cert)
                 }
-                Button("Cancel", role: .cancel) { }
+                Button("Cancel", role: .cancel) {
+                    InteractionFeedback.cancel()
+                }
             }, message: { cert in
                 Text(
                     String(

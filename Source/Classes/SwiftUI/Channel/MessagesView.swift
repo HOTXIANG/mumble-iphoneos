@@ -982,7 +982,10 @@ struct MessagesView: View {
                 .sheet(item: $selectedImageForSend) { item in
                     ImageConfirmationView(
                         image: item.image,
-                        onCancel: { selectedImageForSend = nil },
+                        onCancel: {
+                            InteractionFeedback.cancel()
+                            selectedImageForSend = nil
+                        },
                         onSend: { imageToSend in
                             await serverManager.sendImageMessage(image: imageToSend)
                             selectedImageForSend = nil
@@ -2488,7 +2491,10 @@ struct ImageConfirmationView: View {
                     .padding(.horizontal)
                 
                 HStack(spacing: 20) {
-                    Button("Cancel", role: .cancel, action: onCancel)
+                    Button("Cancel", role: .cancel) {
+                        InteractionFeedback.cancel()
+                        onCancel()
+                    }
                         .buttonStyle(.bordered).controlSize(.large)
                         .keyboardShortcut(.cancelAction)
                     Button("Send") {

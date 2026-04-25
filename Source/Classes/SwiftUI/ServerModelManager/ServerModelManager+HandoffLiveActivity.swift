@@ -28,6 +28,18 @@ extension ServerModelManager {
 
     // MARK: - Handoff (接力)
 
+    func schedulePostConnectionActivities() {
+        pendingPostConnectionActivitiesTask?.cancel()
+        pendingPostConnectionActivitiesTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard let self, !Task.isCancelled, self.isConnected else { return }
+
+            self.startLiveActivity()
+            self.publishHandoffActivity()
+            self.pendingPostConnectionActivitiesTask = nil
+        }
+    }
+
     /// 发布 Handoff Activity，让其他设备可以接力
     func publishHandoffActivity() {
         guard let model = serverModel,
@@ -138,7 +150,7 @@ extension ServerModelManager {
         #endif
     }
 
-    func updateLiveActivity() {
+    func updateLiveActivity(syncHandoffAudioState: Bool = true) {
         #if os(iOS)
         guard let activity = liveActivity else { return }
 
@@ -176,7 +188,9 @@ extension ServerModelManager {
         }
 
         // 同步更新 Handoff Activity 的音频状态
-        updateHandoffAudioState()
+        if syncHandoffAudioState {
+            updateHandoffAudioState()
+        }
         #endif
     }
 

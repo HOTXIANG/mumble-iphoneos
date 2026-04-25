@@ -13,15 +13,6 @@ extension ServerModelManager {
         setupServerModel()
         setupNotifications()
         requestNotificationAccess()
-
-        // SystemMute 和 AudioRoute 只在实际连接到服务器后才激活，
-        // 避免在欢迎界面插入耳机时触发麦克风激活
-        if serverModel != nil {
-            setupSystemMute()
-            #if os(iOS)
-            setupAudioRouteObservation()
-            #endif
-        }
     }
 
     func markAsRead() {

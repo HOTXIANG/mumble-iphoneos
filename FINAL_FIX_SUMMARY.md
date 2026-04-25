@@ -1,3 +1,47 @@
+# 最新状态补充（2026-04-25）
+
+本文件早期内容记录 2026-03-16 的 AU 插件修复。当前最新事实来源是 `docs/CURRENT_STATUS.md`，本节只补充 2026-04-25 之后的关键进度。
+
+## 音频生命周期
+
+- 普通欢迎页和 App 前后台切换不再自动进入 iOS VoiceChat 模式，也不会打开麦克风。
+- 麦克风只在首次 VAD 欢迎引导、Input Setting、Audio Plugin Mixer、服务器连接中启用。
+- VAD 欢迎引导显示时会启动本地音频测试并调用麦克风。
+- 从 Input Setting 打开 VAD 欢迎引导时，会保留本地音频测试，不会先停麦再开麦。
+- `MKAudio.sharedAudio` 不再在单例创建时配置 `AVAudioSession`。
+- `MKAudio.stop()` 会将 iOS session 重置为 `Ambient` / `Default` 并 deactivate。
+
+## AudioUnit 启动顺序
+
+- `setupDevice()` 只负责创建、配置和初始化 AudioUnit。
+- `MKAudioInput` / `MKAudioOutput` 绑定回调后，`MKAudio` 再调用 `startDevice()`。
+- 这修复了“已经进入 VoiceChat 模式，但麦克风输入回调没有稳定运行”的状态。
+
+## Opus / 网络
+
+- 旧 Weak Network Mode 已删除，不再有相关 UI、UserDefaults、MumbleKit 状态或 WebSocket 命令。
+- Opus 默认启用：
+  - `OPUS_SET_VBR(1)`
+  - `OPUS_SET_VBR_CONSTRAINT(1)`
+  - `OPUS_SET_DTX(1)`
+  - `OPUS_SET_INBAND_FEC(1)`
+  - `OPUS_SET_PACKET_LOSS_PERC(10)`
+- `AudioOpusCodecForceCELTMode` 默认改为 `false`。
+
+## 连接和 UI 性能
+
+- 连接弹窗保留 Liquid Glass 效果。
+- 初始连接、音频启动、模型重建、头像刷新、Live Activity/Handoff 更新已错峰，避免连接进入服务器时阻塞首帧。
+- Cancel 按钮统一添加轻量震动反馈，取消连接时先让 UI 退出再执行实际取消。
+
+## 验证
+
+- iOS Simulator `build_run_sim` 已通过。
+- 首次 VAD 欢迎引导日志确认本地音频启动、AudioUnit 启动、输入 buffer 分配。
+- Opus 初始化日志确认 `constrained VBR, DTX, FEC` 生效。
+
+---
+
 # ✅ 所有修复完成 - 最终总结（2026-03-16）
 
 ## 🎉 构建状态

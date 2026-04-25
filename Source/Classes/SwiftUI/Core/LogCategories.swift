@@ -388,7 +388,14 @@ final class LogManager: @unchecked Sendable {
             }
         }
 
-        NotificationCenter.default.post(name: .mumbleLogEntryAdded, object: nil, userInfo: entry.dictionary)
+        let userInfo = entry.dictionary
+        if Thread.isMainThread {
+            NotificationCenter.default.post(name: .mumbleLogEntryAdded, object: nil, userInfo: userInfo)
+        } else {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .mumbleLogEntryAdded, object: nil, userInfo: userInfo)
+            }
+        }
 
         // 可选文件持久化
         if _isFilePersistenceEnabled {

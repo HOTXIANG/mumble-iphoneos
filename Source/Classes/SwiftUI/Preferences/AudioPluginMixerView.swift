@@ -452,7 +452,7 @@ struct AudioPluginMixerView: View {
     private var mixerBodyCore: some View {
         mixerContentView
         .onAppear { performOnAppear() }
-        .onDisappear { snapshotAllPluginParameters() }
+        .onDisappear { performOnDisappear() }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userJoinedNotification)) { _ in refreshHearableUsers() }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userLeftNotification)) { _ in refreshHearableUsers() }
         .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userMovedNotification)) { _ in refreshHearableUsers() }
@@ -475,6 +475,7 @@ struct AudioPluginMixerView: View {
 
     private func performOnAppear() {
         AppState.shared.setAutomationCurrentScreen("audioPluginMixer")
+        ServerModelManager.shared?.startAudioTest()
         loadPluginChainState()
         let adoptedLiveProcessorState = syncLoadedStateFromSharedRackManager()
         migrateRemoteBusToMasterBus1()
@@ -494,6 +495,11 @@ struct AudioPluginMixerView: View {
         syncPluginHostBufferFrames()
         syncAllTrackSendRouting()
         Task { await loadPersistedAudioUnits() }
+    }
+
+    private func performOnDisappear() {
+        snapshotAllPluginParameters()
+        ServerModelManager.shared?.stopAudioTest()
     }
 
     @discardableResult

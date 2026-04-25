@@ -4,6 +4,8 @@
 
 Mumble 是一个跨平台 VoIP 应用，支持 iOS（iPhone + iPad）和 macOS。采用三层混合架构：SwiftUI（UI 层）→ Objective-C/ARC（应用逻辑层）→ MumbleKit/MRC（音频/网络底层）。
 
+当前事实来源：`docs/CURRENT_STATUS.md`。开始处理音频、连接性能、弱网/Opus、欢迎引导、macOS 窗口或自动化测试问题前，先读该文档确认最新预期。
+
 ### 技术栈
 
 - **部署目标**: iOS 17.0+ / macOS 14.0+
@@ -107,6 +109,41 @@ Network → Opus/Speex Decoder → MKAudioOutputUser (float*, per-user)
 1. **Input Track**: 本地麦克风处理（编码前）
 2. **Remote Track**: 每用户独立处理（解码后，混音前）
 3. **Master Bus**: 最终混音处理（输出前）
+
+### 音频生命周期规则（2026-04-25）
+
+普通欢迎页和从后台回到前台时，不得仅因为 App 激活就进入 iOS VoiceChat 模式或打开麦克风。允许主动开启麦克风的场景只有：
+
+1. 首次启动的 "Welcome to Mumble" VAD 引导页正在显示
+2. Input Setting 正在显示
+3. Audio Plugin Mixer 正在显示
+4. 服务器连接已建立或连接流程需要通话音频
+
+实现规则：
+
+- `MKAudio.sharedAudio` 不在单例创建时配置 `AVAudioSession`。
+- `MKAudio.stop()` 在 iOS 上必须回到 `Ambient` / `Default` 并 deactivate session。
+- `MUApplicationDelegate` 只根据真实活动连接决定前后台恢复音频，不根据过期 `_connectionActive` 状态恢复。
+- `ServerModelManager.startAudioTest()` 同时检查 `isLocalAudioTestRunning` 和真实 `MKAudio.isRunning()`。
+- 本地音频测试启动中用 `isLocalAudioTestStarting` 合并 UI 重试，避免多次 teardown/start。
+- 从 Input Setting 打开 VAD 引导页时，调用 `preserveLocalAudioTestForVADOnboardingTransition()`，让设置页 dismiss 期间不关麦；VAD 引导页 `onAppear` 后调用 `finishLocalAudioTestPreservationForVADOnboarding()`。
+- AudioUnit 启动顺序必须是：`setupDevice()` 初始化 → `MKAudioInput/MKAudioOutput` 绑定回调 → `startDevice()` 启动 AudioUnit。不要把 `AudioOutputUnitStart` 放回 setup 阶段。
+
+### Opus / 网络策略（2026-04-25）
+
+弱网模式已经删除。不要再新增 `WeakNetwork*` UserDefaults、设置页开关或 WebSocket 命令。网络体验依赖 Opus 默认能力和现有 Mumble 传输/抖动缓冲。
+
+Opus encoder 默认必须保持：
+
+```objc
+opus_encoder_ctl(enc, OPUS_SET_VBR(1));
+opus_encoder_ctl(enc, OPUS_SET_VBR_CONSTRAINT(1));
+opus_encoder_ctl(enc, OPUS_SET_DTX(1));
+opus_encoder_ctl(enc, OPUS_SET_INBAND_FEC(1));
+opus_encoder_ctl(enc, OPUS_SET_PACKET_LOSS_PERC(10));
+```
+
+`AudioOpusCodecForceCELTMode` 默认值是 `false`。不要默认强制 CELT-only，否则会削弱 Opus VOIP 特性。
 
 ### 关键状态管理规则
 
@@ -459,6 +496,7 @@ websocat ws://localhost:54296
 ### 已知注意事项
 
 - **`MKAudio.shared()` 不可在未连接时调用**：会阻塞主线程。`audio.*` 命令在未连接时返回安全默认值
+- **例外**：`audio.startTest` / `audio.status` 可用于 Input Setting、Mixer、VAD 引导页等本地音频测试场景；普通状态读取仍应避免不必要地初始化音频单例
 - **iOS 真机**：需 USB 端口转发或同网络访问设备 IP
 - **iOS 模拟器**：直接通过 `localhost:54296` 访问
 
@@ -585,7 +623,7 @@ chore: 构建/工具变动
 8. **VST3 插件支持**：完善 VST3 bundle 解析、参数映射、状态保存（macOS）
 9. **实时线程优化**：把 AU 路径中的临时分配迁移到预分配缓冲，进一步降低抖动与宿主失效风险
 
-**暂缓**：Audio Wizard、Global Shortcuts、Advanced Log Config、ContextAction、Voice Recording。
+**暂缓**：完整桌面版 Audio Wizard、Global Shortcuts、Advanced Log Config、ContextAction、Voice Recording。当前仅实现首次启动 VAD onboarding，并复用本地音频测试链路。
 
 ### DAW / AU 插件专项说明（2026-03-23 最终更新）
 

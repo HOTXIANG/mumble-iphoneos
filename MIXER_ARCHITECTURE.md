@@ -1,5 +1,7 @@
 # Mumble Audio Mixer 架构文档
 
+最新状态请先看 `docs/CURRENT_STATUS.md`。当前音频生命周期要求：普通欢迎页不进入 VoiceChat/不调用麦克风；只有首次 VAD onboarding、Input Setting、Mixer、服务器连接会启动本地输入。AudioUnit 现在在输入/输出回调绑定后才 `startDevice()`，避免只进入语音模式但麦克风回调未运行。
+
 ## 🎚️ 音频信号流
 
 ### 输入链路（Input Chain）
@@ -48,6 +50,8 @@
        └─→ Opus/Speex Encoder
            └─→ Network (UDP)
 ```
+
+当前 Opus 默认启用 constrained VBR、DTX、in-band FEC，并设置默认丢包预期；旧 Weak Network Mode 已删除，不再通过独立 UI 或 WebSocket 命令控制。
 
 ### 输出链路（Output Chain）
 

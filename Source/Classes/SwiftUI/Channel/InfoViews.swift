@@ -443,6 +443,7 @@ struct UserInfoView: View {
             HStack {
                 Spacer()
                 Button("Cancel") {
+                    InteractionFeedback.cancel()
                     isEditing = false
                 }
                 .buttonStyle(.bordered)

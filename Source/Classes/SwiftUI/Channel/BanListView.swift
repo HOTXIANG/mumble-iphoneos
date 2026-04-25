@@ -323,7 +323,12 @@ private struct AddBanView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        InteractionFeedback.cancel()
+                        dismiss()
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         let addressData = parseIP(ipAddress.trimmingCharacters(in: .whitespacesAndNewlines))

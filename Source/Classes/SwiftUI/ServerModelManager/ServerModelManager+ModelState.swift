@@ -102,7 +102,9 @@ extension ServerModelManager {
                 item.talkingState = .passive
             }
         }
-        updateLiveActivity()
+        if !isBulkUpdatingModelItems {
+            updateLiveActivity(syncHandoffAudioState: false)
+        }
     }
 
     private func updateUserItemState(item: ChannelNavigationItem, user: MKUser) {
@@ -164,6 +166,12 @@ extension ServerModelManager {
             return
         }
 
+        isBulkUpdatingModelItems = true
+        deferredAvatarRefreshSessions.removeAll(keepingCapacity: true)
+        defer {
+            isBulkUpdatingModelItems = false
+        }
+
         modelItems = []
         userIndexMap = [:]
         channelIndexMap = [:]
@@ -198,8 +206,7 @@ extension ServerModelManager {
                   let usersArray = currentChannel.users(),
                   let users = usersArray as? [MKUser] {
             for (index, user) in users.enumerated() {
-                applySavedUserPreferences(user: user)
-                updateAvatarCache(for: user)
+                deferAvatarRefreshAfterRebuild(for: user)
 
                 let userName = displayName(for: user)
                 let channelName = currentChannel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
@@ -218,9 +225,37 @@ extension ServerModelManager {
         }
 
         updateLiveActivity()
+        scheduleDeferredAvatarRefresh()
 
         let elapsedMs = (CACurrentMediaTime() - startedAt) * 1000.0
         MumbleLogger.model.debug("PERF rebuild_model_array reason=\(reason) items=\(self.modelItems.count) elapsed_ms=\(String(format: "%.2f", elapsedMs))")
+    }
+
+    private func deferAvatarRefreshAfterRebuild(for user: MKUser) {
+        deferredAvatarRefreshSessions.insert(user.session())
+    }
+
+    private func scheduleDeferredAvatarRefresh() {
+        let sessions = Array(deferredAvatarRefreshSessions)
+        deferredAvatarRefreshSessions.removeAll(keepingCapacity: true)
+        guard !sessions.isEmpty else { return }
+
+        pendingAvatarRefreshTask?.cancel()
+        pendingAvatarRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard let self, !Task.isCancelled else { return }
+
+            for (index, session) in sessions.enumerated() {
+                if index > 0 && index % 8 == 0 {
+                    try? await Task.sleep(nanoseconds: 40_000_000)
+                }
+                guard !Task.isCancelled else { return }
+                if let user = self.serverModel?.user(withSession: session) {
+                    self.updateAvatarCache(for: user)
+                }
+            }
+            self.pendingAvatarRefreshTask = nil
+        }
     }
 
     private func addChannelTreeToModel(channel: MKChannel, indentLevel: Int, isTraversingPinnedTree: Bool = false) {
@@ -262,9 +297,7 @@ extension ServerModelManager {
             modelItems.append(channelItem)
 
             for user in rawUsers {
-                // 顺便确保配置被应用 (之前的修复)
-                applySavedUserPreferences(user: user)
-                updateAvatarCache(for: user)
+                deferAvatarRefreshAfterRebuild(for: user)
 
                 let userName = displayName(for: user)
                 let userItem = ChannelNavigationItem(

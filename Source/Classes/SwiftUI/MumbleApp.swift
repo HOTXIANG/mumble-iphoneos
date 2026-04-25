@@ -409,6 +409,8 @@ struct WindowMinSizeSetter: NSViewRepresentable {
     }
 
     private func configure(window: NSWindow, context: Context) {
+        // 禁用 macOS 系统状态恢复，防止隔很长时间后重新打开时系统用缓存的旧尺寸覆盖窗口
+        window.isRestorable = false
         context.coordinator.restoreFrameIfNeeded(for: window)
         window.minSize = minSize
         if window.frameAutosaveName != autosaveName {

@@ -243,7 +243,10 @@ struct ACLEntryEditView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        InteractionFeedback.cancel()
+                        dismiss()
+                    }
                 }
                 if !entry.isInherited {
                     ToolbarItem(placement: .confirmationAction) {
@@ -574,7 +577,10 @@ struct GroupEntryEditView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        InteractionFeedback.cancel()
+                        dismiss()
+                    }
                 }
                 if !entry.isInherited {
                     ToolbarItem(placement: .confirmationAction) {

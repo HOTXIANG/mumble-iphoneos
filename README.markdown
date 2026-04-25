@@ -77,10 +77,13 @@ xcodebuild -target Mumble -destination 'platform=macOS' build
 
 ### 开发说明
 
+- 最新开发状态请先看 `docs/CURRENT_STATUS.md`。该文档记录当前音频生命周期、Opus 默认策略、连接性能优化、弱网模式删除状态和验证结果。
 - UI 更新请注意主线程约束（@MainActor / 主线程派发）。
 - Source/Classes/ 下 Objective-C 代码默认 ARC。
 - MumbleKit/src/ 下为 MRC，修改时需要手动内存管理。
 - 提交前建议至少完成 iOS 与 macOS 双平台构建验证。
+- 当前音频策略：普通欢迎页和后台恢复不应进入 VoiceChat 或调用麦克风；只有首次 VAD 欢迎引导、输入设置、Mixer、服务器连接会启动麦克风。
+- 当前 Opus 默认策略：启用 constrained VBR、DTX、in-band FEC，并默认不强制 CELT-only。
 
 ### 贡献
 
@@ -169,10 +172,13 @@ xcodebuild -target Mumble -destination 'platform=macOS' build
 
 ### Development Notes
 
+- Check `docs/CURRENT_STATUS.md` first for the latest audio lifecycle, Opus defaults, connection performance notes, removed weak-network mode, and verification status.
 - Keep UI state updates on the main thread (@MainActor / main-thread dispatch).
 - Objective-C code under Source/Classes/ uses ARC.
 - MumbleKit/src/ uses MRC, so manual memory management is required.
 - Validate both iOS and macOS builds before submitting changes.
+- Current audio policy: the normal welcome screen and foreground return must not enter VoiceChat or open the microphone; only first-run VAD onboarding, Input Setting, Mixer, and server connections should do that.
+- Current Opus policy: constrained VBR, DTX, and in-band FEC are enabled by default, and CELT-only mode is no longer the default.
 
 ### Contributing
 

@@ -27,7 +27,7 @@ extension ServerModelManager {
         if self.serverModel === newModel {
             MumbleLogger.connection.debug("ServerModel identity match. Skipping setup to prevent duplicates.")
             // 兜底：如果界面是空的，强制刷新一下
-            if self.modelItems.isEmpty { requestModelRebuild(reason: "setup_same_model_empty", debounce: 0) }
+            if self.modelItems.isEmpty { rebuildModelArray(reason: "setup_same_model_empty") }
             return
         }
 
@@ -79,11 +79,8 @@ extension ServerModelManager {
             updateAvatarCache(for: connectedUser)
         }
 
-        requestModelRebuild(reason: "setup_server_model_bound", debounce: 0)
-        startLiveActivity()
-
-        // 发布 Handoff Activity，让其他设备可以接力
-        publishHandoffActivity()
+        rebuildModelArray(reason: "setup_server_model_bound")
+        schedulePostConnectionActivities()
 
         // 服务器模型绑定成功后，才激活音频相关的监听
         setupSystemMute()
@@ -104,6 +101,10 @@ extension ServerModelManager {
         MumbleLogger.connection.info("ServerModelManager: CLEANUP (Data Only)")
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
+        pendingAvatarRefreshTask?.cancel()
+        pendingAvatarRefreshTask = nil
+        pendingPostConnectionActivitiesTask?.cancel()
+        pendingPostConnectionActivitiesTask = nil
 
         userVolumes.removeAll()
         previousMuteStates.removeAll()

@@ -232,61 +232,8 @@ final class MUTestCommandRouter {
                 ] as [String: Any]
             }
 
-        // MARK: Weak Network Commands (弱网命令)
-
-        case "weakNetworkStatus":
-            let audio = MKAudio.shared()
-            var result: [String: Any] = [
-                "weakNetworkModeEnabled": audio?.isWeakNetworkModeEnabled() ?? false
-            ]
-            if let metrics = audio?.copyNetworkQualityMetrics() {
-                result["metrics"] = metrics
-            }
-            if let stats = audio?.copyWeakNetworkStatistics() {
-                result["statistics"] = stats
-            }
-            return result
-
-        case "setWeakNetworkMode":
-            guard let enabled = boolValue(params["enabled"]) else {
-                throw TestCommandError("Missing 'enabled'")
-            }
-            MKAudio.shared()?.setWeakNetworkModeEnabled(enabled)
-            return ["weakNetworkModeEnabled": MKAudio.shared()?.isWeakNetworkModeEnabled() ?? enabled]
-
-        case "setWeakNetworkConfig":
-            var settings = MKAudioSettings()
-            MKAudio.shared()?.readAudioSettings(&settings)
-
-            if let jitterBufferMs = params["jitterBufferMs"] as? Int {
-                settings.weakNetworkJitterBufferMs = jitterBufferMs
-            }
-            if let expectedLoss = params["expectedLoss"] as? Int {
-                settings.weakNetworkExpectedLoss = expectedLoss
-            }
-            if let adaptiveBitrate = params["adaptiveBitrate"] as? Bool {
-                settings.weakNetworkAdaptiveBitrate = adaptiveBitrate
-            }
-            if let enhancedPLC = params["enhancedPLC"] as? Bool {
-                settings.weakNetworkEnhancedPLC = enhancedPLC
-            }
-            if let minBitrate = params["minBitrate"] as? Int {
-                settings.weakNetworkMinBitrate = minBitrate
-            }
-            if let maxBitrate = params["maxBitrate"] as? Int {
-                settings.weakNetworkMaxBitrate = maxBitrate
-            }
-
-            settings.enableWeakNetworkMode = true
-            MKAudio.shared()?.updateAudioSettings(&settings)
-            return ["status": "configured"]
-
-        case "resetWeakNetworkStats":
-            MKAudio.shared()?.resetWeakNetworkStatistics()
-            return ["status": "reset"]
-
         default:
-            throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, toggleMute, toggleDeafen, startTest, stopTest, restart, forceTransmit, status, weakNetworkStatus, setWeakNetworkMode, setWeakNetworkConfig, resetWeakNetworkStats")
+            throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, toggleMute, toggleDeafen, startTest, stopTest, restart, forceTransmit, status")
         }
     }
 
@@ -435,6 +382,7 @@ final class MUTestCommandRouter {
             guard let channel = findChannel(id: channelId, in: model.rootChannel()) else {
                 throw TestCommandError("Channel \(channelId) not found")
             }
+            try requireRootPermission(MKPermissionWrite, name: "Write")
             serverManager?.requestACL(for: channel)
             return nil
 
@@ -443,6 +391,7 @@ final class MUTestCommandRouter {
             guard let channel = findChannel(id: channelId, in: model.rootChannel()) else {
                 throw TestCommandError("Channel \(channelId) not found")
             }
+            try requireRootPermission(MKPermissionWrite, name: "Write")
             let notification = try await awaitNotification(name: ServerModelNotificationManager.aclReceivedNotification) { [weak serverManager] in
                 serverManager?.requestACL(for: channel)
             }
@@ -457,6 +406,7 @@ final class MUTestCommandRouter {
                 throw TestCommandError("Channel \(channelId) not found")
             }
             let accessControl = try parseAccessControl(params)
+            try requireRootPermission(MKPermissionWrite, name: "Write")
             serverManager?.setACL(accessControl, for: channel)
             return ["channelId": channel.channelId()]
 
@@ -541,6 +491,7 @@ final class MUTestCommandRouter {
             guard let text = params["text"] as? String else {
                 throw TestCommandError("Missing 'text'")
             }
+            try requireConnected()
             sm.sendTextMessage(text)
             return nil
 
@@ -548,6 +499,7 @@ final class MUTestCommandRouter {
             guard let text = params["text"] as? String else {
                 throw TestCommandError("Missing 'text'")
             }
+            try requireConnected()
             sm.sendTextMessageToTree(text)
             return nil
 
@@ -555,6 +507,7 @@ final class MUTestCommandRouter {
             guard let text = params["text"] as? String else {
                 throw TestCommandError("Missing 'text' or 'session'")
             }
+            try requireConnected()
             let session = try requireUInt(params["session"], name: "session")
             guard let user = sm.getUserBySession(session) else {
                 throw TestCommandError("User with session \(session) not found")
@@ -589,11 +542,13 @@ final class MUTestCommandRouter {
             return ["unreadMessageCount": AppState.shared.unreadMessageCount]
 
         case "sendImage":
+            try requireConnected()
             let image = try loadPlatformImage(from: params)
             await sm.sendImageMessage(image: image)
             return ["status": "sent"]
 
         case "sendPrivateImage":
+            try requireConnected()
             let session = try requireUInt(params["session"], name: "session")
             guard let user = sm.getUserBySession(session) else {
                 throw TestCommandError("User with session \(session) not found")
@@ -1114,6 +1069,13 @@ final class MUTestCommandRouter {
             let appliedValue = try applySetting(key: key, value: value)
             return ["key": key, "value": appliedValue]
 
+        case "remove":
+            guard let key = params["key"] as? String else {
+                throw TestCommandError("Missing 'key'")
+            }
+            UserDefaults.standard.removeObject(forKey: key)
+            return ["key": key, "removed": true] as [String: Any]
+
         case "list":
             let prefix = params["prefix"] as? String
             let entries = UserDefaults.standard.dictionaryRepresentation()
@@ -1123,7 +1085,7 @@ final class MUTestCommandRouter {
             return ["entries": entries]
 
         default:
-            throw TestCommandError("Unknown settings.\(cmd). Available: get, set, list")
+            throw TestCommandError("Unknown settings.\(cmd). Available: get, set, remove, list")
         }
     }
 
@@ -1248,9 +1210,11 @@ final class MUTestCommandRouter {
         guard let serverManager else {
             throw TestCommandError("ServerModelManager not available")
         }
+        try requireConnected()
 
         switch cmd {
         case "getBanList":
+            try requireRootPermission(MKPermissionBan, name: "Ban")
             let notification = try await awaitNotification(name: ServerModelNotificationManager.banListReceivedNotification) { [weak serverManager] in
                 serverManager?.requestBanList()
             }
@@ -1261,34 +1225,42 @@ final class MUTestCommandRouter {
                 throw TestCommandError("Missing 'entries'")
             }
             let models = try parseBanEntriesForSubmission(entries)
+            try requireRootPermission(MKPermissionBan, name: "Ban")
             serverManager.sendBanList(models.map { $0 as Any })
             return ["count": models.count]
 
         case "addBan":
+            let entry = try parseBanEntryForSubmission(params)
+            try requireRootPermission(MKPermissionBan, name: "Ban")
             let notification = try await awaitNotification(name: ServerModelNotificationManager.banListReceivedNotification) { [weak serverManager] in
                 serverManager?.requestBanList()
             }
             var existing = try parseBanEntriesForSubmission(parseBanList(notification.userInfo?["banList"]))
-            existing.append(try parseBanEntryForSubmission(params))
+            existing.append(entry)
             serverManager.sendBanList(existing.map { $0 as Any })
             return ["count": existing.count]
 
         case "removeBan":
+            let removalIndex = intValue(params["index"])
+            let removalAddress = params["address"] as? String
+            guard removalIndex != nil || removalAddress != nil else {
+                throw TestCommandError("Missing 'index' or 'address'")
+            }
+            try requireRootPermission(MKPermissionBan, name: "Ban")
             let notification = try await awaitNotification(name: ServerModelNotificationManager.banListReceivedNotification) { [weak serverManager] in
                 serverManager?.requestBanList()
             }
             var existing = try parseBanEntriesForSubmission(parseBanList(notification.userInfo?["banList"]))
-            if let index = intValue(params["index"]), existing.indices.contains(index) {
+            if let index = removalIndex, existing.indices.contains(index) {
                 existing.remove(at: index)
-            } else if let address = params["address"] as? String {
+            } else if let address = removalAddress {
                 existing.removeAll { $0.addressString == address }
-            } else {
-                throw TestCommandError("Missing 'index' or 'address'")
             }
             serverManager.sendBanList(existing.map { $0 as Any })
             return ["count": existing.count]
 
         case "getRegisteredUsers":
+            try requireRootPermission(MKPermissionRegister, name: "Register")
             let notification = try await awaitNotification(name: ServerModelNotificationManager.userListReceivedNotification) { [weak serverManager] in
                 serverManager?.requestRegisteredUserList()
             }
@@ -1489,13 +1461,13 @@ final class MUTestCommandRouter {
         return [
             "domains": [
                 "connection": ["connect", "disconnect", "acceptCert", "rejectCert", "status"],
-                "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "restart", "forceTransmit", "status", "weakNetworkStatus", "setWeakNetworkMode", "setWeakNetworkConfig", "resetWeakNetworkStats"],
+                "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "restart", "forceTransmit", "status"],
                 "channel": ["list", "info", "join", "create", "edit", "move", "remove", "listen", "unlisten", "toggleCollapse", "togglePinned", "toggleHidden", "requestACL", "getACL", "setACL", "setAccessTokens", "getAccessTokens", "submitPassword", "scanPermissions", "link", "unlink", "unlinkAll", "current"],
                 "message": ["send", "sendTree", "sendPrivate", "sendImage", "sendPrivateImage", "listImages", "exportImage", "previewImage", "history", "markRead"],
                 "plugin": ["listTracks", "get", "available", "scanPaths", "addScanPath", "removeScanPath", "buffer", "setBuffer", "add", "remove", "move", "setBypass", "setGain", "load", "unload", "parameters", "setParameter", "presets", "savePreset", "applyPreset", "deletePreset", "setSidechain", "getSidechain"],
                 "user": ["list", "self", "registerSelf", "info", "setNickname", "getComment", "setSelfComment", "setAvatar", "removeAvatar", "kick", "ban", "setVolume", "setLocalMute", "move", "serverMute", "serverDeafen", "prioritySpeaker", "stats"],
                 "favourite": ["list", "info", "add", "update", "remove", "connect", "pinWidget", "unpinWidget"],
-                "settings": ["get", "set", "list"],
+                "settings": ["get", "set", "remove", "list"],
                 "state": ["get", "snapshot"],
                 "app": ["get", "setTab", "setViewMode", "clearError", "clearToast", "dismissCert", "cancelConnection", "refreshModel"],
                 "ui": ["get", "open", "dismiss", "back", "root"],
@@ -2301,6 +2273,18 @@ final class MUTestCommandRouter {
             throw TestCommandError("Missing '\(name)'")
         }
         return parsed
+    }
+
+    private func requireConnected() throws {
+        guard MUConnectionController.shared()?.isConnected() == true else {
+            throw TestCommandError("Not connected")
+        }
+    }
+
+    private func requireRootPermission(_ permission: MKPermission, name: String) throws {
+        guard serverManager?.hasRootPermission(permission) == true else {
+            throw TestCommandError("Permission denied: \(name)")
+        }
     }
 
     private func requirePluginTrackKey(_ params: [String: Any]) throws -> String {

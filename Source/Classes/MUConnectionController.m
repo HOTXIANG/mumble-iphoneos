@@ -118,6 +118,8 @@ static CFTimeInterval MUMonotonicNow(void) {
     CFTimeInterval  _socketConnectedAt;
     BOOL            _connectFlowIsReconnect;
     NSInteger       _connectFlowAttempt;
+    dispatch_queue_t _audioLifecycleQueue;
+    NSUInteger       _audioLifecycleGeneration;
 
 #if TARGET_OS_IOS
     UIBackgroundTaskIdentifier _reconnectBackgroundTask;
@@ -138,6 +140,8 @@ static CFTimeInterval MUMonotonicNow(void) {
 - (NSTimeInterval) calculatedReconnectDelayForAttempt:(NSInteger)attempt baseInterval:(NSTimeInterval)baseInterval;
 - (void) beginPerformanceConnectFlowIsReconnect:(BOOL)isReconnect attempt:(NSInteger)attempt reason:(NSString *)reason;
 - (void) logPerformanceConnectFailureWithTitle:(NSString *)title message:(NSString *)message;
+- (void) startAudioEngineAsyncForGeneration:(NSUInteger)generation;
+- (void) stopAudioEngineAsyncForGeneration:(NSUInteger)generation;
 #if TARGET_OS_IOS
 - (void) beginReconnectBackgroundTask;
 - (void) endReconnectBackgroundTask;
@@ -168,6 +172,8 @@ static CFTimeInterval MUMonotonicNow(void) {
         _socketConnectedAt = 0;
         _connectFlowIsReconnect = NO;
         _connectFlowAttempt = 0;
+        _audioLifecycleQueue = dispatch_queue_create("cn.hotxiang.Mumble.audioLifecycle", DISPATCH_QUEUE_SERIAL);
+        _audioLifecycleGeneration = 0;
     #if TARGET_OS_IOS
         _reconnectBackgroundTask = UIBackgroundTaskInvalid;
     #endif
@@ -226,7 +232,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 
         [self performSelector:@selector(establishConnection) withObject:nil afterDelay:0.5];
     } else {
-        [self establishConnection];
+        [self performSelector:@selector(establishConnection) withObject:nil afterDelay:0.12];
     }
 }
 
@@ -236,6 +242,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 
 - (void) disconnectFromServer {
     MULogInfo(Connection, @"User initiated disconnect/cancel.");
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
     _isUserInitiatedDisconnect = YES;
     _suppressReconnectForDisconnect = NO;
     if ([_reconnectTimer isValid]) {
@@ -407,11 +414,66 @@ static CFTimeInterval MUMonotonicNow(void) {
         }
     }
     
-    // Ensure audio starts with a valid connection snapshot already attached.
-    MULogInfo(Connection, @"Starting Audio Engine...");
-    [[MKAudio sharedAudio] restart];
-    
     [_connection connectToHost:_hostname port:_port];
+
+    NSUInteger audioGeneration = 0;
+    @synchronized (self) {
+        _audioLifecycleGeneration++;
+        audioGeneration = _audioLifecycleGeneration;
+    }
+    [self startAudioEngineAsyncForGeneration:audioGeneration];
+}
+
+- (void) startAudioEngineAsyncForGeneration:(NSUInteger)generation {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(250 * NSEC_PER_MSEC)), _audioLifecycleQueue, ^{
+        BOOL shouldStart = NO;
+        NSUInteger currentGeneration = 0;
+        @synchronized (self) {
+            currentGeneration = self->_audioLifecycleGeneration;
+            shouldStart = (generation == currentGeneration && self->_connection != nil);
+        }
+
+        if (!shouldStart) {
+            MULogDebug(Connection, @"Skipping stale Audio Engine start. generation=%lu current=%lu",
+                  (unsigned long)generation,
+                  (unsigned long)currentGeneration);
+            return;
+        }
+
+        CFTimeInterval startedAt = MUMonotonicNow();
+        MULogInfo(Connection, @"[Async] Starting Audio Engine...");
+        [[MKAudio sharedAudio] restart];
+        CFTimeInterval elapsedMs = (MUMonotonicNow() - startedAt) * 1000.0;
+        MULogDebug(Connection, @"PERF audio_engine_start_async elapsed_ms=%.2f generation=%lu",
+              elapsedMs,
+              (unsigned long)generation);
+    });
+}
+
+- (void) stopAudioEngineAsyncForGeneration:(NSUInteger)generation {
+    dispatch_async(_audioLifecycleQueue, ^{
+        CFTimeInterval startedAt = MUMonotonicNow();
+        MULogInfo(Connection, @"[Async] Stopping Audio Engine (Release Mic)...");
+        [[MKAudio sharedAudio] stop];
+        
+        // 显式停用 Session，消除橙色点
+        // 这个操作涉及系统 IPC 通信，必须避开主线程
+#if TARGET_OS_IOS
+        NSError *error = nil;
+        [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
+        
+        if (error) {
+            MULogWarning(Connection, @"[Async] Failed to deactivate AudioSession: %@", error.localizedDescription);
+        } else {
+            MULogDebug(Connection, @"[Async] Audio session deactivated successfully.");
+        }
+#endif
+
+        CFTimeInterval elapsedMs = (MUMonotonicNow() - startedAt) * 1000.0;
+        MULogDebug(Connection, @"PERF audio_engine_stop_async elapsed_ms=%.2f generation=%lu",
+              elapsedMs,
+              (unsigned long)generation);
+    });
 }
 
 - (void) applyNetworkForceTCPSetting {
@@ -422,6 +484,7 @@ static CFTimeInterval MUMonotonicNow(void) {
 }
 
 - (void) teardownConnection {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
     [self stopNetworkMonitor];
 
     if ([_reconnectTimer isValid]) {
@@ -455,23 +518,12 @@ static CFTimeInterval MUMonotonicNow(void) {
         [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionClosedNotification object:nil];
     });
     
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        MULogInfo(Connection, @"[Async] Stopping Audio Engine (Release Mic)...");
-        [[MKAudio sharedAudio] stop];
-        
-        // 显式停用 Session，消除橙色点
-        // 这个操作涉及系统 IPC 通信，是造成卡顿的主要原因
-#if TARGET_OS_IOS
-        NSError *error = nil;
-        [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
-        
-        if (error) {
-            MULogWarning(Connection, @"[Async] Failed to deactivate AudioSession: %@", error.localizedDescription);
-        } else {
-            MULogDebug(Connection, @"[Async] Audio session deactivated successfully.");
-        }
-#endif
-    });
+    NSUInteger audioGeneration = 0;
+    @synchronized (self) {
+        _audioLifecycleGeneration++;
+        audioGeneration = _audioLifecycleGeneration;
+    }
+    [self stopAudioEngineAsyncForGeneration:audioGeneration];
 }
 
 - (void) postErrorWithTitle:(NSString *)title message:(NSString *)message {

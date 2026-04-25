@@ -4,65 +4,36 @@
 
 Mumble 内嵌了一个 WebSocket 测试服务器（`MUTestServer`），仅在 `DEBUG` 构建中编译。AI agent 或自动化脚本可通过 WebSocket 连接到运行中的 App，远程执行所有功能并验证结果。
 
-## 弱网模式测试指南
+## 当前测试重点（2026-04-25）
 
-### 启用弱网模式
+弱网模式已经删除，不再存在 `audio.setWeakNetworkMode`、`audio.setWeakNetworkConfig`、`audio.weakNetworkStatus` 命令。网络/语音体验现在通过 Opus 默认配置优化：constrained VBR、DTX、in-band FEC 和默认 `OPUS_SET_PACKET_LOSS_PERC(10)`。
+
+当前需要重点覆盖这些回归路径：
+
+1. **普通欢迎页空闲**
+   - 完全启动 App，停留在普通主界面。
+   - 预期：不进入 VoiceChat 模式，不调用麦克风。
+   - `audio.status` 在没有本地测试/连接时应返回 `running: false`。
+2. **首次 VAD 欢迎引导**
+   - 清除 `HasCompletedVADOnboarding` 后重启 App。
+   - 预期：VAD onboarding 显示后进入 VoiceChat 模式并调用麦克风。
+   - 预期日志包含 `Starting Local Audio for Settings/Testing`、`MKAudioInput: ... constrained VBR, DTX, FEC`、`AudioUnit started`。
+3. **Input Setting -> VAD 欢迎引导**
+   - 打开 Input Setting，确认本地音频测试已运行。
+   - 点击 `Show VAD Tutorial Again`。
+   - 预期：设置页 dismiss 到欢迎引导 sheet 的转场中不出现 `Stopping Local Audio (Settings closed)`；欢迎引导关闭后才停止本地音频测试。
+4. **Mixer 生命周期**
+   - 打开 Audio Plugin Mixer，预期本地音频测试运行。
+   - 关闭 Mixer，若未连接服务器，预期停止本地音频测试并释放 session。
+5. **连接性能**
+   - 收藏服务器连接时观察 connecting overlay 动画和日志。
+   - 预期：`connect_ready`、音频启动、模型重建日志存在；UI 不应因音频启动阻塞掉帧。
+
+清除首次引导标记示例：
 
 ```json
-// 1. 启用弱网模式
-{"action":"audio.setWeakNetworkMode","params":{"enabled":true}}
-
-// 2. 配置弱网参数
-{"action":"audio.setWeakNetworkConfig","params":{
-    "jitterBufferMs": 150,
-    "expectedLoss": 30,
-    "adaptiveBitrate": true,
-    "enhancedPLC": true,
-    "minBitrate": 16000,
-    "maxBitrate": 48000
-}}
-
-// 3. 查看弱网状态
-{"action":"audio.weakNetworkStatus"}
+{"id":"reset-vad","action":"settings.remove","params":{"key":"HasCompletedVADOnboarding"}}
 ```
-
-### 弱网测试流程
-
-1. **基线测试**（不启用弱网模式）
-   - 连接服务器
-   - 发送 `audio.status` 记录正常网络状态
-   - 使用 `log.stream` 监控音频日志
-
-2. **启用弱网模式**
-   - 发送 `audio.setWeakNetworkMode` 启用
-   - 发送 `audio.setWeakNetworkConfig` 配置参数
-   - 等待 5 秒让设置生效
-
-3. **模拟弱网条件**（需外部网络条件）
-   - 使用 Network Link Conditioner 或 Clumsy 模拟：
-     - 延迟：200-500ms
-     - 丢包：10-30%
-     - 抖动：±50ms
-
-4. **监控指标**
-   - `audio.weakNetworkStatus` - 每秒查询一次
-   - 记录 `metrics.qualityScore` 变化
-   - 记录 `metrics.packetLossPercent` 和 `metrics.effectiveLatencyMs`
-
-5. **语音质量验证**
-   - 发送 `audio.forceTransmit` 持续传输
-   - 监听输出音频是否连续无断音
-   - 检查 `log.entry` 中是否有 PLC 触发日志
-
-### 弱网模式预期效果
-
-| 指标 | 普通模式 | 弱网模式 |
-|------|---------|---------|
-| Jitter Buffer | 10-30ms | 100-300ms |
-| FEC | 关闭 | 开启 |
-| 丢包隐藏 | 基础 | 增强 + 平滑 |
-| 码率 | 固定 | 16-64kbps 自适应 |
-| 20% 丢包可懂度 | ~60% | ~85% |
 
 ## Agent 上手速览
 
@@ -418,6 +389,8 @@ websocat ws://localhost:54296
 
 ### audio — 音频控制
 
+`audio.startTest` / `audio.stopTest` 用于本地音频测试场景（Input Setting、Audio Plugin Mixer、VAD onboarding）。普通欢迎页不应主动启动本地音频测试。`audio.restart` 只用于已连接服务器的通话音频引擎。
+
 | 命令 | 参数 | 说明 |
 |------|------|------|
 | `audio.mute` | 无 | 自我静音 |
@@ -437,6 +410,21 @@ websocat ws://localhost:54296
 {"action": "audio.status"}
 # → {"success": true, "data": {"running": true, "selfMuted": true, "selfDeafened": false}}
 ```
+
+VAD onboarding 验证示例：
+
+```bash
+{"action": "settings.remove", "params": {"key": "HasCompletedVADOnboarding"}}
+# 重启 App 后等待 onboarding 出现
+{"action": "audio.status"}
+# 预期：localAudioTestRunning=true, running=true
+```
+
+已删除命令：
+
+- `audio.setWeakNetworkMode`
+- `audio.setWeakNetworkConfig`
+- `audio.weakNetworkStatus`
 
 ### channel — 频道操作
 

@@ -37,3 +37,17 @@ class PlatformSelectionFeedback {
     func prepare() {}
 }
 #endif
+
+enum InteractionFeedback {
+    static func cancel() {
+        let feedback = PlatformImpactFeedback(style: .light)
+        feedback.prepare()
+        feedback.impactOccurred()
+    }
+
+    static func action() {
+        let feedback = PlatformImpactFeedback(style: .medium)
+        feedback.prepare()
+        feedback.impactOccurred()
+    }
+}

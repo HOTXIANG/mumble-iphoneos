@@ -14,7 +14,20 @@ extension ServerModelManager {
     /// 进入设置界面时调用：临时开启麦克风
     func startAudioTest() {
         if isLocalAudioTestRunning {
-            return
+            if MKAudio.shared().isRunning() {
+                return
+            }
+
+            if isLocalAudioTestStarting {
+                return
+            }
+
+            if self.isConnected {
+                return
+            }
+
+            MumbleLogger.audio.debug("Local audio test was marked running while MKAudio was stopped. Restarting audio test")
+            isLocalAudioTestRunning = false
         }
 
         #if os(iOS)
@@ -38,7 +51,7 @@ extension ServerModelManager {
             return
         }
 
-        #if os(macOS)
+        #if os(iOS) || os(macOS)
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             startLocalAudioEngineForSettings()
@@ -49,7 +62,11 @@ extension ServerModelManager {
                 Task { @MainActor in
                     guard let self = self else { return }
                     self.isRequestingMicrophonePermission = false
-                    guard granted, !self.isConnected, !self.isLocalAudioTestRunning else { return }
+                    guard granted, !self.isConnected else { return }
+                    if self.isLocalAudioTestRunning {
+                        guard !MKAudio.shared().isRunning() else { return }
+                        self.isLocalAudioTestRunning = false
+                    }
                     self.startLocalAudioEngineForSettings()
                 }
             }
@@ -65,6 +82,11 @@ extension ServerModelManager {
 
     /// 退出设置界面时调用：关闭麦克风
     func stopAudioTest() {
+        if isPreservingLocalAudioTestForVADOnboardingTransition && isLocalAudioTestRunning && !isConnected {
+            MumbleLogger.audio.debug("Keeping Local Audio running while transitioning from input settings to VAD onboarding")
+            return
+        }
+
         #if os(iOS)
         if isInputSettingsPreviewOverrideActive {
             let shouldRestoreMute = inputSettingsRestoreSystemMute ?? true
@@ -89,6 +111,8 @@ extension ServerModelManager {
         if self.isConnected || connectionInProgressOrActive {
             // We're leaving local test mode; do not stop engine when server connection is active/starting.
             isLocalAudioTestRunning = false
+            isLocalAudioTestStarting = false
+            localAudioTestStartSequence &+= 1
             MumbleLogger.audio.debug("Connection active/in-progress, keeping audio engine running")
             return
         }
@@ -99,6 +123,8 @@ extension ServerModelManager {
 
         MumbleLogger.audio.info("Stopping Local Audio (Settings closed)")
         isLocalAudioTestRunning = false
+        isLocalAudioTestStarting = false
+        localAudioTestStartSequence &+= 1
         #if os(iOS)
         restoreLocalAudioTestSystemMuteIfNeeded()
         #endif
@@ -121,19 +147,57 @@ extension ServerModelManager {
         }
     }
 
+    func preserveLocalAudioTestForVADOnboardingTransition() {
+        isPreservingLocalAudioTestForVADOnboardingTransition = true
+        vadOnboardingAudioPreservationSequence &+= 1
+        let sequence = vadOnboardingAudioPreservationSequence
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self else { return }
+            guard self.vadOnboardingAudioPreservationSequence == sequence else { return }
+            guard self.isPreservingLocalAudioTestForVADOnboardingTransition else { return }
+
+            self.isPreservingLocalAudioTestForVADOnboardingTransition = false
+            if self.isLocalAudioTestRunning && !self.isConnected {
+                MumbleLogger.audio.warning("VAD onboarding audio preservation expired before onboarding appeared; stopping Local Audio")
+                self.stopAudioTest()
+            }
+        }
+    }
+
+    func finishLocalAudioTestPreservationForVADOnboarding() {
+        isPreservingLocalAudioTestForVADOnboardingTransition = false
+        vadOnboardingAudioPreservationSequence &+= 1
+    }
+
     private func startLocalAudioEngineForSettings() {
+        guard !isLocalAudioTestStarting else { return }
+
         MumbleLogger.audio.info("Starting Local Audio for Settings/Testing")
         isLocalAudioTestRunning = true
+        isLocalAudioTestStarting = true
+        localAudioTestStartSequence &+= 1
+        let startSequence = localAudioTestStartSequence
         #if os(iOS)
         captureLocalAudioTestSystemMuteStateIfNeeded()
         #endif
         Task.detached(priority: .userInitiated) {
             MKAudio.shared().start()
-            #if os(iOS)
             Task { @MainActor [weak self] in
-                self?.applyLocalAudioTestSystemMuteOverrideIfNeeded()
+                guard let self, self.localAudioTestStartSequence == startSequence else { return }
+                self.isLocalAudioTestStarting = false
+                guard self.isLocalAudioTestRunning else { return }
+
+                if !MKAudio.shared().isRunning() {
+                    self.isLocalAudioTestRunning = false
+                    MumbleLogger.audio.warning("Local audio test start finished but MKAudio is not running")
+                    return
+                }
+
+                #if os(iOS)
+                self.applyLocalAudioTestSystemMuteOverrideIfNeeded()
+                #endif
             }
-            #endif
         }
     }
 

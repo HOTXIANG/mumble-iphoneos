@@ -1,5 +1,7 @@
 # 🔍 Mumble Audio Mixer 诊断指南
 
+最新音频生命周期和 Opus 默认策略见 `docs/CURRENT_STATUS.md`。Mixer 打开时会启动本地音频测试；关闭 Mixer 且未连接服务器时应停止本地音频测试并释放 iOS VoiceChat session。
+
 ## 问题：插件加载但没有效果
 
 ### 快速检查清单
@@ -72,6 +74,16 @@ MKAudio: AU 'Plugin Name' render failed, status=-3000
 - Remote Bus: 需要有远程用户说话
 - Remote Session: 需要特定用户说话
 - **解决**：确保有音频信号经过该轨道
+
+如果 Mixer 已打开但 Input Track 没有任何输入，请先看 `Audio` 日志是否出现：
+
+```
+Starting Local Audio for Settings/Testing
+MKAudioInput: ... constrained VBR, DTX, FEC
+MKVoiceProcessingDevice: AudioUnit started.
+```
+
+缺少这些日志通常说明本地音频测试没有启动，或 AudioUnit 启动顺序被改坏。
 
 #### 问题 3: 单声道插件弹出安全性警告
 

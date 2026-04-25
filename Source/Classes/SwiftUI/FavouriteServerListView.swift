@@ -257,6 +257,9 @@ struct FavouriteServerListContentView: View {
         }
         .alert("Delete Favourite", isPresented: $showingDeleteAlert, presenting: serverToDelete) { server in
             Button("Delete", role: .destructive) { deleteFavouriteServer(server) }
+            Button("Cancel", role: .cancel) {
+                InteractionFeedback.cancel()
+            }
         } message: { server in
             Text("Are you sure you want to delete '\(server.displayName ?? NSLocalizedString("this server", comment: ""))'?")
         }

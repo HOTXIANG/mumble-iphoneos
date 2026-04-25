@@ -21,6 +21,7 @@
 #import <UserNotifications/UserNotifications.h>
 
 @interface MUApplicationDelegate () <UIApplicationDelegate,
+                                     MKAudioDelegate,
                                      UIAlertViewDelegate> {
     UIWindow                  *_window;
     UINavigationController    *_navigationController;
@@ -31,6 +32,7 @@
 - (void) setupAudio;
 - (void) forceKeyboardLoad;
 - (BOOL) handleMumbleURL:(NSURL *)url;
+- (BOOL) hasActiveServerConnection;
 - (NSArray<NSString *> *) decodedChannelPathFromURL:(NSURL *)url;
 - (BOOL) joinChannelPathComponents:(NSArray<NSString *> *)pathComponents onServerModel:(MKServerModel *)serverModel;
 @end
@@ -40,7 +42,7 @@
     NSTimeInterval _lastAudioRestartTime;
 
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
-    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%f|%d|%d|%d|%d|%d|%d|%d",
+    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%f",
             [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
             [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
             [defaults doubleForKey:@"AudioVADBelow"],
@@ -56,15 +58,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
             [defaults boolForKey:@"AudioPluginInputTrackEnabled"],
             [defaults doubleForKey:@"AudioPluginInputTrackGain"],
             [defaults boolForKey:@"AudioPluginRemoteBusEnabled"],
-            [defaults doubleForKey:@"AudioPluginRemoteBusGain"],
-            // 弱网模式参数变化需要重建 Opus 编码器
-            [defaults boolForKey:@"WeakNetworkModeEnabled"],
-            (int)[defaults integerForKey:@"WeakNetworkExpectedLoss"],
-            [defaults boolForKey:@"WeakNetworkAdaptiveBitrate"],
-            [defaults boolForKey:@"WeakNetworkEnhancedPLC"],
-            (int)[defaults integerForKey:@"WeakNetworkJitterBufferMs"],
-            (int)[defaults integerForKey:@"WeakNetworkMinBitrate"],
-            (int)[defaults integerForKey:@"WeakNetworkMaxBitrate"]];
+            [defaults doubleForKey:@"AudioPluginRemoteBusGain"]];
 }
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
@@ -108,7 +102,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
                                                                 [NSNumber numberWithBool:NO],      @"ShowPTTButton",
                                                                 [NSNumber numberWithInt:49],       @"PTTHotkeyCode",
                                                                 [NSNumber numberWithBool:YES],     @"AudioSpeakerPhoneMode",
-                                                                [NSNumber numberWithBool:YES],     @"AudioOpusCodecForceCELTMode",
+                                                                [NSNumber numberWithBool:NO],      @"AudioOpusCodecForceCELTMode",
                                                                 [NSNumber numberWithBool:NO],      @"AudioPluginInputTrackEnabled",
                                                                 [NSNumber numberWithFloat:1.0f],   @"AudioPluginInputTrackGain",
                                                                 [NSNumber numberWithBool:NO],      @"AudioPluginRemoteBusEnabled",
@@ -133,6 +127,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
                                             object:nil];
     
     [self reloadPreferences];
+    [[MKAudio sharedAudio] setDelegate:self];
     [MUDatabase initializeDatabase];
     
 #ifdef ENABLE_REMOTE_CONTROL
@@ -390,22 +385,6 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     settings.opusForceCELTMode = [defaults boolForKey:@"AudioOpusCodecForceCELTMode"];
     settings.audioMixerDebug = [defaults boolForKey:@"AudioMixerDebug"];
 
-    // 弱网模式：从 UserDefaults 恢复设置，防止 audio restart 后丢失
-    settings.enableWeakNetworkMode = [defaults boolForKey:@"WeakNetworkModeEnabled"];
-    if (settings.enableWeakNetworkMode) {
-        settings.weakNetworkJitterBufferMs = (int)[defaults integerForKey:@"WeakNetworkJitterBufferMs"];
-        settings.weakNetworkExpectedLoss = (int)[defaults integerForKey:@"WeakNetworkExpectedLoss"];
-        settings.weakNetworkAdaptiveBitrate = [defaults boolForKey:@"WeakNetworkAdaptiveBitrate"];
-        settings.weakNetworkEnhancedPLC = [defaults boolForKey:@"WeakNetworkEnhancedPLC"];
-        settings.weakNetworkMinBitrate = (int)[defaults integerForKey:@"WeakNetworkMinBitrate"];
-        settings.weakNetworkMaxBitrate = (int)[defaults integerForKey:@"WeakNetworkMaxBitrate"];
-        // 确保有合理默认值
-        if (settings.weakNetworkJitterBufferMs <= 0) settings.weakNetworkJitterBufferMs = 100;
-        if (settings.weakNetworkExpectedLoss <= 0) settings.weakNetworkExpectedLoss = 20;
-        if (settings.weakNetworkMinBitrate <= 0) settings.weakNetworkMinBitrate = 32000;
-        if (settings.weakNetworkMaxBitrate <= 0) settings.weakNetworkMaxBitrate = 128000;
-    }
-
     MKAudio *audio = [MKAudio sharedAudio];
     BOOL audioActive = _connectionActive || [audio isRunning];
     BOOL shouldRestart = audioActive
@@ -468,13 +447,27 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     _pendingDeepLinkChannelPath = nil;
 }
 
+- (BOOL) hasActiveServerConnection {
+    MUConnectionController *connectionController = [MUConnectionController sharedController];
+    return _connectionActive
+        && [connectionController isConnected]
+        && [connectionController serverModel] != nil;
+}
+
+- (BOOL) audioShouldBeRunning:(MKAudio *)audio {
+    (void)audio;
+    return [self hasActiveServerConnection];
+}
+
 - (void) applicationWillResignActive:(UIApplication *)application {
     // If we have any active connections, don't stop MKAudio. This is
     // for 'clicking-the-home-button' invocations of this method.
     //
     // In case we've been backgrounded by a phone call, MKAudio will
     // already have shut itself down.
-    if (!_connectionActive) {
+    BOOL hasActiveConnection = [self hasActiveServerConnection];
+    if (!hasActiveConnection) {
+        _connectionActive = NO;
         MULogInfo(General, @"Not connected to a server. Stopping MKAudio.");
         [[MKAudio sharedAudio] stop];
         
@@ -493,7 +486,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     //
     // For regular backgrounding, we usually don't turn off the audio system, and
     // we won't have to start it again.
-    if (_connectionActive && ![[MKAudio sharedAudio] isRunning]) {
+    BOOL hasActiveConnection = [self hasActiveServerConnection];
+    if (hasActiveConnection && ![[MKAudio sharedAudio] isRunning]) {
         MULogInfo(General, @"Connection active but MKAudio not running. Starting it.");
         [[MKAudio sharedAudio] start];
         
@@ -502,6 +496,10 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
         [[MURemoteControlServer sharedRemoteControlServer] stop];
         [[MURemoteControlServer sharedRemoteControlServer] start];
 #endif
+    } else if (!hasActiveConnection && [[MKAudio sharedAudio] isRunning]) {
+        _connectionActive = NO;
+        MULogInfo(General, @"No active server connection on foreground. Stopping MKAudio.");
+        [[MKAudio sharedAudio] stop];
     }
 }
 

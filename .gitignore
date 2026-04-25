@@ -1,13 +1,30 @@
-build/*
-MumbleKit/build/*
 .DS_Store
+
+# Xcode user state
 *.pbxuser
 *.mode1v3
-project.xcworkspace
-xcuserdata
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+*.xcscmblueprint
+project.xcworkspace/
+xcuserdata/
+
+# Build products and local DerivedData
+build/
+MumbleKit/build/
 DerivedData/
+DerivedData*/
+DerivedData-*/
 **/DerivedData/
+**/DerivedData*/
 DerivedDataTemp/
 **/DerivedDataTemp/
+*.xcresult
+*.xccovreport
+*.xccovarchive
+
+# Local dependency caches and environments
+.build/
 Dependencies/fmdb/.build/
 .venv/

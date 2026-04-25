@@ -100,7 +100,10 @@ struct CreateChannelView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        InteractionFeedback.cancel()
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") { createChannel() }
@@ -472,7 +475,9 @@ struct ChannelPropertiesView: View {
         .formStyle(.grouped)
         #endif
         .alert("Delete Channel", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {
+                InteractionFeedback.cancel()
+            }
             Button("Delete", role: .destructive) {
                 serverManager.removeChannel(channel)
                 dismiss()

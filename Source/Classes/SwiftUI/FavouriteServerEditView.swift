@@ -221,6 +221,7 @@ struct FavouriteServerEditView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
+                    InteractionFeedback.cancel()
                     dismiss()
                 }
             }

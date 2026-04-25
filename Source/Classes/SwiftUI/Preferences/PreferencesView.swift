@@ -511,6 +511,7 @@ struct AudioTransmissionSettingsView: View {
             .foregroundColor(.secondary)
 
         Button {
+            serverManager.preserveLocalAudioTestForVADOnboardingTransition()
             NotificationCenter.default.post(name: .mumbleShowVADTutorialAgain, object: nil)
             dismiss()
         } label: {
@@ -538,15 +539,6 @@ struct AdvancedAudioSettingsView: View {
     @AppStorage("AudioPluginRemoteBusEnabled") var pluginRemoteBusEnabled: Bool = false
     @AppStorage("AudioPluginRemoteBusGain") var pluginRemoteBusGain: Double = 1.0
 
-    // Weak Network Mode Settings (弱网模式设置)
-    @AppStorage("WeakNetworkModeEnabled") var weakNetworkModeEnabled: Bool = false
-    @AppStorage("WeakNetworkJitterBufferMs") var weakNetworkJitterBufferMs: Int = 100
-    @AppStorage("WeakNetworkExpectedLoss") var weakNetworkExpectedLoss: Int = 20
-    @AppStorage("WeakNetworkAdaptiveBitrate") var weakNetworkAdaptiveBitrate: Bool = true
-    @AppStorage("WeakNetworkEnhancedPLC") var weakNetworkEnhancedPLC: Bool = true
-    @AppStorage("WeakNetworkMinBitrate") var weakNetworkMinBitrate: Int = 32000
-    @AppStorage("WeakNetworkMaxBitrate") var weakNetworkMaxBitrate: Int = 128000
-
 #if os(iOS)
     @State private var showPluginMixer: Bool = false
 #endif
@@ -559,79 +551,6 @@ struct AdvancedAudioSettingsView: View {
         Form {
             platformAdvancedSettingsContent
 
-#if os(iOS)
-            // MARK: Weak Network Mode Section (iOS only)
-            Section(header: Text("Weak Network Mode"),
-                    footer: Text("Optimize audio quality for high latency or lossy network conditions. Enables FEC, adaptive bitrate, and enhanced packet loss concealment.")) {
-                Toggle("Enable Weak Network Mode", isOn: $weakNetworkModeEnabled)
-                    .onChange(of: weakNetworkModeEnabled) { _, newValue in
-                        applyWeakNetworkSettings()
-                    }
-
-                if weakNetworkModeEnabled {
-                    HStack {
-                        Text("Jitter Buffer")
-                        Spacer()
-                        Text("\(weakNetworkJitterBufferMs)ms")
-                            .foregroundColor(.secondary)
-                    }
-                    Slider(value: Binding(
-                        get: { Double(weakNetworkJitterBufferMs) },
-                        set: {
-                            weakNetworkJitterBufferMs = Int($0)
-                            applyWeakNetworkSettings()
-                        }
-                    ), in: 30...500, step: 10)
-
-                    HStack {
-                        Text("Expected Packet Loss")
-                        Spacer()
-                        Text("\(weakNetworkExpectedLoss)%")
-                            .foregroundColor(.secondary)
-                    }
-                    Slider(value: Binding(
-                        get: { Double(weakNetworkExpectedLoss) },
-                        set: {
-                            weakNetworkExpectedLoss = Int($0)
-                            applyWeakNetworkSettings()
-                        }
-                    ), in: 0...60, step: 5)
-
-                    Toggle("Adaptive Bitrate", isOn: $weakNetworkAdaptiveBitrate)
-                        .onChange(of: weakNetworkAdaptiveBitrate) { _, _ in
-                            applyWeakNetworkSettings()
-                        }
-
-                    Toggle("Enhanced PLC", isOn: $weakNetworkEnhancedPLC)
-                        .onChange(of: weakNetworkEnhancedPLC) { _, _ in
-                            applyWeakNetworkSettings()
-                        }
-
-                    HStack {
-                        Text("Bitrate Range")
-                        Spacer()
-                        Text("\(weakNetworkMinBitrate/1000)-\(weakNetworkMaxBitrate/1000)kbps")
-                            .foregroundColor(.secondary)
-                    }
-                    HStack {
-                        Slider(value: Binding(
-                            get: { Double(weakNetworkMinBitrate) },
-                            set: {
-                                weakNetworkMinBitrate = min(Int($0), weakNetworkMaxBitrate - 16000)
-                                applyWeakNetworkSettings()
-                            }
-                        ), in: 32000...80000, step: 8000)
-                        Slider(value: Binding(
-                            get: { Double(weakNetworkMaxBitrate) },
-                            set: {
-                                weakNetworkMaxBitrate = max(Int($0), weakNetworkMinBitrate + 16000)
-                                applyWeakNetworkSettings()
-                            }
-                        ), in: 96000...192000, step: 8000)
-                    }
-                }
-            }
-#endif
         }
         .navigationTitle("Advanced")
         .onAppear {
@@ -661,9 +580,7 @@ struct AdvancedAudioSettingsView: View {
         .onChange(of: pluginInputTrackEnabled) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: pluginInputTrackGain) { PreferencesModel.shared.notifySettingsChanged() }
         .onChange(of: pluginRemoteBusEnabled) { PreferencesModel.shared.notifySettingsChanged() }
-        .onChange(of: pluginRemoteBusGain) { _, _ in
-            applyWeakNetworkSettings()
-        }
+        .onChange(of: pluginRemoteBusGain) { PreferencesModel.shared.notifySettingsChanged() }
         .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
             guard let target = notification.userInfo?["target"] as? String else { return }
             if target == "audioPluginMixer" {
@@ -688,23 +605,6 @@ struct AdvancedAudioSettingsView: View {
             }
         }
         #endif
-    }
-
-    func applyWeakNetworkSettings() {
-        // 通过 UserDefaults 同步设置到 MKAudioSettings
-        UserDefaults.standard.set(weakNetworkModeEnabled, forKey: "WeakNetworkModeEnabled")
-        UserDefaults.standard.set(weakNetworkJitterBufferMs, forKey: "WeakNetworkJitterBufferMs")
-        UserDefaults.standard.set(weakNetworkExpectedLoss, forKey: "WeakNetworkExpectedLoss")
-        UserDefaults.standard.set(weakNetworkAdaptiveBitrate, forKey: "WeakNetworkAdaptiveBitrate")
-        UserDefaults.standard.set(weakNetworkEnhancedPLC, forKey: "WeakNetworkEnhancedPLC")
-        UserDefaults.standard.set(weakNetworkMinBitrate, forKey: "WeakNetworkMinBitrate")
-        UserDefaults.standard.set(weakNetworkMaxBitrate, forKey: "WeakNetworkMaxBitrate")
-
-        // Opus 编码器的 FEC/DTX/complexity 参数只在初始化时配置，
-        // 仅更新 settings 结构体不够，需要通过 notifySettingsChanged 触发音频引擎重启
-        PreferencesModel.shared.notifySettingsChanged()
-
-        MumbleLogger.audio.info("Weak network settings applied: enabled=\(weakNetworkModeEnabled ? "1" : "0"), jitter=\(weakNetworkJitterBufferMs)ms, loss=\(weakNetworkExpectedLoss)%, bitrate=\(weakNetworkMinBitrate)-\(weakNetworkMaxBitrate)")
     }
 
     func openPluginMixer() {

@@ -1,5 +1,7 @@
 # 🔧 AU 插件链路修复说明（2026-03-16）
 
+> 最新音频生命周期状态见 `docs/CURRENT_STATUS.md`。2026-04-25 后，AudioUnit 的启动顺序进一步拆为 `setupDevice()` 初始化和 `startDevice()` 启动；`startDevice()` 必须在 `MKAudioInput` / `MKAudioOutput` 回调绑定后调用，避免进入 VoiceChat 但麦克风未真正采集。
+
 ## 问题诊断
 
 ### 症状

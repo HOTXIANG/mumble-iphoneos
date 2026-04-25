@@ -116,6 +116,10 @@ class ServerModelManager: ObservableObject {
     let systemMuteManager = SystemMuteManager()
     var isRestoringMuteState = false
     var isRequestingMicrophonePermission = false
+    var isLocalAudioTestStarting = false
+    var localAudioTestStartSequence: UInt = 0
+    var isPreservingLocalAudioTestForVADOnboardingTransition = false
+    var vadOnboardingAudioPreservationSequence: UInt = 0
     /// iOS 输入设置页临时开麦预览中（仅影响系统层 input mute，不改服务器 self-mute）
     var isInputSettingsPreviewOverrideActive = false
     /// 记录进入输入设置前系统层 input mute 目标值，用于退出时恢复
@@ -143,6 +147,13 @@ class ServerModelManager: ObservableObject {
     var pendingModelRebuildWorkItem: DispatchWorkItem?
     /// 最近一次重建请求来源（用于性能日志）
     var pendingModelRebuildReason: String = "unknown"
+    /// 模型批量重建期间抑制逐行副作用，避免连接首帧主线程抖动
+    var isBulkUpdatingModelItems: Bool = false
+    /// 批量重建后分批刷新头像，避免在连接首帧同步解码图片
+    var deferredAvatarRefreshSessions: Set<UInt> = []
+    var pendingAvatarRefreshTask: Task<Void, Never>?
+    /// 连接后延迟执行 Live Activity/Handoff 同步，让频道列表先完成首帧渲染
+    var pendingPostConnectionActivitiesTask: Task<Void, Never>?
     
     enum ViewMode {
         case server,

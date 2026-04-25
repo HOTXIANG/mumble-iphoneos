@@ -28,6 +28,13 @@ final class MUTestServer: @unchecked Sendable {
         static let disabled = LogStreamSubscription(isEnabled: false, minimumLevelRaw: nil, categories: [])
     }
 
+    private struct RequestEnvelope: @unchecked Sendable {
+        let id: Any?
+        let idDescription: String
+        let action: String
+        let params: [String: Any]
+    }
+
     private var listener: NWListener?
     private var connections: [ObjectIdentifier: NWConnection] = [:]
     private var logSubscriptions: [ObjectIdentifier: LogStreamSubscription] = [:]
@@ -175,29 +182,33 @@ final class MUTestServer: @unchecked Sendable {
             return
         }
 
-        let requestID = json["id"] as? String
-        let params = json["params"] as? [String: Any] ?? [:]
+        let request = RequestEnvelope(
+            id: json["id"],
+            idDescription: json["id"].map { String(describing: $0) } ?? "-",
+            action: action,
+            params: json["params"] as? [String: Any] ?? [:]
+        )
         let startedAt = CFAbsoluteTimeGetCurrent()
-        let sanitizedParams = sanitizeParamsForLogging(params)
+        let sanitizedParams = sanitizeParamsForLogging(request.params)
 
-        MumbleLogger.general.info("TestServer: request start client=\(connectionID) id=\(requestID ?? "-") action=\(action) params=\(sanitizedParams)")
+        MumbleLogger.general.info("TestServer: request start client=\(connectionID) id=\(request.idDescription) action=\(request.action) params=\(sanitizedParams)")
 
         Task { @MainActor in
             do {
                 let context = MUTestCommandContext(connectionID: connectionID)
-                let result = try await self.router.handle(action: action, params: params, context: context)
+                let result = try await self.router.handle(action: request.action, params: request.params, context: context)
                 var response: [String: Any] = ["success": true]
-                if let id = requestID { response["id"] = id }
+                if let id = request.id { response["id"] = id }
                 if let result = result { response["data"] = result }
                 self.sendJSON(response, to: connection)
                 let elapsedMs = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000.0
-                MumbleLogger.general.info("TestServer: request success client=\(connectionID) id=\(requestID ?? "-") action=\(action) elapsed_ms=\(String(format: "%.2f", elapsedMs))")
+                MumbleLogger.general.info("TestServer: request success client=\(connectionID) id=\(request.idDescription) action=\(request.action) elapsed_ms=\(String(format: "%.2f", elapsedMs))")
             } catch {
                 var response: [String: Any] = ["success": false, "error": error.localizedDescription]
-                if let id = requestID { response["id"] = id }
+                if let id = request.id { response["id"] = id }
                 self.sendJSON(response, to: connection)
                 let elapsedMs = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000.0
-                MumbleLogger.general.error("TestServer: request failed client=\(connectionID) id=\(requestID ?? "-") action=\(action) elapsed_ms=\(String(format: "%.2f", elapsedMs)) error=\(error.localizedDescription)")
+                MumbleLogger.general.error("TestServer: request failed client=\(connectionID) id=\(request.idDescription) action=\(request.action) elapsed_ms=\(String(format: "%.2f", elapsedMs)) error=\(error.localizedDescription)")
             }
         }
     }

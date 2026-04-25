@@ -15,6 +15,7 @@ class SystemMuteManager {
     var onSystemMuteChanged: ((Bool) -> Void)?
     
     private var observer: NSObjectProtocol?
+    private var inputMuteControlUnavailable = false
     
     init() {}
     
@@ -68,6 +69,7 @@ class SystemMuteManager {
         return
         #else
         guard #available(iOS 17.0, *) else { return }
+        guard !inputMuteControlUnavailable else { return }
         
         let session = AVAudioSession.sharedInstance()
         // 只有 Session 激活时才能设置，否则会报错 "cannot control mic"
@@ -79,7 +81,13 @@ class SystemMuteManager {
             try AVAudioApplication.shared.setInputMuted(isMuted)
             MumbleLogger.audio.debug("SystemMuteManager: setInputMuted(\(isMuted)) success")
         } catch {
-            MumbleLogger.audio.error("SystemMuteManager: setInputMuted failed: \(error.localizedDescription)")
+            let message = error.localizedDescription
+            if message.localizedCaseInsensitiveContains("not yet implemented") {
+                inputMuteControlUnavailable = true
+                MumbleLogger.audio.debug("SystemMuteManager: system input mute unavailable on this runtime; using app mute only")
+            } else {
+                MumbleLogger.audio.warning("SystemMuteManager: setInputMuted failed: \(message)")
+            }
         }
         #endif
     }

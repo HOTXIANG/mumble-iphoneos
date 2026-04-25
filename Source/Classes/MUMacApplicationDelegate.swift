@@ -55,7 +55,7 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             "AudioSelectedInputChannel": 1,
             "AudioSelectedInputChannelLeft": 1,
             "AudioSelectedInputChannelRight": 2,
-            "AudioOpusCodecForceCELTMode": true,
+            "AudioOpusCodecForceCELTMode": false,
             "AudioPluginInputTrackEnabled": false,
             "AudioPluginInputTrackGain": 1.0,
             "AudioPluginRemoteBusEnabled": false,

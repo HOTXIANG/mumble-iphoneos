@@ -1,5 +1,7 @@
 # 🔧 Non-Interleaved 格式和单声道插件修复（2026-03-16 最终版）
 
+> 最新音频生命周期状态见 `docs/CURRENT_STATUS.md`。当前 Mixer/Input Setting/VAD onboarding 使用同一套本地音频测试链路；普通欢迎页不应打开麦克风。Opus 默认启用 constrained VBR、DTX、in-band FEC，旧 Weak Network Mode 已删除。
+
 ## 问题 1: Pro-Q 4（立体声）无声音
 
 ### 症状

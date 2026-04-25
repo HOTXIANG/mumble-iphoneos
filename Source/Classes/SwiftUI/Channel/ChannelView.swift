@@ -341,7 +341,10 @@ struct ServerChannelView: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
                 Spacer()
-                Button(action: cancelMoveMode) {
+                Button(action: {
+                    InteractionFeedback.cancel()
+                    cancelMoveMode()
+                }) {
                     Text("Cancel")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
@@ -422,7 +425,10 @@ struct ServerChannelView: View {
     @ViewBuilder
     private func renameAlertActions() -> some View {
         TextField("Nickname", text: $pendingNicknameInput)
-        Button("Cancel", role: .cancel, action: clearNicknameSelection)
+        Button("Cancel", role: .cancel) {
+            InteractionFeedback.cancel()
+            clearNicknameSelection()
+        }
         Button("Reset", role: .destructive, action: resetNicknameSelection)
         Button("Save", action: saveNicknameSelection)
     }
@@ -437,7 +443,10 @@ struct ServerChannelView: View {
     @ViewBuilder
     private func channelPasswordAlertActions() -> some View {
         SecureField("Enter password", text: $serverManager.pendingPasswordInput)
-        Button("Cancel", role: .cancel, action: clearPendingChannelPassword)
+        Button("Cancel", role: .cancel) {
+            InteractionFeedback.cancel()
+            clearPendingChannelPassword()
+        }
         Button("Join", action: submitPendingChannelPassword)
     }
 
@@ -1918,7 +1927,10 @@ struct PrivateMessageInputView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        InteractionFeedback.cancel()
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Send") {
@@ -1948,7 +1960,10 @@ struct PrivateMessageInputView: View {
         .sheet(item: $pendingPrivateImage) { pending in
             ImageConfirmationView(
                 image: pending.image,
-                onCancel: { pendingPrivateImage = nil },
+                onCancel: {
+                    InteractionFeedback.cancel()
+                    pendingPrivateImage = nil
+                },
                 onSend: { image in
                     await serverManager.sendPrivateImageMessage(image: image, to: targetUser)
                     await MainActor.run {

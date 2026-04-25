@@ -799,16 +799,25 @@ private struct VADOnboardingSplashView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
                 onStartAudioTest()
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                onStartAudioTest()
+            }
             audioMeter.startMonitoring()
         }
         .onDisappear {
             audioMeter.stopMonitoring()
             onStopAudioTest()
         }
+        #if os(iOS)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            onStartAudioTest()
+        }
+        #endif
         #if os(macOS)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshDevices()
             normalizeSelectionIfNeeded()
+            onStartAudioTest()
         }
         .onReceive(NotificationCenter.default.publisher(for: onboardingMacAudioInputDevicesChangedNotification)) { _ in
             refreshDevices()
@@ -906,8 +915,15 @@ struct AppRootView: View {
     @StateObject private var sidebarNavigationManager = NavigationManager()
  
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
-    @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
     #if os(macOS)
+    // macOS 启动时直接设为 .all，避免从 .automatic 切换到 .all 时窗口被撑宽一个侧边栏的宽度
+    @State private var splitVisibility: NavigationSplitViewVisibility = .all
+    #else
+    @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
+    #endif
+    #if os(macOS)
+    @State private var initialSplitLayoutWindowFrame: NSRect?
+    @State private var didCaptureInitialSplitLayoutFrame = false
     @State private var preservedDisconnectWindowFrame: NSRect?
     #endif
 
@@ -943,7 +959,7 @@ struct AppRootView: View {
         .environmentObject(serverManager)
         .focusedValue(\.serverManager, serverManager)
         #if os(macOS)
-        .background(WindowFramePreserver(targetFrame: preservedDisconnectWindowFrame))
+        .background(WindowFramePreserver(targetFrame: preservedDisconnectWindowFrame ?? initialSplitLayoutWindowFrame))
         #endif
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
         .overlay(alignment: .top) {
@@ -1030,7 +1046,16 @@ struct AppRootView: View {
                                 .lineLimit(3)
                             }
                         }
-                        Button(action: { appState.cancelConnection() }) {
+                        Button(action: {
+                            InteractionFeedback.cancel()
+                            withAnimation(.easeOut(duration: 0.12)) {
+                                appState.isConnecting = false
+                                appState.isReconnecting = false
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                appState.cancelConnection()
+                            }
+                        }) {
                             Text("Cancel")
                                 .font(.subheadline).fontWeight(.semibold).foregroundColor(.white)
                                 .padding(.horizontal, 32).padding(.vertical, 4)
@@ -1044,7 +1069,7 @@ struct AppRootView: View {
                     .shadow(radius: 10)
                 }
                 .ignoresSafeArea().zIndex(9999)
-                .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                .transition(.opacity.animation(.easeOut(duration: 0.18)))
             }
         }
         .sheet(isPresented: $showVADOnboarding) {
@@ -1063,6 +1088,7 @@ struct AppRootView: View {
             #endif
             .onAppear {
                 // Defensive start for iOS: avoid race with settings-sheet onDismiss stop.
+                serverManager.finishLocalAudioTestPreservationForVADOnboarding()
                 serverManager.startAudioTest()
             }
         }
@@ -1152,7 +1178,10 @@ struct AppRootView: View {
                     MUConnectionController.shared()?.acceptCertificateTrust()
                 },
                 secondaryButton: .cancel {
-                    MUConnectionController.shared()?.rejectCertificateTrust()
+                    InteractionFeedback.cancel()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        MUConnectionController.shared()?.rejectCertificateTrust()
+                    }
                 }
             )
         }
@@ -1168,6 +1197,9 @@ struct AppRootView: View {
             languageManager.reapplyCurrentLanguage()
             serverManager.activate()
             appState.setAutomationCurrentScreen("welcome")
+            #if os(macOS)
+            preserveInitialSplitLayoutWindowFrame()
+            #endif
             if !hasCompletedVADOnboarding {
                 showVADOnboarding = true
             }
@@ -1203,7 +1235,6 @@ struct AppRootView: View {
             syncAutomationOverlayState()
         }
         #endif
-        .animation(.default, value: appState.isConnecting)
         #if os(iOS)
         .animation(.spring(), value: appState.isConnected)
         #endif
@@ -1279,7 +1310,7 @@ struct AppRootView: View {
         #if os(iOS)
         .navigationSplitViewStyle(.balanced)
         #else
-        .navigationSplitViewStyle(.prominentDetail)
+        .navigationSplitViewStyle(.balanced)
         #endif
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
@@ -1346,6 +1377,24 @@ struct AppRootView: View {
             return keyWindow
         }
         return NSApp.windows.first { $0.isVisible }
+    }
+
+    private func preserveInitialSplitLayoutWindowFrame() {
+        guard !didCaptureInitialSplitLayoutFrame else { return }
+
+        DispatchQueue.main.async {
+            guard !didCaptureInitialSplitLayoutFrame else { return }
+            guard let windowFrame = currentMainWindow()?.frame else { return }
+
+            didCaptureInitialSplitLayoutFrame = true
+            initialSplitLayoutWindowFrame = windowFrame
+
+            // NavigationSplitView can mount the detail first and reveal the sidebar
+            // shortly after launch. Keep the restored frame stable through that pass.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                initialSplitLayoutWindowFrame = nil
+            }
+        }
     }
     #endif
 

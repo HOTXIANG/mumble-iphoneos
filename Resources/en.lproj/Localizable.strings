@@ -122,7 +122,6 @@
 "Edit Favourite" = "Edit Favourite";
 "Email" = "Email";
 "Empty slot" = "Empty slot";
-"Enable Weak Network Mode" = "Enable Weak Network Mode";
 "Enable Logging" = "Enable Logging";
 "Enable QoS:" = "Enable QoS:";
 "Enable Sidetone" = "Enable Sidetone";
@@ -406,12 +405,9 @@
 "Voice Activity Configuration" = "Voice Activity Configuration";
 "Voice Activity Help" = "Voice Activity Help";
 "Volume" = "Volume";
-"Weak Network Mode" = "Weak Network Mode";
-"Weak Network Mode:" = "Weak Network Mode:";
 "We're terribly sorry. It looks like Mumble has recently crashed. Do you want to send a crash report to the Mumble developers?" = "We're terribly sorry. It looks like Mumble has recently crashed. Do you want to send a crash report to the Mumble developers?";
 "Website" = "Website";
 "Welcome Message" = "Welcome Message";
-"Optimize audio quality for high latency or lossy network conditions. Enables FEC, adaptive bitrate, and enhanced packet loss concealment." = "Optimize audio quality for high latency or lossy network conditions. Enables FEC, adaptive bitrate, and enhanced packet loss concealment.";
 "When file logging is off, logs are only available in Console.app." = "When file logging is off, logs are only available in Console.app.";
 "Write Logs to File" = "Write Logs to File";
 "Wrong certificate or password for existing user" = "Wrong certificate or password for existing user";
