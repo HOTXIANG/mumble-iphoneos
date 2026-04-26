@@ -43,16 +43,59 @@ private let kDropHighlightCornerRadius: CGFloat = 13.0 // 与 TintedGlassRowModi
 
 // MARK: - 1. Main Layout Container
 
+private enum ChannelLayoutMode: Equatable {
+    case split
+    case compact
+}
+
+private final class ChannelLayoutModeUpdateScheduler: ObservableObject {
+    private var workItem: DispatchWorkItem?
+    private var pendingMode: ChannelLayoutMode?
+
+    func scheduleTransition(to mode: ChannelLayoutMode, after delay: TimeInterval, _ action: @escaping () -> Void) {
+        guard pendingMode != mode else { return }
+
+        cancel()
+        pendingMode = mode
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard self?.pendingMode == mode else { return }
+            self?.workItem = nil
+            self?.pendingMode = nil
+            action()
+        }
+        self.workItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    func cancel() {
+        workItem?.cancel()
+        workItem = nil
+        pendingMode = nil
+    }
+}
+
 struct ChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
     @StateObject private var appState = AppState.shared
     @StateObject private var languageManager = AppLanguageManager.shared
+    @StateObject private var layoutModeUpdateScheduler = ChannelLayoutModeUpdateScheduler()
     @Environment(\.colorScheme) private var colorScheme
     
     @State private var splitHandlePositionRatio: CGFloat = 0.5
+    @State private var channelLayoutMode: ChannelLayoutMode?
+    @State private var latestLayoutWidth: CGFloat = 0
+    @State private var layoutModeUpdateSuppressedUntil: Date?
+    @State private var layoutModeSuppressionReleaseWorkItem: DispatchWorkItem?
     private let minChatWidth: CGFloat = 300
     private let splitHandleWidth: CGFloat = 24
     private let minServerListWidth: CGFloat = 300
+    private let layoutModeUpdateDelay: TimeInterval = 0.06
+    private let layoutModeAnimation: Animation = .easeInOut(duration: 0.16)
+
+    private var layoutModeTransition: AnyTransition {
+        .opacity
+    }
 
     private var splitThreshold: CGFloat {
         minChatWidth + splitHandleWidth + minServerListWidth
@@ -60,8 +103,10 @@ struct ChannelView: View {
 
     var body: some View {
         GeometryReader { geo in
+            let activeLayoutMode = channelLayoutMode ?? immediateLayoutMode(for: geo.size.width)
+
             ZStack {
-                if geo.size.width > splitThreshold {
+                if activeLayoutMode == .split {
                     // [宽屏模式]
                     HStack(spacing: 0) {
                         ServerChannelView(serverManager: serverManager, isSplitLayout: true)
@@ -83,6 +128,7 @@ struct ChannelView: View {
                             .frame(width: calculateEffectiveChatWidth(totalWidth: geo.size.width))
                             .onAppear { appState.unreadMessageCount = 0 }
                     }
+                    .transition(layoutModeTransition)
                 } else {
                     // [窄屏模式]
                     TabView(selection: $appState.currentTab) {
@@ -103,16 +149,18 @@ struct ChannelView: View {
                         if appState.currentTab == .messages { serverManager.markAsRead() }
                     }
                     .onAppear { configureTabBarAppearance() }
+                    .transition(layoutModeTransition)
                 }
 
                 globalGradient
                     .allowsHitTesting(false)
             }
+            .animation(layoutModeAnimation, value: activeLayoutMode)
             .onAppear {
-                updateChannelLayoutState(for: geo.size.width)
+                applyChannelLayoutMode(for: geo.size.width, animated: false, delayed: false)
             }
             .onChange(of: geo.size.width) { _, newWidth in
-                updateChannelLayoutState(for: newWidth)
+                applyChannelLayoutMode(for: newWidth, animated: true, delayed: true)
             }
         }
         .coordinateSpace(name: "ChannelViewSpace")
@@ -135,6 +183,17 @@ struct ChannelView: View {
             if shouldCleanup {
                 serverManager.cleanup()
             }
+            layoutModeUpdateScheduler.cancel()
+            layoutModeSuppressionReleaseWorkItem?.cancel()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muChannelForceCompactLayout)) { notification in
+            let duration = notification.userInfo?["duration"] as? TimeInterval
+            forceCompactLayout(suppressingLayoutUpdatesFor: duration ?? 0)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muChannelSuppressLayoutUpdates)) { notification in
+            let duration = notification.userInfo?["duration"] as? TimeInterval
+            let applyAfter = notification.userInfo?["applyAfter"] as? Bool
+            suppressLayoutModeUpdates(for: duration ?? 0, applyAfter: applyAfter ?? false)
         }
     }
     
@@ -190,11 +249,102 @@ struct ChannelView: View {
         #endif
     }
 
-    private func updateChannelLayoutState(for width: CGFloat) {
-        if width > 0 {
-            let isSplitLayout = width > splitThreshold
+    private func immediateLayoutMode(for width: CGFloat) -> ChannelLayoutMode {
+        width > splitThreshold ? .split : .compact
+    }
+
+    private func applyChannelLayoutMode(for width: CGFloat, animated: Bool, delayed: Bool) {
+        guard width > 0 else { return }
+        latestLayoutWidth = width
+
+        guard !isLayoutModeUpdateSuppressed() else {
+            layoutModeUpdateScheduler.cancel()
+            return
+        }
+
+        let mode = immediateLayoutMode(for: width)
+
+        guard delayed else {
+            layoutModeUpdateScheduler.cancel()
+            setChannelLayoutMode(mode, animated: animated)
+            return
+        }
+
+        guard let currentMode = channelLayoutMode else {
+            layoutModeUpdateScheduler.cancel()
+            setChannelLayoutMode(mode, animated: animated)
+            return
+        }
+
+        if currentMode == mode {
+            layoutModeUpdateScheduler.cancel()
+        } else {
+            layoutModeUpdateScheduler.scheduleTransition(to: mode, after: layoutModeUpdateDelay) {
+                setChannelLayoutMode(mode, animated: animated)
+            }
+        }
+    }
+
+    private func forceCompactLayout(suppressingLayoutUpdatesFor duration: TimeInterval = 0) {
+        layoutModeUpdateScheduler.cancel()
+        suppressLayoutModeUpdates(for: duration, applyAfter: false)
+        setChannelLayoutMode(.compact, animated: true)
+    }
+
+    private func suppressLayoutModeUpdates(for duration: TimeInterval, applyAfter: Bool) {
+        guard duration > 0 else { return }
+
+        let until = Date().addingTimeInterval(duration)
+        if layoutModeUpdateSuppressedUntil.map({ $0 < until }) ?? true {
+            layoutModeUpdateSuppressedUntil = until
+        }
+
+        layoutModeUpdateScheduler.cancel()
+        layoutModeSuppressionReleaseWorkItem?.cancel()
+
+        guard applyAfter else { return }
+
+        let workItem = DispatchWorkItem {
+            layoutModeUpdateSuppressedUntil = nil
+            layoutModeSuppressionReleaseWorkItem = nil
+            applyChannelLayoutMode(for: latestLayoutWidth, animated: true, delayed: false)
+        }
+        layoutModeSuppressionReleaseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: workItem)
+    }
+
+    private func isLayoutModeUpdateSuppressed() -> Bool {
+        guard let until = layoutModeUpdateSuppressedUntil else { return false }
+
+        if Date() < until {
+            return true
+        }
+
+        layoutModeUpdateSuppressedUntil = nil
+        return false
+    }
+
+    private func setChannelLayoutMode(_ mode: ChannelLayoutMode, animated: Bool) {
+        let update = {
+            if channelLayoutMode != mode {
+                channelLayoutMode = mode
+            }
+
+            let isSplitLayout = mode == .split
             if appState.isChannelSplitLayout != isSplitLayout {
                 appState.isChannelSplitLayout = isSplitLayout
+            }
+        }
+
+        if animated {
+            withAnimation(layoutModeAnimation) {
+                update()
+            }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                update()
             }
         }
     }

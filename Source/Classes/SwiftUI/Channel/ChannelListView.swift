@@ -277,13 +277,7 @@ struct ChannelListView: View {
         }
         #else
         ToolbarItem(placement: .primaryAction) {
-            deafenToolbarButton
-        }
-        ToolbarItem(placement: .primaryAction) {
-            muteToolbarButton
-        }
-        ToolbarItem(placement: .primaryAction) {
-            disconnectToolbarButton
+            macToolbarControls
         }
         #endif
     }
@@ -322,6 +316,16 @@ struct ChannelListView: View {
 
     private var muteToolbarTitle: String {
         serverManager.connectedUserState?.isSelfMuted == true ? "Unmute" : "Mute"
+    }
+
+    private var macToolbarControls: some View {
+        HStack(spacing: 4) {
+            deafenToolbarButton
+            muteToolbarButton
+            disconnectToolbarButton
+        }
+        .frame(width: 132, height: 28, alignment: .trailing)
+        .fixedSize(horizontal: true, vertical: true)
     }
 
     private var deafenToolbarButton: some View {

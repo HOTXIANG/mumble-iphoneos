@@ -20,23 +20,56 @@ struct AboutView: View {
     @State private var automationDestination: AboutDestination? = nil
 
     private var preferredLogoName: String {
-        colorScheme == .dark ? "TransparentLogoDarkGlass" : "TransparentLogoBrightGlass"
+        colorScheme == .dark ? "TransparentLogoDarkGlass" : "TransparentLogoPurpleGlass"
     }
 
     private var logoShadowColor: Color {
-        colorScheme == .light ? .black.opacity(0.30) : .black.opacity(0.22)
+        colorScheme == .light ? .clear : .black.opacity(0.22)
     }
 
     private var logoShadowRadius: CGFloat {
-        colorScheme == .light ? 22 : 12
+        colorScheme == .light ? 0 : 12
     }
 
     private var logoShadowYOffset: CGFloat {
-        colorScheme == .light ? 10 : 5
+        colorScheme == .light ? 0 : 5
+    }
+
+    private var logoGlowColor: Color {
+        colorScheme == .light
+            ? Color(red: 0.55, green: 0.50, blue: 1.0).opacity(0.14)
+            : Color.white.opacity(0.16)
+    }
+
+    private var logoGlowRadius: CGFloat {
+        colorScheme == .light ? 6 : 8
     }
 
     private var aboutLogoImage: Image {
         Image(preferredLogoName)
+    }
+
+    private var licenseDestination: some View {
+        ScrollView {
+            Text("Mumble for iOS is Free Software...")
+                .padding()
+        }
+        .navigationTitle("License")
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("aboutLicense")
+        }
+    }
+
+    private var acknowledgementsDestination: some View {
+        List {
+            Text("OpenSSL")
+            Text("MumbleKit")
+            Text("Protobuf")
+        }
+        .navigationTitle("Acknowledgements")
+        .onAppear {
+            AppState.shared.setAutomationCurrentScreen("aboutAcknowledgements")
+        }
     }
     
     @ViewBuilder
@@ -49,6 +82,8 @@ struct AboutView: View {
                     .scaledToFit()
                     .frame(width: 160, height: 160)
                     .shadow(color: logoShadowColor, radius: logoShadowRadius, x: 0, y: logoShadowYOffset)
+                    .shadow(color: logoGlowColor, radius: logoGlowRadius, x: 0, y: 0)
+                    .shadow(color: logoGlowColor.opacity(0.30), radius: logoGlowRadius * 0.35, x: 0, y: 0)
                 
                 VStack(spacing: 4) {
                     #if os(macOS)
@@ -88,34 +123,8 @@ struct AboutView: View {
         
         // 法律信息区
         Section(header: Text("Legal")) {
-            NavigationLink(
-                "License",
-                destination: ScrollView {
-                    Text("Mumble for iOS is Free Software...")
-                        .padding()
-                }
-                .navigationTitle("License")
-                .onAppear {
-                    AppState.shared.setAutomationCurrentScreen("aboutLicense")
-                },
-                tag: .license,
-                selection: $automationDestination
-            )
-            
-            NavigationLink(
-                "Third Party Libraries",
-                destination: List {
-                    Text("OpenSSL")
-                    Text("MumbleKit")
-                    Text("Protobuf")
-                }
-                .navigationTitle("Acknowledgements")
-                .onAppear {
-                    AppState.shared.setAutomationCurrentScreen("aboutAcknowledgements")
-                },
-                tag: .acknowledgements,
-                selection: $automationDestination
-            )
+            NavigationLink("License", destination: licenseDestination)
+            NavigationLink("Third Party Libraries", destination: acknowledgementsDestination)
         }
         
         // 版权区
@@ -142,6 +151,12 @@ struct AboutView: View {
             #endif
         }
         .navigationTitle("About")
+        .navigationDestination(isPresented: licenseAutomationBinding) {
+            licenseDestination
+        }
+        .navigationDestination(isPresented: acknowledgementsAutomationBinding) {
+            acknowledgementsDestination
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -172,5 +187,27 @@ struct AboutView: View {
                 break
             }
         }
+    }
+
+    private var licenseAutomationBinding: Binding<Bool> {
+        Binding(
+            get: { automationDestination == .license },
+            set: { isPresented in
+                if !isPresented, automationDestination == .license {
+                    automationDestination = nil
+                }
+            }
+        )
+    }
+
+    private var acknowledgementsAutomationBinding: Binding<Bool> {
+        Binding(
+            get: { automationDestination == .acknowledgements },
+            set: { isPresented in
+                if !isPresented, automationDestination == .acknowledgements {
+                    automationDestination = nil
+                }
+            }
+        )
     }
 }

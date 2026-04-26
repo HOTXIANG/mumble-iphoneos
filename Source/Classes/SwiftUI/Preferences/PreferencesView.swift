@@ -20,7 +20,7 @@ typealias PlatformViewController = NSViewController
 #endif
 
 // AVAudioUnit is not Sendable but is safe to use when accessed from the same actor
-extension AVAudioUnit: @unchecked Sendable {}
+extension AVAudioUnit: @unchecked @retroactive Sendable {}
 
 struct PTTHotkeyOption: Identifiable {
     let keyCode: Int
@@ -559,7 +559,6 @@ struct AdvancedAudioSettingsView: View {
         .fullScreenCover(isPresented: $showPluginMixer) {
             NavigationStack {
                 AudioPluginMixerView()
-                    .navigationTitle("Audio Plugin Mixer")
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Done") {

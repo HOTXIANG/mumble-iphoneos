@@ -182,6 +182,7 @@ struct TintedGlassRowModifier: ViewModifier {
 struct ClearGlassModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat = 12
+    var lightTintColor: Color = .black
     var lightTintOpacity: Double = 0.12
     var lightFallbackOverlayOpacity: Double = 0.05
     var lightShadowOpacity: Double = 0.10
@@ -190,7 +191,7 @@ struct ClearGlassModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let subtleDimTint: Color = colorScheme == .light
-            ? Color.black.opacity(lightTintOpacity)
+            ? lightTintColor.opacity(lightTintOpacity)
             : Color.clear
 
         if #available(iOS 26.0, macOS 26.0, *) {

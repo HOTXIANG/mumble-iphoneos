@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 @preconcurrency import AVFoundation
 import UniformTypeIdentifiers
 #if os(iOS)
@@ -109,6 +110,62 @@ private struct PluginEditorSnapshot {
     var parameters: [PluginEditorParameterSnapshot]
 }
 
+private struct MixerLiveTrackRefreshModifier<TimerEvents: Publisher>: ViewModifier where TimerEvents.Output == Date, TimerEvents.Failure == Never {
+    let timer: TimerEvents
+    let refreshLiveTrackState: (Bool) -> Void
+    let handleListeningChannelAdd: (Notification) -> Void
+    let handleListeningChannelRemove: (Notification) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(timer) { _ in refreshLiveTrackState(false) }
+            .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userJoinedNotification).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userLeftNotification).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userMovedNotification).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userStateUpdatedNotification).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.rebuildModelNotification).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: .muConnectionReady).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: .muConnectionClosed).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: .mkAudioDidRestart).receive(on: RunLoop.main)) { _ in refreshLiveTrackState(true) }
+            .onReceive(NotificationCenter.default.publisher(for: .mkListeningChannelAdd).receive(on: RunLoop.main), perform: handleListeningChannelAdd)
+            .onReceive(NotificationCenter.default.publisher(for: .mkListeningChannelRemove).receive(on: RunLoop.main), perform: handleListeningChannelRemove)
+    }
+}
+
+private struct MixerTranslucentPanelModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(colorScheme == .light ? 0.10 : 0.12), lineWidth: 1)
+            )
+            .shadow(
+                color: colorScheme == .light ? .black.opacity(0.07) : .clear,
+                radius: colorScheme == .light ? 5 : 0,
+                x: 0,
+                y: colorScheme == .light ? 1 : 0
+            )
+    }
+}
+
+private struct MixerInstructionTextModifier: ViewModifier {
+    let foregroundColor: Color
+
+    func body(content: Content) -> some View {
+        content
+            .font(.caption)
+            .foregroundColor(foregroundColor)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+}
+
 #if os(macOS)
 @MainActor
 final class AudioPluginMixerWindowController: NSObject {
@@ -131,7 +188,7 @@ final class AudioPluginMixerWindowController: NSObject {
             .modifier(MixerColorSchemeModifier())
         let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = ""
+        window.title = NSLocalizedString("Audio Plugin Mixer", comment: "")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -181,6 +238,7 @@ final class AudioPluginMixerWindowController: NSObject {
             window.displayIfNeeded()
         }
     }
+
 }
 
 /// 读取 AppColorScheme 设置并应用到 Mixer 窗口，确保跟随用户选择的亮暗模式
@@ -272,6 +330,7 @@ struct TrackPlugin: Identifiable, Codable, Hashable {
 struct AudioPluginMixerView: View {
     private let defaultInsertSlots: Int = 8
     private let maxInsertSlots: Int = 100
+    private let liveTrackRefreshTimer = Timer.publish(every: 0.75, on: .main, in: .common).autoconnect()
     @ObservedObject private var sharedRackManager = AudioPluginRackManager.shared
 
     private struct HearableUser: Identifiable, Hashable {
@@ -453,11 +512,12 @@ struct AudioPluginMixerView: View {
         mixerContentView
         .onAppear { performOnAppear() }
         .onDisappear { performOnDisappear() }
-        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userJoinedNotification)) { _ in refreshHearableUsers() }
-        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userLeftNotification)) { _ in refreshHearableUsers() }
-        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userMovedNotification)) { _ in refreshHearableUsers() }
-        .onReceive(NotificationCenter.default.publisher(for: .mkListeningChannelAdd)) { n in handleListeningChannelAdd(n) }
-        .onReceive(NotificationCenter.default.publisher(for: .mkListeningChannelRemove)) { n in handleListeningChannelRemove(n) }
+        .modifier(MixerLiveTrackRefreshModifier(
+            timer: liveTrackRefreshTimer,
+            refreshLiveTrackState: { force in refreshLiveTrackState(force: force) },
+            handleListeningChannelAdd: handleListeningChannelAdd,
+            handleListeningChannelRemove: handleListeningChannelRemove
+        ))
         .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { n in handleAutomationOpenUI(n) }
         .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { n in handleAutomationDismissUI(n) }
         .onChange(of: selectedTrack) { loadSelectedTrackState(); normalizeSelectedPluginSelection(); rebuildProcessorStateMachine() }
@@ -484,7 +544,7 @@ struct AudioPluginMixerView: View {
         loadPluginCategoryConfiguration()
         loadPluginPresets()
         initializeListeningChannels()
-        refreshRemoteSessionOrder()
+        refreshLiveTrackState(force: true)
         refreshInstalledAudioUnits()
         loadSelectedTrackState()
         normalizeSelectedPluginSelection()
@@ -714,11 +774,6 @@ struct AudioPluginMixerView: View {
                         }
                     }
                     Button {
-                        refreshRemoteSessionOrder()
-                    } label: {
-                        Label(NSLocalizedString("Refresh Remote Tracks", comment: ""), systemImage: "arrow.clockwise")
-                    }
-                    Button {
                         showingPluginBrowser = true
                     } label: {
                         Label(NSLocalizedString("Plugin Browser", comment: ""), systemImage: "square.grid.2x2")
@@ -744,10 +799,6 @@ struct AudioPluginMixerView: View {
                         .frame(minWidth: 52)
                 }
                 .menuStyle(.borderlessButton)
-                Button(NSLocalizedString("Refresh Remote Tracks", comment: "")) {
-                    refreshRemoteSessionOrder()
-                }
-                .buttonStyle(.bordered)
                 Button(NSLocalizedString("Plugin Browser", comment: "")) {
                     showingPluginBrowser = true
                 }
@@ -876,15 +927,6 @@ struct AudioPluginMixerView: View {
 
             HStack(spacing: 8) {
                 Button {
-                    refreshRemoteSessionOrder()
-                } label: {
-                    Label(NSLocalizedString("Refresh", comment: ""), systemImage: "arrow.clockwise")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                Button {
                     showingPluginBrowser = true
                 } label: {
                     Label(NSLocalizedString("Plugins", comment: ""), systemImage: "square.grid.2x2")
@@ -903,7 +945,6 @@ struct AudioPluginMixerView: View {
     #endif
 
     /// 轨道行内容（Label 部分，macOS List 和 iOS Button 共用）
-    @ViewBuilder
     private func trackTitle(_ track: MixerTrack) -> String {
         switch track {
         case .input: return NSLocalizedString("Input Track", comment: "")
@@ -926,7 +967,7 @@ struct AudioPluginMixerView: View {
     }
 
     private func mixerTrackLabel(_ track: MixerTrack) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Text(track.shortLabel)
                 .font(.caption.monospaced())
                 .foregroundColor(.accentColor)
@@ -1009,16 +1050,13 @@ struct AudioPluginMixerView: View {
 
             if !trackCanSend(sourceTrackKey) {
                 Text(NSLocalizedString("Master tracks are receive-only and cannot send to other tracks.", comment: ""))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .modifier(MixerInstructionTextModifier(foregroundColor: .secondary))
             } else if destinations.isEmpty {
                 Text(NSLocalizedString("No available destination tracks right now.", comment: ""))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .modifier(MixerInstructionTextModifier(foregroundColor: .secondary))
             } else {
                 Text(NSLocalizedString("Choose which tracks should receive this track, and whether each send is audible audio or sidechain-only.", comment: ""))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .modifier(MixerInstructionTextModifier(foregroundColor: .secondary))
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: compact ? 132 : 170), spacing: 8)], spacing: 8) {
                     ForEach(destinations, id: \.self) { destinationKey in
@@ -1028,7 +1066,7 @@ struct AudioPluginMixerView: View {
             }
         }
         .padding(compact ? 10 : 14)
-        .modifier(ClearGlassModifier(cornerRadius: 12))
+        .modifier(MixerTranslucentPanelModifier(cornerRadius: 12))
     }
 
     private func sendTargetChip(for destinationKey: String, sourceTrackKey: String) -> some View {
@@ -1158,13 +1196,11 @@ struct AudioPluginMixerView: View {
                         comment: ""
                     )
                 )
-                .font(.caption)
-                .foregroundColor(.orange)
+                .modifier(MixerInstructionTextModifier(foregroundColor: .orange))
             }
             if !compact {
                 Text(NSLocalizedString("Choose a plugin for each insert, enable it when needed, open its editor, and set its mix.", comment: ""))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .modifier(MixerInstructionTextModifier(foregroundColor: .secondary))
             }
 
             ForEach(0..<selectedTrackSlotCount, id: \.self) { slotIndex in
@@ -1188,14 +1224,14 @@ struct AudioPluginMixerView: View {
             .disabled(selectedTrackSlotCount >= maxInsertSlots)
         }
         .padding(compact ? 10 : 14)
-        .modifier(ClearGlassModifier(cornerRadius: 12))
+        .modifier(MixerTranslucentPanelModifier(cornerRadius: 12))
     }
 
     // MARK: - Wide Plugin Slot (macOS / iPad 横屏)
 
     @ViewBuilder
     private func widePluginSlotRow(slotIndex: Int, plugin: TrackPlugin?, isSelected: Bool) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Text("\(slotIndex + 1)")
                 .font(.caption.monospacedDigit())
                 .foregroundColor(.secondary)
@@ -1204,11 +1240,18 @@ struct AudioPluginMixerView: View {
             pluginSelectMenu(slotIndex: slotIndex, plugin: plugin, minWidth: 240)
 
             if let plugin {
+                if auHasSidechainInput(plugin: plugin, trackKey: selectedTrackKey) {
+                    sidechainSourcePicker(for: plugin, trackKey: selectedTrackKey, width: 88)
+                }
+
                 Spacer(minLength: 0)
 
-                HStack(spacing: 10) {
-                    Button(plugin.bypassed ? NSLocalizedString("Off", comment: "") : NSLocalizedString("On", comment: "")) {
+                HStack(spacing: 8) {
+                    Button {
                         toggleBypass(at: slotIndex)
+                    } label: {
+                        Text(plugin.bypassed ? NSLocalizedString("Off", comment: "") : NSLocalizedString("On", comment: ""))
+                            .frame(minWidth: 32, minHeight: 22)
                     }
                     .buttonStyle(.bordered)
 
@@ -1217,6 +1260,7 @@ struct AudioPluginMixerView: View {
                     } label: {
                         Image(systemName: "chevron.up")
                             .font(.caption)
+                            .frame(width: 26, height: 22)
                     }
                     .buttonStyle(.bordered)
                     .disabled(slotIndex == 0)
@@ -1226,6 +1270,7 @@ struct AudioPluginMixerView: View {
                     } label: {
                         Image(systemName: "chevron.down")
                             .font(.caption)
+                            .frame(width: 26, height: 22)
                     }
                     .buttonStyle(.bordered)
                     .disabled(slotIndex >= selectedTrackChain.count - 1)
@@ -1237,33 +1282,22 @@ struct AudioPluginMixerView: View {
                         Slider(
                             value: Binding(
                                 get: { Double(plugin.stageGain * 100.0) },
-                                set: { updateMixLevel(at: slotIndex, newValue: Float($0 / 100.0)) }
+                                set: { updateMixLevel(at: slotIndex, newValue: Float($0 / 100.0), commit: false) }
                             ),
-                            in: 0...100
+                            in: 0...100,
+                            onEditingChanged: { editing in
+                                if !editing {
+                                    commitMixLevel(at: slotIndex)
+                                }
+                            }
                         )
-                        .frame(width: 140)
+                        .frame(width: 100)
                         Text("\(Int((plugin.stageGain * 100.0).rounded()))%")
                             .font(.caption.monospacedDigit())
                             .foregroundColor(.secondary)
                             .frame(width: 40, alignment: .trailing)
                     }
-                    .frame(width: 220, alignment: .trailing)
-
-                    // Sidechain source picker (only visible if AU has sidechain bus)
-                    if auHasSidechainInput(plugin: plugin, trackKey: selectedTrackKey) {
-                        HStack(spacing: 4) {
-                            Text("SC")
-                                .font(.caption2)
-                                .foregroundStyle(plugin.sidechainSourceKey != nil && !plugin.sidechainSourceKey!.isEmpty ? .orange : .secondary)
-                            Picker("", selection: sidechainBinding(for: plugin, trackKey: selectedTrackKey)) {
-                                ForEach(availableSidechainSources(for: selectedTrackKey, selectedSourceKey: plugin.sidechainSourceKey), id: \.key) { source in
-                                    Text(source.label).tag(source.key)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(maxWidth: 120)
-                        }
-                    }
+                    .frame(width: 180, alignment: .trailing)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             } else {
@@ -1311,13 +1345,15 @@ struct AudioPluginMixerView: View {
                 pluginSelectMenu(slotIndex: slotIndex, plugin: plugin, minWidth: 0, compact: true)
                     .frame(maxWidth: 200)
 
-                if plugin != nil {
+                if let plugin {
+                    if auHasSidechainInput(plugin: plugin, trackKey: selectedTrackKey) {
+                        sidechainSourcePicker(for: plugin, trackKey: selectedTrackKey, width: 72)
+                    }
+
                     // 打开插件编辑器的按钮
                     Button {
-                        if let plugin = pluginAtSlot(slotIndex) {
-                            selectedPluginID = plugin.id
-                            openPluginEditor(for: plugin)
-                        }
+                        selectedPluginID = plugin.id
+                        openPluginEditor(for: plugin)
                     } label: {
                         Image(systemName: "slider.horizontal.3")
                             .font(.body)
@@ -1346,8 +1382,11 @@ struct AudioPluginMixerView: View {
             // 第二行：控制按钮和 Mix 滑块（仅在有插件时显示）
             if let plugin {
                 HStack(spacing: 8) {
-                    Button(plugin.bypassed ? NSLocalizedString("Off", comment: "") : NSLocalizedString("On", comment: "")) {
+                    Button {
                         toggleBypass(at: slotIndex)
+                    } label: {
+                        Text(plugin.bypassed ? NSLocalizedString("Off", comment: "") : NSLocalizedString("On", comment: ""))
+                            .frame(minWidth: 28, minHeight: 18)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -1357,6 +1396,7 @@ struct AudioPluginMixerView: View {
                     } label: {
                         Image(systemName: "chevron.up")
                             .font(.caption2)
+                            .frame(width: 22, height: 18)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -1367,6 +1407,7 @@ struct AudioPluginMixerView: View {
                     } label: {
                         Image(systemName: "chevron.down")
                             .font(.caption2)
+                            .frame(width: 22, height: 18)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -1375,31 +1416,21 @@ struct AudioPluginMixerView: View {
                     Slider(
                         value: Binding(
                             get: { Double(plugin.stageGain * 100.0) },
-                            set: { updateMixLevel(at: slotIndex, newValue: Float($0 / 100.0)) }
+                            set: { updateMixLevel(at: slotIndex, newValue: Float($0 / 100.0), commit: false) }
                         ),
-                        in: 0...100
+                        in: 0...100,
+                        onEditingChanged: { editing in
+                            if !editing {
+                                commitMixLevel(at: slotIndex)
+                            }
+                        }
                     )
+                    .frame(maxWidth: 110)
 
                     Text("\(Int((plugin.stageGain * 100.0).rounded()))%")
                         .font(.caption2.monospacedDigit())
                         .foregroundColor(.secondary)
                         .frame(width: 34, alignment: .trailing)
-
-                    // Sidechain source picker (only visible if AU has sidechain bus)
-                    if auHasSidechainInput(plugin: plugin, trackKey: selectedTrackKey) {
-                        HStack(spacing: 4) {
-                            Text("SC")
-                                .font(.caption2)
-                                .foregroundStyle(plugin.sidechainSourceKey != nil && !plugin.sidechainSourceKey!.isEmpty ? .orange : .secondary)
-                            Picker("", selection: sidechainBinding(for: plugin, trackKey: selectedTrackKey)) {
-                                ForEach(availableSidechainSources(for: selectedTrackKey, selectedSourceKey: plugin.sidechainSourceKey), id: \.key) { source in
-                                    Text(source.label).tag(source.key)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(width: 100)
-                        }
-                    }
                 }
             }
         }
@@ -1412,6 +1443,50 @@ struct AudioPluginMixerView: View {
     }
 
     // MARK: - Plugin Select Menu (共用)
+
+    private func sidechainSourcePicker(for plugin: TrackPlugin, trackKey: String, width: CGFloat) -> some View {
+        let sources = availableSidechainSources(for: trackKey, selectedSourceKey: plugin.sidechainSourceKey)
+        let selectedKey = plugin.sidechainSourceKey ?? ""
+        let selectedLabel = sources.first(where: { $0.key == selectedKey })?.label ?? NSLocalizedString("None", comment: "")
+
+        return Menu {
+            ForEach(sources, id: \.key) { source in
+                Button {
+                    setSidechainSource(source.key.isEmpty ? nil : source.key, forPlugin: plugin, trackKey: trackKey)
+                } label: {
+                    HStack {
+                        Text(source.label)
+                        if source.key == selectedKey {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text("SC")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(selectedKey.isEmpty ? Color.secondary : Color.orange)
+                Text(selectedLabel)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: width, alignment: .leading)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.secondary.opacity(0.12))
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize(horizontal: true, vertical: false)
+    }
 
     @ViewBuilder
     private func pluginSelectMenu(slotIndex: Int, plugin: TrackPlugin?, minWidth: CGFloat, compact: Bool = false) -> some View {
@@ -2002,11 +2077,11 @@ struct AudioPluginMixerView: View {
         return au.auAudioUnit.inputBusses.count > 1
     }
 
-    /// Builds the list of available sidechain sources from incoming sidechain sends only.
+    /// Builds the list of available sidechain sources from incoming sends.
     private func availableSidechainSources(for trackKey: String, selectedSourceKey: String?) -> [(key: String, label: String)] {
         var sources: [(key: String, label: String)] = [("", "None")]
 
-        for route in incomingSendRoutes(forDestinationTrackKey: trackKey, mode: .sidechain) {
+        for route in incomingSendRoutes(forDestinationTrackKey: trackKey) {
             guard let routingKey = routingSourceKey(forTrackKey: route.source) else { continue }
             sources.append((routingKey, trackLabel(forTrackKey: route.source)))
         }
@@ -2021,7 +2096,7 @@ struct AudioPluginMixerView: View {
     }
 
     private func validSidechainRoutingKeys(forDestinationTrackKey trackKey: String) -> Set<String> {
-        Set(incomingSendRoutes(forDestinationTrackKey: trackKey, mode: .sidechain).compactMap { route in
+        Set(incomingSendRoutes(forDestinationTrackKey: trackKey).compactMap { route in
             routingSourceKey(forTrackKey: route.source)
         })
     }
@@ -2039,26 +2114,15 @@ struct AudioPluginMixerView: View {
 
     private func setSidechainSource(_ sourceKey: String?, forPlugin plugin: TrackPlugin, trackKey: String) {
         if isSharedManagedTrack(trackKey) {
-            if plugin.sidechainSourceKey != sourceKey {
-                closePluginEditorIfNeeded(for: plugin, trackKey: trackKey)
-                clearPluginEditorCache(for: plugin, trackKey: trackKey)
-            }
             AudioPluginRackManager.shared.setSidechainSource(sourceKey, forPluginID: plugin.id, inTrack: trackKey)
             refreshSharedManagedTrackState()
             return
         }
 
-        let previousSourceKey = plugin.sidechainSourceKey
         mutateSelectedTrackChain { chain in
             guard let index = chain.firstIndex(where: { $0.id == plugin.id }) else { return }
             chain[index].sidechainSourceKey = sourceKey
         }
-        reloadAudioUnitForSidechainChangeIfNeeded(
-            pluginID: plugin.id,
-            trackKey: trackKey,
-            previousSourceKey: previousSourceKey,
-            newSourceKey: sourceKey
-        )
     }
 
     private func mutateSelectedTrackChain(_ update: (inout [TrackPlugin]) -> Void) {
@@ -2227,7 +2291,6 @@ struct AudioPluginMixerView: View {
         }
 
         let existing = pluginAtSlot(slotIndex)
-        let reopenEditorAfterReplace = existing.map { pluginEditorWasOpen(for: $0, trackKey: selectedTrackKey) } ?? false
         if let existing {
             closePluginEditorIfNeeded(for: existing, trackKey: selectedTrackKey)
         }
@@ -2370,22 +2433,50 @@ struct AudioPluginMixerView: View {
         }
     }
 
-    private func updateMixLevel(at index: Int, newValue: Float) {
+    private func updateMixLevel(at index: Int, newValue: Float, commit: Bool) {
+        let clampedValue = min(max(newValue, 0.0), 1.0)
+
         if isSharedManagedTrack(selectedTrackKey) {
             guard selectedTrackChain.indices.contains(index) else { return }
             let plugin = selectedTrackChain[index]
             AudioPluginRackManager.shared.setPluginStageGain(
                 trackKey: selectedTrackKey,
                 pluginID: plugin.id,
-                stageGain: min(max(newValue, 0.0), 1.0)
+                stageGain: clampedValue,
+                persist: commit
             )
-            refreshSharedManagedTrackState()
+            updateLocalMixMirror(at: index, newValue: clampedValue)
             return
         }
-        mutateSelectedTrackChain { chain in
-            guard chain.indices.contains(index) else { return }
-            chain[index].stageGain = min(max(newValue, 0.0), 1.0)
+
+        guard var chain = pluginChainByTrack[selectedTrackKey],
+              chain.indices.contains(index),
+              abs(chain[index].stageGain - clampedValue) > 0.0001 || commit else {
+            return
         }
+
+        chain[index].stageGain = clampedValue
+        pluginChainByTrack[selectedTrackKey] = chain
+        applyLivePreviewForTrackKey(selectedTrackKey)
+
+        if commit {
+            savePluginChainState()
+        }
+    }
+
+    private func commitMixLevel(at index: Int) {
+        guard selectedTrackChain.indices.contains(index) else { return }
+        updateMixLevel(at: index, newValue: selectedTrackChain[index].stageGain, commit: true)
+    }
+
+    private func updateLocalMixMirror(at index: Int, newValue: Float) {
+        guard var chain = pluginChainByTrack[selectedTrackKey],
+              chain.indices.contains(index),
+              abs(chain[index].stageGain - newValue) > 0.0001 else {
+            return
+        }
+        chain[index].stageGain = newValue
+        pluginChainByTrack[selectedTrackKey] = chain
     }
 
     private func loadPersistedAudioUnits() async {
@@ -2702,10 +2793,16 @@ struct AudioPluginMixerView: View {
             return
         }
 
+        let previousDestinations = Set(trackSendRoutesBySource[sourceTrackKey]?.map(\.destination) ?? [])
         AudioPluginRackManager.shared.setSendMode(mode, from: sourceTrackKey, to: destinationTrackKey)
         trackSendRoutesBySource = AudioPluginRackManager.shared.trackSendRoutesBySource
+        let newDestinations = Set(trackSendRoutesBySource[sourceTrackKey]?.map(\.destination) ?? [])
+        let affectedDestinations = previousDestinations.union(newDestinations).union([destinationTrackKey])
         syncSidetoneToggleFromTrackSends(sourceTrackKey: sourceTrackKey)
         syncAllTrackSendRouting()
+        for destination in affectedDestinations {
+            syncAudioUnitDSPChainForTrackKey(destination)
+        }
     }
 
     private func syncTrackSendRoutingForTrackKey(_ key: String) {
@@ -2779,17 +2876,6 @@ struct AudioPluginMixerView: View {
     private func allTrackKeys() -> [String] {
         var keys: [String] = ["input", "sidetone", "masterBus1", "masterBus2"]
         keys.append(contentsOf: hearableUsers.map { "remoteUser:\($0.id)" })
-        for key in pluginChainByTrack.keys where !keys.contains(key) {
-            keys.append(key)
-        }
-        for key in trackSendRoutesBySource.keys where !keys.contains(key) {
-            keys.append(key)
-        }
-        for routes in trackSendRoutesBySource.values {
-            for key in routes.map(\.destination) where !keys.contains(key) {
-                keys.append(key)
-            }
-        }
         return keys
     }
 
@@ -2949,6 +3035,18 @@ struct AudioPluginMixerView: View {
         }
 
 #if os(macOS)
+        let (unitOut, errorOut) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
+            AVAudioUnit.instantiate(with: description, options: [.loadOutOfProcess]) { unit, error in
+                c.resume(returning: (unit, error as NSError?))
+            }
+        }
+
+        if let unitOut, self.configureAudioUnit(unitOut, format: format) {
+            self.loadedAudioUnits[loadedKey] = unitOut
+            NSLog("MKAudio: AU loaded successfully with %lu channels (loadOutOfProcess)", UInt(channels))
+            return nil
+        }
+
         let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
             AVAudioUnit.instantiate(with: description, options: []) { unit, error in
                 c.resume(returning: (unit, error as NSError?))
@@ -2974,19 +3072,7 @@ struct AudioPluginMixerView: View {
             return nil
         }
 
-        let (unitOut, errorOut) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
-            AVAudioUnit.instantiate(with: description, options: [.loadOutOfProcess]) { unit, error in
-                c.resume(returning: (unit, error as NSError?))
-            }
-        }
-
-        if let unitOut, self.configureAudioUnit(unitOut, format: format) {
-            self.loadedAudioUnits[loadedKey] = unitOut
-            NSLog("MKAudio: AU loaded successfully with %lu channels (loadOutOfProcess)", UInt(channels))
-            return nil
-        }
-
-        let finalError = (errorDefault ?? errorIn ?? errorOut)
+        let finalError = (errorOut ?? errorDefault ?? errorIn)
         if finalError?.domain == NSOSStatusErrorDomain, finalError?.code == -3000 {
             return NSLocalizedString("Audio Unit host compatibility error (-3000). Try another AU or restart audio engine.", comment: "")
         }
@@ -3227,36 +3313,6 @@ struct AudioPluginMixerView: View {
         }
         pluginOperationMessage = String(format: NSLocalizedString("Unloaded %@", comment: ""), plugin.name)
         rebuildProcessorStateMachine()
-    }
-
-    private func reloadAudioUnitForSidechainChangeIfNeeded(
-        pluginID: String,
-        trackKey: String,
-        previousSourceKey: String?,
-        newSourceKey: String?
-    ) {
-#if os(macOS)
-        guard previousSourceKey != newSourceKey,
-              let plugin = findPlugin(withID: pluginID, trackKey: trackKey),
-              plugin.source == .audioUnit else {
-            return
-        }
-
-        let loadedKey = loadedAudioUnitKey(trackKey: trackKey, pluginID: pluginID)
-        guard let unit = loadedAudioUnits[loadedKey],
-              unit.auAudioUnit.inputBusses.count > 1 else {
-            return
-        }
-
-        let reopenEditor = pluginEditorWasOpen(for: plugin, trackKey: trackKey)
-        Task { @MainActor in
-            unloadAudioUnit(for: plugin)
-            guard await loadAudioUnit(for: plugin) else { return }
-            if reopenEditor {
-                openPluginEditor(for: plugin)
-            }
-        }
-#endif
     }
 
     private func trackKey(containingPluginID pluginID: String) -> String? {
@@ -3596,10 +3652,18 @@ struct AudioPluginMixerView: View {
         pluginOperationMessage = String(format: NSLocalizedString("Preset '%@' deleted", comment: ""), preset.name)
     }
 
-    private func refreshRemoteSessionOrder() {
+    private func refreshLiveTrackState(force: Bool = false) {
+        if let manager = ServerModelManager.shared {
+            listeningChannelIds = manager.listeningChannels
+        }
+        refreshRemoteSessionOrder(force: force)
+    }
+
+    private func refreshRemoteSessionOrder(force: Bool = false) {
         let sessions = MKAudio.shared().copyRemoteSessionOrder().map { $0.intValue }
+        let didChange = sessions != remoteSessionOrder
         remoteSessionOrder = sessions
-        refreshHearableUsers()
+        refreshHearableUsers(force: force || didChange)
     }
 
     /// 从 ServerModelManager 同步当前监听频道（Mixer 独立窗口无 EnvironmentObject）
@@ -3615,7 +3679,7 @@ struct AudioPluginMixerView: View {
         for num in addChannels {
             listeningChannelIds.insert(num.uintValue)
         }
-        refreshHearableUsers()
+        refreshLiveTrackState(force: true)
     }
 
     private func handleListeningChannelRemove(_ notification: Notification) {
@@ -3626,15 +3690,16 @@ struct AudioPluginMixerView: View {
         for num in removeChannels {
             listeningChannelIds.remove(num.uintValue)
         }
-        refreshHearableUsers()
+        refreshLiveTrackState(force: true)
     }
 
     /// 从 ServerModel 获取所有可听见的用户（同频道 + 监听频道），构建 session↔hash 映射
-    private func refreshHearableUsers() {
+    private func refreshHearableUsers(force: Bool = false) {
         let previousSessions = Set(sessionToHash.keys)
 
         guard let serverModel = MUConnectionController.shared()?.serverModel,
               let connectedUser = serverModel.connectedUser() else {
+            let hadUsers = !hearableUsers.isEmpty || !sessionToHash.isEmpty || !hashToSession.isEmpty
             hearableUsers = []
             sessionToHash = [:]
             hashToSession = [:]
@@ -3642,6 +3707,9 @@ struct AudioPluginMixerView: View {
                 MKAudio.shared().setRemoteTrackUsesSendRouting(false, forSession: session)
                 MKAudio.shared().setRemoteTrackSendBusMask(0, forSession: session)
                 MKAudio.shared().setBusAssignment(0, forSession: session)
+            }
+            if force || hadUsers {
+                syncAllTrackSendRouting()
             }
             return
         }
@@ -3679,11 +3747,20 @@ struct AudioPluginMixerView: View {
             }
         }
 
+        let removedSessions = previousSessions.subtracting(newSessionToHash.keys)
+        let usersChanged =
+            force ||
+            users != hearableUsers ||
+            newSessionToHash != sessionToHash ||
+            newHashToSession != hashToSession ||
+            !removedSessions.isEmpty
+
+        guard usersChanged else { return }
+
         hearableUsers = users
         sessionToHash = newSessionToHash
         hashToSession = newHashToSession
 
-        let removedSessions = previousSessions.subtracting(newSessionToHash.keys)
         for session in removedSessions {
             MKAudio.shared().setRemoteTrackUsesSendRouting(false, forSession: session)
             MKAudio.shared().setRemoteTrackSendBusMask(0, forSession: session)

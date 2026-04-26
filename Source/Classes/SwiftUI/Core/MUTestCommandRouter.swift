@@ -777,7 +777,7 @@ final class MUTestCommandRouter {
             guard let source = params["source"] as? String else { throw TestCommandError("Missing 'source'") }
             let selection = try requireTrackPlugin(params)
             let sourceKey = source == "none" ? nil : source
-            await manager.setSidechainSource(sourceKey, forPluginID: selection.plugin.id, inTrack: trackKey)
+            manager.setSidechainSource(sourceKey, forPluginID: selection.plugin.id, inTrack: trackKey)
             return ["trackKey": trackKey, "pluginID": selection.plugin.id, "sidechainSource": source]
 
         case "getSidechain":

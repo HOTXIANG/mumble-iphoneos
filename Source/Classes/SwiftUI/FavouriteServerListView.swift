@@ -136,7 +136,8 @@ struct FavouriteServerRowView: View {
         .modifier(
             ClearGlassModifier(
                 cornerRadius: rowCornerRadius,
-                lightTintOpacity: colorScheme == .light ? 0.0 : 0.12,
+                lightTintColor: .white,
+                lightTintOpacity: colorScheme == .light ? 0.18 : 0.12,
                 lightFallbackOverlayOpacity: colorScheme == .light ? 0.0 : 0.05,
                 lightShadowOpacity: 0.16,
                 lightShadowRadius: 10,
@@ -145,7 +146,7 @@ struct FavouriteServerRowView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous)
-                .fill(colorScheme == .light ? Color.white.opacity(0.08) : Color.clear)
+                .fill(colorScheme == .light ? Color.white.opacity(0.16) : Color.clear)
         )
         #else
         .modifier(ClearGlassModifier(cornerRadius: rowCornerRadius))

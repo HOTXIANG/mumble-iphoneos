@@ -321,6 +321,15 @@ struct MumbleMenuCommands: Commands {
         
         // 移除 View 菜单中的 "Show Tab Bar" 和 "Show All Tabs"
         CommandGroup(replacing: .toolbar) {}
+
+        CommandGroup(after: .appSettings) {
+            Button {
+                AudioPluginMixerWindowController.shared.showWindow()
+            } label: {
+                Label("Audio Plugin Mixer", systemImage: "slider.horizontal.3")
+            }
+            .keyboardShortcut("m", modifiers: [.command, .option])
+        }
         
         // "Server" 菜单
         CommandMenu("Server") {
@@ -456,6 +465,7 @@ struct WindowMinSizeSetter: NSViewRepresentable {
             self.autosaveName = autosaveName
         }
 
+        @MainActor
         @objc func mainWindowWillClose(_ notification: Notification) {
             if let window = notification.object as? NSWindow {
                 window.saveFrame(usingName: autosaveName)

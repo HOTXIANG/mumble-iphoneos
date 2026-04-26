@@ -25,6 +25,19 @@ struct PreferencesView: View {
         AppColorSchemeOption.normalized(from: appColorSchemeRawValue)
     }
 
+    private func automationBinding(for destination: AutomationDestination) -> Binding<Bool> {
+        Binding(
+            get: { automationDestination == destination },
+            set: { isPresented in
+                if isPresented {
+                    automationDestination = destination
+                } else if automationDestination == destination {
+                    automationDestination = nil
+                }
+            }
+        )
+    }
+
     @ViewBuilder
     private var preferencesContent: some View {
         Section(header: Text("General")) {
@@ -95,36 +108,28 @@ struct PreferencesView: View {
                 .padding(.vertical, 4)
             }
 
-            NavigationLink(
-                destination: AudioTransmissionSettingsView(),
-                tag: .audioTransmissionSettings,
-                selection: $automationDestination
-            ) {
+            NavigationLink {
+                AudioTransmissionSettingsView()
+            } label: {
                 Label("Input Setting", systemImage: "mic")
             }
 
-            NavigationLink(
-                destination: AdvancedAudioSettingsView(),
-                tag: .advancedAudioSettings,
-                selection: $automationDestination
-            ) {
+            NavigationLink {
+                AdvancedAudioSettingsView()
+            } label: {
                 Label("Advanced & Network", systemImage: "slider.horizontal.3")
             }
         }
 
         Section(header: Text("Notifications")) {
-            NavigationLink(
-                destination: NotificationSettingsView(),
-                tag: .notificationSettings,
-                selection: $automationDestination
-            ) {
+            NavigationLink {
+                NotificationSettingsView()
+            } label: {
                 Label("Push Notifications", systemImage: "bell.badge")
             }
-            NavigationLink(
-                destination: TTSSettingsView(),
-                tag: .ttsSettings,
-                selection: $automationDestination
-            ) {
+            NavigationLink {
+                TTSSettingsView()
+            } label: {
                 Label("Text-to-Speech", systemImage: "waveform")
             }
         }
@@ -137,30 +142,24 @@ struct PreferencesView: View {
             Toggle("Sync Local User Volume on Handoff", isOn: $handoffSyncLocalAudioSettings)
         }
 
-        NavigationLink(
-            destination: CertificatePreferencesView(),
-            tag: .certificateSettings,
-            selection: $automationDestination
-        ) {
+        NavigationLink {
+            CertificatePreferencesView()
+        } label: {
             Label("Certificates", systemImage: "checkmark.shield")
         }
 
         Section(header: Text("Developer")) {
-            NavigationLink(
-                destination: LogSettingsView(),
-                tag: .logSettings,
-                selection: $automationDestination
-            ) {
+            NavigationLink {
+                LogSettingsView()
+            } label: {
                 Label("Logging", systemImage: "ladybug")
             }
         }
 
         Section {
-            NavigationLink(
-                destination: AboutView(),
-                tag: .about,
-                selection: $automationDestination
-            ) {
+            NavigationLink {
+                AboutView()
+            } label: {
                 Label("About Mumble", systemImage: "info.circle")
             }
         } footer: {
@@ -185,6 +184,27 @@ struct PreferencesView: View {
         .modifier(SettingsColorSchemeOverrideModifier(option: selectedAppColorScheme))
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: automationBinding(for: .audioTransmissionSettings)) {
+            AudioTransmissionSettingsView()
+        }
+        .navigationDestination(isPresented: automationBinding(for: .advancedAudioSettings)) {
+            AdvancedAudioSettingsView()
+        }
+        .navigationDestination(isPresented: automationBinding(for: .notificationSettings)) {
+            NotificationSettingsView()
+        }
+        .navigationDestination(isPresented: automationBinding(for: .ttsSettings)) {
+            TTSSettingsView()
+        }
+        .navigationDestination(isPresented: automationBinding(for: .certificateSettings)) {
+            CertificatePreferencesView()
+        }
+        .navigationDestination(isPresented: automationBinding(for: .logSettings)) {
+            LogSettingsView()
+        }
+        .navigationDestination(isPresented: automationBinding(for: .about)) {
+            AboutView()
+        }
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button("Done") {

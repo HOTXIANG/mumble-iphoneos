@@ -57,15 +57,29 @@ struct WelcomeContentView: View {
     #endif
 
     private var logoBlockShadowColor: Color {
-        colorScheme == .light ? .black.opacity(0.46) : .black.opacity(0.22)
+        .black.opacity(0.22)
     }
 
     private var logoBlockShadowRadius: CGFloat {
-        colorScheme == .light ? 40 : 14
+        14
     }
 
     private var logoBlockShadowYOffset: CGFloat {
-        colorScheme == .light ? 8 : 6
+        6
+    }
+
+    private var preferredLogoName: String {
+        colorScheme == .light ? "TransparentLogoPurpleGlass" : "TransparentLogoDarkGlass"
+    }
+
+    private var logoGlowColor: Color {
+        colorScheme == .light
+            ? Color(red: 0.55, green: 0.50, blue: 1.0).opacity(0.16)
+            : Color.white.opacity(0.18)
+    }
+
+    private var logoGlowRadius: CGFloat {
+        colorScheme == .light ? 7 : 9
     }
 
     private var recentConnectionsRowBackground: AnyView {
@@ -91,15 +105,19 @@ struct WelcomeContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Ellipse()
-                    .fill(logoBlockShadowColor)
-                    .frame(width: logoShadowWidth, height: logoShadowHeight)
-                    .blur(radius: logoBlockShadowRadius)
-                    .offset(y: logoBlockShadowYOffset)
-                Image("TransparentLogo")
+                if colorScheme == .dark {
+                    Ellipse()
+                        .fill(logoBlockShadowColor)
+                        .frame(width: logoShadowWidth, height: logoShadowHeight)
+                        .blur(radius: logoBlockShadowRadius)
+                        .offset(y: logoBlockShadowYOffset)
+                }
+                Image(preferredLogoName)
                     .resizable()
                     .scaledToFit()
                     .frame(width: logoSize, height: logoSize)
+                    .shadow(color: logoGlowColor, radius: logoGlowRadius, x: 0, y: 0)
+                    .shadow(color: logoGlowColor.opacity(0.30), radius: logoGlowRadius * 0.35, x: 0, y: 0)
             }
                 .padding(.top, 8)
                 .padding(.bottom, 10)
@@ -913,10 +931,72 @@ private struct VADOnboardingSplashView: View {
     #endif
 }
 
-#if os(macOS)
-private enum SplitWidthBucket: Equatable {
-    case narrow
-    case wide
+private struct SplitViewOverlayBehaviorConfigurator: View {
+    let isOverlayEnabled: Bool
+
+    var body: some View {
+        #if os(iOS)
+        SplitViewOverlayBehaviorUIView(isOverlayEnabled: isOverlayEnabled)
+        #else
+        EmptyView()
+        #endif
+    }
+}
+
+#if os(iOS)
+private struct SplitViewOverlayBehaviorUIView: UIViewRepresentable {
+    let isOverlayEnabled: Bool
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        configure(from: view, isOverlayEnabled: isOverlayEnabled)
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        configure(from: uiView, isOverlayEnabled: isOverlayEnabled)
+    }
+
+    private func configure(from view: UIView, isOverlayEnabled: Bool, attempt: Int = 0) {
+        DispatchQueue.main.async {
+            guard let splitViewController = view.enclosingSplitViewController else {
+                if attempt < 12 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        configure(from: view, isOverlayEnabled: isOverlayEnabled, attempt: attempt + 1)
+                    }
+                }
+                return
+            }
+
+            let preferredBehavior: UISplitViewController.SplitBehavior = isOverlayEnabled ? .overlay : .tile
+            if splitViewController.preferredSplitBehavior != preferredBehavior {
+                splitViewController.preferredSplitBehavior = preferredBehavior
+            }
+        }
+    }
+}
+
+private extension UIView {
+    var enclosingSplitViewController: UISplitViewController? {
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let splitViewController = current as? UISplitViewController {
+                return splitViewController
+            }
+            if let viewController = current as? UIViewController {
+                var parent = viewController.parent
+                while let candidate = parent {
+                    if let splitViewController = candidate as? UISplitViewController {
+                        return splitViewController
+                    }
+                    parent = candidate.parent
+                }
+            }
+            responder = current.next
+        }
+        return nil
+    }
 }
 #endif
 
@@ -936,20 +1016,22 @@ struct AppRootView: View {
     // iPad 使用的侧边栏导航管理器 (让 Detail 独立变化)
     @StateObject private var sidebarNavigationManager = NavigationManager()
     @StateObject private var channelNavigationManager = NavigationManager()
- 
+
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     #if os(macOS)
-    @State private var splitVisibility: NavigationSplitViewVisibility = MacMainWindowConfiguration.initialSplitVisibility
+    @State private var splitVisibility: NavigationSplitViewVisibility = .detailOnly
+    @State private var macSplitLayoutWidth: CGFloat = 0
+    @State private var pendingMacSidebarOpenWorkItem: DispatchWorkItem?
     #else
-    @State private var splitVisibility: NavigationSplitViewVisibility = .automatic
+    @State private var splitVisibility: NavigationSplitViewVisibility = .all
     #endif
+
     #if os(macOS)
-    @State private var lastSplitWidthBucket: SplitWidthBucket?
-    #endif
-    #if os(iOS)
-    private let narrowWindowThreshold: CGFloat = 700
-    #else
-    private let narrowWindowThreshold: CGFloat = MacMainWindowConfiguration.narrowWindowThreshold
+    private let macProjectedSidebarWidth: CGFloat = 340
+    private let macChannelSplitThreshold: CGFloat = 624
+    private let macSidebarOpenDelayAfterCompact: TimeInterval = 0.06
+    private let macSidebarOpenLayoutSuppressionDuration: TimeInterval = 0.36
+    private let macSidebarCloseLayoutSuppressionDuration: TimeInterval = 0.28
     #endif
 
     private var selectedAppColorScheme: AppColorSchemeOption {
@@ -1257,122 +1339,189 @@ struct AppRootView: View {
     // MARK: - iPad Split View Layout
     
     var iPadLayout: some View {
+        iPadOverlaySplitLayout
+    }
+
+    private var iPadOverlaySplitLayout: some View {
         GeometryReader { geo in
-            iPadSplitView(geo: geo)
+            splitLayout
+                .onAppear {
+                    updateMacSplitLayoutWidth(geo.size.width)
+                }
+                .onChange(of: geo.size.width) { _, width in
+                    updateMacSplitLayoutWidth(width)
+                }
         }
     }
 
-    private func iPadSplitView(geo: GeometryProxy) -> some View {
-        NavigationSplitView(columnVisibility: $splitVisibility, preferredCompactColumn: $preferredCompactColumn) {
-            NavigationStack(path: $sidebarNavigationManager.navigationPath) {
-                WelcomeView()
-                    .navigationDestination(for: NavigationDestination.self) { destination in
-                        destinationView(for: destination, navigationManager: sidebarNavigationManager)
-                            .environmentObject(sidebarNavigationManager)
-                    }
-                    .background(Color.clear)
-            }
-            .environmentObject(sidebarNavigationManager)
-            .background(Color.clear)
-            .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
+    private var splitLayout: some View {
+        NavigationSplitView(columnVisibility: splitVisibilityBinding, preferredCompactColumn: $preferredCompactColumn) {
+            sidebarNavigationStack
         } detail: {
-            ZStack {
-                if appState.isConnected {
-                    NavigationStack {
-                        ChannelListView()
-                            .environmentObject(channelNavigationManager)
-                    }
-                } else {
-                    ContentUnavailableView {
-                        Label(NSLocalizedString("No Server Connected", comment: ""), systemImage: "server.rack")
-                    } description: {
-                        Text(NSLocalizedString("Select a server from the sidebar to start chatting.", comment: ""))
-                    }
+            detailContent
+        }
+            .navigationSplitViewStyle(.prominentDetail)
+            .background(SplitViewOverlayBehaviorConfigurator(isOverlayEnabled: appState.isConnected))
+            .onAppear {
+                preferredCompactColumn = appState.isConnected ? .detail : .sidebar
+                #if os(macOS)
+                guard !appState.isConnected else {
+                    setSplitVisibility(.detailOnly, animated: false)
+                    return
                 }
+
+                setSplitVisibility(.detailOnly, animated: false)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    guard !appState.isConnected else { return }
+                    setSplitVisibility(.all, animated: true)
+                }
+                #else
+                setSplitVisibility(appState.isConnected ? .detailOnly : .all)
+                #endif
+            }
+            .onChange(of: appState.isConnected) { _, isConnected in
+                preferredCompactColumn = isConnected ? .detail : .sidebar
+                setSplitVisibility(isConnected ? .detailOnly : .all, animated: true)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.clear)
-        }
-        .onChange(of: appState.isConnected) { _, isConnected in
-            preferredCompactColumn = isConnected ? .detail : .sidebar
-            handleConnectionStateChange(isConnected: isConnected, width: geo.size.width)
-        }
-        .onChange(of: geo.size.width) { _, width in
-            updateSplitVisibility(width: width, connectionChanged: false)
-        }
-        .onAppear {
-            if appState.isConnected {
-                preferredCompactColumn = .detail
+    }
+
+    private var splitVisibilityBinding: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { splitVisibility },
+            set: { requestedVisibility in
+                handleSplitVisibilityRequest(requestedVisibility)
             }
-            updateSplitVisibility(width: geo.size.width, connectionChanged: false)
+        )
+    }
+
+    private var sidebarNavigationStack: some View {
+        NavigationStack(path: $sidebarNavigationManager.navigationPath) {
+            WelcomeView()
+                .navigationDestination(for: NavigationDestination.self) { destination in
+                    destinationView(for: destination, navigationManager: sidebarNavigationManager)
+                        .environmentObject(sidebarNavigationManager)
+                }
+                .background(Color.clear)
         }
-        #if os(iOS)
-        .navigationSplitViewStyle(.balanced)
-        #else
-        .navigationSplitViewStyle(.balanced)
-        #endif
+        .environmentObject(sidebarNavigationManager)
+        .background(Color.clear)
+        .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
+    }
+
+    private var detailContent: some View {
+        ZStack {
+            if appState.isConnected {
+                NavigationStack {
+                    ChannelListView()
+                        .environmentObject(channelNavigationManager)
+                }
+            } else {
+                ContentUnavailableView {
+                    Label(NSLocalizedString("No Server Connected", comment: ""), systemImage: "server.rack")
+                } description: {
+                    Text(NSLocalizedString("Select a server from the sidebar to start chatting.", comment: ""))
+                }
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
     }
 
-    private func handleConnectionStateChange(isConnected: Bool, width: CGFloat) {
-        #if os(macOS)
-        if isConnected {
-            updateSplitVisibility(width: width, connectionChanged: true)
-            return
-        }
-
-        // Let the disconnected placeholder replace the channel view first.
-        // Otherwise AppKit may preserve the old detail width and expand the window
-        // by the sidebar width during the same layout pass.
-        DispatchQueue.main.async {
-            guard !appState.isConnected else { return }
-            updateSplitVisibility(width: width, connectionChanged: true)
-        }
-        #else
-        updateSplitVisibility(width: width, connectionChanged: true)
-        #endif
-    }
-
-    private func updateSplitVisibility(width: CGFloat, connectionChanged: Bool) {
-        #if os(iOS)
-        if appState.isConnected {
-            if width < 960 {
-                setSplitVisibility(.detailOnly)
-            } else if connectionChanged {
-                setSplitVisibility(.detailOnly)
-            }
-        } else if connectionChanged {
-            setSplitVisibility(.all)
-        }
-        #else
-        let widthBucket: SplitWidthBucket = width < narrowWindowThreshold ? .narrow : .wide
-        if !connectionChanged && lastSplitWidthBucket == widthBucket {
-            return
-        }
-        lastSplitWidthBucket = widthBucket
-
-        if widthBucket == .narrow {
-            setSplitVisibility(appState.isConnected ? .detailOnly : .automatic)
-        } else if splitVisibility != .all {
-            setSplitVisibility(.all)
-        }
-        #endif
-    }
-
-    private func setSplitVisibility(_ visibility: NavigationSplitViewVisibility) {
+    private func setSplitVisibility(_ visibility: NavigationSplitViewVisibility, animated: Bool = true) {
         guard splitVisibility != visibility else { return }
 
         #if os(macOS)
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            splitVisibility = visibility
+        if animated {
+            withAnimation(.easeInOut(duration: 0.26)) {
+                splitVisibility = visibility
+            }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                splitVisibility = visibility
+            }
         }
         #else
-        splitVisibility = visibility
+        if animated {
+            withAnimation(.easeInOut(duration: 0.22)) {
+                splitVisibility = visibility
+            }
+        } else {
+            splitVisibility = visibility
+        }
         #endif
     }
+
+    private func handleSplitVisibilityRequest(_ requestedVisibility: NavigationSplitViewVisibility) {
+        #if os(macOS)
+        cancelPendingMacSidebarOpen()
+
+        if shouldPrecompactBeforeOpeningMacSidebar(requestedVisibility: requestedVisibility) {
+            NotificationCenter.default.post(
+                name: .muChannelForceCompactLayout,
+                object: nil,
+                userInfo: ["duration": macSidebarOpenLayoutSuppressionDuration]
+            )
+
+            let workItem = DispatchWorkItem {
+                setSplitVisibility(.all, animated: true)
+                pendingMacSidebarOpenWorkItem = nil
+            }
+            pendingMacSidebarOpenWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + macSidebarOpenDelayAfterCompact, execute: workItem)
+            return
+        }
+
+        if shouldApplyMacChannelLayoutAfterClosingSidebar(requestedVisibility: requestedVisibility) {
+            NotificationCenter.default.post(
+                name: .muChannelSuppressLayoutUpdates,
+                object: nil,
+                userInfo: [
+                    "duration": macSidebarCloseLayoutSuppressionDuration,
+                    "applyAfter": true
+                ]
+            )
+        }
+        #endif
+
+        setSplitVisibility(requestedVisibility, animated: true)
+    }
+
+    private func updateMacSplitLayoutWidth(_ width: CGFloat) {
+        #if os(macOS)
+        guard width > 0, abs(width - macSplitLayoutWidth) > 0.5 else { return }
+        macSplitLayoutWidth = width
+        #endif
+    }
+
+    #if os(macOS)
+    private func shouldPrecompactBeforeOpeningMacSidebar(requestedVisibility: NavigationSplitViewVisibility) -> Bool {
+        guard appState.isConnected else { return false }
+        guard splitVisibility == .detailOnly else { return false }
+        guard requestedVisibility == .all || requestedVisibility == .automatic else { return false }
+        guard macSplitLayoutWidth > 0 else { return false }
+
+        let projectedDetailWidth = macSplitLayoutWidth - macProjectedSidebarWidth
+        return projectedDetailWidth <= macChannelSplitThreshold
+    }
+
+    private func shouldApplyMacChannelLayoutAfterClosingSidebar(requestedVisibility: NavigationSplitViewVisibility) -> Bool {
+        guard appState.isConnected else { return false }
+        guard splitVisibility != .detailOnly else { return false }
+        guard requestedVisibility == .detailOnly || requestedVisibility == .automatic else { return false }
+        guard macSplitLayoutWidth > 0 else { return false }
+
+        return macSplitLayoutWidth > macChannelSplitThreshold
+    }
+
+    private func cancelPendingMacSidebarOpen() {
+        pendingMacSidebarOpenWorkItem?.cancel()
+        pendingMacSidebarOpenWorkItem = nil
+    }
+    #endif
     
     // MARK: - iPhone Stack Layout
     

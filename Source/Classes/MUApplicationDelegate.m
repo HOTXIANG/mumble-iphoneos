@@ -42,23 +42,25 @@
     NSTimeInterval _lastAudioRestartTime;
 
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
-    return [NSString stringWithFormat:@"%@|%@|%f|%f|%f|%@|%f|%d|%d|%d|%d|%d|%f|%d|%f",
-            [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
-            [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
-            [defaults doubleForKey:@"AudioVADBelow"],
-            [defaults doubleForKey:@"AudioVADAbove"],
-            [defaults doubleForKey:@"AudioVADHoldSeconds"],
-            [defaults stringForKey:@"AudioQualityKind"] ?: @"balanced",
-            [defaults doubleForKey:@"AudioMicBoost"],
-            [defaults boolForKey:@"AudioStereoInput"],
-            [defaults boolForKey:@"AudioStereoOutput"],
-            [defaults boolForKey:@"AudioSpeakerPhoneMode"],
-            [defaults boolForKey:@"AudioOpusCodecForceCELTMode"],
-            [defaults boolForKey:@"AudioMixerDebug"],
-            [defaults boolForKey:@"AudioPluginInputTrackEnabled"],
-            [defaults doubleForKey:@"AudioPluginInputTrackGain"],
-            [defaults boolForKey:@"AudioPluginRemoteBusEnabled"],
-            [defaults doubleForKey:@"AudioPluginRemoteBusGain"]];
+    NSArray<NSString *> *components = @[
+        [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
+        [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
+        @([defaults doubleForKey:@"AudioVADBelow"]).stringValue,
+        @([defaults doubleForKey:@"AudioVADAbove"]).stringValue,
+        @([defaults doubleForKey:@"AudioVADHoldSeconds"]).stringValue,
+        [defaults stringForKey:@"AudioQualityKind"] ?: @"balanced",
+        @([defaults doubleForKey:@"AudioMicBoost"]).stringValue,
+        @([defaults boolForKey:@"AudioStereoInput"]).stringValue,
+        @([defaults boolForKey:@"AudioStereoOutput"]).stringValue,
+        @([defaults boolForKey:@"AudioSpeakerPhoneMode"]).stringValue,
+        @([defaults boolForKey:@"AudioOpusCodecForceCELTMode"]).stringValue,
+        @([defaults boolForKey:@"AudioMixerDebug"]).stringValue,
+        @([defaults boolForKey:@"AudioPluginInputTrackEnabled"]).stringValue,
+        @([defaults doubleForKey:@"AudioPluginInputTrackGain"]).stringValue,
+        @([defaults boolForKey:@"AudioPluginRemoteBusEnabled"]).stringValue,
+        @([defaults doubleForKey:@"AudioPluginRemoteBusGain"]).stringValue,
+    ];
+    return [components componentsJoinedByString:@"|"];
 }
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {

@@ -40,14 +40,30 @@ class PlatformSelectionFeedback {
 
 enum InteractionFeedback {
     static func cancel() {
+        #if os(iOS)
+        Task { @MainActor in
+            let feedback = PlatformImpactFeedback(style: .light)
+            feedback.prepare()
+            feedback.impactOccurred()
+        }
+        #else
         let feedback = PlatformImpactFeedback(style: .light)
         feedback.prepare()
         feedback.impactOccurred()
+        #endif
     }
 
     static func action() {
+        #if os(iOS)
+        Task { @MainActor in
+            let feedback = PlatformImpactFeedback(style: .medium)
+            feedback.prepare()
+            feedback.impactOccurred()
+        }
+        #else
         let feedback = PlatformImpactFeedback(style: .medium)
         feedback.prepare()
         feedback.impactOccurred()
+        #endif
     }
 }

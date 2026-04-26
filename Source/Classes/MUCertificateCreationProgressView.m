@@ -48,11 +48,7 @@
     stackView.layoutMargins = UIEdgeInsetsMake(24.0, 24.0, 24.0, 24.0);
     [rootView addSubview:stackView];
 
-    if (@available(iOS 13.0, *)) {
-        _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
-    } else {
-        _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
-    }
+    _activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     _activityIndicator.translatesAutoresizingMaskIntoConstraints = NO;
     [stackView addArrangedSubview:_activityIndicator];
 

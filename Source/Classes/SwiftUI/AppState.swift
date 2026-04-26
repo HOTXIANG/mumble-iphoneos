@@ -27,6 +27,8 @@ extension Notification.Name {
     static let muAutomationNavigate      = Notification.Name("MUAutomationNavigateNotification")
     static let muAutomationUIStateChanged = Notification.Name("MUAutomationUIStateChangedNotification")
     static let muLogFilePersistenceChanged = Notification.Name("MULogFilePersistenceChangedNotification")
+    static let muChannelForceCompactLayout = Notification.Name("MUChannelForceCompactLayoutNotification")
+    static let muChannelSuppressLayoutUpdates = Notification.Name("MUChannelSuppressLayoutUpdatesNotification")
 
     #if os(macOS)
     static let muMacAudioInputDevicesChanged = Notification.Name("MUMacAudioInputDevicesChanged")
@@ -332,6 +334,7 @@ class AppState: ObservableObject {
                 guard let self = self else { return }
                 let stateName = (notification.userInfo?["stateName"] as? String) ?? "unknown"
                 guard stateName != self.lastUDPTransportStateName else { return }
+                let previousStateName = self.lastUDPTransportStateName
                 self.lastUDPTransportStateName = stateName
 
                 MumbleLogger.connection.info("UDP transport state changed: \(stateName)")
@@ -341,6 +344,7 @@ class AppState: ObservableObject {
                     self.suppressNextUDPAvailableToast = false
                     self.showToast(message: NSLocalizedString("UDP stalled, recovering audio channel...", comment: "UDP stalled status toast"), type: .error)
                 case "recovering":
+                    guard previousStateName == "stalled" else { break }
                     self.suppressNextUDPAvailableToast = false
                     self.showToast(message: NSLocalizedString("Re-establishing UDP channel...", comment: "UDP recovering status toast"), type: .info)
                 case "available":
