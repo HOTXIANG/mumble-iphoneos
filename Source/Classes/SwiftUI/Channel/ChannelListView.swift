@@ -276,8 +276,14 @@ struct ChannelListView: View {
             trailingButtonsContent
         }
         #else
-        ToolbarItem(placement: .primaryAction) {
-            macToolbarControls
+        ToolbarItem(id: "deafen", placement: .primaryAction) {
+            deafenToolbarButton
+        }
+        ToolbarItem(id: "mute", placement: .primaryAction) {
+            muteToolbarButton
+        }
+        ToolbarItem(id: "disconnect", placement: .primaryAction) {
+            disconnectToolbarButton
         }
         #endif
     }
@@ -318,16 +324,6 @@ struct ChannelListView: View {
         serverManager.connectedUserState?.isSelfMuted == true ? "Unmute" : "Mute"
     }
 
-    private var macToolbarControls: some View {
-        HStack(spacing: 4) {
-            deafenToolbarButton
-            muteToolbarButton
-            disconnectToolbarButton
-        }
-        .frame(width: 132, height: 28, alignment: .trailing)
-        .fixedSize(horizontal: true, vertical: true)
-    }
-
     private var deafenToolbarButton: some View {
         Button(action: {
             hapticGenerator.impactOccurred()
@@ -346,6 +342,7 @@ struct ChannelListView: View {
             .frame(width: 40, height: 28)
         }
         .buttonStyle(.borderless)
+        .accessibilityLabel(deafenToolbarTitle)
         .help(deafenToolbarTitle)
     }
 
@@ -369,6 +366,7 @@ struct ChannelListView: View {
             .frame(width: 40, height: 28)
         }
         .buttonStyle(.borderless)
+        .accessibilityLabel(muteToolbarTitle)
         .help(muteToolbarTitle)
     }
 
@@ -384,6 +382,7 @@ struct ChannelListView: View {
                 .frame(width: 40, height: 28)
         }
         .buttonStyle(.borderless)
+        .accessibilityLabel("Disconnect")
         .help("Disconnect")
     }
     #endif

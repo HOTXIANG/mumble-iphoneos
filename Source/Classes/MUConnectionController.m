@@ -21,6 +21,10 @@
 #endif
 @import Security;
 
+@interface MKAudio (MUMuteStateRestore)
+- (void)setSelfMuted:(BOOL)selfMuted;
+@end
+
 NSString *MUConnectionOpenedNotification = @"MUConnectionOpenedNotification";
 NSString *MUConnectionClosedNotification = @"MUConnectionClosedNotification";
 NSString *MUConnectionConnectingNotification = @"MUConnectionConnectingNotification";
@@ -114,12 +118,16 @@ static CFTimeInterval MUMonotonicNow(void) {
     NSInteger       _retryCount; // 重试计数器
     NSDictionary    *_pendingReconnectFailureInfo;
     BOOL            _suppressReconnectForDisconnect;
+    BOOL            _preserveAudioSessionForReconnect;
     CFTimeInterval  _connectFlowStartedAt;
     CFTimeInterval  _socketConnectedAt;
     BOOL            _connectFlowIsReconnect;
     NSInteger       _connectFlowAttempt;
     dispatch_queue_t _audioLifecycleQueue;
     NSUInteger       _audioLifecycleGeneration;
+    BOOL             _hasRestoredMuteState;
+    BOOL             _restoredSelfMuted;
+    BOOL             _restoredSelfDeafened;
 
 #if TARGET_OS_IOS
     UIBackgroundTaskIdentifier _reconnectBackgroundTask;
@@ -142,6 +150,9 @@ static CFTimeInterval MUMonotonicNow(void) {
 - (void) logPerformanceConnectFailureWithTitle:(NSString *)title message:(NSString *)message;
 - (void) startAudioEngineAsyncForGeneration:(NSUInteger)generation;
 - (void) stopAudioEngineAsyncForGeneration:(NSUInteger)generation;
+- (void) loadSavedMuteStateForUsername:(NSString *)username;
+- (void) applyCachedMuteStateToAudio;
+- (BOOL) loadSavedBoolForKey:(NSString *)key value:(BOOL *)value;
 #if TARGET_OS_IOS
 - (void) beginReconnectBackgroundTask;
 - (void) endReconnectBackgroundTask;
@@ -173,16 +184,19 @@ static MUConnectionController *sSharedConnectionController;
         _retryCount = 0;
         _pendingReconnectFailureInfo = nil;
         _suppressReconnectForDisconnect = NO;
+        _preserveAudioSessionForReconnect = NO;
         _connectFlowStartedAt = 0;
         _socketConnectedAt = 0;
         _connectFlowIsReconnect = NO;
         _connectFlowAttempt = 0;
         _audioLifecycleQueue = dispatch_queue_create("cn.hotxiang.Mumble.audioLifecycle", DISPATCH_QUEUE_SERIAL);
+        _hasRestoredMuteState = NO;
+        _restoredSelfMuted = NO;
+        _restoredSelfDeafened = NO;
         _audioLifecycleGeneration = 0;
     #if TARGET_OS_IOS
         _reconnectBackgroundTask = UIBackgroundTaskInvalid;
     #endif
-        [[MKAudio sharedAudio] stop];
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(defaultsDidChange:)
                                                      name:NSUserDefaultsDidChangeNotification
@@ -228,6 +242,7 @@ static MUConnectionController *sSharedConnectionController;
     _retryCount = 0;
     _pendingReconnectFailureInfo = nil;
     _suppressReconnectForDisconnect = NO;
+    _preserveAudioSessionForReconnect = NO;
     [self beginPerformanceConnectFlowIsReconnect:NO attempt:0 reason:@"manual-connect"];
     
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
@@ -250,6 +265,7 @@ static MUConnectionController *sSharedConnectionController;
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
     _isUserInitiatedDisconnect = YES;
     _suppressReconnectForDisconnect = NO;
+    _preserveAudioSessionForReconnect = NO;
     if ([_reconnectTimer isValid]) {
         [_reconnectTimer invalidate];
     }
@@ -342,6 +358,8 @@ static MUConnectionController *sSharedConnectionController;
             if (autoReconnectEnabled && strongSelf->_connection == nil && strongSelf->_hostname != nil && !strongSelf->_isUserInitiatedDisconnect) {
                 MULogInfo(Connection, @"Triggering reconnect due to network restore...");
                 strongSelf->_retryCount = 0;
+                strongSelf->_preserveAudioSessionForReconnect = YES;
+                [strongSelf beginPerformanceConnectFlowIsReconnect:YES attempt:1 reason:@"network-restored"];
                 [strongSelf establishConnection];
                 NSDictionary *info = @{
                     @"isReconnecting": @(YES),
@@ -380,6 +398,8 @@ static MUConnectionController *sSharedConnectionController;
     
     _serverModel = [[MKServerModel alloc] initWithConnection:_connection];
     [_serverModel addDelegate:self];
+    [self loadSavedMuteStateForUsername:_username];
+    [self applyCachedMuteStateToAudio];
     
     if (_certificateRef != nil) {
         // 如果这个服务器有专属证书，就优先使用可认证（含 identity）的证书链
@@ -446,8 +466,22 @@ static MUConnectionController *sSharedConnectionController;
         }
 
         CFTimeInterval startedAt = MUMonotonicNow();
-        MULogInfo(Connection, @"[Async] Starting Audio Engine...");
-        [[MKAudio sharedAudio] restart];
+        MKAudio *audio = [MKAudio sharedAudio];
+        BOOL shouldPreserveRunningAudio = self->_preserveAudioSessionForReconnect && [audio isRunning];
+        if (shouldPreserveRunningAudio) {
+            MULogInfo(Connection, @"[Async] Preserving Audio Engine for reconnect; keeping voice audio session active.");
+        } else {
+            MULogInfo(Connection, @"[Async] Starting Audio Engine...");
+            [audio restart];
+        }
+        self->_preserveAudioSessionForReconnect = NO;
+#if TARGET_OS_IOS
+        if (self->_hasRestoredMuteState) {
+            BOOL targetMuted = self->_restoredSelfMuted || self->_restoredSelfDeafened;
+            NSString *reason = shouldPreserveRunningAudio ? @"audio_engine_preserved_restore_state" : @"audio_engine_started_restore_state";
+            [MUSystemInputMuteBridge applyRestoredMute:targetMuted reason:reason];
+        }
+#endif
         CFTimeInterval elapsedMs = (MUMonotonicNow() - startedAt) * 1000.0;
         MULogDebug(Connection, @"PERF audio_engine_start_async elapsed_ms=%.2f generation=%lu",
               elapsedMs,
@@ -457,6 +491,17 @@ static MUConnectionController *sSharedConnectionController;
 
 - (void) stopAudioEngineAsyncForGeneration:(NSUInteger)generation {
     dispatch_async(_audioLifecycleQueue, ^{
+        NSUInteger currentGeneration = 0;
+        @synchronized (self) {
+            currentGeneration = self->_audioLifecycleGeneration;
+        }
+        if (generation != currentGeneration) {
+            MULogDebug(Connection, @"Skipping stale Audio Engine stop. generation=%lu current=%lu",
+                  (unsigned long)generation,
+                  (unsigned long)currentGeneration);
+            return;
+        }
+
         CFTimeInterval startedAt = MUMonotonicNow();
         MULogInfo(Connection, @"[Async] Stopping Audio Engine (Release Mic)...");
         [[MKAudio sharedAudio] stop];
@@ -491,6 +536,7 @@ static MUConnectionController *sSharedConnectionController;
 - (void) teardownConnection {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
     [self stopNetworkMonitor];
+    _preserveAudioSessionForReconnect = NO;
 
     if ([_reconnectTimer isValid]) {
         [_reconnectTimer invalidate];
@@ -551,9 +597,49 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 // ... Key helper methods (unchanged) ...
-- (NSString *) lastChannelKey { return [NSString stringWithFormat:@"LastChannel_%@_%lu_%@", _hostname, (unsigned long)_port, _username]; }
-- (NSString *) muteStateKey { return [NSString stringWithFormat:@"State_Mute_%@_%lu_%@", _hostname, (unsigned long)_port, _username]; }
-- (NSString *) deafStateKey { return [NSString stringWithFormat:@"State_Deaf_%@_%lu_%@", _hostname, (unsigned long)_port, _username]; }
+- (NSString *) stateKeyWithPrefix:(NSString *)prefix username:(NSString *)username {
+    NSString *safeUsername = (username && [username length] > 0) ? username : @"";
+    return [NSString stringWithFormat:@"%@_%@_%lu_%@", prefix, _hostname, (unsigned long)_port, safeUsername];
+}
+- (NSString *) lastChannelKey { return [self stateKeyWithPrefix:@"LastChannel" username:_username]; }
+- (NSString *) muteStateKey { return [self stateKeyWithPrefix:@"State_Mute" username:_username]; }
+- (NSString *) deafStateKey { return [self stateKeyWithPrefix:@"State_Deaf" username:_username]; }
+- (NSString *) muteStateKeyForUsername:(NSString *)username { return [self stateKeyWithPrefix:@"State_Mute" username:username]; }
+- (NSString *) deafStateKeyForUsername:(NSString *)username { return [self stateKeyWithPrefix:@"State_Deaf" username:username]; }
+
+- (BOOL) loadSavedBoolForKey:(NSString *)key value:(BOOL *)value {
+    id stored = [[NSUserDefaults standardUserDefaults] objectForKey:key];
+    if (stored == nil) {
+        return NO;
+    }
+    if (value != NULL) {
+        *value = [stored boolValue];
+    }
+    return YES;
+}
+
+- (void) loadSavedMuteStateForUsername:(NSString *)username {
+    BOOL savedMute = NO;
+    BOOL savedDeaf = NO;
+    BOOL hasMute = [self loadSavedBoolForKey:[self muteStateKeyForUsername:username] value:&savedMute];
+    BOOL hasDeaf = [self loadSavedBoolForKey:[self deafStateKeyForUsername:username] value:&savedDeaf];
+
+    _hasRestoredMuteState = (hasMute || hasDeaf);
+    _restoredSelfMuted = savedMute || savedDeaf;
+    _restoredSelfDeafened = savedDeaf;
+}
+
+- (void) applyCachedMuteStateToAudio {
+    if (!_hasRestoredMuteState) {
+        return;
+    }
+
+    BOOL targetMuted = _restoredSelfMuted || _restoredSelfDeafened;
+    [[MKAudio sharedAudio] setSelfMuted:targetMuted];
+#if TARGET_OS_IOS
+    [MUSystemInputMuteBridge applyRestoredMute:targetMuted reason:@"connection_restore_cached_state"];
+#endif
+}
 
 #pragma mark - MKConnectionDelegate
 
@@ -641,6 +727,7 @@ static MUConnectionController *sSharedConnectionController;
                                                                 baseInterval:[self configuredReconnectInterval]];
 
     MULogWarning(Connection, @"Connection closed unexpectedly. Attempting reconnect (Attempt %ld/%ld)...", (long)currentAttempt, (long)maxAttempts);
+    _preserveAudioSessionForReconnect = YES;
     [self beginPerformanceConnectFlowIsReconnect:YES attempt:currentAttempt reason:message];
     
     // 通知 UI 显示 "Reconnecting..."
@@ -658,6 +745,8 @@ static MUConnectionController *sSharedConnectionController;
     [_connection setDelegate:nil];
     [_connection disconnect];
     _connection = nil;
+
+    MULogInfo(Connection, @"Preserving voice audio session while reconnecting to avoid background media route churn.");
 
     MULogDebug(Connection, @"Reconnect scheduled after %.2fs (attempt %ld/%ld).", reconnectDelay, (long)currentAttempt, (long)maxAttempts);
     [self scheduleReconnectAfterDelay:reconnectDelay];
@@ -911,13 +1000,32 @@ static MUConnectionController *sSharedConnectionController;
     
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     NSInteger lastChannelId = [defaults integerForKey:[self lastChannelKey]];
-    BOOL shouldMute = [defaults boolForKey:[self muteStateKey]];
-    BOOL shouldDeaf = [defaults boolForKey:[self deafStateKey]];
+    NSString *confirmedUsername = [user userName] ?: _username;
+    BOOL shouldMute = NO;
+    BOOL shouldDeaf = NO;
+    BOOL hasMute = [self loadSavedBoolForKey:[self muteStateKeyForUsername:confirmedUsername] value:&shouldMute];
+    BOOL hasDeaf = [self loadSavedBoolForKey:[self deafStateKeyForUsername:confirmedUsername] value:&shouldDeaf];
+
+    if (!hasMute && !hasDeaf && ![confirmedUsername isEqualToString:_username]) {
+        hasMute = [self loadSavedBoolForKey:[self muteStateKey] value:&shouldMute];
+        hasDeaf = [self loadSavedBoolForKey:[self deafStateKey] value:&shouldDeaf];
+    }
+
+    BOOL hasSavedMuteState = (hasMute || hasDeaf);
+    if (shouldDeaf) {
+        shouldMute = YES;
+    }
     
-    // 2. 恢复静音状态
-    if (shouldMute || shouldDeaf) {
-        if (shouldDeaf) shouldMute = YES;
+    // 2. 恢复同一服务器、同一用户名上次保存的闭麦/不听状态
+    if (hasSavedMuteState) {
+        _hasRestoredMuteState = YES;
+        _restoredSelfMuted = shouldMute;
+        _restoredSelfDeafened = shouldDeaf;
         [model setSelfMuted:shouldMute andSelfDeafened:shouldDeaf];
+        [defaults setBool:shouldMute forKey:[self muteStateKeyForUsername:confirmedUsername]];
+        [defaults setBool:shouldDeaf forKey:[self deafStateKeyForUsername:confirmedUsername]];
+        [defaults synchronize];
+        [self applyCachedMuteStateToAudio];
     }
     
     // 3. 恢复上次频道

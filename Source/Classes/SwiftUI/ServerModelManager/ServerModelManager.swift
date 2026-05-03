@@ -116,6 +116,8 @@ class ServerModelManager: ObservableObject {
     var keepAliveTimer: Timer?
     let systemMuteManager = SystemMuteManager()
     var isRestoringMuteState = false
+    var isApplyingAppDrivenSystemMute = false
+    var appDrivenSystemMuteSequence: UInt = 0
     var isRequestingMicrophonePermission = false
     var isLocalAudioTestStarting = false
     var localAudioTestStartSequence: UInt = 0
@@ -130,6 +132,8 @@ class ServerModelManager: ObservableObject {
     /// 音频重启前保存的闭麦/不听状态（防止系统回调覆盖）
     var savedMuteBeforeRestart: Bool?
     var savedDeafenBeforeRestart: Bool?
+    /// iOS 音频路由切换序号，用于让蓝牙/网络抖动期间的旧异步任务失效
+    var audioRouteChangeSequence: UInt = 0
     /// 追踪每个用户的 mute/deafen 状态，用于检测变化并生成系统消息
     var previousMuteStates: [UInt: (isSelfMuted: Bool, isSelfDeafened: Bool)] = [:]
     /// 当前的 access tokens 列表

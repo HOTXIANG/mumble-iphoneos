@@ -1208,6 +1208,7 @@ struct AppRootView: View {
             if let preview = appState.activeImagePreview {
                 IOSMessageImageFullscreenPreview(
                     item: preview,
+                    liveSourceFrame: appState.imagePreviewSourceFrames[preview.id],
                     onEntryAnimationCompleted: {
                         // Hide source thumbnail only after entry animation finishes.
                         if appState.activeImagePreview?.id == preview.id {
@@ -1235,6 +1236,7 @@ struct AppRootView: View {
             if let preview = appState.activeMacImagePreview {
                 MacImagePreviewOverlay(
                     item: preview,
+                    liveSourceFrame: appState.macImagePreviewSourceFrames[preview.id],
                     onEntryAnimationCompleted: {
                         appState.hiddenMacPreviewSourceID = preview.id
                     },

@@ -121,6 +121,8 @@ class HandoffManager: NSObject, ObservableObject {
     
     /// 标记这是一次 Handoff 连接（用于在连接成功后加入频道）
     var isHandoffConnection: Bool = false
+
+    private var handoffOperationID = UUID()
     
     private override init() {
         super.init()
@@ -259,6 +261,11 @@ class HandoffManager: NSObject, ObservableObject {
 
     /// 处理从其他设备接力过来的 NSUserActivity
     func handleIncomingActivity(_ userActivity: NSUserActivity) {
+        guard !isProcessingHandoff else {
+            MumbleLogger.handoff.info("Handoff: Ignoring duplicate incoming activity while another handoff is in progress")
+            return
+        }
+
         guard userActivity.activityType == MumbleHandoffActivityType else {
             MumbleLogger.connection.warning("Handoff: Unknown activity type: \(userActivity.activityType)")
             return
@@ -273,6 +280,8 @@ class HandoffManager: NSObject, ObservableObject {
         
         isProcessingHandoff = true
         isHandoffConnection = true
+        let operationID = UUID()
+        handoffOperationID = operationID
         
         // 保存目标频道信息
         pendingChannelId = serverInfo.channelId
@@ -282,6 +291,15 @@ class HandoffManager: NSObject, ObservableObject {
         pendingSelfMuted = serverInfo.isSelfMuted
         pendingSelfDeafened = serverInfo.isSelfDeafened
         pendingUserAudioSettings = serverInfo.userAudioSettings
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20.0) { [weak self] in
+            guard let self,
+                  self.handoffOperationID == operationID,
+                  self.isProcessingHandoff,
+                  self.isHandoffConnection else { return }
+            MumbleLogger.handoff.warning("Handoff: Timed out waiting for connection to complete")
+            self.resetHandoffState()
+        }
         
         // 如果当前已经连接到某个服务器，先断开
         if MUConnectionController.shared()?.isConnected() == true {
@@ -289,7 +307,8 @@ class HandoffManager: NSObject, ObservableObject {
             MUConnectionController.shared()?.disconnectFromServer()
             // 等待断开后再连接
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.connectForHandoff(serverInfo: serverInfo)
+                guard let self, self.handoffOperationID == operationID else { return }
+                self.connectForHandoff(serverInfo: serverInfo)
             }
         } else {
             connectForHandoff(serverInfo: serverInfo)

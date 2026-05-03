@@ -101,3 +101,39 @@ class SystemMuteManager {
         onSystemMuteChanged?(isMuted)
     }
 }
+
+#if os(iOS)
+@objc(MUSystemInputMuteBridge)
+final class MUSystemInputMuteBridge: NSObject {
+    @objc static func applyRestoredMute(_ muted: Bool, reason: String) {
+        guard #available(iOS 17.0, *) else { return }
+
+        DispatchQueue.main.async {
+            applyRestoredMuteOnMain(muted, reason: reason, attemptsRemaining: 10)
+        }
+    }
+
+    @available(iOS 17.0, *)
+    private static func applyRestoredMuteOnMain(_ muted: Bool, reason: String, attemptsRemaining: Int) {
+        let session = AVAudioSession.sharedInstance()
+        guard session.category == .playAndRecord else {
+            guard attemptsRemaining > 0 else {
+                MumbleLogger.audio.warning("SystemInputMuteBridge: failed to apply restored mute=\(muted); session category=\(session.category.rawValue) reason=\(reason)")
+                return
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                applyRestoredMuteOnMain(muted, reason: reason, attemptsRemaining: attemptsRemaining - 1)
+            }
+            return
+        }
+
+        do {
+            try AVAudioApplication.shared.setInputMuted(muted)
+            MumbleLogger.audio.debug("SystemInputMuteBridge: restored system input mute=\(muted) reason=\(reason)")
+        } catch {
+            MumbleLogger.audio.warning("SystemInputMuteBridge: setInputMuted(\(muted)) failed reason=\(reason): \(error.localizedDescription)")
+        }
+    }
+}
+#endif

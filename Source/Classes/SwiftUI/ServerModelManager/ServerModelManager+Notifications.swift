@@ -133,7 +133,15 @@ extension ServerModelManager {
 
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userStateUpdatedNotification, object: nil, queue: nil) { [weak self] notification in
             guard let userInfo = notification.userInfo, let userSession = userInfo["userSession"] as? UInt else { return }
-            Task { @MainActor in self?.updateUserBySession(userSession) }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.updateUserBySession(userSession)
+                #if os(iOS)
+                if let user = self.serverModel?.connectedUser(), user.session() == userSession {
+                    self.syncCurrentAppMuteStateToSystem(reason: "server_user_state")
+                }
+                #endif
+            }
         })
 
         tokenHolder.add(center.addObserver(forName: ServerModelNotificationManager.userTextureChangedNotification, object: nil, queue: nil) { [weak self] notification in
@@ -689,7 +697,7 @@ extension ServerModelManager {
                     // 初始进入时的状态同步
                     if let user = self.serverModel?.connectedUser(), user.isSelfMuted() {
                         MumbleLogger.audio.info("[Async] Initial Sync: Enforcing System Mute")
-                        self.systemMuteManager.setSystemMute(true)
+                        self.setSystemMuteFromApp(true, reason: "post_connection_initial_sync")
                     }
                 }
 

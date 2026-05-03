@@ -40,7 +40,7 @@ extension ServerModelManager {
             isInputSettingsPreviewOverrideActive = true
             inputSettingsRestoreSystemMute = true
             isRestoringMuteState = true
-            systemMuteManager.setSystemMute(false)
+            setSystemMuteFromApp(false, reason: "input_settings_preview_start")
             MumbleLogger.audio.debug("Input settings preview: temporarily unmuted system input while staying self-muted on server")
             return
         }
@@ -91,7 +91,7 @@ extension ServerModelManager {
         if isInputSettingsPreviewOverrideActive {
             let shouldRestoreMute = inputSettingsRestoreSystemMute ?? true
             isRestoringMuteState = true
-            systemMuteManager.setSystemMute(shouldRestoreMute)
+            setSystemMuteFromApp(shouldRestoreMute, reason: "input_settings_preview_stop")
             isInputSettingsPreviewOverrideActive = false
             inputSettingsRestoreSystemMute = nil
 

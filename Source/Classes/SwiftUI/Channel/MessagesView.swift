@@ -51,6 +51,7 @@ private struct MessageTopAnchorFramePreferenceKey: PreferenceKey {
 
 struct IOSMessageImageFullscreenPreview: View {
     let item: MessageImagePreviewItem
+    let liveSourceFrame: CGRect?
     let onEntryAnimationCompleted: () -> Void
     let onDismissWillStart: () -> Void
     let onDismiss: () -> Void
@@ -107,6 +108,10 @@ struct IOSMessageImageFullscreenPreview: View {
     
     private var isDismissDragInProgress: Bool {
         dismissDragY > 1.0
+    }
+
+    private var currentSourceFrame: CGRect? {
+        liveSourceFrame ?? item.sourceFrame
     }
     
     var body: some View {
@@ -178,8 +183,12 @@ struct IOSMessageImageFullscreenPreview: View {
             .onAppear {
                 applyEntryAnimation(targetRect: targetRect)
             }
+            .onChange(of: liveSourceFrame) { _, _ in
+                updateDismissTargetIfNeeded(targetRect: targetRect)
+            }
         }
         .ignoresSafeArea()
+        .allowsHitTesting(!isAnimatingDismiss)
     }
     
     private func fittedRect(in containerSize: CGSize) -> CGRect {
@@ -206,7 +215,9 @@ struct IOSMessageImageFullscreenPreview: View {
     }
     
     private func initialTransition(for targetRect: CGRect) -> (scale: CGFloat, offset: CGSize) {
-        guard let source = item.sourceFrame, source.width > 0, source.height > 0 else {
+        guard let source = currentSourceFrame,
+              source.width > 0,
+              source.height > 0 else {
             return (0.95, .zero)
         }
         let sourceCenter = CGPoint(x: source.midX, y: source.midY)
@@ -214,6 +225,16 @@ struct IOSMessageImageFullscreenPreview: View {
         let offset = CGSize(width: sourceCenter.x - targetCenter.x, height: sourceCenter.y - targetCenter.y)
         let scale = min(max(source.width / targetRect.width, 0.1), 1.0)
         return (scale, offset)
+    }
+
+    private func updateDismissTargetIfNeeded(targetRect: CGRect) {
+        guard isAnimatingDismiss, !isZoomed else { return }
+        let latest = initialTransition(for: targetRect)
+        withAnimation(.interactiveSpring(response: 0.16, dampingFraction: 0.96, blendDuration: 0.02)) {
+            transitionScale = latest.scale
+            transitionOffset = latest.offset
+            dismissDragY = 0
+        }
     }
     
     private func applyEntryAnimation(targetRect: CGRect) {
@@ -968,7 +989,7 @@ struct MessagesView: View {
                 layoutCompensationY: messagesLayoutCompensationY,
                 hiddenPreviewSourceID: hiddenPreviewSourceID,
                 onPreviewRequest: { payload in handleImageTap(payload: payload) },
-                onThumbnailFramesChanged: { frames in messageImageFrames = frames },
+                onThumbnailFramesChanged: { frames in updateMessageImageFrames(frames) },
                 onTopAnchorFrameChanged: { frame in
                     handleTopAnchorFrameChange(frame)
                 },
@@ -1075,12 +1096,34 @@ struct MessagesView: View {
     private func recomputeLayoutCompensation() {
         messagesLayoutCompensationY = topLayoutCompensationY
     }
+
+    private func updateMessageImageFrames(_ frames: [String: CGRect]) {
+        messageImageFrames = frames
+        #if os(iOS)
+        var nextFrames = frames
+        if let activeID = appState.activeImagePreview?.id,
+           nextFrames[activeID] == nil,
+           let previousFrame = appState.imagePreviewSourceFrames[activeID] {
+            nextFrames[activeID] = previousFrame
+        }
+        appState.imagePreviewSourceFrames = nextFrames
+        #elseif os(macOS)
+        var nextFrames = frames
+        if let activeID = appState.activeMacImagePreview?.id,
+           nextFrames[activeID] == nil,
+           let previousFrame = appState.macImagePreviewSourceFrames[activeID] {
+            nextFrames[activeID] = previousFrame
+        }
+        appState.macImagePreviewSourceFrames = nextFrames
+        #endif
+    }
 }
 
 #if os(macOS)
 /// macOS 图片预览 overlay：全窗口覆盖，支持触控板/鼠标缩放，双击还原，Esc 关闭
 struct MacImagePreviewOverlay: View {
     let item: MessageImagePreviewItem
+    let liveSourceFrame: CGRect?
     let onEntryAnimationCompleted: () -> Void
     let onDismissWillStart: () -> Void
     let onDismiss: () -> Void
@@ -1108,6 +1151,10 @@ struct MacImagePreviewOverlay: View {
             width: transitionOffset.width + offset.width,
             height: transitionOffset.height + offset.height
         )
+    }
+
+    private var currentSourceFrame: CGRect? {
+        liveSourceFrame ?? item.sourceFrame
     }
     
     @ViewBuilder
@@ -1256,7 +1303,9 @@ struct MacImagePreviewOverlay: View {
     }
     
     private func initialTransition(for targetRect: CGRect, in containerFrame: CGRect) -> (scale: CGFloat, offset: CGSize) {
-        guard let source = item.sourceFrame, source.width > 0, source.height > 0 else {
+        guard let source = currentSourceFrame,
+              source.width > 0,
+              source.height > 0 else {
             return (0.95, .zero)
         }
         let sourceCenterGlobal = CGPoint(x: source.midX, y: source.midY)
@@ -1268,6 +1317,16 @@ struct MacImagePreviewOverlay: View {
         let offset = CGSize(width: sourceCenter.x - targetCenter.x, height: sourceCenter.y - targetCenter.y)
         let scale = min(max(source.width / targetRect.width, 0.1), 1.0)
         return (scale, offset)
+    }
+
+    private func updateDismissTargetIfNeeded(targetRect: CGRect, containerFrame: CGRect) {
+        guard isAnimatingDismiss, !isZoomed else { return }
+        let latest = initialTransition(for: targetRect, in: containerFrame)
+        withAnimation(.interactiveSpring(response: 0.18, dampingFraction: 0.96, blendDuration: 0.02)) {
+            transitionScale = latest.scale
+            transitionOffset = latest.offset
+            resetToDefault(animated: false)
+        }
     }
     
     private func applyEntryAnimation(targetRect: CGRect, containerFrame: CGRect) {
@@ -1447,8 +1506,12 @@ struct MacImagePreviewOverlay: View {
             .onAppear {
                 applyEntryAnimation(targetRect: targetRect, containerFrame: containerFrame)
             }
+            .onChange(of: liveSourceFrame) { _, _ in
+                updateDismissTargetIfNeeded(targetRect: targetRect, containerFrame: containerFrame)
+            }
             .onExitCommand { dismissAnimated(targetRect: targetRect, containerFrame: containerFrame) } // Esc 键关闭
         }
+        .allowsHitTesting(!isAnimatingDismiss)
     }
 }
 

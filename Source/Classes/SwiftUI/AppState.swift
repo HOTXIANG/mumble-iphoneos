@@ -165,12 +165,14 @@ class AppState: ObservableObject {
     @Published var isImmersiveStatusBarHidden: Bool = false
     @Published var activeImagePreview: MessageImagePreviewItem? = nil
     @Published var hiddenPreviewSourceID: String? = nil
+    @Published var imagePreviewSourceFrames: [String: CGRect] = [:]
     #endif
     
     /// macOS 图片预览：设置此属性会在 AppRootView 层级弹出全窗口预览 overlay
     #if os(macOS)
     @Published var activeMacImagePreview: MessageImagePreviewItem? = nil
     @Published var hiddenMacPreviewSourceID: String? = nil
+    @Published var macImagePreviewSourceFrames: [String: CGRect] = [:]
     #endif
     
     private var cancellables = Set<AnyCancellable>()

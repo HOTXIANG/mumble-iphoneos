@@ -143,7 +143,10 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         }
         
         MumbleLogger.handoff.info("MUMacApplicationDelegate: Received Handoff activity via NSApplicationDelegate")
-        HandoffManager.shared.handleIncomingActivity(userActivity)
+        restorationHandler([])
+        DispatchQueue.main.async {
+            HandoffManager.shared.handleIncomingActivity(userActivity)
+        }
         return true
     }
     
