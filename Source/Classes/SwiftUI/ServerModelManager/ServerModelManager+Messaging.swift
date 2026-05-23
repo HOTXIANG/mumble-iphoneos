@@ -20,6 +20,7 @@ extension ServerModelManager {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
         MumbleLogger.model.debug("Sending text message (\(trimmedText.count) chars) to current channel")
+        guard let userChannel = serverModel.connectedUser()?.channel() else { return }
 
         // processedHTMLFromPlainTextMessage 会将纯文本转换为带 <p> 标签的 HTML
         let htmlMessage = MUTextMessageProcessor.processedHTML(
@@ -28,13 +29,10 @@ extension ServerModelManager {
 
         let message = MKTextMessage(string: htmlMessage)
 
-        if let userChannel = serverModel.connectedUser()?.channel() {
-            serverModel.send(message, to: userChannel)
-        }
-
         // 立即在UI上显示自己发送的消息，体验更流畅
+        let messageID = UUID()
         let selfMessage = ChatMessage(
-            id: UUID(),
+            id: messageID,
             type: .userMessage,
             senderName: serverModel.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: ""),
             attributedMessage: attributedString(from: trimmedText),
@@ -43,9 +41,18 @@ extension ServerModelManager {
             isSentBySelf: true,
             senderSession: serverModel.connectedUser()?.session()
         )
-        DispatchQueue.main.async {
-            self.messages.append(selfMessage)
+        messages.append(selfMessage)
+
+        if !hasTextMessagePermissionIfKnown(for: userChannel) {
+            markOutgoingMessageFailed(
+                id: messageID,
+                reason: NSLocalizedString("You do not have permission to send messages in this channel.", comment: "")
+            )
+            return
         }
+
+        trackPendingOutgoingMessage(id: messageID)
+        serverModel.send(message, to: userChannel)
     }
 
     /// 发送文本消息到当前频道及其所有子频道（频道树）
@@ -63,11 +70,10 @@ extension ServerModelManager {
         
         let htmlMessage = MUTextMessageProcessor.processedHTML(fromPlainTextMessage: trimmed)
         let msg = MKTextMessage(string: htmlMessage)
-        
-        serverModel.send(msg, toTree: userChannel)
-        
+
+        let messageID = UUID()
         let selfMessage = ChatMessage(
-            id: UUID(),
+            id: messageID,
             type: .userMessage,
             senderName: serverModel.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: ""),
             attributedMessage: attributedString(from: trimmed),
@@ -76,9 +82,18 @@ extension ServerModelManager {
             isSentBySelf: true,
             senderSession: serverModel.connectedUser()?.session()
         )
-        DispatchQueue.main.async {
-            self.messages.append(selfMessage)
+        messages.append(selfMessage)
+
+        if !hasTextMessagePermissionIfKnown(for: userChannel) {
+            markOutgoingMessageFailed(
+                id: messageID,
+                reason: NSLocalizedString("You do not have permission to send messages in this channel.", comment: "")
+            )
+            return
         }
+
+        trackPendingOutgoingMessage(id: messageID)
+        serverModel.send(msg, toTree: userChannel)
     }
 
     func sendPrivateMessage(_ text: String, to user: MKUser) {
@@ -106,6 +121,73 @@ extension ServerModelManager {
         DispatchQueue.main.async {
             self.messages.append(selfMessage)
         }
+    }
+
+    func handleTextMessagePermissionDenied(reason: String? = nil) {
+        let cutoff = Date().addingTimeInterval(-15)
+        pendingOutgoingMessages.removeAll { $0.createdAt < cutoff }
+        guard let pending = pendingOutgoingMessages.last else {
+            postMessagePermissionDeniedToast(reason: reason)
+            return
+        }
+        markOutgoingMessageFailed(
+            id: pending.id,
+            reason: reason ?? NSLocalizedString("You do not have permission to send messages in this channel.", comment: "")
+        )
+    }
+
+    private func hasTextMessagePermissionIfKnown(for channel: MKChannel) -> Bool {
+        guard let permissions = channelPermissions[channel.channelId()] else {
+            return true
+        }
+        return (permissions & MKPermissionTextMessage.rawValue) != 0
+    }
+
+    private func trackPendingOutgoingMessage(id: UUID) {
+        pendingOutgoingMessages.append((id: id, createdAt: Date()))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15.0) { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.pendingOutgoingMessages.removeAll { $0.id == id }
+            }
+        }
+    }
+
+    private func markOutgoingMessageFailed(id: UUID, reason: String) {
+        pendingOutgoingMessages.removeAll { $0.id == id }
+        guard let index = messages.firstIndex(where: { $0.id == id }) else {
+            postMessagePermissionDeniedToast(reason: reason)
+            return
+        }
+
+        let current = messages[index]
+        messages[index] = ChatMessage(
+            id: current.id,
+            type: current.type,
+            senderName: current.senderName,
+            attributedMessage: current.attributedMessage,
+            images: current.images,
+            timestamp: current.timestamp,
+            isSentBySelf: current.isSentBySelf,
+            senderSession: current.senderSession,
+            privatePeerName: current.privatePeerName,
+            deliveryState: .failed
+        )
+        postMessagePermissionDeniedToast(reason: reason)
+    }
+
+    private func postMessagePermissionDeniedToast(reason: String?) {
+        let message = reason?.isEmpty == false
+            ? reason!
+            : NSLocalizedString("You do not have permission to send messages in this channel.", comment: "")
+        NotificationCenter.default.post(
+            name: .muAppShowMessage,
+            object: nil,
+            userInfo: [
+                "message": message,
+                "type": "error",
+                "jumpToMessages": true
+            ]
+        )
     }
 
     func sendImageMessage(image: PlatformImage) async {

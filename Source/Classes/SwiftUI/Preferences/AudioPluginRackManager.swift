@@ -135,6 +135,17 @@ final class AudioPluginRackManager: ObservableObject {
         ["input", "sidetone", "masterBus1", "masterBus2"]
     }
 
+    func replaceRemoteUserTrackChains(_ remoteUserChains: [String: [TrackPlugin]]) {
+        let existingRemoteKeys = pluginChainByTrack.keys.filter { $0.hasPrefix("remoteUser:") }
+        for key in existingRemoteKeys where remoteUserChains[key] == nil {
+            pluginChainByTrack.removeValue(forKey: key)
+        }
+        for (key, chain) in remoteUserChains where key.hasPrefix("remoteUser:") {
+            pluginChainByTrack[key] = chain
+        }
+        savePluginChainState()
+    }
+
     func currentHostBufferFrames() -> Int {
         max(UserDefaults.standard.integer(forKey: "AudioPluginHostBufferFrames"), 64)
     }

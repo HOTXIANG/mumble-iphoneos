@@ -115,6 +115,7 @@ static CFTimeInterval MUMonotonicNow(void) {
     BOOL            _isUserInitiatedDisconnect;
     BOOL            _waitingForCertDecision;
     NSTimer         *_reconnectTimer;
+    NSUInteger      _reconnectGeneration;
     NSInteger       _retryCount; // 重试计数器
     NSDictionary    *_pendingReconnectFailureInfo;
     BOOL            _suppressReconnectForDisconnect;
@@ -182,6 +183,7 @@ static MUConnectionController *sSharedConnectionController;
 - (id) init {
     if ((self = [super init])) {
         _retryCount = 0;
+        _reconnectGeneration = 0;
         _pendingReconnectFailureInfo = nil;
         _suppressReconnectForDisconnect = NO;
         _preserveAudioSessionForReconnect = NO;
@@ -270,6 +272,7 @@ static MUConnectionController *sSharedConnectionController;
         [_reconnectTimer invalidate];
     }
     _reconnectTimer = nil;
+    _reconnectGeneration++;
     
     if (_connection) {
         [_connection disconnect];
@@ -359,6 +362,7 @@ static MUConnectionController *sSharedConnectionController;
                 MULogInfo(Connection, @"Triggering reconnect due to network restore...");
                 strongSelf->_retryCount = 0;
                 strongSelf->_preserveAudioSessionForReconnect = YES;
+                strongSelf->_reconnectGeneration++;
                 [strongSelf beginPerformanceConnectFlowIsReconnect:YES attempt:1 reason:@"network-restored"];
                 [strongSelf establishConnection];
                 NSDictionary *info = @{
@@ -542,6 +546,7 @@ static MUConnectionController *sSharedConnectionController;
         [_reconnectTimer invalidate];
     }
     _reconnectTimer = nil;
+    _reconnectGeneration++;
     _pendingReconnectFailureInfo = nil;
 
 #if TARGET_OS_IOS
@@ -766,16 +771,23 @@ static MUConnectionController *sSharedConnectionController;
 
 - (void) scheduleReconnectAfterDelay:(NSTimeInterval)delay {
     [_reconnectTimer invalidate];
+    _reconnectTimer = nil;
+    _reconnectGeneration++;
+    NSUInteger generation = _reconnectGeneration;
 
 #if TARGET_OS_IOS
     [self beginReconnectBackgroundTask];
 #endif
 
-    _reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:delay
-                                                        target:self
-                                                      selector:@selector(performReconnect)
-                                                      userInfo:nil
-                                                       repeats:NO];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (generation != self->_reconnectGeneration) {
+            MULogDebug(Connection, @"Skipping stale reconnect timer. generation=%lu current=%lu",
+                       (unsigned long)generation,
+                       (unsigned long)self->_reconnectGeneration);
+            return;
+        }
+        [self performReconnect];
+    });
 }
 
 - (NSInteger) configuredReconnectMaxAttempts {

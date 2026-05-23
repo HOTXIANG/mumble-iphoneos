@@ -568,7 +568,11 @@ struct AudioPluginMixerView: View {
         let adoptedLiveProcessorState = !manager.loadedAudioUnits.isEmpty
 
         if !manager.pluginChainByTrack.isEmpty {
+            let remoteUserChains = remoteUserPluginChains(from: pluginChainByTrack)
             pluginChainByTrack = manager.pluginChainByTrack
+            for (key, chain) in remoteUserChains {
+                pluginChainByTrack[key] = chain
+            }
         }
         trackSendRoutesBySource = manager.trackSendRoutesBySource
         if !manager.loadedAudioUnits.isEmpty {
@@ -592,6 +596,10 @@ struct AudioPluginMixerView: View {
         }
         normalizePluginSlotCountsPersistingIfNeeded()
         return adoptedLiveProcessorState
+    }
+
+    private func remoteUserPluginChains(from chains: [String: [TrackPlugin]]) -> [String: [TrackPlugin]] {
+        chains.filter { key, _ in key.hasPrefix("remoteUser:") }
     }
 
     private func handleAutomationOpenUI(_ notification: Notification) {
@@ -2176,6 +2184,7 @@ struct AudioPluginMixerView: View {
             return
         }
         pluginTrackChainsData = string
+        AudioPluginRackManager.shared.replaceRemoteUserTrackChains(remoteUserPluginChains(from: pluginChainByTrack))
     }
 
     private func savePluginSlotCountState() {

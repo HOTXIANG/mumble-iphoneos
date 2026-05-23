@@ -6,6 +6,22 @@ import UserNotifications
 
 private let macAudioInputDevicesChangedNotification = Notification.Name("MUMacAudioInputDevicesChanged")
 
+private enum MacInputRoutingMode: String, CaseIterable, Identifiable {
+    case mono
+    case stereoPair
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .mono:
+            return "Mono"
+        case .stereoPair:
+            return "Stereo Pair"
+        }
+    }
+}
+
 extension View {
     func macSettingsCenteredPageStyle() -> some View {
         self
@@ -108,16 +124,15 @@ extension AudioTransmissionSettingsView {
     var platformProcessingSection: some View {
         LabeledContent("Audio Processing:") {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Capture All Input Channels", isOn: $captureAllInputChannels)
-                Text("Enable this only for multi-channel USB microphones that otherwise show no input. It may affect macOS voice modes and expose Wide Spectrum.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 360, alignment: .leading)
-                if captureAllInputChannels {
-                    Toggle("Stereo Input", isOn: $enableStereoInput)
+                Picker("Input Mode:", selection: inputRoutingMode) {
+                    ForEach(MacInputRoutingMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
                 }
-                if activeInputChannelCount > 1 && !captureAllInputChannels {
+                .pickerStyle(.segmented)
+                .frame(width: 240)
+
+                if activeInputChannelCount > 1 && inputRoutingMode.wrappedValue == .mono {
                     Picker("Input Channel:", selection: $selectedInputChannel) {
                         ForEach(1...activeInputChannelCount, id: \.self) { channel in
                             Text(String(format: NSLocalizedString("Channel %d", comment: ""), channel)).tag(channel)
@@ -131,7 +146,7 @@ extension AudioTransmissionSettingsView {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: 360, alignment: .leading)
                 }
-                if captureAllInputChannels && enableStereoInput && activeInputChannelCount > 1 {
+                if inputRoutingMode.wrappedValue == .stereoPair && activeInputChannelCount > 1 {
                     Picker("Left Channel:", selection: $selectedInputChannelLeft) {
                         ForEach(1...activeInputChannelCount, id: \.self) { channel in
                             Text(String(format: NSLocalizedString("Channel %d", comment: ""), channel)).tag(channel)
@@ -267,6 +282,25 @@ extension AudioTransmissionSettingsView {
         refreshDevices()
         normalizeSelectionIfNeeded()
     }
+
+    private var inputRoutingMode: Binding<MacInputRoutingMode> {
+        Binding<MacInputRoutingMode>(
+            get: {
+                captureAllInputChannels && enableStereoInput ? .stereoPair : .mono
+            },
+            set: { newMode in
+                switch newMode {
+                case .mono:
+                    captureAllInputChannels = false
+                    enableStereoInput = false
+                case .stereoPair:
+                    captureAllInputChannels = true
+                    enableStereoInput = true
+                }
+                normalizeSelectionIfNeeded()
+            }
+        )
+    }
     
     var selectedInputDeviceTag: Binding<String> {
         Binding<String>(
@@ -339,6 +373,11 @@ extension AudioTransmissionSettingsView {
            (preferredInputDeviceUID.isEmpty || !devices.contains(where: { $0.uid == preferredInputDeviceUID })) {
             followSystemInputDevice = true
             preferredInputDeviceUID = ""
+            changed = true
+        }
+
+        if captureAllInputChannels && !enableStereoInput {
+            captureAllInputChannels = false
             changed = true
         }
 

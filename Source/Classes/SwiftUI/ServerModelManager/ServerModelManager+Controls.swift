@@ -351,6 +351,19 @@ extension ServerModelManager {
         guard let serverHost = serverModel?.hostname(),
               let name = user.userName() else { return }
 
+        if let connectedUser = serverModel?.connectedUser(),
+           connectedUser.session() == user.session() {
+            if user.isLocalMuted() {
+                user.setLocalMuted(false)
+            }
+            if let connection = MUConnectionController.shared()?.connection {
+                connection.audioOutput?.setMuted(false, forSession: user.session())
+            }
+            let volume = userVolumes[user.session()] ?? 1.0
+            LocalUserPreferences.shared.save(volume: volume, isLocalMuted: false, for: name, on: serverHost)
+            return
+        }
+
         let prefs = LocalUserPreferences.shared.load(for: name, on: serverHost)
         userVolumes[user.session()] = prefs.volume
         user.localVolume = prefs.volume

@@ -252,6 +252,8 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
         )
         if shouldRestart {
             audio?.restart()
+        } else {
+            audio?.refreshInputRoutingSettings()
         }
         lastAudioRestartSignature = restartSignature
     }
@@ -265,17 +267,12 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
             String(defaults.double(forKey: "AudioVADHoldSeconds")),
             defaults.string(forKey: "AudioQualityKind") ?? "balanced",
             String(defaults.double(forKey: "AudioMicBoost")),
-            String(defaults.bool(forKey: "AudioStereoInput")),
             String(defaults.bool(forKey: "AudioStereoOutput")),
             String(defaults.bool(forKey: "AudioSpeakerPhoneMode")),
             String(defaults.bool(forKey: "AudioOpusCodecForceCELTMode")),
             String(defaults.bool(forKey: "AudioMixerDebug")),
             String(defaults.bool(forKey: "AudioFollowSystemInputDevice")),
             defaults.string(forKey: "AudioPreferredInputDeviceUID") ?? "",
-            String(defaults.bool(forKey: "AudioCaptureAllInputChannels")),
-            String(defaults.integer(forKey: "AudioSelectedInputChannel")),
-            String(defaults.integer(forKey: "AudioSelectedInputChannelLeft")),
-            String(defaults.integer(forKey: "AudioSelectedInputChannelRight")),
             String(defaults.bool(forKey: "AudioPluginInputTrackEnabled")),
             String(defaults.double(forKey: "AudioPluginInputTrackGain")),
             String(defaults.bool(forKey: "AudioPluginRemoteBusEnabled")),

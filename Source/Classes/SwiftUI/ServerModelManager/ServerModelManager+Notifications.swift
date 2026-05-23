@@ -440,6 +440,9 @@ extension ServerModelManager {
                 // 检测是否为 Enter 权限被拒绝
                 let isEnterDenied = permRaw.map { ($0 & MKPermissionEnter.rawValue) != 0 } ?? false
                 let isListenDenied = permRaw.map { ($0 & MKPermissionListen.rawValue) != 0 } ?? false
+                let isTextMessageDenied = permRaw.map { ($0 & MKPermissionTextMessage.rawValue) != 0 } ?? false
+                let reasonLooksLikeTextMessageDenied = reason?.range(of: "text", options: .caseInsensitive) != nil
+                    || reason?.range(of: "message", options: .caseInsensitive) != nil
                 let deniedChannelId = channelTransfer?.value.channelId()
                 let isUserInitiated = deniedChannelId != nil && deniedChannelId == self.userInitiatedJoinChannelId
 
@@ -459,6 +462,10 @@ extension ServerModelManager {
                     self.passwordPromptChannel = ch
                     self.pendingPasswordInput = ""
                     self.addSystemNotification(NSLocalizedString("Access denied. You may try entering a password.", comment: ""))
+                } else if isTextMessageDenied || reasonLooksLikeTextMessageDenied {
+                    self.handleTextMessagePermissionDenied(
+                        reason: NSLocalizedString("You do not have permission to send messages in this channel.", comment: "")
+                    )
                 } else if let reason = reason {
                     self.addSystemNotification(
                         String(format: NSLocalizedString("Permission denied: %@", comment: ""), reason)

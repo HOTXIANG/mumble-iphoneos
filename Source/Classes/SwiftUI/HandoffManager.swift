@@ -471,9 +471,15 @@ class HandoffManager: NSObject, ObservableObject {
         // 2. 恢复每个用户的本地音量和本地静音
         if shouldSyncLocalAudio && !pendingUserAudioSettings.isEmpty {
             guard let hostname = serverModel.hostname() else { return }
+            let connectedUserName = serverModel.connectedUser()?.userName()
 
             // 先将所有设置保存到 LocalUserPreferences（持久化）
             for setting in pendingUserAudioSettings {
+                if setting.userName == connectedUserName {
+                    MumbleLogger.audio.debug("Handoff: Skipped local audio prefs for connected user '\(setting.userName)'")
+                    continue
+                }
+
                 LocalUserPreferences.shared.save(
                     volume: setting.volume,
                     isLocalMuted: setting.isLocalMuted,

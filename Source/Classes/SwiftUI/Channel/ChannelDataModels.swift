@@ -85,6 +85,11 @@ enum ChatMessageType {
     case privateMessage   // 私聊消息
 }
 
+enum ChatMessageDeliveryState {
+    case sent
+    case failed
+}
+
 // 2. 为 ChatMessage 结构体添加一个新的 type 属性
 struct ChatMessage: Identifiable, Equatable {
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
@@ -102,8 +107,9 @@ struct ChatMessage: Identifiable, Equatable {
     let senderSession: UInt?
     /// 私聊对方的名称（收到时为发送者名，发出时为接收者名）
     let privatePeerName: String?
+    let deliveryState: ChatMessageDeliveryState
     
-    init(id: UUID = UUID(), type: ChatMessageType, senderName: String, attributedMessage: AttributedString, images: [PlatformImage] = [], timestamp: Date = Date(), isSentBySelf: Bool, senderSession: UInt? = nil, privatePeerName: String? = nil) {
+    init(id: UUID = UUID(), type: ChatMessageType, senderName: String, attributedMessage: AttributedString, images: [PlatformImage] = [], timestamp: Date = Date(), isSentBySelf: Bool, senderSession: UInt? = nil, privatePeerName: String? = nil, deliveryState: ChatMessageDeliveryState = .sent) {
         self.id = id
         self.type = type
         self.senderName = senderName
@@ -114,5 +120,6 @@ struct ChatMessage: Identifiable, Equatable {
         self.isSentBySelf = isSentBySelf
         self.senderSession = senderSession
         self.privatePeerName = privatePeerName
+        self.deliveryState = deliveryState
     }
 }

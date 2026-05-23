@@ -1647,7 +1647,7 @@ private struct MacTrackpadGestureBridge: NSViewRepresentable {
 // MARK: - 4. 消息列表 (Dynamic Content)
 // 这个视图负责监听数据变化和 UI 刷新
 struct MessagesList: View {
-    @ObservedObject var serverManager: ServerModelManager
+    let serverManager: ServerModelManager
     let isSplitLayout: Bool
     let layoutCompensationY: CGFloat
     let hiddenPreviewSourceID: String?
@@ -1722,6 +1722,7 @@ struct MessagesList: View {
                                                     showSenderName: false,
                                                     showTimestamp: shouldShowTimestamp(in: run.messages, index: index)
                                                 )
+                                                .equatable()
                                             case .privateMessage:
                                                 PrivateMessageBubbleView(
                                                     message: message,
@@ -1730,8 +1731,10 @@ struct MessagesList: View {
                                                     showSenderLabel: false,
                                                     showTimestamp: shouldShowTimestamp(in: run.messages, index: index)
                                                 )
+                                                .equatable()
                                             case .notification:
                                                 NotificationMessageView(message: message)
+                                                    .equatable()
                                             }
                                         }
                                     }
@@ -1770,8 +1773,8 @@ struct MessagesList: View {
                     .background(.clear)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .onChange(of: serverManager.messages) { _, _ in
-                    rebuildRenderBlocks(reason: "messages_changed")
+                .onReceive(serverManager.$messages) { messages in
+                    rebuildRenderBlocks(from: messages, reason: "messages_changed")
                     scheduleAutoScrollToBottom(proxy: proxy)
                 }
                 .onChange(of: isTextFieldFocused) { _, focused in
@@ -1782,7 +1785,7 @@ struct MessagesList: View {
                     }
                 }
                 .onAppear {
-                    rebuildRenderBlocks(reason: "list_appear")
+                    rebuildRenderBlocks(from: serverManager.messages, reason: "list_appear")
                     scrollToBottom(proxy: proxy, animated: false)
                 }
                 .onDisappear {
@@ -1875,15 +1878,15 @@ struct MessagesList: View {
         return blocks
     }
 
-    private func rebuildRenderBlocks(reason: String) {
+    private func rebuildRenderBlocks(from messages: [ChatMessage], reason: String) {
         let start = CACurrentMediaTime()
-        let blocks = buildRenderBlocks(from: serverManager.messages)
+        let blocks = buildRenderBlocks(from: messages)
         cachedRenderBlocks = blocks
 
         let elapsedMs = (CACurrentMediaTime() - start) * 1000.0
-        if elapsedMs >= 1.0 || serverManager.messages.count >= 80 {
+        if elapsedMs >= 1.0 || messages.count >= 80 {
             MumbleLogger.ui.debug(
-                "PERF message_render_blocks reason=\(reason) messages=\(serverManager.messages.count) blocks=\(blocks.count) elapsed_ms=\(String(format: "%.2f", elapsedMs))"
+                "PERF message_render_blocks reason=\(reason) messages=\(messages.count) blocks=\(blocks.count) elapsed_ms=\(String(format: "%.2f", elapsedMs))"
             )
         }
     }
@@ -1977,7 +1980,7 @@ struct MessagesList: View {
 
 // MARK: - 辅助视图 (Bubble, Notification, Input, etc.)
 
-private struct NotificationMessageView: View {
+private struct NotificationMessageView: View, Equatable {
     let message: ChatMessage
     #if os(macOS)
     private let textSize: CGFloat = 11
@@ -1995,6 +1998,10 @@ private struct NotificationMessageView: View {
         .padding(.vertical, 6)
         .background(Color.systemGray5, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    nonisolated static func == (lhs: NotificationMessageView, rhs: NotificationMessageView) -> Bool {
+        lhs.message.id == rhs.message.id
     }
 }
 
@@ -2299,7 +2306,7 @@ private struct SenderStickyHeaderView: View {
     }
 }
 
-private struct MessageBubbleView: View {
+private struct MessageBubbleView: View, Equatable {
     let message: ChatMessage
     let onImageTap: (MessageImageTapPayload) -> Void
     let hiddenPreviewSourceID: String?
@@ -2397,15 +2404,27 @@ private struct MessageBubbleView: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 4)
             }
+            if message.deliveryState == .failed {
+                MessageDeliveryFailedLabel()
+                    .padding(.horizontal, 4)
+            }
             }
             if !message.isSentBySelf { Spacer(minLength: otherMinGap) }
         }
+    }
+
+    nonisolated static func == (lhs: MessageBubbleView, rhs: MessageBubbleView) -> Bool {
+        lhs.message.id == rhs.message.id
+            && lhs.message.deliveryState == rhs.message.deliveryState
+            && lhs.hiddenPreviewSourceID == rhs.hiddenPreviewSourceID
+            && lhs.showSenderName == rhs.showSenderName
+            && lhs.showTimestamp == rhs.showTimestamp
     }
 }
 
 // MARK: - Private Message Bubble
 
-private struct PrivateMessageBubbleView: View {
+private struct PrivateMessageBubbleView: View, Equatable {
     let message: ChatMessage
     let onImageTap: (MessageImageTapPayload) -> Void
     let hiddenPreviewSourceID: String?
@@ -2537,9 +2556,34 @@ private struct PrivateMessageBubbleView: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 4)
             }
+            if message.deliveryState == .failed {
+                MessageDeliveryFailedLabel()
+                    .padding(.horizontal, 4)
+            }
             }
             if !message.isSentBySelf { Spacer(minLength: otherMinGap) }
         }
+    }
+
+    nonisolated static func == (lhs: PrivateMessageBubbleView, rhs: PrivateMessageBubbleView) -> Bool {
+        lhs.message.id == rhs.message.id
+            && lhs.message.deliveryState == rhs.message.deliveryState
+            && lhs.hiddenPreviewSourceID == rhs.hiddenPreviewSourceID
+            && lhs.showSenderLabel == rhs.showSenderLabel
+            && lhs.showTimestamp == rhs.showTimestamp
+    }
+}
+
+private struct MessageDeliveryFailedLabel: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.caption2)
+            Text(NSLocalizedString("Not sent", comment: "Failed outgoing message status"))
+                .font(.caption2)
+        }
+        .foregroundColor(.red)
+        .accessibilityLabel(NSLocalizedString("Message was not sent", comment: "Failed outgoing message accessibility label"))
     }
 }
 

@@ -159,6 +159,8 @@ class ServerModelManager: ObservableObject {
     var pendingAvatarRefreshTask: Task<Void, Never>?
     /// 连接后延迟执行 Live Activity/Handoff 同步，让频道列表先完成首帧渲染
     var pendingPostConnectionActivitiesTask: Task<Void, Never>?
+    /// 乐观插入的本机发送消息，用于服务端异步 permission denied 到达时回标失败。
+    var pendingOutgoingMessages: [(id: UUID, createdAt: Date)] = []
     
     enum ViewMode {
         case server,

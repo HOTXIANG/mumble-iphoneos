@@ -455,6 +455,9 @@
 "Add category" = "Add category";
 "Dedicated local monitor bus after input track" = "Dedicated local monitor bus after input track";
 "Capture All Input Channels" = "Capture All Input Channels";
+"Input Mode:" = "Input Mode:";
+"Mono" = "Mono";
+"Stereo Pair" = "Stereo Pair";
 "Input Channel:" = "Input Channel:";
 "Left Channel:" = "Left Channel:";
 "Right Channel:" = "Right Channel:";
