@@ -112,6 +112,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
                                                                 [NSNumber numberWithInt:256],      @"AudioPluginHostBufferFrames",
                                                                 // Network
                                                                 [NSNumber numberWithBool:NO],      @"NetworkForceTCP",
+                                                                [NSNumber numberWithBool:YES],     @"NetworkQoS",
                                                                 @"MumbleUser",                     @"DefaultUserName",
                                                                 // Notifications
                                                                 [NSNumber numberWithBool:YES],     @"NotifyUserJoinedSameChannel",

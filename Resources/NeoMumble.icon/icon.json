@@ -36,6 +36,7 @@
               }
             }
           ],
+          "glass" : true,
           "hidden" : false,
           "image-name" : "TransparentLogoWhite.png",
           "name" : "TransparentLogoWhite"

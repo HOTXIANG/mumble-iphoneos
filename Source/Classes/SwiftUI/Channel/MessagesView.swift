@@ -15,6 +15,13 @@ import UniformTypeIdentifiers
 struct MessageImageTapPayload {
     let sourceID: String
     let image: PlatformImage
+    let sourceFrame: CGRect?
+
+    init(sourceID: String, image: PlatformImage, sourceFrame: CGRect? = nil) {
+        self.sourceID = sourceID
+        self.image = image
+        self.sourceFrame = sourceFrame
+    }
 }
 
 struct MessageImagePreviewItem: Identifiable {
@@ -979,6 +986,14 @@ struct MessagesView: View {
         return appState.hiddenMacPreviewSourceID
         #endif
     }
+
+    private var shouldTrackThumbnailFrames: Bool {
+        #if os(iOS)
+        return appState.activeImagePreview != nil
+        #else
+        return appState.activeMacImagePreview != nil
+        #endif
+    }
     
     var body: some View {
         ZStack {
@@ -988,6 +1003,7 @@ struct MessagesView: View {
                 isSplitLayout: isSplitLayout,
                 layoutCompensationY: messagesLayoutCompensationY,
                 hiddenPreviewSourceID: hiddenPreviewSourceID,
+                tracksThumbnailFrames: shouldTrackThumbnailFrames,
                 onPreviewRequest: { payload in handleImageTap(payload: payload) },
                 onThumbnailFramesChanged: { frames in updateMessageImageFrames(frames) },
                 onTopAnchorFrameChanged: { frame in
@@ -1054,7 +1070,7 @@ struct MessagesView: View {
         let preview = MessageImagePreviewItem(
             id: payload.sourceID,
             image: payload.image,
-            sourceFrame: messageImageFrames[payload.sourceID]
+            sourceFrame: payload.sourceFrame ?? messageImageFrames[payload.sourceID]
         )
         appState.activeMacImagePreview = preview
         // Fallback: ensure source thumbnail gets hidden after entry animation window.
@@ -1075,7 +1091,7 @@ struct MessagesView: View {
         appState.activeImagePreview = MessageImagePreviewItem(
             id: payload.sourceID,
             image: payload.image,
-            sourceFrame: messageImageFrames[payload.sourceID]
+            sourceFrame: payload.sourceFrame ?? messageImageFrames[payload.sourceID]
         )
         #endif
     }
@@ -1098,7 +1114,6 @@ struct MessagesView: View {
     }
 
     private func updateMessageImageFrames(_ frames: [String: CGRect]) {
-        messageImageFrames = frames
         #if os(iOS)
         var nextFrames = frames
         if let activeID = appState.activeImagePreview?.id,
@@ -1106,6 +1121,8 @@ struct MessagesView: View {
            let previousFrame = appState.imagePreviewSourceFrames[activeID] {
             nextFrames[activeID] = previousFrame
         }
+        guard messageImageFrames != nextFrames || appState.imagePreviewSourceFrames != nextFrames else { return }
+        messageImageFrames = nextFrames
         appState.imagePreviewSourceFrames = nextFrames
         #elseif os(macOS)
         var nextFrames = frames
@@ -1114,6 +1131,8 @@ struct MessagesView: View {
            let previousFrame = appState.macImagePreviewSourceFrames[activeID] {
             nextFrames[activeID] = previousFrame
         }
+        guard messageImageFrames != nextFrames || appState.macImagePreviewSourceFrames != nextFrames else { return }
+        messageImageFrames = nextFrames
         appState.macImagePreviewSourceFrames = nextFrames
         #endif
     }
@@ -1651,6 +1670,7 @@ struct MessagesList: View {
     let isSplitLayout: Bool
     let layoutCompensationY: CGFloat
     let hiddenPreviewSourceID: String?
+    let tracksThumbnailFrames: Bool
     @Environment(\.colorScheme) private var colorScheme
     
     // 回调函数
@@ -1719,6 +1739,7 @@ struct MessagesList: View {
                                                     message: message,
                                                     onImageTap: onPreviewRequest,
                                                     hiddenPreviewSourceID: hiddenPreviewSourceID,
+                                                    tracksThumbnailFrames: tracksThumbnailFrames,
                                                     showSenderName: false,
                                                     showTimestamp: shouldShowTimestamp(in: run.messages, index: index)
                                                 )
@@ -1728,6 +1749,7 @@ struct MessagesList: View {
                                                     message: message,
                                                     onImageTap: onPreviewRequest,
                                                     hiddenPreviewSourceID: hiddenPreviewSourceID,
+                                                    tracksThumbnailFrames: tracksThumbnailFrames,
                                                     showSenderLabel: false,
                                                     showTimestamp: shouldShowTimestamp(in: run.messages, index: index)
                                                 )
@@ -1820,7 +1842,13 @@ struct MessagesList: View {
             handleDrop(providers: providers)
         }
         .onPreferenceChange(MessageThumbnailFramePreferenceKey.self) { frames in
+            guard tracksThumbnailFrames else { return }
             onThumbnailFramesChanged(frames)
+        }
+        .onChange(of: tracksThumbnailFrames) { _, isTracking in
+            if !isTracking {
+                onThumbnailFramesChanged([:])
+            }
         }
         #if os(iOS)
         .onPreferenceChange(MessageTopAnchorFramePreferenceKey.self) { frame in
@@ -2306,10 +2334,100 @@ private struct SenderStickyHeaderView: View {
     }
 }
 
+private struct MessageImageThumbnailButton: View {
+    let sourceID: String
+    let image: PlatformImage
+    let isHiddenForPreview: Bool
+    let tracksFrame: Bool
+    let onTap: (MessageImageTapPayload) -> Void
+
+    @State private var thumbnail: PlatformImage?
+
+    private static let cache = NSCache<NSString, PlatformImage>()
+    private let maxDisplayDimension: CGFloat = 200
+    private let maxRenderedDimension: CGFloat = 420
+
+    private var fittedSize: CGSize {
+        let imageSize = image.size
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return CGSize(width: 120, height: 90)
+        }
+
+        let scale = min(maxDisplayDimension / max(imageSize.width, imageSize.height), 1)
+        return CGSize(
+            width: max(1, floor(imageSize.width * scale)),
+            height: max(1, floor(imageSize.height * scale))
+        )
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            Button(action: {
+                onTap(
+                    MessageImageTapPayload(
+                        sourceID: sourceID,
+                        image: image,
+                        sourceFrame: geo.frame(in: .global)
+                    )
+                )
+            }) {
+                Image(platformImage: thumbnail ?? image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: fittedSize.width, height: fittedSize.height)
+                    .background {
+                        if tracksFrame {
+                            GeometryReader { frameGeo in
+                                Color.clear.preference(
+                                    key: MessageThumbnailFramePreferenceKey.self,
+                                    value: [sourceID: frameGeo.frame(in: .global)]
+                                )
+                            }
+                        }
+                    }
+                    #if os(macOS)
+                    .cornerRadius(10)
+                    #else
+                    .cornerRadius(12)
+                    #endif
+            }
+            .buttonStyle(.plain)
+            .allowsHitTesting(!isHiddenForPreview)
+            .opacity(isHiddenForPreview ? 0 : 1)
+            .animation(.easeOut(duration: 0.18), value: isHiddenForPreview)
+            #if os(macOS)
+            .cornerRadius(10)
+            #else
+            .cornerRadius(12)
+            #endif
+        }
+        .frame(width: fittedSize.width, height: fittedSize.height)
+        .task(id: sourceID) {
+            loadThumbnailIfNeeded()
+        }
+    }
+
+    private func loadThumbnailIfNeeded() {
+        let key = sourceID as NSString
+        if let cached = Self.cache.object(forKey: key) {
+            thumbnail = cached
+            return
+        }
+
+        let rendered = WYSIWYGEditorView.Coordinator.resizeImage(
+            image: image,
+            maxDimension: maxRenderedDimension
+        )
+        Self.cache.setObject(rendered, forKey: key)
+        thumbnail = rendered
+    }
+}
+
 private struct MessageBubbleView: View, Equatable {
     let message: ChatMessage
     let onImageTap: (MessageImageTapPayload) -> Void
     let hiddenPreviewSourceID: String?
+    let tracksThumbnailFrames: Bool
     let showSenderName: Bool
     let showTimestamp: Bool
     
@@ -2342,41 +2460,13 @@ private struct MessageBubbleView: View, Equatable {
                     ForEach(0..<message.images.count, id: \.self) { index in
                         let sourceID = "\(message.id.uuidString)-\(index)"
                         let isHiddenForPreview = (hiddenPreviewSourceID == sourceID)
-                        Button(action: {
-                            onImageTap(
-                                MessageImageTapPayload(
-                                    sourceID: sourceID,
-                                    image: message.images[index]
-                                )
-                            )
-                        }) {
-                            Image(platformImage: message.images[index])
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxWidth: 200)
-                                .background(
-                                    GeometryReader { geo in
-                                        Color.clear.preference(
-                                            key: MessageThumbnailFramePreferenceKey.self,
-                                            value: [sourceID: geo.frame(in: .global)]
-                                        )
-                                    }
-                                )
-                                #if os(macOS)
-                                .cornerRadius(10)
-                                #else
-                                .cornerRadius(12)
-                                #endif
-                        }
-                        .buttonStyle(.plain)
-                        .allowsHitTesting(!isHiddenForPreview)
-                        .opacity(isHiddenForPreview ? 0 : 1)
-                        .animation(.easeOut(duration: 0.18), value: isHiddenForPreview)
-                        #if os(macOS)
-                        .cornerRadius(10)
-                        #else
-                        .cornerRadius(12)
-                        #endif
+                        MessageImageThumbnailButton(
+                            sourceID: sourceID,
+                            image: message.images[index],
+                            isHiddenForPreview: isHiddenForPreview,
+                            tracksFrame: tracksThumbnailFrames,
+                            onTap: onImageTap
+                        )
                     }
                 }
             }
@@ -2417,6 +2507,7 @@ private struct MessageBubbleView: View, Equatable {
         lhs.message.id == rhs.message.id
             && lhs.message.deliveryState == rhs.message.deliveryState
             && lhs.hiddenPreviewSourceID == rhs.hiddenPreviewSourceID
+            && lhs.tracksThumbnailFrames == rhs.tracksThumbnailFrames
             && lhs.showSenderName == rhs.showSenderName
             && lhs.showTimestamp == rhs.showTimestamp
     }
@@ -2428,6 +2519,7 @@ private struct PrivateMessageBubbleView: View, Equatable {
     let message: ChatMessage
     let onImageTap: (MessageImageTapPayload) -> Void
     let hiddenPreviewSourceID: String?
+    let tracksThumbnailFrames: Bool
     let showSenderLabel: Bool
     let showTimestamp: Bool
     
@@ -2482,41 +2574,13 @@ private struct PrivateMessageBubbleView: View, Equatable {
                     ForEach(0..<message.images.count, id: \.self) { index in
                         let sourceID = "\(message.id.uuidString)-\(index)"
                         let isHiddenForPreview = (hiddenPreviewSourceID == sourceID)
-                        Button(action: {
-                            onImageTap(
-                                MessageImageTapPayload(
-                                    sourceID: sourceID,
-                                    image: message.images[index]
-                                )
-                            )
-                        }) {
-                            Image(platformImage: message.images[index])
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxWidth: 200)
-                                .background(
-                                    GeometryReader { geo in
-                                        Color.clear.preference(
-                                            key: MessageThumbnailFramePreferenceKey.self,
-                                            value: [sourceID: geo.frame(in: .global)]
-                                        )
-                                    }
-                                )
-                                #if os(macOS)
-                                .cornerRadius(10)
-                                #else
-                                .cornerRadius(12)
-                                #endif
-                        }
-                        .buttonStyle(.plain)
-                        .allowsHitTesting(!isHiddenForPreview)
-                        .opacity(isHiddenForPreview ? 0 : 1)
-                        .animation(.easeOut(duration: 0.18), value: isHiddenForPreview)
-                        #if os(macOS)
-                        .cornerRadius(10)
-                        #else
-                        .cornerRadius(12)
-                        #endif
+                        MessageImageThumbnailButton(
+                            sourceID: sourceID,
+                            image: message.images[index],
+                            isHiddenForPreview: isHiddenForPreview,
+                            tracksFrame: tracksThumbnailFrames,
+                            onTap: onImageTap
+                        )
                     }
                 }
             }
@@ -2569,6 +2633,7 @@ private struct PrivateMessageBubbleView: View, Equatable {
         lhs.message.id == rhs.message.id
             && lhs.message.deliveryState == rhs.message.deliveryState
             && lhs.hiddenPreviewSourceID == rhs.hiddenPreviewSourceID
+            && lhs.tracksThumbnailFrames == rhs.tracksThumbnailFrames
             && lhs.showSenderLabel == rhs.showSenderLabel
             && lhs.showTimestamp == rhs.showTimestamp
     }

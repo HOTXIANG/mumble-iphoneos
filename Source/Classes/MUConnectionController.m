@@ -90,6 +90,13 @@ static CFTimeInterval MUMonotonicNow(void) {
     return CACurrentMediaTime();
 }
 
+static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
+    if (!error) return NO;
+    NSInteger code = [error code];
+    NSInteger target = (NSInteger)status;
+    return code == target || labs(code) == labs(target);
+}
+
 @interface MUConnectionController () <MKConnectionDelegate, MKServerModelDelegate> {
     MKConnection               *_connection;
     MKServerModel              *_serverModel;
@@ -125,7 +132,9 @@ static CFTimeInterval MUMonotonicNow(void) {
     BOOL            _connectFlowIsReconnect;
     NSInteger       _connectFlowAttempt;
     dispatch_queue_t _audioLifecycleQueue;
+    dispatch_queue_t _connectionSetupQueue;
     NSUInteger       _audioLifecycleGeneration;
+    NSUInteger       _connectionSetupGeneration;
     BOOL             _hasRestoredMuteState;
     BOOL             _restoredSelfMuted;
     BOOL             _restoredSelfDeafened;
@@ -138,8 +147,11 @@ static CFTimeInterval MUMonotonicNow(void) {
     BOOL              _networkWasSatisfied;
 }
 - (void) establishConnection;
+- (void) establishConnectionForGeneration:(NSUInteger)generation;
+- (BOOL) isCurrentConnectionSetupGeneration:(NSUInteger)generation;
 - (void) teardownConnection;
 - (void) applyNetworkForceTCPSetting;
+- (void) applyNetworkQoSSetting;
 - (void) showConnectingView;
 - (void) hideConnectingView;
 - (void) hideConnectingViewWithCompletion:(void(^)(void))completion;
@@ -192,6 +204,8 @@ static MUConnectionController *sSharedConnectionController;
         _connectFlowIsReconnect = NO;
         _connectFlowAttempt = 0;
         _audioLifecycleQueue = dispatch_queue_create("cn.hotxiang.Mumble.audioLifecycle", DISPATCH_QUEUE_SERIAL);
+        _connectionSetupQueue = dispatch_queue_create("cn.hotxiang.Mumble.connectionSetup", DISPATCH_QUEUE_SERIAL);
+        _connectionSetupGeneration = 0;
         _hasRestoredMuteState = NO;
         _restoredSelfMuted = NO;
         _restoredSelfDeafened = NO;
@@ -210,6 +224,7 @@ static MUConnectionController *sSharedConnectionController;
 - (void) defaultsDidChange:(NSNotification *)notification {
     (void)notification;
     [self applyNetworkForceTCPSetting];
+    [self applyNetworkQoSSetting];
 }
 
 - (MKServerModel *)serverModel {
@@ -224,6 +239,9 @@ static MUConnectionController *sSharedConnectionController;
               displayName:(NSString *)displayName {
     
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
+    @synchronized (self) {
+        _connectionSetupGeneration++;
+    }
     
     BOOL wasConnected = (_connection != nil || _serverModel != nil);
     
@@ -265,6 +283,9 @@ static MUConnectionController *sSharedConnectionController;
 - (void) disconnectFromServer {
     MULogInfo(Connection, @"User initiated disconnect/cancel.");
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
+    @synchronized (self) {
+        _connectionSetupGeneration++;
+    }
     _isUserInitiatedDisconnect = YES;
     _suppressReconnectForDisconnect = NO;
     _preserveAudioSessionForReconnect = NO;
@@ -389,68 +410,134 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 - (void) establishConnection {
-    _isUserInitiatedDisconnect = NO;
-    _waitingForCertDecision = NO;
-    
-    // 启动网络监控
-    [self startNetworkMonitor];
+    NSUInteger setupGeneration = 0;
+    @synchronized (self) {
+        _connectionSetupGeneration++;
+        setupGeneration = _connectionSetupGeneration;
+    }
 
-    _connection = [[MKConnection alloc] init];
-    [_connection setDelegate:self];
-    [self applyNetworkForceTCPSetting];
-    [_connection setIgnoreSSLVerification:NO];
-    
-    _serverModel = [[MKServerModel alloc] initWithConnection:_connection];
-    [_serverModel addDelegate:self];
-    [self loadSavedMuteStateForUsername:_username];
-    [self applyCachedMuteStateToAudio];
-    
-    if (_certificateRef != nil) {
-        // 如果这个服务器有专属证书，就优先使用可认证（含 identity）的证书链
-        NSArray *certChain = MUIdentityBackedChainForPersistentRef(_certificateRef, @"server-specific");
-        if (certChain && certChain.count > 0) {
-            [_connection setCertificateChain:certChain];
-            MULogInfo(Connection, @"Using server-specific certificate for connection. (chain length: %lu)", (unsigned long)certChain.count);
+    dispatch_async(_connectionSetupQueue, ^{
+        [self establishConnectionForGeneration:setupGeneration];
+    });
+}
+
+- (BOOL) isCurrentConnectionSetupGeneration:(NSUInteger)generation {
+    @synchronized (self) {
+        return generation == _connectionSetupGeneration;
+    }
+}
+
+- (void) establishConnectionForGeneration:(NSUInteger)generation {
+    @autoreleasepool {
+        if (![self isCurrentConnectionSetupGeneration:generation]) {
+            return;
+        }
+
+        NSString *hostname = nil;
+        NSString *username = nil;
+        NSString *password = nil;
+        NSData *certificateRef = nil;
+        NSUInteger port = 0;
+        @synchronized (self) {
+            if (generation != _connectionSetupGeneration) {
+                return;
+            }
+            _isUserInitiatedDisconnect = NO;
+            _waitingForCertDecision = NO;
+            hostname = [_hostname copy];
+            username = [_username copy];
+            password = [_password copy];
+            certificateRef = [_certificateRef copy];
+            port = _port;
+        }
+
+        if (!hostname || [hostname length] == 0) {
+            return;
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([self isCurrentConnectionSetupGeneration:generation]) {
+                [self startNetworkMonitor];
+            }
+        });
+
+        MKConnection *connection = [[MKConnection alloc] init];
+        [connection setDelegate:self];
+        @synchronized (self) {
+            if (generation != _connectionSetupGeneration || _isUserInitiatedDisconnect) {
+                [connection setDelegate:nil];
+                return;
+            }
+            _connection = connection;
+        }
+
+        [self applyNetworkForceTCPSetting];
+        [self applyNetworkQoSSetting];
+        [connection setIgnoreSSLVerification:NO];
+
+        _serverModel = [[MKServerModel alloc] initWithConnection:connection];
+        [_serverModel addDelegate:self];
+        [self loadSavedMuteStateForUsername:username];
+        [self applyCachedMuteStateToAudio];
+
+        if (certificateRef != nil) {
+            NSArray *certChain = MUIdentityBackedChainForPersistentRef(certificateRef, @"server-specific");
+            if (certChain && certChain.count > 0) {
+                [connection setCertificateChain:certChain];
+                MULogInfo(Connection, @"Using server-specific certificate for connection. (chain length: %lu)", (unsigned long)certChain.count);
+            } else {
+                MULogWarning(Connection, @"Failed to resolve server-specific cert identity (%lu bytes). Falling back...", (unsigned long)certificateRef.length);
+                NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
+                if (globalCert) {
+                    NSArray *fallbackChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
+                    if (fallbackChain && fallbackChain.count > 0) {
+                        [connection setCertificateChain:fallbackChain];
+                        MULogInfo(Connection, @"Fell back to global default certificate.");
+                    } else {
+                        MULogWarning(Connection, @"Global default certificate is unusable for client auth. Connecting anonymously.");
+                    }
+                } else {
+                    MULogInfo(Connection, @"No fallback certificate available. Connecting anonymously.");
+                }
+            }
         } else {
-            // 专属证书不可用，回退到全局默认
-            MULogWarning(Connection, @"Failed to resolve server-specific cert identity (%lu bytes). Falling back...", (unsigned long)_certificateRef.length);
             NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
             if (globalCert) {
-                NSArray *fallbackChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
-                if (fallbackChain && fallbackChain.count > 0) {
-                    [_connection setCertificateChain:fallbackChain];
-                    MULogInfo(Connection, @"Fell back to global default certificate.");
+                NSArray *certChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
+                if (certChain && certChain.count > 0) {
+                    [connection setCertificateChain:certChain];
+                    MULogInfo(Connection, @"Using global default certificate.");
                 } else {
                     MULogWarning(Connection, @"Global default certificate is unusable for client auth. Connecting anonymously.");
                 }
             } else {
-                MULogInfo(Connection, @"No fallback certificate available. Connecting anonymously.");
+                MULogInfo(Connection, @"Connecting anonymously (No certificate).");
             }
         }
-    } else {
-        // 如果没有专属证书，再回退到全局默认 (可选，或者直接匿名)
-        NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
-        if (globalCert) {
-            NSArray *certChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
-            if (certChain && certChain.count > 0) {
-                [_connection setCertificateChain:certChain];
-                MULogInfo(Connection, @"Using global default certificate.");
-            } else {
-                MULogWarning(Connection, @"Global default certificate is unusable for client auth. Connecting anonymously.");
-            }
-        } else {
-            MULogInfo(Connection, @"Connecting anonymously (No certificate).");
-        }
-    }
-    
-    [_connection connectToHost:_hostname port:_port];
 
-    NSUInteger audioGeneration = 0;
-    @synchronized (self) {
-        _audioLifecycleGeneration++;
-        audioGeneration = _audioLifecycleGeneration;
+        if (![self isCurrentConnectionSetupGeneration:generation]) {
+            [connection setDelegate:nil];
+            [_serverModel removeDelegate:self];
+            @synchronized (self) {
+                if (_connection == connection) {
+                    _connection = nil;
+                }
+                _serverModel = nil;
+            }
+            [connection disconnect];
+            return;
+        }
+
+        [connection connectToHost:hostname port:port];
+
+        NSUInteger audioGeneration = 0;
+        @synchronized (self) {
+            _audioLifecycleGeneration++;
+            audioGeneration = _audioLifecycleGeneration;
+        }
+        [self startAudioEngineAsyncForGeneration:audioGeneration];
+
     }
-    [self startAudioEngineAsyncForGeneration:audioGeneration];
 }
 
 - (void) startAudioEngineAsyncForGeneration:(NSUInteger)generation {
@@ -537,8 +624,18 @@ static MUConnectionController *sSharedConnectionController;
     }
 }
 
+- (void) applyNetworkQoSSetting {
+    BOOL shouldEnableQoS = [[NSUserDefaults standardUserDefaults] boolForKey:@"NetworkQoS"];
+    if (_connection) {
+        [_connection setQoSEnabled:shouldEnableQoS];
+    }
+}
+
 - (void) teardownConnection {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
+    @synchronized (self) {
+        _connectionSetupGeneration++;
+    }
     [self stopNetworkMonitor];
     _preserveAudioSessionForReconnect = NO;
 
@@ -667,15 +764,38 @@ static MUConnectionController *sSharedConnectionController;
               (unsigned long)_port);
     }
 
-    NSArray *tokens = [MUDatabase accessTokensForServerWithHostname:[conn hostname] port:[conn port]];
-    [conn authenticateWithUsername:_username password:_password accessTokens:tokens];
-    
-    NSString *nameToSave = (_displayName && _displayName.length > 0) ? _displayName : _hostname;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[RecentServerManager shared] addRecentWithHostname:self->_hostname
-                                                       port:self->_port
-                                                   username:self->_username
-                                                displayName:nameToSave];
+    MKConnection *connection = conn;
+    NSString *hostname = [[conn hostname] copy];
+    NSUInteger port = [conn port];
+    NSString *username = [_username copy];
+    NSString *password = [_password copy];
+    NSString *displayName = [_displayName copy];
+    dispatch_async(_connectionSetupQueue, ^{
+        @autoreleasepool {
+            NSArray *tokens = [MUDatabase accessTokensForServerWithHostname:hostname port:port];
+            BOOL shouldAuthenticate = NO;
+            @synchronized (self) {
+                shouldAuthenticate = (self->_connection == connection && !self->_isUserInitiatedDisconnect);
+            }
+
+            if (shouldAuthenticate) {
+                [connection authenticateWithUsername:username password:password accessTokens:tokens];
+            }
+
+            NSString *nameToSave = (displayName && [displayName length] > 0) ? displayName : hostname;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                @synchronized (self) {
+                    if (self->_connection != connection || self->_isUserInitiatedDisconnect) {
+                        return;
+                    }
+                }
+                [[RecentServerManager shared] addRecentWithHostname:hostname
+                                                               port:port
+                                                           username:username
+                                                        displayName:nameToSave];
+            });
+
+        }
     });
 }
 
@@ -703,6 +823,19 @@ static MUConnectionController *sSharedConnectionController;
     NSString *fallbackMessage = NSLocalizedString(@"The connection was closed.", nil);
     NSString *title = [err localizedDescription] ?: fallbackTitle;
     NSString *message = [err localizedFailureReason] ?: [err localizedDescription] ?: fallbackMessage;
+
+    if (MUErrorMatchesOSStatus(err, errSSLClosedAbort)) {
+        title = fallbackTitle;
+        message = NSLocalizedString(@"The TLS connection was closed due to an error.\n\nThe server might be temporarily rejecting your connection because you have attempted to connect too many times in a row.", nil);
+        MULogWarning(Connection, @"TLS connection closed by peer during connect. domain=%@ code=%ld host=%@:%lu",
+              [err domain] ?: @"",
+              (long)[err code],
+              _hostname ?: @"",
+              (unsigned long)_port);
+        [self postErrorWithTitle:title message:message];
+        return;
+    }
+
     _pendingReconnectFailureInfo = @{ @"title": title, @"message": message };
 
     NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
