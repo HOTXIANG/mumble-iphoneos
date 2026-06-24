@@ -7,6 +7,62 @@ import SwiftUI
 import QuartzCore
 
 extension ServerModelManager {
+    func schedulePermissionScanUpdateFlush(debounce: TimeInterval = 0.75) {
+        pendingPermissionScanFlushWorkItem?.cancel()
+
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingPermissionScanFlushWorkItem = nil
+            self.flushPendingPermissionScanUpdates(reason: "permission_scan_batch", rebuildDebounce: 0.2)
+        }
+        pendingPermissionScanFlushWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + debounce, execute: work)
+    }
+
+    func flushPendingPermissionScanUpdates(reason: String, rebuildDebounce: TimeInterval = 0.05) {
+        pendingPermissionScanFlushWorkItem?.cancel()
+        pendingPermissionScanFlushWorkItem = nil
+
+        let permissionUpdates = pendingPermissionScanResults
+        let passwordUpdates = pendingPasswordStatusUpdates
+        pendingPermissionScanResults.removeAll(keepingCapacity: true)
+        pendingPasswordStatusUpdates.removeAll(keepingCapacity: true)
+
+        guard !permissionUpdates.isEmpty || !passwordUpdates.isEmpty else { return }
+        MumbleLogger.model.debug("permission_scan_flush reason=\(reason) permission_updates=\(permissionUpdates.count) password_updates=\(passwordUpdates.count)")
+
+        if !permissionUpdates.isEmpty {
+            var nextPermissions = channelPermissions
+            var nextCanEnter = channelsUserCanEnter
+
+            for (channelId, permissions) in permissionUpdates {
+                nextPermissions[channelId] = permissions
+                if (permissions & MKPermissionEnter.rawValue) != 0 {
+                    nextCanEnter.insert(channelId)
+                } else {
+                    nextCanEnter.remove(channelId)
+                }
+            }
+
+            channelPermissions = nextPermissions
+            channelsUserCanEnter = nextCanEnter
+        }
+
+        if !passwordUpdates.isEmpty {
+            var nextPasswordChannels = channelsWithPassword
+            for (channelId, hasPassword) in passwordUpdates {
+                if hasPassword {
+                    nextPasswordChannels.insert(channelId)
+                } else {
+                    nextPasswordChannels.remove(channelId)
+                }
+            }
+            channelsWithPassword = nextPasswordChannels
+        }
+
+        requestModelRebuild(reason: reason, debounce: rebuildDebounce)
+    }
+
     func requestModelRebuild(reason: String, debounce: TimeInterval = 0.08) {
         pendingModelRebuildWorkItem?.cancel()
         pendingModelRebuildReason = reason
@@ -224,7 +280,8 @@ extension ServerModelManager {
             }
         }
 
-        updateLiveActivity()
+        let syncHandoffAudioState = !reason.contains("permission") && !reason.contains("acl")
+        updateLiveActivity(syncHandoffAudioState: syncHandoffAudioState)
         scheduleDeferredAvatarRefresh()
 
         let elapsedMs = (CACurrentMediaTime() - startedAt) * 1000.0

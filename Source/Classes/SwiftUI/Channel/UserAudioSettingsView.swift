@@ -15,6 +15,13 @@ struct UserAudioSettingsView: View {
     @State private var volume: Float = 1.0
     @State private var isMuted: Bool = false
     @Environment(\.dismiss) var dismiss
+
+    private var snappedVolume: Binding<Float> {
+        Binding(
+            get: { volume },
+            set: { volume = snapVolumeToUnity($0) }
+        )
+    }
     
     var body: some View {
         NavigationStack {
@@ -29,7 +36,7 @@ struct UserAudioSettingsView: View {
                                 .font(.headline)
                         }
                         
-                        Slider(value: $volume, in: 0.0...3.0, step: 0.1) {
+                        Slider(value: snappedVolume, in: 0.0...3.0) {
                             Text("Volume")
                         } minimumValueLabel: {
                             Text("0%")
@@ -96,6 +103,11 @@ struct UserAudioSettingsView: View {
         if volume < 0.5 { return "speaker.wave.1" }
         if volume < 1.0 { return "speaker.wave.2" }
         return "speaker.wave.3"
+    }
+
+    private func snapVolumeToUnity(_ value: Float) -> Float {
+        let clamped = min(max(value, 0.0), 3.0)
+        return abs(clamped - 1.0) <= 0.025 ? 1.0 : clamped
     }
     
     private func loadCurrentState() {

@@ -34,6 +34,10 @@ NS_ASSUME_NONNULL_BEGIN
 extern void MumbleLogFormatted(int level, const char *category,
                                const char *file, const char *function, int line,
                                NSString *format, ...) NS_FORMAT_FUNCTION(6, 7);
+/// Swift 可调用的非 variadic 日志入口。
+extern void MumbleLogMessage(int level, const char *category,
+                             NSString *message,
+                             const char *file, const char *function, int line);
 
 #pragma mark - Application Layer Macros (MU*)
 /// 用法：MULogInfo(Connection, @"连接成功: %@", hostname);

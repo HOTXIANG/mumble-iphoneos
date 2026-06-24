@@ -1,0 +1,159 @@
+{
+  "description": "Initial performance, scenario duration, command latency, and network budgets for MUTestServer JSONL evidence. Entries are optional by default so a scenario can be analyzed even when it does not exercise every marker or connected network path.",
+  "version": 1,
+  "budgets": [
+    {
+      "description": "Connected session should become ready without a long join stall.",
+      "marker": "connect_ready",
+      "metric": "total_ms",
+      "max": 1500,
+      "required": false
+    },
+    {
+      "description": "Authentication and initial model join should stay below one second when connect_ready is emitted.",
+      "marker": "connect_ready",
+      "metric": "auth_join_ms",
+      "max": 1000,
+      "required": false
+    },
+    {
+      "description": "Audio callback p95 should stay comfortably below realtime pressure.",
+      "marker": "audio_callback",
+      "metric": "p95_us",
+      "max": 2500,
+      "required": false
+    },
+    {
+      "description": "Audio callback worst sampled value should not spike into audible-risk territory.",
+      "marker": "audio_callback",
+      "metric": "max_us",
+      "max": 5000,
+      "required": false
+    },
+    {
+      "description": "Server model rebuild should not block UI updates for a full frame budget.",
+      "marker": "rebuild_model_array",
+      "metric": "elapsed_ms",
+      "max": 50,
+      "required": false
+    },
+    {
+      "description": "Message render block construction should remain under a visible frame hitch threshold.",
+      "marker": "message_render_blocks",
+      "metric": "elapsed_ms",
+      "max": 50,
+      "required": false
+    },
+    {
+      "description": "Main-thread stall monitor should not observe long UI responsiveness gaps during probe scenarios.",
+      "marker": "main_thread_stall",
+      "metric": "lag_ms",
+      "max": 250,
+      "required": false
+    }
+  ],
+  "networkBudgets": [
+    {
+      "description": "When UDP ping is observed in connected scenarios, the mean should stay below an obvious unstable-network threshold.",
+      "metric": "maxUdpPingMeanMs",
+      "max": 250,
+      "required": false
+    },
+    {
+      "description": "When packet accounting is observed in connected scenarios, loss should stay below a clearly degraded voice threshold.",
+      "metric": "maxPacketLossPercent",
+      "max": 5,
+      "required": false
+    },
+    {
+      "description": "Network timeline should not accumulate repeated warning-level lifecycle events during short probe scenarios.",
+      "metric": "timelineWarningCount",
+      "max": 5,
+      "required": false
+    },
+    {
+      "description": "Network timeline should not include error-level lifecycle events during passing probe scenarios.",
+      "metric": "timelineErrorCount",
+      "max": 0,
+      "required": false
+    }
+  ],
+  "scenarioBudgets": [
+    {
+      "description": "UI/model performance sampling should complete quickly enough to catch obvious refresh or observation regressions.",
+      "scenario": "ui-performance-sampling",
+      "maxMs": 10000,
+      "required": false
+    },
+    {
+      "description": "Synthetic UDP degradation evidence should be captured and analyzed without making the probe suite slow.",
+      "scenario": "network-udp-degraded",
+      "maxMs": 10000,
+      "required": false
+    },
+    {
+      "description": "UDP toast throttling should remain quick enough to catch status-flapping UI regressions.",
+      "scenario": "network-udp-toast-throttle",
+      "maxMs": 10000,
+      "required": false
+    },
+    {
+      "description": "Idle background/foreground lifecycle simulation should not look hung while proving audio stays stopped.",
+      "scenario": "lifecycle-idle-audio",
+      "maxMs": 10000,
+      "required": false
+    },
+    {
+      "description": "Every probe scenario should finish before it looks hung or visibly too slow for smoke automation.",
+      "scenario": "*",
+      "maxMs": 30000,
+      "required": true
+    }
+  ],
+  "waitBudgets": [
+    {
+      "descriptionText": "Each semantic wait should complete before the probe-level wait timeout is exhausted.",
+      "description": "*",
+      "maxMs": 8000,
+      "required": false
+    }
+  ],
+  "commandBudgets": [
+    {
+      "description": "Model refresh command used by ui-performance-sampling should not block the WebSocket command loop.",
+      "action": "app.refreshModel",
+      "maxMs": 1000,
+      "required": false
+    },
+    {
+      "description": "Performance sampling command should stay responsive while collecting UI/model evidence.",
+      "action": "performance.status",
+      "maxMs": 1000,
+      "required": false
+    },
+    {
+      "description": "State snapshot command should stay responsive during UI/model sampling.",
+      "action": "state.get",
+      "maxMs": 1000,
+      "required": false
+    },
+    {
+      "description": "UI snapshot command should stay responsive during UI/model sampling.",
+      "action": "ui.get",
+      "maxMs": 1000,
+      "required": false
+    },
+    {
+      "description": "App snapshot command should stay responsive during UI/model sampling.",
+      "action": "app.get",
+      "maxMs": 1000,
+      "required": false
+    },
+    {
+      "description": "Every MUTestServer command should round-trip quickly enough to rule out hung automation or obviously blocked app-side command handling.",
+      "action": "*",
+      "maxMs": 5000,
+      "required": true
+    }
+  ]
+}

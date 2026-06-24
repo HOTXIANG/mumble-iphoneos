@@ -98,7 +98,7 @@ struct PreferencesView: View {
                     Image(systemName: "speaker")
                         .foregroundColor(.secondary)
                         .frame(width: 16)
-                    Slider(value: $outputVolume, in: 0...3, step: 0.1) { editing in
+                    PercentVolumeSlider(value: $outputVolume) { editing in
                         if !editing { PreferencesModel.shared.notifySettingsChanged() }
                     }
                     Image(systemName: "speaker.wave.3")

@@ -101,6 +101,7 @@ struct MumbleApp: App {
                     bootstrapAudioPluginRackIfNeeded()
 
                     #if DEBUG
+                    MainThreadPerformanceMonitor.shared.start()
                     MUTestServer.shared.start(serverManager: serverManager)
                     #endif
                 }
@@ -134,7 +135,7 @@ struct MumbleApp: App {
                         Task {
                             await audioPluginRackManager.initializeOnStartup(useSafeMode: true)
                             if recoveryContext != nil {
-                                MumbleLogger.plugin.warning("Audio plugins launched in safe mode after abnormal termination")
+                                MumbleLogger.plugin.warning("Audio plugins launched in safe mode after suspected plugin crash")
                             }
                         }
                     }
@@ -146,7 +147,7 @@ struct MumbleApp: App {
                     }
                 } message: { recoveryContext in
                     let baseMessage = NSLocalizedString(
-                        "Mumble did not exit normally last time while mixer plugins were configured. Safe Mode will skip loading all mixer plugins for this launch, so you can remove problematic plugins without entering a crash loop.",
+                        "Mumble may have crashed while loading mixer plugins last time. Safe Mode will skip loading all mixer plugins for this launch, so you can remove problematic plugins without entering a crash loop.",
                         comment: ""
                     )
                     if recoveryContext.pendingTrackKeys.isEmpty {
@@ -163,9 +164,15 @@ struct MumbleApp: App {
                 }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            // 你可以在这里处理生命周期，慢慢替代 AppDelegate 里的逻辑
-            if newPhase == .background {
-                // 例如：触发清理操作
+            switch newPhase {
+            case .active:
+                audioPluginRackManager.markAppActive()
+            case .inactive:
+                audioPluginRackManager.markAppInactive()
+            case .background:
+                audioPluginRackManager.markAppBackgrounded()
+            @unknown default:
+                break
             }
         }
         #if os(macOS)

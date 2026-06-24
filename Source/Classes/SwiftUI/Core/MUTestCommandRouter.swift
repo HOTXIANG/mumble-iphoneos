@@ -11,6 +11,12 @@
 
 import Foundation
 import Network
+#if os(iOS) || os(macOS)
+import AVFoundation
+#endif
+#if os(iOS)
+import UIKit
+#endif
 #if os(macOS)
 import AppKit
 #endif
@@ -62,6 +68,8 @@ final class MUTestCommandRouter {
         case "server":     return try await handleServer(command, params)
         case "certificate": return try handleCertificate(command, params)
         case "log":        return try handleLog(command, params, context: context)
+        case "performance": return try handlePerformance(command, params)
+        case "network":     return try handleNetwork(command, params)
         case "help":       return try handleHelp(command, params)
         default:
             throw TestCommandError("Unknown domain '\(domain)'. Use help.actions for available commands")
@@ -191,6 +199,27 @@ final class MUTestCommandRouter {
             sm.stopAudioTest()
             return ["localAudioTestRunning": sm.isLocalAudioTestRunning]
 
+        case "permission":
+            #if os(iOS) || os(macOS)
+            let status = AVCaptureDevice.authorizationStatus(for: .audio)
+            let label: String
+            switch status {
+            case .authorized:
+                label = "authorized"
+            case .notDetermined:
+                label = "notDetermined"
+            case .denied:
+                label = "denied"
+            case .restricted:
+                label = "restricted"
+            @unknown default:
+                label = "unknown"
+            }
+            return ["microphone": label]
+            #else
+            return ["microphone": "unsupported"]
+            #endif
+
         case "restart":
             guard MUConnectionController.shared()?.isConnected() == true else {
                 throw TestCommandError("Not connected — audio engine not active")
@@ -233,7 +262,7 @@ final class MUTestCommandRouter {
             }
 
         default:
-            throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, toggleMute, toggleDeafen, startTest, stopTest, restart, forceTransmit, status")
+            throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, toggleMute, toggleDeafen, startTest, stopTest, permission, restart, forceTransmit, status")
         }
     }
 
@@ -1162,8 +1191,14 @@ final class MUTestCommandRouter {
             serverManager?.requestModelRebuild(reason: "websocket_refresh_model", debounce: 0)
             return buildStateSnapshot()
 
+        case "simulateLifecycle":
+            guard let phase = params["phase"] as? String else {
+                throw TestCommandError("Missing 'phase'")
+            }
+            return try simulateLifecyclePhase(phase)
+
         default:
-            throw TestCommandError("Unknown app.\(cmd). Available: get, setTab, setViewMode, clearError, clearToast, dismissCert, cancelConnection, refreshModel")
+            throw TestCommandError("Unknown app.\(cmd). Available: get, setTab, setViewMode, clearError, clearToast, dismissCert, cancelConnection, refreshModel, simulateLifecycle")
         }
     }
 
@@ -1455,13 +1490,58 @@ final class MUTestCommandRouter {
         }
     }
 
+    // MARK: - Performance
+
+    private func handlePerformance(_ cmd: String, _ params: [String: Any]) throws -> Any? {
+        switch cmd {
+        case "status":
+            return performanceSnapshot()
+        case "reset":
+            MainThreadPerformanceMonitor.shared.reset()
+            return performanceSnapshot()
+        case "start":
+            MainThreadPerformanceMonitor.shared.start()
+            return performanceSnapshot()
+        case "stop":
+            MainThreadPerformanceMonitor.shared.stop()
+            return performanceSnapshot()
+        default:
+            throw TestCommandError("Unknown performance.\(cmd). Available: status, reset, start, stop")
+        }
+    }
+
+    // MARK: - Network
+
+    private func handleNetwork(_ cmd: String, _ params: [String: Any]) throws -> Any? {
+        switch cmd {
+        case "status":
+            let logLimit = intValue(params["logLimit"]) ?? 20
+            return networkSnapshot(logLimit: logLimit)
+        case "injectUDPStatus":
+            guard let stateName = params["state"] as? String else {
+                throw TestCommandError("Missing 'state'")
+            }
+            guard ["unknown", "unavailable", "available", "stalled", "recovering"].contains(stateName) else {
+                throw TestCommandError("Invalid UDP state. Available: unknown, unavailable, available, stalled, recovering")
+            }
+            NotificationCenter.default.post(
+                name: .muConnectionUDPTransportStatus,
+                object: nil,
+                userInfo: ["stateName": stateName]
+            )
+            return networkSnapshot(logLimit: intValue(params["logLimit"]) ?? 20)
+        default:
+            throw TestCommandError("Unknown network.\(cmd). Available: status, injectUDPStatus")
+        }
+    }
+
     // MARK: - Help
 
     private func handleHelp(_ cmd: String, _ params: [String: Any]) throws -> Any? {
         return [
             "domains": [
                 "connection": ["connect", "disconnect", "acceptCert", "rejectCert", "status"],
-                "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "restart", "forceTransmit", "status"],
+                "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "permission", "restart", "forceTransmit", "status"],
                 "channel": ["list", "info", "join", "create", "edit", "move", "remove", "listen", "unlisten", "toggleCollapse", "togglePinned", "toggleHidden", "requestACL", "getACL", "setACL", "setAccessTokens", "getAccessTokens", "submitPassword", "scanPermissions", "link", "unlink", "unlinkAll", "current"],
                 "message": ["send", "sendTree", "sendPrivate", "sendImage", "sendPrivateImage", "listImages", "exportImage", "previewImage", "history", "markRead"],
                 "plugin": ["listTracks", "get", "available", "scanPaths", "addScanPath", "removeScanPath", "buffer", "setBuffer", "add", "remove", "move", "setBypass", "setGain", "load", "unload", "parameters", "setParameter", "presets", "savePreset", "applyPreset", "deletePreset", "setSidechain", "getSidechain"],
@@ -1469,11 +1549,13 @@ final class MUTestCommandRouter {
                 "favourite": ["list", "info", "add", "update", "remove", "connect", "pinWidget", "unpinWidget"],
                 "settings": ["get", "set", "remove", "list"],
                 "state": ["get", "snapshot"],
-                "app": ["get", "setTab", "setViewMode", "clearError", "clearToast", "dismissCert", "cancelConnection", "refreshModel"],
+                "app": ["get", "setTab", "setViewMode", "clearError", "clearToast", "dismissCert", "cancelConnection", "refreshModel", "simulateLifecycle"],
                 "ui": ["get", "open", "dismiss", "back", "root"],
                 "server": ["getBanList", "setBanList", "addBan", "removeBan", "getRegisteredUsers"],
                 "certificate": ["list", "generate", "delete", "import", "export", "currentSession"],
                 "log": ["setLevel", "setEnabled", "getConfig", "setGlobalEnabled", "setFilePersistence", "recent", "clearRecent", "marker", "stream", "streamStatus", "files", "export", "reset"],
+                "performance": ["status", "reset", "start", "stop"],
+                "network": ["status", "injectUDPStatus"],
                 "help": ["actions"]
             ],
             "protocol": [
@@ -1613,6 +1695,8 @@ final class MUTestCommandRouter {
             state["listeningChannels"] = Array(sm.listeningChannels).sorted()
         }
 
+        state["performance"] = performanceSnapshot()
+
         if let ctrl = MUConnectionController.shared(), ctrl.isConnected(), let conn = ctrl.connection {
             state["connectionHostname"] = conn.hostname() ?? ""
             state["connectionPort"] = conn.port()
@@ -1638,12 +1722,208 @@ final class MUTestCommandRouter {
             "activeToast": serializeToast(appState.activeToast),
             "pendingCertTrust": serializePendingCert(appState.pendingCertTrust),
             "viewMode": serverManager?.viewMode == .channel ? "channel" : "server",
+            "performance": performanceSnapshot(),
             "ui": buildUISnapshot()
         ]
     }
 
+    private func simulateLifecyclePhase(_ phase: String) throws -> [String: Any] {
+        var snapshot: [String: Any]
+        #if os(iOS)
+        let application = UIApplication.shared
+        guard let delegate = application.delegate else {
+            throw TestCommandError("UIApplication delegate not available")
+        }
+        switch phase {
+        case "willResignActive":
+            delegate.applicationWillResignActive?(application)
+        case "didBecomeActive":
+            delegate.applicationDidBecomeActive?(application)
+        default:
+            throw TestCommandError("Invalid lifecycle phase. Available: willResignActive, didBecomeActive")
+        }
+        snapshot = buildAppSnapshot()
+        snapshot["lifecycleSupported"] = true
+        #else
+        guard ["willResignActive", "didBecomeActive"].contains(phase) else {
+            throw TestCommandError("Invalid lifecycle phase. Available: willResignActive, didBecomeActive")
+        }
+        snapshot = buildAppSnapshot()
+        snapshot["lifecycleSupported"] = false
+        #endif
+        snapshot["lifecyclePhase"] = phase
+        return snapshot
+    }
+
     private func buildUISnapshot() -> [String: Any] {
         AppState.shared.automationUISnapshot()
+    }
+
+    private func performanceSnapshot() -> [String: Any] {
+        MainThreadPerformanceMonitor.shared.snapshot()
+    }
+
+    private func networkSnapshot(logLimit: Int = 20) -> [String: Any] {
+        let appState = AppState.shared
+        let ctrl = MUConnectionController.shared()
+        let connected = ctrl?.isConnected() ?? false
+        let boundedLogLimit = max(0, min(logLimit, 200))
+        var snapshot: [String: Any] = [
+            "connection": [
+                "connected": connected,
+                "isConnecting": appState.isConnecting,
+                "isReconnecting": appState.isReconnecting,
+                "reconnectAttempt": appState.reconnectAttempt,
+                "reconnectMaxAttempts": appState.reconnectMaxAttempts,
+                "reconnectReason": (appState.reconnectReason ?? NSNull()) as Any,
+                "hasPendingCertTrust": appState.pendingCertTrust != nil
+            ],
+            "settings": [
+                "forceTCP": UserDefaults.standard.bool(forKey: "NetworkForceTCP"),
+                "autoReconnect": UserDefaults.standard.object(forKey: "NetworkAutoReconnect") as? Bool ?? true,
+                "enableQoS": UserDefaults.standard.object(forKey: "NetworkQoS") as? Bool ?? true,
+                "reconnectMaxAttempts": UserDefaults.standard.object(forKey: "NetworkReconnectMaxAttempts") as? Int ?? 10,
+                "reconnectInterval": UserDefaults.standard.object(forKey: "NetworkReconnectInterval") as? Double ?? 1.0
+            ],
+            "recentNetworkLogs": LogManager.shared.getRecentEntries(
+                limit: boundedLogLimit,
+                category: .network,
+                minimumLevel: .debug
+            ),
+            "timeline": networkTimeline(limit: boundedLogLimit)
+        ]
+
+        if connected, let conn = ctrl?.connection {
+            let udpState = conn.udpTransportState()
+            let good = Int(conn.lastGood())
+            let late = Int(conn.lastLate())
+            let lost = Int(conn.lastLost())
+            let totalPackets = good + late + lost
+            var transport: [String: Any] = [
+                "hostname": conn.hostname() ?? "",
+                "port": conn.port(),
+                "udpState": udpTransportStateName(udpState),
+                "udpPingMeanMs": roundedMetric(conn.udpPingMeanMs()),
+                "udpPingVarianceMs": roundedMetric(conn.udpPingVarianceMs()),
+                "udpPingSamples": Int(conn.udpPingSamples()),
+                "lastGood": good,
+                "lastLate": late,
+                "lastLost": lost,
+                "packetAccountingTotal": totalPackets,
+                "shouldUseOpus": conn.shouldUseOpus()
+            ]
+            if totalPackets > 0 {
+                transport["packetLossPercent"] = roundedMetric((Double(lost) / Double(totalPackets)) * 100.0)
+                transport["latePacketPercent"] = roundedMetric((Double(late) / Double(totalPackets)) * 100.0)
+            }
+            snapshot["transport"] = transport
+        } else {
+            snapshot["transport"] = [
+                "udpState": "unknown",
+                "udpPingSamples": 0,
+                "packetAccountingTotal": 0
+            ]
+        }
+
+        return snapshot
+    }
+
+    private func networkTimeline(limit: Int) -> [[String: Any]] {
+        guard limit > 0 else { return [] }
+        let categories: [LogCategory] = [.connection, .network, .certificate]
+        let entries = categories.flatMap { category in
+            LogManager.shared.getRecentEntries(limit: limit, category: category, minimumLevel: .debug)
+        }
+        let sortedEntries = entries.sorted { lhs, rhs in
+            let leftTimestamp = lhs["timestamp"] as? String ?? ""
+            let rightTimestamp = rhs["timestamp"] as? String ?? ""
+            if leftTimestamp == rightTimestamp {
+                let leftCategory = lhs["category"] as? String ?? ""
+                let rightCategory = rhs["category"] as? String ?? ""
+                return leftCategory < rightCategory
+            }
+            return leftTimestamp < rightTimestamp
+        }
+        return Array(sortedEntries.suffix(limit)).map(networkTimelineEntry)
+    }
+
+    private func networkTimelineEntry(from entry: [String: Any]) -> [String: Any] {
+        let category = entry["category"] as? String ?? "Unknown"
+        let level = entry["level"] as? String ?? "info"
+        let message = entry["message"] as? String ?? ""
+        return [
+            "timestamp": entry["timestamp"] as? String ?? "",
+            "category": category,
+            "level": level,
+            "kind": networkTimelineKind(category: category, level: level, message: message),
+            "message": message,
+            "source": [
+                "file": entry["file"] as? String ?? "",
+                "function": entry["function"] as? String ?? "",
+                "line": entry["line"] as? Int ?? 0
+            ]
+        ]
+    }
+
+    private func networkTimelineKind(category: String, level: String, message: String) -> String {
+        let lowerMessage = message.lowercased()
+        let lowerCategory = category.lowercased()
+        let perfMarkerPrefix = "PERF" + " "
+        if message.contains(perfMarkerPrefix + "connect_begin") {
+            return "connect_begin"
+        }
+        if message.contains(perfMarkerPrefix + "connect_opened") || lowerMessage.contains("connection opened") {
+            return "connect_opened"
+        }
+        if message.contains(perfMarkerPrefix + "connect_ready") {
+            return "connect_ready"
+        }
+        if message.contains(perfMarkerPrefix + "connect_failed") || lowerMessage.contains("connection error") {
+            return "connect_failed"
+        }
+        if lowerMessage.contains("connection closed") {
+            return "connect_closed"
+        }
+        if lowerMessage.contains("reconnect") || lowerMessage.contains("reconnection") {
+            return "reconnect"
+        }
+        if lowerMessage.contains("connecting") {
+            return "connecting"
+        }
+        if lowerMessage.contains("udp transport state") || lowerMessage.contains("udp") {
+            return "udp_state"
+        }
+        if lowerCategory == "certificate" || lowerMessage.contains("certificate trust") {
+            return "certificate"
+        }
+        if level == "error" {
+            return "error"
+        }
+        if level == "warning" {
+            return "warning"
+        }
+        return "log"
+    }
+
+    private func udpTransportStateName(_ state: MKUDPTransportState) -> String {
+        switch state {
+        case MKUDPTransportStateUnavailable:
+            return "unavailable"
+        case MKUDPTransportStateAvailable:
+            return "available"
+        case MKUDPTransportStateStalled:
+            return "stalled"
+        case MKUDPTransportStateRecovering:
+            return "recovering"
+        case MKUDPTransportStateUnknown:
+            fallthrough
+        default:
+            return "unknown"
+        }
+    }
+
+    private func roundedMetric(_ value: Double) -> Double {
+        (value * 100).rounded() / 100
     }
 
     private func buildPluginTrackSnapshot(trackKey: String) -> [String: Any] {

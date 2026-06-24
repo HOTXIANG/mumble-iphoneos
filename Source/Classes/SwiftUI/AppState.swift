@@ -98,7 +98,7 @@ struct CertTrustInfo: Identifiable {
 
 @objc class CertTrustBridge: NSObject {
     @objc static func handleTrustFailure(_ info: NSDictionary) {
-        NSLog("📜 CertTrustBridge.handleTrustFailure called")
+        MumbleLogger.certificate.info("CertTrustBridge: certificate trust failure received")
         let hostname    = info["hostname"]    as? String ?? ""
         let port        = (info["port"]       as? NSNumber)?.intValue ?? 0
         let subjectName = info["subjectName"] as? String ?? "Unknown"
@@ -118,8 +118,7 @@ struct CertTrustInfo: Identifiable {
                 notBefore: notBefore, notAfter: notAfter,
                 isChanged: isChanged
             )
-            NSLog("📜 CertTrustBridge: isConnecting=%d, pendingCertTrust=%@",
-                  state.isConnecting, state.pendingCertTrust != nil ? "SET" : "nil")
+            MumbleLogger.certificate.info("CertTrustBridge: isConnecting=\(state.isConnecting) pendingCertTrust=\(state.pendingCertTrust != nil ? "set" : "nil")")
         }
     }
 }
@@ -178,6 +177,8 @@ class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var lastUDPTransportStateName: String = "unknown"
     private var suppressNextUDPAvailableToast: Bool = false
+    private var lastUDPTransientToastAt: Date = .distantPast
+    private let udpTransientToastCooldown: TimeInterval = 4.0
     
     static let shared = AppState()
     private init() {
@@ -210,7 +211,8 @@ class AppState: ObservableObject {
                 guard let self = self else { return }
                 
                 MumbleLogger.connection.info("Connection opened")
-                     self.suppressNextUDPAvailableToast = true
+                self.suppressNextUDPAvailableToast = true
+                self.lastUDPTransientToastAt = .distantPast
                 if let userInfo = notification.userInfo,
                    let displayName = userInfo["displayName"] as? String {
                     self.serverDisplayName = displayName
@@ -269,6 +271,7 @@ class AppState: ObservableObject {
                 self.isUserAuthenticated = false
                 self.lastUDPTransportStateName = "unknown"
                 self.suppressNextUDPAvailableToast = false
+                self.lastUDPTransientToastAt = .distantPast
                 self.serverDisplayName = nil
                 self.unreadMessageCount = 0
             }
@@ -344,11 +347,11 @@ class AppState: ObservableObject {
                 switch stateName {
                 case "stalled":
                     self.suppressNextUDPAvailableToast = false
-                    self.showToast(message: NSLocalizedString("UDP stalled, recovering audio channel...", comment: "UDP stalled status toast"), type: .error)
+                    self.showUDPTransientToast(message: NSLocalizedString("UDP stalled, recovering audio channel...", comment: "UDP stalled status toast"), type: .error)
                 case "recovering":
                     guard previousStateName == "stalled" else { break }
                     self.suppressNextUDPAvailableToast = false
-                    self.showToast(message: NSLocalizedString("Re-establishing UDP channel...", comment: "UDP recovering status toast"), type: .info)
+                    self.showUDPTransientToast(message: NSLocalizedString("Re-establishing UDP channel...", comment: "UDP recovering status toast"), type: .info)
                 case "available":
                     if self.suppressNextUDPAvailableToast {
                         self.suppressNextUDPAvailableToast = false
@@ -357,7 +360,7 @@ class AppState: ObservableObject {
                     self.showToast(message: NSLocalizedString("UDP channel restored", comment: "UDP available status toast"), type: .success)
                 case "unavailable":
                     self.suppressNextUDPAvailableToast = false
-                    self.showToast(message: NSLocalizedString("UDP unavailable, using TCP tunnel", comment: "UDP unavailable status toast"), type: .info)
+                    self.showUDPTransientToast(message: NSLocalizedString("UDP unavailable, using TCP tunnel", comment: "UDP unavailable status toast"), type: .info)
                 default:
                     break
                 }
@@ -482,6 +485,16 @@ class AppState: ObservableObject {
     }
 
     private var toastWorkItem: DispatchWorkItem?
+
+    private func showUDPTransientToast(message: String, type: AppToast.ToastType) {
+        let now = Date()
+        guard now.timeIntervalSince(lastUDPTransientToastAt) >= udpTransientToastCooldown else {
+            MumbleLogger.connection.debug("Suppressing UDP transient toast during cooldown: \(message)")
+            return
+        }
+        lastUDPTransientToastAt = now
+        showToast(message: message, type: type)
+    }
 
     private func postAutomationUIStateChanged() {
         NotificationCenter.default.post(

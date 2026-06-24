@@ -427,6 +427,125 @@ final class LogManager: @unchecked Sendable {
     }()
 }
 
+#if DEBUG
+@MainActor
+final class MainThreadPerformanceMonitor {
+    static let shared = MainThreadPerformanceMonitor()
+
+    private let intervalSeconds: TimeInterval = 0.5
+    private let stallThresholdMs: Double = 120.0
+    private var interval: DispatchTimeInterval {
+        .milliseconds(Int(intervalSeconds * 1000))
+    }
+    private var timer: DispatchSourceTimer?
+    private var expectedFireTime: DispatchTime?
+    private var consecutiveStallCount = 0
+    private(set) var isRunning = false
+    private(set) var stallCount = 0
+    private(set) var lastLagMs = 0.0
+    private(set) var maxLagMs = 0.0
+    private(set) var lastStallContext: [String: Any] = [:]
+    private(set) var maxStallContext: [String: Any] = [:]
+
+    private init() {}
+
+    func start() {
+        guard !isRunning else { return }
+        isRunning = true
+        expectedFireTime = .now() + interval
+
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(25))
+        timer.setEventHandler { [weak self] in
+            Task { @MainActor in
+                self?.sampleMainThreadResponsiveness()
+            }
+        }
+        self.timer = timer
+        timer.resume()
+        MumbleLogger.ui.debug("MainThreadPerformanceMonitor started interval_ms=\(Int(intervalSeconds * 1000)) threshold_ms=\(Int(stallThresholdMs))")
+    }
+
+    func stop() {
+        guard isRunning else { return }
+        timer?.cancel()
+        timer = nil
+        expectedFireTime = nil
+        consecutiveStallCount = 0
+        isRunning = false
+        MumbleLogger.ui.debug("MainThreadPerformanceMonitor stopped")
+    }
+
+    func reset() {
+        stallCount = 0
+        lastLagMs = 0
+        maxLagMs = 0
+        consecutiveStallCount = 0
+        lastStallContext = [:]
+        maxStallContext = [:]
+    }
+
+    func snapshot() -> [String: Any] {
+        [
+            "isRunning": isRunning,
+            "intervalMs": Int(intervalSeconds * 1000),
+            "thresholdMs": stallThresholdMs,
+            "stallCount": stallCount,
+            "lastLagMs": rounded(lastLagMs),
+            "maxLagMs": rounded(maxLagMs),
+            "lastStallContext": lastStallContext,
+            "maxStallContext": maxStallContext
+        ]
+    }
+
+    private func sampleMainThreadResponsiveness() {
+        let now = DispatchTime.now()
+        let expected = expectedFireTime ?? now
+        let lagNs = now.uptimeNanoseconds > expected.uptimeNanoseconds
+            ? now.uptimeNanoseconds - expected.uptimeNanoseconds
+            : 0
+        let lagMs = Double(lagNs) / 1_000_000.0
+        expectedFireTime = now + interval
+        lastLagMs = lagMs
+        let previousMaxLagMs = maxLagMs
+        maxLagMs = max(maxLagMs, lagMs)
+
+        guard lagMs >= stallThresholdMs else {
+            consecutiveStallCount = 0
+            return
+        }
+
+        stallCount += 1
+        consecutiveStallCount += 1
+
+        let appState = AppState.shared
+        let screen = appState.automationCurrentScreen
+        let sheet = appState.automationPresentedSheet ?? "none"
+        let alert = appState.automationPresentedAlert ?? "none"
+        let connected = appState.isConnected
+        lastStallContext = [
+            "lagMs": rounded(lagMs),
+            "screen": screen,
+            "sheet": sheet,
+            "alert": alert,
+            "connected": connected,
+            "consecutive": consecutiveStallCount
+        ]
+        if lagMs >= previousMaxLagMs {
+            maxStallContext = lastStallContext
+        }
+
+        MumbleLogger.ui.warning(
+            "PERF main_thread_stall lag_ms=\(String(format: "%.2f", lagMs)) threshold_ms=\(String(format: "%.0f", stallThresholdMs)) count=\(stallCount) consecutive=\(consecutiveStallCount) screen=\(screen) sheet=\(sheet) alert=\(alert) connected=\(connected)"
+        )
+    }
+
+    private func rounded(_ value: Double) -> Double {
+        (value * 100).rounded() / 100
+    }
+}
+#endif
+
 // MARK: - Log File Writer
 
 /// 日志文件写入器，写入 App 的 Documents/Logs/ 目录

@@ -99,12 +99,16 @@ extension ServerModelManager {
         pendingAvatarRefreshTask = nil
         pendingPostConnectionActivitiesTask?.cancel()
         pendingPostConnectionActivitiesTask = nil
+        pendingPermissionScanFlushWorkItem?.cancel()
+        pendingPermissionScanFlushWorkItem = nil
 
         userVolumes.removeAll()
         previousMuteStates.removeAll()
         channelsWithPassword.removeAll()
         channelsUserCanEnter.removeAll()
         channelPermissions.removeAll()
+        pendingPermissionScanResults.removeAll()
+        pendingPasswordStatusUpdates.removeAll()
         aclUserNamesById.removeAll()
         pendingACLUserNameQueries.removeAll()
         userAvatars.removeAll()

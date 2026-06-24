@@ -504,7 +504,7 @@ private struct MacAudioOutputSettingsTabView: View {
         Form {
             LabeledContent("Output Volume:") {
                 HStack(spacing: 2) {
-                    Slider(value: $outputVolume, in: 0...3, step: 0.1) { editing in
+                    PercentVolumeSlider(value: $outputVolume) { editing in
                         if !editing { PreferencesModel.shared.notifySettingsChanged() }
                     }
                     Text("\(Int(outputVolume * 100))%")

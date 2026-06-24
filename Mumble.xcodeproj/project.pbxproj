@@ -48,7 +48,6 @@
 		F1A2B3C42F90600100ABC001 /* ServerModelManager+ModelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C42F90600100ABC002 /* ServerModelManager+ModelState.swift */; };
 		F1A2B3C52F90600100ABC001 /* ServerModelManager+Registration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C52F90600100ABC002 /* ServerModelManager+Registration.swift */; };
 		F20581B62F6FD568006BC896 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C62E216A7F000AA092 /* Assets.xcassets */; };
-		F20581BE2F6FD56D006BC896 /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */; };
 		F20581BF2F6FD5D5006BC896 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F26689922EE89F20008FC7EB /* LaunchScreen.storyboard */; platformFilter = ios; };
 		F220ECB42F30E6100017CCCC /* MUCertificateCreationProgressView.m in Sources */ = {isa = PBXBuildFile; fileRef = F220ECB22F30E6100017CCCC /* MUCertificateCreationProgressView.m */; };
 		F220ECD12F30FB1A0017CCCC /* SystemMuteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F220ECCF2F30FB120017CCCC /* SystemMuteManager.swift */; };
@@ -65,7 +64,9 @@
 		F25F34B22F17353F00420631 /* LocalUserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B02F17353500420631 /* LocalUserPreferences.swift */; };
 		F25F34B62F1735DD00420631 /* UserAudioSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F25F34B42F1735D400420631 /* UserAudioSettingsView.swift */; };
 		F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */ = {isa = PBXBuildFile; fileRef = F26689952EE8A46A008FC7EB /* LOGO.psd */; };
+		F266899F2EE8A46A008FC7EB /* NeoMumble.icon in Resources */ = {isa = PBXBuildFile; fileRef = F26689962EE8A46A008FC7EB /* NeoMumble.icon */; };
 		F26689A62EE8A472008FC7EB /* TransparentLogo.png in Resources */ = {isa = PBXBuildFile; fileRef = F26689A42EE8A472008FC7EB /* TransparentLogo.png */; };
+		F27E46A12FEBB2140041217D /* LOGO.psd in Resources */ = {isa = PBXBuildFile; fileRef = F26689952EE8A46A008FC7EB /* LOGO.psd */; };
 		F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AE42EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m */; };
 		F28C6AEC2EE6E52F00DE9CD2 /* PreferencesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEA2EE6E52000DE9CD2 /* PreferencesModel.swift */; };
 		F28C6AF02EE6E55300DE9CD2 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */; };
@@ -410,7 +411,6 @@
 		F2ECCD982F3D283100AEA117 /* HandoffManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffManager.swift; sourceTree = "<group>"; };
 		F2ECCD9F2F3D3C4200AEA117 /* Mumble.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mumble.entitlements; sourceTree = "<group>"; };
 		F2ECCDA02F3D3C6E00AEA117 /* MumbleWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MumbleWidgetExtension.entitlements; sourceTree = "<group>"; };
-		F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = NeoMumble.icon; path = Resources/NeoMumble.icon; sourceTree = "<group>"; };
 		F2FBE1C62E216A7F000AA092 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelDataModels.swift; sourceTree = "<group>"; };
 		F2FF56712E0F711A00D76B49 /* ChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelView.swift; sourceTree = "<group>"; };
@@ -635,7 +635,6 @@
 				F2ECCDA02F3D3C6E00AEA117 /* MumbleWidgetExtension.entitlements */,
 				F2ECCD9F2F3D3C4200AEA117 /* Mumble.entitlements */,
 				F2FBE1C62E216A7F000AA092 /* Assets.xcassets */,
-				F2FBE1C42E2167F4000AA092 /* NeoMumble.icon */,
 				2861C28C116BE90B002B8514 /* Dependencies */,
 				080E96DDFE201D6D7F000001 /* Classes */,
 				29B97315FDCFA39411CA2CEA /* Other Sources */,
@@ -1022,9 +1021,9 @@
 			isa = PBXResourcesBuildPhase;
 			files = (
 				F266899E2EE8A46A008FC7EB /* LOGO.psd in Resources */,
-				F20581BE2F6FD56D006BC896 /* NeoMumble.icon in Resources */,
 				F2E9AFD42F9E03050031F3EA /* TransparentLogoPurpleGlass.png in Resources */,
 				F23EEF832F4563E100743254 /* TransparentLogoWhite.png in Resources */,
+				F266899F2EE8A46A008FC7EB /* NeoMumble.icon in Resources */,
 				F20581B62F6FD568006BC896 /* Assets.xcassets in Resources */,
 				F20581BF2F6FD5D5006BC896 /* LaunchScreen.storyboard in Resources */,
 				F23EEF812F4563DD00743254 /* TransparentLogoBlack.png in Resources */,
@@ -1040,6 +1039,7 @@
 		F2CBB0492F090CE200D88E21 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				F27E46A12FEBB2140041217D /* LOGO.psd in Resources */,
 			);
 		};
 /* End PBXResourcesBuildPhase section */
@@ -1260,7 +1260,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
@@ -1295,7 +1295,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1333,7 +1333,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1364,7 +1364,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1414,7 +1414,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1445,7 +1445,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1495,7 +1495,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1526,7 +1526,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1621,7 +1621,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1659,7 +1659,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1722,7 +1722,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1754,7 +1754,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1816,7 +1816,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1848,7 +1848,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1910,7 +1910,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 500800000;
+				CURRENT_PROJECT_VERSION = 600000000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1942,7 +1942,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 5.8.0;
+				MARKETING_VERSION = 6.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (

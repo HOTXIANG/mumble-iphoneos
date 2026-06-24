@@ -43,6 +43,22 @@ struct AudioPluginStartupRecoveryContext: Sendable {
     let hadUncleanExitWithPlugins: Bool
 }
 
+private enum AudioPluginLastLifecycleState: String {
+    case active
+    case inactive
+    case background
+    case terminating
+
+    var canBeCrashCandidate: Bool {
+        switch self {
+        case .active, .inactive:
+            return true
+        case .background, .terminating:
+            return false
+        }
+    }
+}
+
 /// Manages the audio plugin rack persistence and initialization.
 /// This manager loads saved plugin chains on app startup and syncs them to MKAudio.
 @MainActor
@@ -66,6 +82,7 @@ final class AudioPluginRackManager: ObservableObject {
     private let pluginPresetsKey = "AudioPluginPresetsV1"
     private let dspPendingVerificationKey = "AudioPluginDSPPendingVerification"
     private let cleanExitKey = "AudioPluginCleanExit"
+    private let lastLifecycleStateKey = "AudioPluginLastLifecycleState"
     private var pendingPluginChainSaveWorkItem: DispatchWorkItem?
 
     /// Tracks that have been synced to DSP but not yet verified as running safely.
@@ -83,22 +100,29 @@ final class AudioPluginRackManager: ObservableObject {
 
     func startupRecoveryContext() -> AudioPluginStartupRecoveryContext {
         let pendingTracks = UserDefaults.standard.stringArray(forKey: dspPendingVerificationKey) ?? []
-        let cleanExitValue = UserDefaults.standard.object(forKey: cleanExitKey) as? Bool
-        let hasPlugins = pluginChainByTrack.values.contains { !$0.isEmpty }
-        let hadUncleanExitWithPlugins = (cleanExitValue == false) && hasPlugins
+        let lastLifecycleState = UserDefaults.standard.string(forKey: lastLifecycleStateKey)
+            .flatMap(AudioPluginLastLifecycleState.init(rawValue:))
+        let hasCrashCandidatePendingTracks = !pendingTracks.isEmpty && (lastLifecycleState?.canBeCrashCandidate ?? true)
+
+        if !pendingTracks.isEmpty && !hasCrashCandidatePendingTracks {
+            UserDefaults.standard.removeObject(forKey: dspPendingVerificationKey)
+            MumbleLogger.plugin.info("AudioPluginRackManager: cleared stale DSP recovery marker from non-crash lifecycle state")
+        }
+
         return AudioPluginStartupRecoveryContext(
-            shouldOfferSafeMode: !pendingTracks.isEmpty || hadUncleanExitWithPlugins,
-            pendingTrackKeys: pendingTracks,
-            hadUncleanExitWithPlugins: hadUncleanExitWithPlugins
+            shouldOfferSafeMode: hasCrashCandidatePendingTracks,
+            pendingTrackKeys: hasCrashCandidatePendingTracks ? pendingTracks : [],
+            hadUncleanExitWithPlugins: false
         )
     }
 
     /// Called on app startup to initialize the audio rack.
     /// Loads persisted plugins and syncs them to MKAudio unless safe mode is enabled.
     func initializeOnStartup(useSafeMode: Bool) async {
-        NSLog("AudioPluginRackManager: Initializing on startup")
+        MumbleLogger.plugin.info("AudioPluginRackManager: initializing on startup")
         isSafeModeActive = useSafeMode
         UserDefaults.standard.set(false, forKey: cleanExitKey)
+        markLifecycleState(.active)
 
         // Sync buffer frames setting
         let bufferFrames = UserDefaults.standard.integer(forKey: "AudioPluginHostBufferFrames")
@@ -109,7 +133,7 @@ final class AudioPluginRackManager: ObservableObject {
             loadingPluginIDs = []
             syncAllDSPChains()
             syncAllTrackSendRouting()
-            NSLog("AudioPluginRackManager: Safe mode active, skipped loading persisted plugins")
+            MumbleLogger.plugin.warning("AudioPluginRackManager: safe mode active, skipped loading persisted plugins")
             return
         }
 
@@ -127,12 +151,29 @@ final class AudioPluginRackManager: ObservableObject {
     func markCleanExit() {
         UserDefaults.standard.removeObject(forKey: dspPendingVerificationKey)
         UserDefaults.standard.set(true, forKey: cleanExitKey)
+        markLifecycleState(.terminating)
         dspVerificationTimer?.invalidate()
         dspVerificationTimer = nil
     }
 
+    func markAppActive() {
+        markLifecycleState(.active)
+    }
+
+    func markAppInactive() {
+        markLifecycleState(.inactive)
+    }
+
+    func markAppBackgrounded() {
+        markLifecycleState(.background)
+    }
+
     func currentTrackKeys() -> [String] {
         ["input", "sidetone", "masterBus1", "masterBus2"]
+    }
+
+    private func markLifecycleState(_ state: AudioPluginLastLifecycleState) {
+        UserDefaults.standard.set(state.rawValue, forKey: lastLifecycleStateKey)
     }
 
     func replaceRemoteUserTrackChains(_ remoteUserChains: [String: [TrackPlugin]]) {
@@ -411,7 +452,7 @@ final class AudioPluginRackManager: ObservableObject {
             return
         }
         pluginChainByTrack = decoded
-        NSLog("AudioPluginRackManager: Loaded \(decoded.count) track chains from persistence")
+        MumbleLogger.plugin.info("AudioPluginRackManager: loaded \(decoded.count) track chains from persistence")
     }
 
     func savePluginChainState() {
@@ -460,13 +501,13 @@ final class AudioPluginRackManager: ObservableObject {
             }
 
         guard !targets.isEmpty else {
-            NSLog("AudioPluginRackManager: No persisted plugins to load")
+            MumbleLogger.plugin.debug("AudioPluginRackManager: no persisted plugins to load")
             // Still sync the empty chain to ensure the rack is active
             syncAllDSPChains()
             return
         }
 
-        NSLog("AudioPluginRackManager: Loading \(targets.count) persisted plugins")
+        MumbleLogger.plugin.info("AudioPluginRackManager: loading \(targets.count) persisted plugins")
 
         for plugin in targets {
             _ = await loadAudioUnit(for: plugin, allowInProcessFallback: true)
@@ -529,7 +570,7 @@ final class AudioPluginRackManager: ObservableObject {
         }
         lastLoadErrorByPlugin[plugin.id] = nil
         syncDSPChain(for: trackKey)
-        NSLog("AudioPluginRackManager: Loaded AU '\(plugin.name)' for track \(trackKey)")
+        MumbleLogger.plugin.info("AudioPluginRackManager: loaded AU '\(plugin.name)' for track \(trackKey)")
         return true
     }
 
@@ -573,7 +614,7 @@ final class AudioPluginRackManager: ObservableObject {
             } else if trackKey == "masterBus2" {
                 MKAudio.shared().setRemoteBus2AudioUnitChain([])
             }
-            NSLog("AudioPluginRackManager: Safe mode active, synced empty DSP chain for \(trackKey)")
+            MumbleLogger.plugin.debug("AudioPluginRackManager: safe mode active, synced empty DSP chain for \(trackKey)")
             return
         }
         let chain = activeProcessorChain(for: trackKey)
@@ -602,7 +643,7 @@ final class AudioPluginRackManager: ObservableObject {
         // remoteUser: tracks are synced via AudioPluginMixerView which holds the hash→session mapping
 
         if logSync {
-            NSLog("AudioPluginRackManager: Synced DSP chain for \(trackKey) with \(chain.count) processors")
+            MumbleLogger.plugin.debug("AudioPluginRackManager: synced DSP chain for \(trackKey) with \(chain.count) processors")
         }
     }
 
@@ -613,7 +654,7 @@ final class AudioPluginRackManager: ObservableObject {
         dspVerificationTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.markDSPVerified()
-                NSLog("AudioPluginRackManager: DSP verified safe after 5s")
+                MumbleLogger.plugin.info("AudioPluginRackManager: DSP verified safe after 5s")
             }
         }
     }
@@ -1042,7 +1083,7 @@ final class AudioPluginRackManager: ObservableObject {
             allowInProcessFallback: allowInProcessFallback
         ) {
             if requiredChannels == 2 {
-                NSLog("AudioPluginRackManager: Failed to load AU with 2 channels, trying 1 channel")
+                MumbleLogger.plugin.warning("AudioPluginRackManager: failed to load AU with 2 channels, trying 1 channel")
                 if let monoError = await tryInstantiateWithChannels(
                     description: description,
                     channels: 1,
@@ -1182,13 +1223,13 @@ final class AudioPluginRackManager: ObservableObject {
             if filteredChain.count != chain.count {
                 pluginChainByTrack[trackKey] = filteredChain
                 modified = true
-                NSLog("AudioPluginRackManager: Removed \(chain.count - filteredChain.count) legacy filesystem plugin(s) from track '\(trackKey)'")
+                MumbleLogger.plugin.info("AudioPluginRackManager: removed \(chain.count - filteredChain.count) legacy filesystem plugin(s) from track '\(trackKey)'")
             }
         }
 
         if modified {
             savePluginChainState()
-            NSLog("AudioPluginRackManager: Saved cleaned plugin chain after removing legacy filesystem plugins")
+            MumbleLogger.plugin.info("AudioPluginRackManager: saved cleaned plugin chain after removing legacy filesystem plugins")
         }
     }
 }

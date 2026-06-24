@@ -54,14 +54,9 @@ static os_log_type_t _MumbleLogTypeFromLevel(int level) {
     }
 }
 
-void MumbleLogFormatted(int level, const char *category,
-                        const char *file, const char *function, int line,
-                        NSString *format, ...) {
-    va_list args;
-    va_start(args, format);
-    NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
-    va_end(args);
-
+static void _MumbleLogDispatch(int level, const char *category,
+                               const char *file, const char *function, int line,
+                               NSString *msg) {
     MumbleLogBridgeFn bridge = _ResolvedBridge();
     if (bridge) {
         // Swift LogManager 可用（主应用内运行）
@@ -72,4 +67,21 @@ void MumbleLogFormatted(int level, const char *category,
                          _MumbleLogTypeFromLevel(level),
                          "%{public}@", msg);
     }
+}
+
+void MumbleLogFormatted(int level, const char *category,
+                        const char *file, const char *function, int line,
+                        NSString *format, ...) {
+    va_list args;
+    va_start(args, format);
+    NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
+    va_end(args);
+
+    _MumbleLogDispatch(level, category, file, function, line, msg);
+}
+
+void MumbleLogMessage(int level, const char *category,
+                      NSString *message,
+                      const char *file, const char *function, int line) {
+    _MumbleLogDispatch(level, category, file, function, line, message ?: @"");
 }

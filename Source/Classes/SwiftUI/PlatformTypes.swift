@@ -119,8 +119,9 @@ struct RedGlassCapsuleModifier: ViewModifier {
 }
 
 /// Tinted glass row highlight for channel/user rows.
-/// iOS 26+: `.glassEffect(.clear.interactive().tint(...))` rounded rect
-/// Fallback: translucent background color
+/// iOS 26/macOS 26: clear Liquid Glass.
+/// Newer systems: regular Liquid Glass.
+/// Earlier systems: original translucent background fallback.
 struct TintedGlassRowModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     var isHighlighted: Bool
@@ -141,22 +142,34 @@ struct TintedGlassRowModifier: ViewModifier {
         let highlightTint: Color = colorScheme == .light
             ? highlightColor.opacity(0.28)
             : highlightColor.opacity(0.5)
-        let normalTint: Color = colorScheme == .light
-            ? Color.black.opacity(0.10)
-            : Color.clear
+        let normalTint: Color = Color.clear
 
         if #available(iOS 26.0, macOS 26.0, *) {
-            content
-                .glassEffect(
-                    .clear.interactive().tint(isHighlighted ? highlightTint : normalTint),
-                    in: .rect(cornerRadius: cornerRadius)
-                )
-                .shadow(
-                    color: colorScheme == .light ? .black.opacity(isHighlighted ? 0.08 : 0.06) : .clear,
-                    radius: colorScheme == .light ? 4 : 0,
-                    x: 0,
-                    y: colorScheme == .light ? 1 : 0
-                )
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 26 {
+                content
+                    .glassEffect(
+                        .clear.interactive().tint(isHighlighted ? highlightTint : normalTint),
+                        in: .rect(cornerRadius: cornerRadius)
+                    )
+                    .shadow(
+                        color: colorScheme == .light ? .black.opacity(isHighlighted ? 0.08 : 0.06) : .clear,
+                        radius: colorScheme == .light ? 4 : 0,
+                        x: 0,
+                        y: colorScheme == .light ? 1 : 0
+                    )
+            } else {
+                content
+                    .glassEffect(
+                        .regular.tint(isHighlighted ? highlightTint : normalTint).interactive(),
+                        in: .rect(cornerRadius: cornerRadius)
+                    )
+                    .shadow(
+                        color: colorScheme == .light ? .black.opacity(isHighlighted ? 0.08 : 0.06) : .clear,
+                        radius: colorScheme == .light ? 4 : 0,
+                        x: 0,
+                        y: colorScheme == .light ? 1 : 0
+                    )
+            }
         } else {
             content
                 .background(

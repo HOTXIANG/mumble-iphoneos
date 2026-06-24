@@ -301,7 +301,9 @@ extension ServerModelManager {
 
         // 延迟后关闭扫描标记（给服务器足够时间响应）
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-            self?.isScanningACLs = false
+            guard let self = self else { return }
+            self.flushPendingPermissionScanUpdates(reason: "permission_scan_finished")
+            self.isScanningACLs = false
         }
     }
 

@@ -1,0 +1,5 @@
+{
+  "description": "Known observability-policy violations. Do not add entries unless accepting existing debt intentionally.",
+  "version": 1,
+  "violations": []
+}

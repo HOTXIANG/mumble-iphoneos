@@ -537,6 +537,12 @@ extension ServerModelManager {
             let hasEnter = (permissions & MKPermissionEnter.rawValue) != 0
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                if self.isScanningACLs {
+                    self.pendingPermissionScanResults[channelId] = permissions
+                    self.schedulePermissionScanUpdateFlush()
+                    return
+                }
+
                 // 存储此频道的完整权限位
                 self.channelPermissions[channelId] = permissions
                 // 记录用户有权进入的频道

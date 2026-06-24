@@ -420,8 +420,27 @@ struct WelcomeView: MumbleContentView {
             }
             .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
                 guard let target = notification.userInfo?["target"] as? String else { return }
-                guard target == "preferences" else { return }
+                let preferenceTargets: Set<String> = [
+                    "audioTransmissionSettings",
+                    "advancedAudioSettings",
+                    "notificationSettings",
+                    "ttsSettings",
+                    "certificateSettings",
+                    "logSettings",
+                    "about"
+                ]
+                guard target == "preferences" || preferenceTargets.contains(target) else { return }
                 showingPreferences = true
+                guard preferenceTargets.contains(target),
+                      notification.userInfo?["preferencesRelay"] as? Bool != true else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    MumbleLogger.ui.debug("Relaying automation preference target after sheet presentation: \(target)")
+                    NotificationCenter.default.post(
+                        name: .muAutomationOpenUI,
+                        object: nil,
+                        userInfo: ["target": target, "preferencesRelay": true]
+                    )
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
                 let target = notification.userInfo?["target"] as? String
@@ -433,6 +452,7 @@ struct WelcomeView: MumbleContentView {
                     appState.setAutomationPresentedSheet("preferences")
                 } else {
                     appState.clearAutomationPresentedSheet(ifMatches: "preferences")
+                    appState.setAutomationCurrentScreen("welcome")
                 }
             }
             #if os(iOS)

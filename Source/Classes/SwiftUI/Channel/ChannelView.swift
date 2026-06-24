@@ -2191,6 +2191,7 @@ struct ListenerRow: View {
     let level: Int
     @ObservedObject var serverManager: ServerModelManager
     @State private var hasSpeaker: Bool = false
+    @State private var channelUserSessions: Set<UInt> = []
     
     private var isMyself: Bool {
         return listener == MUConnectionController.shared()?.serverModel?.connectedUser()
@@ -2242,31 +2243,88 @@ struct ListenerRow: View {
         .onAppear {
             refreshSpeakerState()
         }
-        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userTalkStateChangedNotification)) { _ in
-            refreshSpeakerState()
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userTalkStateChangedNotification)) { notification in
+            refreshSpeakerStateIfTalkChangeIsRelevant(notification)
         }
-        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userMovedNotification)) { _ in
-            refreshSpeakerState()
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userMovedNotification)) { notification in
+            refreshSpeakerStateIfMembershipMayHaveChanged(notification)
         }
-        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userJoinedNotification)) { _ in
-            refreshSpeakerState()
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userJoinedNotification)) { notification in
+            refreshSpeakerStateIfJoinedUserIsRelevant(notification)
         }
-        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userLeftNotification)) { _ in
-            refreshSpeakerState()
+        .onReceive(NotificationCenter.default.publisher(for: ServerModelNotificationManager.userLeftNotification)) { notification in
+            refreshSpeakerStateIfLeftUserIsRelevant(notification)
         }
     }
 
     private func refreshSpeakerState() {
-        let newValue = serverManager.getSortedUsers(for: channel).contains { user in
-            switch user.talkState().rawValue {
-            case 1, 2, 3:
-                return true
-            default:
-                return false
-            }
+        let users = currentChannelUsers()
+        channelUserSessions = Set(users.map { $0.session() })
+
+        let newValue = users.contains { user in
+            isSpeaking(talkStateRawValue: user.talkState().rawValue)
         }
         if newValue != hasSpeaker {
             hasSpeaker = newValue
+        }
+    }
+
+    private func refreshSpeakerStateIfTalkChangeIsRelevant(_ notification: Notification) {
+        guard let changedSession = notification.userInfo?["userSession"] as? UInt,
+              channelUserSessions.contains(changedSession) else { return }
+
+        if let talkState = notification.userInfo?["talkState"] as? MKTalkState,
+           isSpeaking(talkStateRawValue: talkState.rawValue) {
+            if !hasSpeaker {
+                hasSpeaker = true
+            }
+            return
+        }
+
+        refreshSpeakerState()
+    }
+
+    private func refreshSpeakerStateIfMembershipMayHaveChanged(_ notification: Notification) {
+        guard let user = notification.userInfo?["user"] as? MKUser else {
+            refreshSpeakerState()
+            return
+        }
+
+        let movedSession = user.session()
+        let destinationChannelId = (notification.userInfo?["channel"] as? MKChannel)?.channelId()
+        guard destinationChannelId == channel.channelId() || channelUserSessions.contains(movedSession) else {
+            return
+        }
+
+        refreshSpeakerState()
+    }
+
+    private func refreshSpeakerStateIfJoinedUserIsRelevant(_ notification: Notification) {
+        guard let user = notification.userInfo?["user"] as? MKUser,
+              user.channel()?.channelId() == channel.channelId() else { return }
+        refreshSpeakerState()
+    }
+
+    private func refreshSpeakerStateIfLeftUserIsRelevant(_ notification: Notification) {
+        guard let user = notification.userInfo?["user"] as? MKUser,
+              channelUserSessions.contains(user.session()) else { return }
+        refreshSpeakerState()
+    }
+
+    private func currentChannelUsers() -> [MKUser] {
+        guard let users = channel.users() as? [MKUser] else { return [] }
+        let channelId = channel.channelId()
+        return users.filter { user in
+            user.channel()?.channelId() == channelId
+        }
+    }
+
+    private func isSpeaking(talkStateRawValue: UInt32) -> Bool {
+        switch talkStateRawValue {
+        case 1, 2, 3:
+            return true
+        default:
+            return false
         }
     }
 }

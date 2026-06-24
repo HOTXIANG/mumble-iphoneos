@@ -43,6 +43,22 @@ private struct MessageThumbnailFramePreferenceKey: PreferenceKey {
     }
 }
 
+private struct MessageListContentHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct MessageListViewportHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 // MARK: - 2. iOS 全屏图片预览
 #if os(iOS)
 private struct MessageTopAnchorFramePreferenceKey: PreferenceKey {
@@ -1685,7 +1701,10 @@ struct MessagesList: View {
     @State private var cachedRenderBlocks: [RenderBlock] = []
     @State private var pendingAutoScrollWorkItem: DispatchWorkItem?
     @State private var autoScrollGeneration = 0
+    @State private var messageContentHeight: CGFloat = 0
+    @State private var messageViewportHeight: CGFloat = 0
     
+    private let topID = "topOfMessages"
     private let bottomID = "bottomOfMessages"
 
     private struct SenderIdentity {
@@ -1724,6 +1743,10 @@ struct MessagesList: View {
                         return CGFloat(16)
                         #endif
                     }(), pinnedViews: [.sectionHeaders]) {
+                        Color.clear
+                            .frame(height: 0)
+                            .id(topID)
+
                         ForEach(cachedRenderBlocks) { block in
                             switch block.kind {
                             case .notification(let message):
@@ -1779,8 +1802,24 @@ struct MessagesList: View {
                     .padding(.leading, isSplitLayout ? 4 : 16)
                     .padding(.trailing, 16)
                     .offset(y: layoutCompensationY)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(
+                                key: MessageListContentHeightPreferenceKey.self,
+                                value: geo.size.height
+                            )
+                        }
+                    )
                 }
                 .scrollClipDisabled(true)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: MessageListViewportHeightPreferenceKey.self,
+                            value: geo.size.height
+                        )
+                    }
+                )
                 .safeAreaInset(edge: .bottom) {
                     TextInputBar(
                         text: $newMessage,
@@ -1808,7 +1847,15 @@ struct MessagesList: View {
                 }
                 .onAppear {
                     rebuildRenderBlocks(from: serverManager.messages, reason: "list_appear")
-                    scrollToBottom(proxy: proxy, animated: false)
+                    scheduleAutoScrollToBottom(proxy: proxy, animated: false)
+                }
+                .onPreferenceChange(MessageListContentHeightPreferenceKey.self) { height in
+                    messageContentHeight = height
+                    scrollToDefaultPosition(proxy: proxy, animated: false)
+                }
+                .onPreferenceChange(MessageListViewportHeightPreferenceKey.self) { height in
+                    messageViewportHeight = height
+                    scrollToDefaultPosition(proxy: proxy, animated: false)
                 }
                 .onDisappear {
                     pendingAutoScrollWorkItem?.cancel()
@@ -1919,17 +1966,31 @@ struct MessagesList: View {
         }
     }
 
-    private func scheduleAutoScrollToBottom(proxy: ScrollViewProxy) {
+    private var hasMeasuredMessageLayout: Bool {
+        messageContentHeight > 0 && messageViewportHeight > 0
+    }
+
+    private var messageContentNeedsScrolling: Bool {
+        guard hasMeasuredMessageLayout else { return false }
+        return messageContentHeight > messageViewportHeight + 1
+    }
+
+    private func scheduleAutoScrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         pendingAutoScrollWorkItem?.cancel()
         autoScrollGeneration += 1
         let generation = autoScrollGeneration
 
         let work = DispatchWorkItem {
-            scrollToBottom(proxy: proxy)
+            scrollToDefaultPosition(proxy: proxy, animated: animated)
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                 guard autoScrollGeneration == generation else { return }
-                scrollToBottom(proxy: proxy, animated: false)
+                scrollToDefaultPosition(proxy: proxy, animated: false)
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+                guard autoScrollGeneration == generation else { return }
+                scrollToDefaultPosition(proxy: proxy, animated: false)
             }
         }
 
@@ -1988,8 +2049,18 @@ struct MessagesList: View {
         return false
     }
     
+    private func scrollToDefaultPosition(proxy: ScrollViewProxy, animated: Bool = true) {
+        if serverManager.messages.isEmpty { return }
+        if hasMeasuredMessageLayout && !messageContentNeedsScrolling {
+            proxy.scrollTo(topID, anchor: .top)
+            return
+        }
+        scrollToBottom(proxy: proxy, animated: animated)
+    }
+
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         if serverManager.messages.isEmpty { return }
+        if !hasMeasuredMessageLayout { return }
         if animated {
             withAnimation(.spring(response: 0.3, dampingFraction: 1.0)) {
                 proxy.scrollTo(bottomID, anchor: .bottom)

@@ -102,7 +102,14 @@ extension ServerModelManager {
             }
         }
 
-        if hasDenyEnterAll && hasGrantEnterToken {
+        let hasPassword = hasDenyEnterAll && hasGrantEnterToken
+        if isScanningACLs {
+            pendingPasswordStatusUpdates[channelId] = hasPassword
+            schedulePermissionScanUpdateFlush()
+            return
+        }
+
+        if hasPassword {
             channelsWithPassword.insert(channelId)
         } else {
             channelsWithPassword.remove(channelId)

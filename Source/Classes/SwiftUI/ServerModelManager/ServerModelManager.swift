@@ -98,6 +98,10 @@ class ServerModelManager: ObservableObject {
     
     /// ACL 扫描期间抑制 permission denied 通知
     var isScanningACLs: Bool = false
+    /// 连接初期权限扫描回包会很密集，先批量缓存再发布，避免连续触发 SwiftUI 重绘。
+    var pendingPermissionScanResults: [UInt: UInt32] = [:]
+    var pendingPasswordStatusUpdates: [UInt: Bool] = [:]
+    var pendingPermissionScanFlushWorkItem: DispatchWorkItem?
     var pendingACLUserNameQueries: Set<Int> = []
     
     let tokenHolder = ObserverTokenHolder()

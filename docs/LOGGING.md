@@ -312,7 +312,20 @@ constrained VBR, DTX, FEC
 - `PERF connect_opened`
 - `PERF connect_ready`
 - `PERF rebuild_model_array` / model rebuild timing
+- `PERF main_thread_stall` / Debug 主线程响应性监控
+- `PERF message_render_blocks` / 消息渲染块构建耗时
+- `PERF audio_callback` / 音频 callback 采样耗时
 - `Starting Audio Engine` / audio engine async startup timing
+
+### 主线程卡顿监控
+
+Debug App 启动后会自动启用 `MainThreadPerformanceMonitor`。它每 500ms 在主队列采样一次，如果主线程响应延迟超过 120ms，会写入：
+
+```text
+PERF main_thread_stall lag_ms=... threshold_ms=120 count=... consecutive=... screen=... sheet=... alert=... connected=...
+```
+
+`screen`、`sheet`、`alert` 来自自动化 UI 状态，便于把卡顿和具体页面/弹窗关联起来。`performance.status` WebSocket 命令可以读取当前监控状态、累计 stall 数、最近一次 stall 上下文和最大 stall 上下文。定位掉帧时优先查看 `maxStallContext`，再用 `lastStallContext` 判断是否仍在同一页面或弹窗持续复现。
 
 ## 新增模块日志规范
 
@@ -358,3 +371,7 @@ Xcode 调试运行时，`debug` 及以上日志自动显示在控制台。`verbo
 | 排查插件问题 | `MUMBLE_LOG_VERBOSE=Plugin,Audio` |
 | 只看错误 | `MUMBLE_LOG_LEVEL=error` |
 | 全量日志写文件 | `MUMBLE_LOG_LEVEL=verbose MUMBLE_LOG_FILE=1` |
+
+连接/网络不稳时，先用 `network.status` 采集连接/重连状态、UDP transport state、UDP ping 样本、包统计、最近 Network 日志，以及由 Connection/Network/Certificate 日志归一化出的 `timeline`。`timeline.kind` 会把连接开始、打开、ready、失败、断开、重连、UDP 状态、证书等事件合并成同一条时间线，再结合 `PERF connect_*` marker 判断问题发生在连接阶段、证书阶段、重连阶段还是语音 UDP 路径。离线分析会生成 `networkHealth.status`、`rootCauseHint` 和 `networkIssueKinds`，把网络问题先归到 certificate/TLS、connection failure、reconnect loop、UDP transport、packet loss 或 latency 等问题簇。离线分析时可用 `--require-network-snapshot`、`--max-network-udp-ping-ms`、`--max-network-packet-loss-percent`、`--max-network-timeline-warnings`、`--max-network-timeline-errors` 和 `--max-network-issues` 把网络证据和阈值纳入门禁；长期阈值放在 `Tests/Baselines/performance_budgets.json` 的 `networkBudgets`。
+
+自动化证据中的 `command.send` / `command.response` 会被 `mumble_trace_analyze.py` 汇总为 command latency。排查掉帧或无响应时，先看最慢 MUTestServer action：如果 command latency 本身升高，优先怀疑主线程、命令路由或状态查询被阻塞；如果 command latency 正常但 PERF 指标或 `performance.status` 变差，再继续追业务路径。

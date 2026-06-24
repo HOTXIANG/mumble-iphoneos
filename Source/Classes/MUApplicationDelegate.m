@@ -283,6 +283,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 - (void) applicationWillTerminate:(UIApplication *)application {
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"AudioPluginDSPPendingVerification"];
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"AudioPluginCleanExit"];
+    [[NSUserDefaults standardUserDefaults] setObject:@"terminating" forKey:@"AudioPluginLastLifecycleState"];
     [MUDatabase teardown];
     
     if (@available(iOS 16.1, *)) {
@@ -463,6 +464,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 }
 
 - (void) applicationWillResignActive:(UIApplication *)application {
+    [[NSUserDefaults standardUserDefaults] setObject:@"inactive" forKey:@"AudioPluginLastLifecycleState"];
+
     // If we have any active connections, don't stop MKAudio. This is
     // for 'clicking-the-home-button' invocations of this method.
     //
@@ -482,6 +485,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 }
 
 - (void) applicationDidBecomeActive:(UIApplication *)application {
+    [[NSUserDefaults standardUserDefaults] setObject:@"active" forKey:@"AudioPluginLastLifecycleState"];
+
     // It is possible that we will become active after a phone call has ended.
     // In the case of phone calls, MKAudio will automatically stop itself, to
     // allow the phone call to go through. However, once we're back inside the
@@ -504,6 +509,10 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
         MULogInfo(General, @"No active server connection on foreground. Stopping MKAudio.");
         [[MKAudio sharedAudio] stop];
     }
+}
+
+- (void) applicationDidEnterBackground:(UIApplication *)application {
+    [[NSUserDefaults standardUserDefaults] setObject:@"background" forKey:@"AudioPluginLastLifecycleState"];
 }
 
 @end

@@ -120,6 +120,64 @@ struct SettingsColorSchemeOverrideModifier: ViewModifier {
     }
 }
 
+struct PercentVolumeSlider: View {
+    private let value: Binding<Double>
+    private let range: ClosedRange<Double>
+    private let onEditingChanged: (Bool) -> Void
+    private let unityDetent = 1.0
+    private let snapThreshold = 0.025
+    private let feedback = PlatformImpactFeedback(style: .light)
+
+    init(
+        value: Binding<Double>,
+        range: ClosedRange<Double> = 0...3,
+        onEditingChanged: @escaping (Bool) -> Void = { _ in }
+    ) {
+        self.value = value
+        self.range = range
+        self.onEditingChanged = onEditingChanged
+    }
+
+    init(
+        value: Binding<Float>,
+        range: ClosedRange<Double> = 0...3,
+        onEditingChanged: @escaping (Bool) -> Void = { _ in }
+    ) {
+        self.value = Binding<Double>(
+            get: { Double(value.wrappedValue) },
+            set: { value.wrappedValue = Float($0) }
+        )
+        self.range = range
+        self.onEditingChanged = onEditingChanged
+    }
+
+    var body: some View {
+        Slider(value: snappedValue, in: range) { editing in
+            if editing {
+                feedback.prepare()
+            }
+            onEditingChanged(editing)
+        }
+    }
+
+    private var snappedValue: Binding<Double> {
+        Binding(
+            get: { value.wrappedValue },
+            set: { newValue in
+                let clamped = min(max(newValue, range.lowerBound), range.upperBound)
+                let shouldSnap = abs(clamped - unityDetent) <= snapThreshold
+                let nextValue = shouldSnap ? unityDetent : clamped
+                let wasAtDetent = abs(value.wrappedValue - unityDetent) <= .ulpOfOne
+                value.wrappedValue = nextValue
+                if shouldSnap && !wasAtDetent {
+                    feedback.impactOccurred()
+                }
+            }
+        )
+    }
+
+}
+
 private final class OverridableMainBundle: Bundle, @unchecked Sendable {
     override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
         if let bundle = objc_getAssociatedObject(self, &LanguageBundleAssociation.key) as? Bundle {

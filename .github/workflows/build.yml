@@ -1,5 +1,23 @@
 name: Build
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      real_app_probe:
+        description: 'Build and launch the Debug app, then run MUTestServer probe suite'
+        required: false
+        type: boolean
+        default: false
+      real_app_probe_platform:
+        description: 'Platform for the real-app probe'
+        required: false
+        type: choice
+        default: ios-simulator
+        options:
+          - ios-simulator
+          - ipados-simulator
+          - macos
 env:
   buildDir: ${{ github.workspace }}/build/
 
@@ -13,6 +31,32 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '16.2'
+      - name: Automation tooling self-test
+        env:
+          MUMBLE_KEEP_ARTIFACTS: '1'
+        run: |
+          sh Scripts/mumble_automation_check.sh
+      - name: Real-app probe
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.real_app_probe }}
+        run: |
+          set +e
+          Scripts/mumble_real_app_probe.sh --platform "${{ inputs.real_app_probe_platform }}" --scenario all --repeat 2
+          probe_rc=$?
+          if [ -d Tests/Artifacts/real-app ]; then
+            {
+              echo "## Mumble Real-App Probe Manifests"
+              echo
+              python3 Scripts/mumble_manifest_summarize.py Tests/Artifacts/real-app --markdown
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$probe_rc"
+      - name: Upload automation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mumble-automation-evidence
+          path: Tests/Artifacts
+          if-no-files-found: ignore
       - name: Build
         run: |
           gem install --verbose xcpretty

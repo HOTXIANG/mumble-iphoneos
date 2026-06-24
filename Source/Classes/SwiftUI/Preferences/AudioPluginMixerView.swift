@@ -2511,7 +2511,7 @@ struct AudioPluginMixerView: View {
         let masterBus1Targets = targets.filter { plugin in
             pluginChainByTrack["masterBus1"]?.contains(where: { $0.id == plugin.id }) == true
         }.count
-        NSLog("MKAudioProbe: loadPersistedAudioUnits targets=\(targets.count) masterBus1Targets=\(masterBus1Targets)")
+        MumbleLogger.plugin.debug("MKAudioProbe: loadPersistedAudioUnits targets=\(targets.count) masterBus1Targets=\(masterBus1Targets)")
 
         isLoadingPersistedPlugins = true
         defer { isLoadingPersistedPlugins = false }
@@ -3012,7 +3012,7 @@ struct AudioPluginMixerView: View {
         ) {
             // If required channels is 2 and failed, try with 1 channel (mono plugins)
             if requiredChannels == 2 {
-                NSLog("MKAudio: Failed to load AU with 2 channels, trying 1 channel (mono)")
+                MumbleLogger.plugin.warning("MKAudio: failed to load AU with 2 channels, trying 1 channel (mono)")
                 if let monoError = await tryInstantiateWithChannels(
                     description: description,
                     channels: 1,
@@ -3052,7 +3052,7 @@ struct AudioPluginMixerView: View {
 
         if let unitOut, self.configureAudioUnit(unitOut, format: format) {
             self.loadedAudioUnits[loadedKey] = unitOut
-            NSLog("MKAudio: AU loaded successfully with %lu channels (loadOutOfProcess)", UInt(channels))
+            MumbleLogger.plugin.info("MKAudio: AU loaded successfully with \(channels) channels (loadOutOfProcess)")
             return nil
         }
 
@@ -3064,7 +3064,7 @@ struct AudioPluginMixerView: View {
 
         if let unitDefault, self.configureAudioUnit(unitDefault, format: format) {
             self.loadedAudioUnits[loadedKey] = unitDefault
-            NSLog("MKAudio: AU loaded successfully with %lu channels (default)", UInt(channels))
+            MumbleLogger.plugin.info("MKAudio: AU loaded successfully with \(channels) channels (default)")
             return nil
         }
 
@@ -3077,7 +3077,7 @@ struct AudioPluginMixerView: View {
 
         if let unitIn, self.configureAudioUnit(unitIn, format: format) {
             self.loadedAudioUnits[loadedKey] = unitIn
-            NSLog("MKAudio: AU loaded successfully with %lu channels (loadInProcess)", UInt(channels))
+            MumbleLogger.plugin.info("MKAudio: AU loaded successfully with \(channels) channels (loadInProcess)")
             return nil
         }
 
@@ -3095,7 +3095,7 @@ struct AudioPluginMixerView: View {
 
         if let unitDefault, self.configureAudioUnit(unitDefault, format: format) {
             self.loadedAudioUnits[loadedKey] = unitDefault
-            NSLog("MKAudio: AU loaded successfully with %lu channels", UInt(channels))
+            MumbleLogger.plugin.info("MKAudio: AU loaded successfully with \(channels) channels")
             return nil
         }
 

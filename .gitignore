@@ -1,4 +1,6 @@
 .DS_Store
+__pycache__/
+*.pyc
 
 # Xcode user state
 *.pbxuser
@@ -23,6 +25,7 @@ DerivedDataTemp/
 *.xcresult
 *.xccovreport
 *.xccovarchive
+Tests/Artifacts/
 
 # Local dependency caches and environments
 .build/
