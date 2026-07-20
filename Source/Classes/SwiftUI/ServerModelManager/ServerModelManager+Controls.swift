@@ -181,9 +181,9 @@ extension ServerModelManager {
         #if os(iOS)
         captureLocalAudioTestSystemMuteStateIfNeeded()
         #endif
-        Task.detached(priority: .userInitiated) {
+        Task.detached(priority: .userInitiated) { [weak self] in
             MKAudio.shared().start()
-            Task { @MainActor [weak self] in
+            await MainActor.run { [weak self] in
                 guard let self, self.localAudioTestStartSequence == startSequence else { return }
                 self.isLocalAudioTestStarting = false
                 guard self.isLocalAudioTestRunning else { return }

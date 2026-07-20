@@ -28,11 +28,19 @@
     BOOL                      _connectionActive;
     NSString                  *_lastAudioRestartSignature;
     NSArray<NSString *>       *_pendingDeepLinkChannelPath;
+    NSTimer                   *_backgroundAudioWatchdogTimer;
 }
 - (void) setupAudio;
 - (void) forceKeyboardLoad;
 - (BOOL) handleMumbleURL:(NSURL *)url;
 - (BOOL) hasActiveServerConnection;
+- (void) startBackgroundAudioWatchdogIfNeeded;
+- (void) stopBackgroundAudioWatchdog;
+- (void) backgroundAudioWatchdogFired:(NSTimer *)timer;
+- (void) ensureActiveConnectionAudioRunningWithReason:(NSString *)reason;
+- (void) markActiveConnectionSessionStarted;
+- (void) markActiveConnectionSessionEndedCleanly;
+- (void) reportPreviousActiveConnectionCrashIfNeeded;
 - (NSArray<NSString *> *) decodedChannelPathFromURL:(NSURL *)url;
 - (BOOL) joinChannelPathComponents:(NSArray<NSString *> *)pathComponents onServerModel:(MKServerModel *)serverModel;
 @end
@@ -41,13 +49,12 @@
 
     NSTimeInterval _lastAudioRestartTime;
 
+static NSString *const MUActiveConnectionUncleanExitKey = @"MumbleActiveConnectionUncleanExit";
+static NSString *const MUActiveConnectionLifecycleKey = @"MumbleActiveConnectionLifecycleState";
+static NSString *const MUActiveConnectionHeartbeatKey = @"MumbleActiveConnectionHeartbeat";
+
 static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     NSArray<NSString *> *components = @[
-        [defaults stringForKey:@"AudioTransmitMethod"] ?: @"vad",
-        [defaults stringForKey:@"AudioVADKind"] ?: @"amplitude",
-        @([defaults doubleForKey:@"AudioVADBelow"]).stringValue,
-        @([defaults doubleForKey:@"AudioVADAbove"]).stringValue,
-        @([defaults doubleForKey:@"AudioVADHoldSeconds"]).stringValue,
         [defaults stringForKey:@"AudioQualityKind"] ?: @"balanced",
         @([defaults doubleForKey:@"AudioMicBoost"]).stringValue,
         @([defaults boolForKey:@"AudioStereoInput"]).stringValue,
@@ -64,6 +71,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 }
 
 - (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    [self reportPreviousActiveConnectionCrashIfNeeded];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(connectionOpened:) name:MUConnectionOpenedNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(connectionClosed:) name:MUConnectionClosedNotification object:nil];
@@ -281,6 +289,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 }
 
 - (void) applicationWillTerminate:(UIApplication *)application {
+    [self stopBackgroundAudioWatchdog];
+    [self markActiveConnectionSessionEndedCleanly];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"AudioPluginDSPPendingVerification"];
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"AudioPluginCleanExit"];
     [[NSUserDefaults standardUserDefaults] setObject:@"terminating" forKey:@"AudioPluginLastLifecycleState"];
@@ -297,13 +307,6 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     NSString *restartSignature = MURestartSignatureFromDefaults(defaults);
     MKAudioSettings settings;
     memset(&settings, 0, sizeof(settings));
-
-    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
-    if (now - _lastAudioRestartTime < 0.5) {
-        MULogDebug(audio, @"Audio restart ignored (too frequent)");
-        return;
-    }
-    _lastAudioRestartTime = now;
     
     if ([[defaults stringForKey:@"AudioTransmitMethod"] isEqualToString:@"vad"])
         settings.transmitType = MKTransmitTypeVAD;
@@ -394,6 +397,14 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     BOOL shouldRestart = audioActive
         && _lastAudioRestartSignature != nil
         && ![_lastAudioRestartSignature isEqualToString:restartSignature];
+    if (shouldRestart) {
+        NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+        if (now - _lastAudioRestartTime < 0.5) {
+            MULogDebug(audio, @"Audio restart ignored (too frequent)");
+            return;
+        }
+        _lastAudioRestartTime = now;
+    }
     [audio updateAudioSettings:&settings];
     [audio setPluginHostBufferFrames:(NSUInteger)MAX(64, [defaults integerForKey:@"AudioPluginHostBufferFrames"])];
     [audio setInputTrackPreviewGain:[defaults floatForKey:@"AudioPluginInputTrackGain"]
@@ -436,6 +447,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 
 - (void) connectionOpened:(NSNotification *)notification {
     _connectionActive = YES;
+    [self markActiveConnectionSessionStarted];
+    [self startBackgroundAudioWatchdogIfNeeded];
     if (_pendingDeepLinkChannelPath.count > 0) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             MUConnectionController *connController = [MUConnectionController sharedController];
@@ -449,6 +462,8 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 - (void) connectionClosed:(NSNotification *)notification {
     _connectionActive = NO;
     _pendingDeepLinkChannelPath = nil;
+    [self stopBackgroundAudioWatchdog];
+    [self markActiveConnectionSessionEndedCleanly];
 }
 
 - (BOOL) hasActiveServerConnection {
@@ -463,8 +478,91 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
     return [self hasActiveServerConnection];
 }
 
+- (void) ensureActiveConnectionAudioRunningWithReason:(NSString *)reason {
+    if (![self hasActiveServerConnection]) {
+        return;
+    }
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:[NSDate date] forKey:MUActiveConnectionHeartbeatKey];
+
+    MKAudio *audio = [MKAudio sharedAudio];
+    if (![audio isRunning]) {
+        MULogWarning(General, @"Active server connection has stopped audio while %@. Restarting MKAudio to preserve background session.", reason ?: @"unknown");
+        [audio start];
+    }
+}
+
+- (void) startBackgroundAudioWatchdogIfNeeded {
+    if (![self hasActiveServerConnection]) {
+        [self stopBackgroundAudioWatchdog];
+        return;
+    }
+
+    if ([UIApplication sharedApplication].applicationState == UIApplicationStateActive) {
+        return;
+    }
+
+    if (_backgroundAudioWatchdogTimer != nil) {
+        return;
+    }
+
+    [self ensureActiveConnectionAudioRunningWithReason:@"background watchdog start"];
+    _backgroundAudioWatchdogTimer = [NSTimer timerWithTimeInterval:10.0
+                                                            target:self
+                                                          selector:@selector(backgroundAudioWatchdogFired:)
+                                                          userInfo:nil
+                                                           repeats:YES];
+    [[NSRunLoop mainRunLoop] addTimer:_backgroundAudioWatchdogTimer forMode:NSRunLoopCommonModes];
+    MULogInfo(General, @"Started background audio watchdog for active server connection.");
+}
+
+- (void) stopBackgroundAudioWatchdog {
+    [_backgroundAudioWatchdogTimer invalidate];
+    _backgroundAudioWatchdogTimer = nil;
+}
+
+- (void) backgroundAudioWatchdogFired:(NSTimer *)timer {
+    (void)timer;
+    if (![self hasActiveServerConnection]) {
+        [self stopBackgroundAudioWatchdog];
+        return;
+    }
+
+    [self ensureActiveConnectionAudioRunningWithReason:@"background watchdog tick"];
+}
+
+- (void) markActiveConnectionSessionStarted {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setBool:YES forKey:MUActiveConnectionUncleanExitKey];
+    [defaults setObject:@"active" forKey:MUActiveConnectionLifecycleKey];
+    [defaults setObject:[NSDate date] forKey:MUActiveConnectionHeartbeatKey];
+}
+
+- (void) markActiveConnectionSessionEndedCleanly {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setBool:NO forKey:MUActiveConnectionUncleanExitKey];
+    [defaults setObject:@"closed" forKey:MUActiveConnectionLifecycleKey];
+    [defaults removeObjectForKey:MUActiveConnectionHeartbeatKey];
+}
+
+- (void) reportPreviousActiveConnectionCrashIfNeeded {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if (![defaults boolForKey:MUActiveConnectionUncleanExitKey]) {
+        return;
+    }
+
+    NSString *state = [defaults stringForKey:MUActiveConnectionLifecycleKey] ?: @"unknown";
+    NSDate *heartbeat = [defaults objectForKey:MUActiveConnectionHeartbeatKey];
+    MULogWarning(General, @"Previous launch ended unexpectedly while connected. lifecycle=%@ heartbeat=%@", state, heartbeat);
+    [self markActiveConnectionSessionEndedCleanly];
+}
+
 - (void) applicationWillResignActive:(UIApplication *)application {
     [[NSUserDefaults standardUserDefaults] setObject:@"inactive" forKey:@"AudioPluginLastLifecycleState"];
+    if ([self hasActiveServerConnection]) {
+        [[NSUserDefaults standardUserDefaults] setObject:@"inactive" forKey:MUActiveConnectionLifecycleKey];
+    }
 
     // If we have any active connections, don't stop MKAudio. This is
     // for 'clicking-the-home-button' invocations of this method.
@@ -486,6 +584,10 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 
 - (void) applicationDidBecomeActive:(UIApplication *)application {
     [[NSUserDefaults standardUserDefaults] setObject:@"active" forKey:@"AudioPluginLastLifecycleState"];
+    [self stopBackgroundAudioWatchdog];
+    if ([self hasActiveServerConnection]) {
+        [[NSUserDefaults standardUserDefaults] setObject:@"active" forKey:MUActiveConnectionLifecycleKey];
+    }
 
     // It is possible that we will become active after a phone call has ended.
     // In the case of phone calls, MKAudio will automatically stop itself, to
@@ -513,6 +615,10 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 
 - (void) applicationDidEnterBackground:(UIApplication *)application {
     [[NSUserDefaults standardUserDefaults] setObject:@"background" forKey:@"AudioPluginLastLifecycleState"];
+    if ([self hasActiveServerConnection]) {
+        [[NSUserDefaults standardUserDefaults] setObject:@"background" forKey:MUActiveConnectionLifecycleKey];
+        [self startBackgroundAudioWatchdogIfNeeded];
+    }
 }
 
 @end

@@ -10,6 +10,10 @@ import ActivityKit
 
 extension ServerModelManager {
     #if os(iOS)
+    private var liveActivityStaleDate: Date {
+        Date().addingTimeInterval(45)
+    }
+
     private func restartLiveActivityKeepAliveTimer() {
         self.keepAliveTimer?.invalidate()
         self.keepAliveTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
@@ -135,7 +139,7 @@ extension ServerModelManager {
         do {
             let activity = try Activity.request(
                 attributes: attributes,
-                content: .init(state: initialContentState, staleDate: nil),
+                content: .init(state: initialContentState, staleDate: liveActivityStaleDate),
                 pushType: nil
             )
             self.liveActivity = activity
@@ -180,10 +184,11 @@ extension ServerModelManager {
             isSelfDeafened: isSelfDeafened
         )
 
+        let staleDate = liveActivityStaleDate
         nonisolated(unsafe) let activityToUpdate = activity
         Task {
             await activityToUpdate.update(
-                ActivityContent(state: contentState, staleDate: nil)
+                ActivityContent(state: contentState, staleDate: staleDate)
             )
         }
 

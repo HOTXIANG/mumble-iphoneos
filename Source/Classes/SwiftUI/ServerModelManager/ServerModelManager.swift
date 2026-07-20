@@ -203,6 +203,22 @@ class ServerModelManager: ObservableObject {
 
 @objc public class LiveActivityCleanup: NSObject {
     
+    @objc public static func endAllActivitiesIfDisconnected() {
+        #if os(iOS)
+        guard #available(iOS 16.1, *) else { return }
+        let controller = MUConnectionController.existingShared()
+        let hasActiveConnection = controller?.isConnected() == true || controller?.connection != nil
+        guard !hasActiveConnection else { return }
+
+        Task.detached(priority: .utility) {
+            for activity in Activity<MumbleActivityAttributes>.activities {
+                MumbleLogger.general.info("Ending stale Live Activity after disconnected launch: \(activity.id)")
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+        #endif
+    }
+
     /// 阻塞式强制结束所有活动（专用于 App 终止时）
     @objc public static func forceEndAllActivitiesBlocking() {
         #if os(iOS)

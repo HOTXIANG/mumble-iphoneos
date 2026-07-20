@@ -59,6 +59,17 @@ private struct MessageListViewportHeightPreferenceKey: PreferenceKey {
     }
 }
 
+private struct MessageListBottomFramePreferenceKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero {
+            value = next
+        }
+    }
+}
+
 // MARK: - 2. iOS 全屏图片预览
 #if os(iOS)
 private struct MessageTopAnchorFramePreferenceKey: PreferenceKey {
@@ -1703,9 +1714,13 @@ struct MessagesList: View {
     @State private var autoScrollGeneration = 0
     @State private var messageContentHeight: CGFloat = 0
     @State private var messageViewportHeight: CGFloat = 0
+    @State private var isPinnedToBottom = true
+    @State private var hasAppliedInitialLayoutScroll = false
+    @State private var lastObservedMessageCount = 0
     
     private let topID = "topOfMessages"
     private let bottomID = "bottomOfMessages"
+    private let scrollCoordinateSpaceName = "MessagesListScrollView"
 
     private struct SenderIdentity {
         let key: String
@@ -1796,6 +1811,14 @@ struct MessagesList: View {
                         Color.clear
                             .frame(height: 1)
                             .padding(.bottom, 4)
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: MessageListBottomFramePreferenceKey.self,
+                                        value: geo.frame(in: .named(scrollCoordinateSpaceName))
+                                    )
+                                }
+                            )
                             .id(bottomID)
                     }
                     .padding(.top, 16)
@@ -1811,6 +1834,7 @@ struct MessagesList: View {
                         }
                     )
                 }
+                .coordinateSpace(name: scrollCoordinateSpaceName)
                 .scrollClipDisabled(true)
                 .background(
                     GeometryReader { geo in
@@ -1835,8 +1859,29 @@ struct MessagesList: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onReceive(serverManager.$messages) { messages in
+                    let shouldFollowNewMessages = isPinnedToBottom || !messageContentNeedsScrolling || !hasAppliedInitialLayoutScroll
+                    let newMessages: ArraySlice<ChatMessage> = messages.count > lastObservedMessageCount
+                        ? messages.suffix(messages.count - lastObservedMessageCount)
+                        : []
+                    let hasNewSelfAuthoredMessage = newMessages.contains { message in
+                        message.isSentBySelf && message.type != .notification
+                    }
+
                     rebuildRenderBlocks(from: messages, reason: "messages_changed")
-                    scheduleAutoScrollToBottom(proxy: proxy)
+                    lastObservedMessageCount = messages.count
+
+                    if messages.isEmpty {
+                        hasAppliedInitialLayoutScroll = false
+                        pendingAutoScrollWorkItem?.cancel()
+                        pendingAutoScrollWorkItem = nil
+                        return
+                    }
+
+                    if !hasAppliedInitialLayoutScroll {
+                        applyInitialLayoutScrollIfReady(proxy: proxy)
+                    } else if shouldFollowNewMessages || hasNewSelfAuthoredMessage {
+                        scheduleAutoScrollToBottom(proxy: proxy, requiresPinnedToBottom: !hasNewSelfAuthoredMessage)
+                    }
                 }
                 .onChange(of: isTextFieldFocused) { _, focused in
                     if focused {
@@ -1847,15 +1892,20 @@ struct MessagesList: View {
                 }
                 .onAppear {
                     rebuildRenderBlocks(from: serverManager.messages, reason: "list_appear")
-                    scheduleAutoScrollToBottom(proxy: proxy, animated: false)
+                    lastObservedMessageCount = serverManager.messages.count
+                    applyInitialLayoutScrollIfReady(proxy: proxy)
                 }
                 .onPreferenceChange(MessageListContentHeightPreferenceKey.self) { height in
                     messageContentHeight = height
-                    scrollToDefaultPosition(proxy: proxy, animated: false)
+                    applyInitialLayoutScrollIfReady(proxy: proxy)
                 }
                 .onPreferenceChange(MessageListViewportHeightPreferenceKey.self) { height in
                     messageViewportHeight = height
-                    scrollToDefaultPosition(proxy: proxy, animated: false)
+                    updatePinnedToBottomState()
+                    applyInitialLayoutScrollIfReady(proxy: proxy)
+                }
+                .onPreferenceChange(MessageListBottomFramePreferenceKey.self) { frame in
+                    updatePinnedToBottomState(bottomFrame: frame)
                 }
                 .onDisappear {
                     pendingAutoScrollWorkItem?.cancel()
@@ -1863,11 +1913,15 @@ struct MessagesList: View {
                 }
                 #if os(iOS)
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                    scheduleAutoScrollToBottom(proxy: proxy)
+                    if isPinnedToBottom {
+                        scheduleAutoScrollToBottom(proxy: proxy, requiresPinnedToBottom: true)
+                    }
                 }
                 #else
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                    scheduleAutoScrollToBottom(proxy: proxy)
+                    if isPinnedToBottom {
+                        scheduleAutoScrollToBottom(proxy: proxy, requiresPinnedToBottom: true)
+                    }
                 }
                 #endif
             }
@@ -1975,21 +2029,51 @@ struct MessagesList: View {
         return messageContentHeight > messageViewportHeight + 1
     }
 
-    private func scheduleAutoScrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+    private func updatePinnedToBottomState(bottomFrame: CGRect? = nil) {
+        guard hasMeasuredMessageLayout, messageContentNeedsScrolling else {
+            isPinnedToBottom = true
+            return
+        }
+
+        if let bottomFrame {
+            let threshold: CGFloat = 24
+            isPinnedToBottom = bottomFrame.maxY <= messageViewportHeight + threshold
+        }
+    }
+
+    private func applyInitialLayoutScrollIfReady(proxy: ScrollViewProxy) {
+        guard !hasAppliedInitialLayoutScroll else { return }
+        guard !serverManager.messages.isEmpty, hasMeasuredMessageLayout else { return }
+        hasAppliedInitialLayoutScroll = true
+        scheduleAutoScrollToBottom(proxy: proxy, animated: false)
+    }
+
+    private func scheduleAutoScrollToBottom(
+        proxy: ScrollViewProxy,
+        animated: Bool = true,
+        requiresPinnedToBottom: Bool = false
+    ) {
         pendingAutoScrollWorkItem?.cancel()
         autoScrollGeneration += 1
         let generation = autoScrollGeneration
 
+        func shouldScroll() -> Bool {
+            !requiresPinnedToBottom || isPinnedToBottom || !messageContentNeedsScrolling
+        }
+
         let work = DispatchWorkItem {
+            guard shouldScroll() else { return }
             scrollToDefaultPosition(proxy: proxy, animated: animated)
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                 guard autoScrollGeneration == generation else { return }
+                guard shouldScroll() else { return }
                 scrollToDefaultPosition(proxy: proxy, animated: false)
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
                 guard autoScrollGeneration == generation else { return }
+                guard shouldScroll() else { return }
                 scrollToDefaultPosition(proxy: proxy, animated: false)
             }
         }

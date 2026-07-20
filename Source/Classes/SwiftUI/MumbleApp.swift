@@ -99,6 +99,9 @@ struct MumbleApp: App {
                     UNUserNotificationCenter.current().delegate = notificationDelegate
 
                     bootstrapAudioPluginRackIfNeeded()
+                    #if os(iOS)
+                    LiveActivityCleanup.endAllActivitiesIfDisconnected()
+                    #endif
 
                     #if DEBUG
                     MainThreadPerformanceMonitor.shared.start()
@@ -167,6 +170,9 @@ struct MumbleApp: App {
             switch newPhase {
             case .active:
                 audioPluginRackManager.markAppActive()
+                #if os(iOS)
+                LiveActivityCleanup.endAllActivitiesIfDisconnected()
+                #endif
             case .inactive:
                 audioPluginRackManager.markAppInactive()
             case .background:

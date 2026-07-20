@@ -260,11 +260,6 @@ class MUMacApplicationDelegate: NSObject, NSApplicationDelegate {
 
     private func audioRestartSignature(defaults: UserDefaults) -> String {
         [
-            defaults.string(forKey: "AudioTransmitMethod") ?? "vad",
-            defaults.string(forKey: "AudioVADKind") ?? "amplitude",
-            String(defaults.double(forKey: "AudioVADBelow")),
-            String(defaults.double(forKey: "AudioVADAbove")),
-            String(defaults.double(forKey: "AudioVADHoldSeconds")),
             defaults.string(forKey: "AudioQualityKind") ?? "balanced",
             String(defaults.double(forKey: "AudioMicBoost")),
             String(defaults.bool(forKey: "AudioStereoOutput")),

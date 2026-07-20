@@ -131,6 +131,7 @@ static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
     CFTimeInterval  _socketConnectedAt;
     BOOL            _connectFlowIsReconnect;
     NSInteger       _connectFlowAttempt;
+    BOOL            _hasJoinedServerForCurrentSession;
     dispatch_queue_t _audioLifecycleQueue;
     dispatch_queue_t _connectionSetupQueue;
     NSUInteger       _audioLifecycleGeneration;
@@ -203,6 +204,7 @@ static MUConnectionController *sSharedConnectionController;
         _socketConnectedAt = 0;
         _connectFlowIsReconnect = NO;
         _connectFlowAttempt = 0;
+        _hasJoinedServerForCurrentSession = NO;
         _audioLifecycleQueue = dispatch_queue_create("cn.hotxiang.Mumble.audioLifecycle", DISPATCH_QUEUE_SERIAL);
         _connectionSetupQueue = dispatch_queue_create("cn.hotxiang.Mumble.connectionSetup", DISPATCH_QUEUE_SERIAL);
         _connectionSetupGeneration = 0;
@@ -263,6 +265,7 @@ static MUConnectionController *sSharedConnectionController;
     _pendingReconnectFailureInfo = nil;
     _suppressReconnectForDisconnect = NO;
     _preserveAudioSessionForReconnect = NO;
+    _hasJoinedServerForCurrentSession = NO;
     [self beginPerformanceConnectFlowIsReconnect:NO attempt:0 reason:@"manual-connect"];
     
     [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
@@ -638,6 +641,7 @@ static MUConnectionController *sSharedConnectionController;
     }
     [self stopNetworkMonitor];
     _preserveAudioSessionForReconnect = NO;
+    _hasJoinedServerForCurrentSession = NO;
 
     if ([_reconnectTimer isValid]) {
         [_reconnectTimer invalidate];
@@ -746,13 +750,6 @@ static MUConnectionController *sSharedConnectionController;
 #pragma mark - MKConnectionDelegate
 
 - (void) connectionOpened:(MKConnection *)conn {
-    // 连接成功，重置重试计数
-    _retryCount = 0;
-    _pendingReconnectFailureInfo = nil;
-#if TARGET_OS_IOS
-    [self endReconnectBackgroundTask];
-#endif
-    
     _socketConnectedAt = MUMonotonicNow();
     if (_connectFlowStartedAt > 0) {
         CFTimeInterval handshakeMs = (_socketConnectedAt - _connectFlowStartedAt) * 1000.0;
@@ -832,6 +829,11 @@ static MUConnectionController *sSharedConnectionController;
               (long)[err code],
               _hostname ?: @"",
               (unsigned long)_port);
+    }
+
+    BOOL shouldUseReconnectPolicy = _hasJoinedServerForCurrentSession || _connectFlowIsReconnect || _retryCount > 0;
+    if (!shouldUseReconnectPolicy) {
+        MULogInfo(Connection, @"Initial join failed before server sync. Showing error without reconnect.");
         [self postErrorWithTitle:title message:message];
         return;
     }
@@ -1127,6 +1129,13 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 - (void) serverModel:(MKServerModel *)model joinedServerAsUser:(MKUser *)user withWelcomeMessage:(MKTextMessage *)welcomeMessage {
+    _hasJoinedServerForCurrentSession = YES;
+    _retryCount = 0;
+    _pendingReconnectFailureInfo = nil;
+#if TARGET_OS_IOS
+    [self endReconnectBackgroundTask];
+#endif
+
     if (_connectFlowStartedAt > 0) {
         CFTimeInterval now = MUMonotonicNow();
         CFTimeInterval totalMs = (now - _connectFlowStartedAt) * 1000.0;
