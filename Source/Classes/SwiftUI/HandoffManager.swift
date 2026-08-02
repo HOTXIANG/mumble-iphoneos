@@ -170,6 +170,13 @@ class HandoffManager: NSObject, ObservableObject {
         
         // 设置 Handoff 相关属性
         activity.isEligibleForHandoff = true
+        // 该活动只用于设备间接力，不进入 Spotlight 或快捷指令捐赠队列。
+        // 显式关闭可避免系统 SetStore/CSInlineDonation 服务异常时产生无关错误日志。
+        activity.isEligibleForSearch = false
+        activity.isEligibleForPublicIndexing = false
+        #if os(iOS)
+        activity.isEligibleForPrediction = false
+        #endif
         activity.title = {
             if let name = displayName, !name.isEmpty {
                 return "Continue on \(name)"

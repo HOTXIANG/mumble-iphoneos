@@ -8,32 +8,137 @@ import UIKit
 #endif
 #if os(macOS)
 import AppKit
+import ImageIO
+import QuickLook
+import QuickLookUI
 #endif
 import UniformTypeIdentifiers
 
 // MARK: - 1. 预览状态模型
+typealias MessageImageLiveSourceFrame = @MainActor () -> CGRect?
+
 struct MessageImageTapPayload {
     let sourceID: String
-    let image: PlatformImage
     let sourceFrame: CGRect?
+    let liveSourceFrame: MessageImageLiveSourceFrame?
 
-    init(sourceID: String, image: PlatformImage, sourceFrame: CGRect? = nil) {
+    init(
+        sourceID: String,
+        sourceFrame: CGRect? = nil,
+        liveSourceFrame: MessageImageLiveSourceFrame? = nil
+    ) {
         self.sourceID = sourceID
-        self.image = image
         self.sourceFrame = sourceFrame
+        self.liveSourceFrame = liveSourceFrame
     }
 }
 
 struct MessageImagePreviewItem: Identifiable {
     let id: String
     let image: PlatformImage
+    let encodedData: Data?
     let sourceFrame: CGRect?
+    let liveSourceFrame: MessageImageLiveSourceFrame?
 }
 
-private struct PendingSendImage: Identifiable {
-    let id = UUID()
-    let image: PlatformImage
+struct MessageImagePreviewGallery {
+    let items: [MessageImagePreviewItem]
+    let selectedIndex: Int
+
+    var selectedItem: MessageImagePreviewItem? {
+        guard items.indices.contains(selectedIndex) else { return nil }
+        return items[selectedIndex]
+    }
+
+    static func make(
+        messages: [ChatMessage],
+        selectedSourceID: String,
+        sourceFrames: [String: CGRect] = [:],
+        selectedSourceFrame: CGRect? = nil,
+        selectedLiveSourceFrame: MessageImageLiveSourceFrame? = nil
+    ) -> MessageImagePreviewGallery? {
+        let items = messages.flatMap { message in
+            message.images.indices.map { imageIndex in
+                let sourceID = "\(message.id.uuidString)-\(imageIndex)"
+                return MessageImagePreviewItem(
+                    id: sourceID,
+                    image: message.images[imageIndex],
+                    encodedData: message.imageData.indices.contains(imageIndex)
+                        ? message.imageData[imageIndex]
+                        : nil,
+                    sourceFrame: sourceID == selectedSourceID
+                        ? (selectedSourceFrame ?? sourceFrames[sourceID])
+                        : sourceFrames[sourceID],
+                    liveSourceFrame: sourceID == selectedSourceID
+                        ? selectedLiveSourceFrame
+                        : nil
+                )
+            }
+        }
+        guard !items.isEmpty,
+              let selectedIndex = items.firstIndex(where: { $0.id == selectedSourceID }) else {
+            return nil
+        }
+        return MessageImagePreviewGallery(items: items, selectedIndex: selectedIndex)
+    }
 }
+
+private final class SendablePlatformImageBox: @unchecked Sendable {
+    let image: PlatformImage
+
+    init(_ image: PlatformImage) {
+        self.image = image
+    }
+}
+
+#if os(macOS)
+@MainActor
+private final class MacThumbnailSourceFrameProvider: ObservableObject {
+    weak var view: NSView?
+
+    var frameOnScreen: CGRect? {
+        guard let view,
+              let window = view.window,
+              !view.bounds.isEmpty else {
+            return nil
+        }
+        let frameInWindow = view.convert(view.bounds, to: nil)
+        let frame = window.convertToScreen(frameInWindow)
+        let scale = window.screen?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
+        let minX = (frame.minX * scale).rounded() / scale
+        let minY = (frame.minY * scale).rounded() / scale
+        let maxX = (frame.maxX * scale).rounded() / scale
+        let maxY = (frame.maxY * scale).rounded() / scale
+        return CGRect(
+            x: minX,
+            y: minY,
+            width: max(1 / scale, maxX - minX),
+            height: max(1 / scale, maxY - minY)
+        )
+    }
+}
+
+private struct MacThumbnailSourceFrameReader: NSViewRepresentable {
+    let provider: MacThumbnailSourceFrameProvider
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        provider.view = view
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if provider.view !== nsView {
+            provider.view = nsView
+        }
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Void) {
+        // The provider is owned by its thumbnail and disappears with it. Avoid
+        // retaining or publishing geometry from a detached AppKit view.
+    }
+}
+#endif
 
 private struct MessageThumbnailFramePreferenceKey: PreferenceKey {
     static let defaultValue: [String: CGRect] = [:]
@@ -83,14 +188,132 @@ private struct MessageTopAnchorFramePreferenceKey: PreferenceKey {
     }
 }
 
+struct IOSMessageImageGalleryPreview: View {
+    let gallery: MessageImagePreviewGallery
+    let liveSourceFrames: [String: CGRect]
+    let onSelectionChanged: (Int) -> Void
+    let onEntryAnimationCompleted: (String) -> Void
+    let onDismissWillStart: (String) -> Void
+    let onDismiss: () -> Void
+
+    @State private var selectedIndex: Int
+    @State private var openingSourceID: String
+    @State private var backdropOpacity: Double = 0
+    @State private var isDismissing = false
+
+    init(
+        gallery: MessageImagePreviewGallery,
+        liveSourceFrames: [String: CGRect],
+        onSelectionChanged: @escaping (Int) -> Void,
+        onEntryAnimationCompleted: @escaping (String) -> Void,
+        onDismissWillStart: @escaping (String) -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.gallery = gallery
+        self.liveSourceFrames = liveSourceFrames
+        self.onSelectionChanged = onSelectionChanged
+        self.onEntryAnimationCompleted = onEntryAnimationCompleted
+        self.onDismissWillStart = onDismissWillStart
+        self.onDismiss = onDismiss
+        _selectedIndex = State(initialValue: gallery.selectedIndex)
+        _openingSourceID = State(initialValue: gallery.selectedItem?.id ?? "")
+    }
+
+    var body: some View {
+        ZStack {
+            // Keep one backdrop outside the native pager. A background inside
+            // each page moves with UIPageViewController during horizontal swipes.
+            Color.black.opacity(backdropOpacity)
+                .ignoresSafeArea()
+
+            TabView(selection: $selectedIndex) {
+                ForEach(Array(gallery.items.enumerated()), id: \.element.id) { index, item in
+                    IOSMessageImageFullscreenPreview(
+                        item: item,
+                        liveSourceFrame: liveSourceFrames[item.id],
+                        animatesFromSource: item.id == openingSourceID,
+                        isActive: selectedIndex == index,
+                        onBackdropOpacityChanged: { opacity, animated in
+                            guard selectedIndex == index, !isDismissing else { return }
+                            if animated {
+                                withAnimation(.easeOut(duration: 0.18)) {
+                                    backdropOpacity = opacity
+                                }
+                            } else {
+                                var transaction = Transaction()
+                                transaction.disablesAnimations = true
+                                withTransaction(transaction) {
+                                    backdropOpacity = opacity
+                                }
+                            }
+                        },
+                        onEntryAnimationCompleted: {
+                            guard item.id == openingSourceID else { return }
+                            onEntryAnimationCompleted(item.id)
+                        },
+                        onDismissWillStart: {
+                            guard !isDismissing else { return }
+                            isDismissing = true
+                            withAnimation(.easeInOut(duration: 0.14)) {
+                                backdropOpacity = 0
+                            }
+
+                            // Let the page commit its shrink transaction before
+                            // publishing app-wide state changes for the thumbnail.
+                            DispatchQueue.main.async {
+                                onDismissWillStart(item.id)
+                            }
+                        },
+                        onDismiss: onDismiss
+                    )
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+        }
+        .onChange(of: selectedIndex) { _, index in
+            guard gallery.items.indices.contains(index) else { return }
+            if !isDismissing {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    backdropOpacity = 0.96
+                }
+            }
+            onSelectionChanged(index)
+        }
+        .onAppear {
+            DispatchQueue.main.async {
+                guard !isDismissing else { return }
+                withAnimation(.easeInOut(duration: 0.20)) {
+                    backdropOpacity = 0.96
+                }
+            }
+        }
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                selectedIndex = min(selectedIndex + 1, gallery.items.count - 1)
+            case .decrement:
+                selectedIndex = max(selectedIndex - 1, 0)
+            @unknown default:
+                break
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
 struct IOSMessageImageFullscreenPreview: View {
     let item: MessageImagePreviewItem
     let liveSourceFrame: CGRect?
+    let animatesFromSource: Bool
+    let isActive: Bool
+    let onBackdropOpacityChanged: (Double, Bool) -> Void
     let onEntryAnimationCompleted: () -> Void
     let onDismissWillStart: () -> Void
     let onDismiss: () -> Void
     
-    @State private var backgroundFade: Double = 0.0
     @State private var transitionScale: CGFloat = 1.0
     @State private var transitionOffset: CGSize = .zero
     @State private var baseScale: CGFloat = 1.0
@@ -134,10 +357,10 @@ struct IOSMessageImageFullscreenPreview: View {
         return CGSize(width: transitionOffset.width, height: transitionOffset.height + dismissDragY)
     }
     
-    private var backgroundOpacity: Double {
-        if isZoomed { return 0.96 * backgroundFade }
-        let progress = min(max(dismissDragY / 260.0, 0.0), 1.0)
-        return (0.96 - (progress * 0.46)) * backgroundFade
+    private func backdropOpacity(forDismissTranslation translationY: CGFloat) -> Double {
+        if isZoomed { return 0.96 }
+        let progress = min(max(translationY / 260.0, 0.0), 1.0)
+        return 0.96 - (progress * 0.46)
     }
     
     private var isDismissDragInProgress: Bool {
@@ -155,7 +378,7 @@ struct IOSMessageImageFullscreenPreview: View {
             let targetRect = fittedRect(in: containerSize)
             
             ZStack {
-                Color.black.opacity(backgroundOpacity)
+                Color.clear
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -171,8 +394,25 @@ struct IOSMessageImageFullscreenPreview: View {
                     .position(x: targetRect.midX, y: targetRect.midY)
                     .scaleEffect(transitionCompositeScale)
                     .offset(effectiveOffset)
-                    .simultaneousGesture(panAndDismissGesture(targetRect: targetRect, containerSize: containerSize))
-                    .highPriorityGesture(
+                    .animation(
+                        .spring(
+                            response: isAnimatingDismiss ? 0.24 : 0.34,
+                            dampingFraction: isAnimatingDismiss ? 0.92 : 0.88
+                        ),
+                        value: transitionScale
+                    )
+                    .animation(
+                        .spring(
+                            response: isAnimatingDismiss ? 0.24 : 0.34,
+                            dampingFraction: isAnimatingDismiss ? 0.92 : 0.88
+                        ),
+                        value: transitionOffset
+                    )
+                    .gesture(
+                        zoomedPanGesture(targetRect: targetRect, containerSize: containerSize),
+                        including: isZoomed ? .all : .none
+                    )
+                    .simultaneousGesture(
                         SpatialTapGesture(count: 1, coordinateSpace: .global)
                             .onEnded { value in
                                 let localPoint = CGPoint(
@@ -186,8 +426,10 @@ struct IOSMessageImageFullscreenPreview: View {
                                 )
                             }
                     )
-                
+
                 IOSPinchGestureBridge(
+                    isActive: isActive,
+                    allowsVerticalDismiss: !isZoomed && !isAnimatingDismiss,
                     onBegan: { globalCenter in
                         let localCenter = CGPoint(
                             x: globalCenter.x - containerFrame.minX,
@@ -209,6 +451,25 @@ struct IOSMessageImageFullscreenPreview: View {
                     },
                     onEnded: {
                         endPinch(targetRect: targetRect, containerSize: containerSize)
+                    },
+                    onVerticalDismissChanged: { translationY in
+                        dismissDragY = max(0, translationY)
+                        onBackdropOpacityChanged(
+                            backdropOpacity(forDismissTranslation: translationY),
+                            false
+                        )
+                    },
+                    onVerticalDismissEnded: { translationY, velocityY in
+                        let shouldDismiss = translationY > 140
+                            || (translationY > 30 && velocityY > 900)
+                        if shouldDismiss {
+                            dismissAnimated(targetRect: targetRect)
+                        } else {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                                dismissDragY = 0
+                            }
+                            onBackdropOpacityChanged(0.96, true)
+                        }
                     }
                 )
                 .frame(width: 0, height: 0)
@@ -222,9 +483,9 @@ struct IOSMessageImageFullscreenPreview: View {
             }
         }
         .ignoresSafeArea()
-        .allowsHitTesting(!isAnimatingDismiss)
+        .allowsHitTesting(isActive && !isAnimatingDismiss)
     }
-    
+
     private func fittedRect(in containerSize: CGSize) -> CGRect {
         let availableWidth = max(containerSize.width, 1)
         let availableHeight = max(containerSize.height, 1)
@@ -273,26 +534,47 @@ struct IOSMessageImageFullscreenPreview: View {
     
     private func applyEntryAnimation(targetRect: CGRect) {
         let initial = initialTransition(for: targetRect)
-        backgroundFade = 0
-        transitionScale = initial.scale
-        transitionOffset = initial.offset
-        dismissDragY = 0
-        baseScale = 1.0
-        gestureScale = 1.0
-        baseOffset = .zero
-        dragOffset = .zero
-        isPinching = false
-        pinchSmoothedCenter = nil
-        panSmoothedOffset = nil
-        dragUnlockAfterPinchAt = 0
-        didNotifyEntryAnimationCompleted = false
-        
-        withAnimation(.easeInOut(duration: 0.20)) {
-            backgroundFade = 1.0
+        var initialTransaction = Transaction()
+        initialTransaction.disablesAnimations = true
+        withTransaction(initialTransaction) {
+            transitionScale = initial.scale
+            transitionOffset = initial.offset
+            dismissDragY = 0
+            baseScale = 1.0
+            gestureScale = 1.0
+            baseOffset = .zero
+            dragOffset = .zero
+            isPinching = false
+            pinchSmoothedCenter = nil
+            panSmoothedOffset = nil
+            dragUnlockAfterPinchAt = 0
+            didNotifyEntryAnimationCompleted = false
         }
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
-            transitionScale = 1.0
-            transitionOffset = .zero
+
+        guard animatesFromSource else {
+            var finalTransaction = Transaction()
+            finalTransaction.disablesAnimations = true
+            withTransaction(finalTransaction) {
+                transitionScale = 1
+                transitionOffset = .zero
+            }
+            DispatchQueue.main.async {
+                guard !isAnimatingDismiss, !didNotifyEntryAnimationCompleted else { return }
+                didNotifyEntryAnimationCompleted = true
+                onEntryAnimationCompleted()
+            }
+            return
+        }
+
+        // PageTabViewStyle preloads pages. Commit the thumbnail-sized state
+        // first, then animate on the following run-loop turn so SwiftUI cannot
+        // coalesce both states into an already-fullscreen first frame.
+        DispatchQueue.main.async {
+            guard !isAnimatingDismiss else { return }
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
+                transitionScale = 1.0
+                transitionOffset = .zero
+            }
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
@@ -540,7 +822,7 @@ struct IOSMessageImageFullscreenPreview: View {
         }
     }
     
-    private func panAndDismissGesture(targetRect: CGRect, containerSize: CGSize) -> some Gesture {
+    private func zoomedPanGesture(targetRect: CGRect, containerSize: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .local)
             .onChanged { value in
                 let now = Date().timeIntervalSinceReferenceDate
@@ -552,30 +834,23 @@ struct IOSMessageImageFullscreenPreview: View {
                 if isPinching {
                     return
                 }
-                if isZoomed {
-                    let proposed = CGSize(
-                        width: baseOffset.width + value.translation.width,
-                        height: baseOffset.height + value.translation.height
-                    )
-                    let resisted = resistedBaseOffset(
-                        proposed,
-                        targetRect: targetRect,
-                        containerSize: containerSize,
-                        scale: baseScale
-                    )
-                    let smoothed = smoothedPanOffset(from: resisted)
-                    panSmoothedOffset = smoothed
-                    dragOffset = CGSize(
-                        width: smoothed.width - baseOffset.width,
-                        height: smoothed.height - baseOffset.height
-                    )
-                } else {
-                    if isPinching {
-                        isPinching = false
-                        pinchSmoothedCenter = nil
-                    }
-                    dismissDragY = max(0, value.translation.height)
-                }
+                guard isZoomed else { return }
+                let proposed = CGSize(
+                    width: baseOffset.width + value.translation.width,
+                    height: baseOffset.height + value.translation.height
+                )
+                let resisted = resistedBaseOffset(
+                    proposed,
+                    targetRect: targetRect,
+                    containerSize: containerSize,
+                    scale: baseScale
+                )
+                let smoothed = smoothedPanOffset(from: resisted)
+                panSmoothedOffset = smoothed
+                dragOffset = CGSize(
+                    width: smoothed.width - baseOffset.width,
+                    height: smoothed.height - baseOffset.height
+                )
             }
             .onEnded { value in
                 let now = Date().timeIntervalSinceReferenceDate
@@ -587,82 +862,71 @@ struct IOSMessageImageFullscreenPreview: View {
                 if isPinching {
                     return
                 }
-                if isZoomed {
-                    let currentOffset = CGSize(
-                        width: baseOffset.width + dragOffset.width,
-                        height: baseOffset.height + dragOffset.height
+                guard isZoomed else { return }
+                let currentOffset = CGSize(
+                    width: baseOffset.width + dragOffset.width,
+                    height: baseOffset.height + dragOffset.height
+                )
+                baseOffset = currentOffset
+                dragOffset = .zero
+                panSmoothedOffset = nil
+                let momentumDelta = CGSize(
+                    width: value.predictedEndTranslation.width - value.translation.width,
+                    height: value.predictedEndTranslation.height - value.translation.height
+                )
+                let momentumMagnitude = hypot(momentumDelta.width, momentumDelta.height)
+                let inertiaScale: CGFloat = 0.9
+                let projectedOffset = CGSize(
+                    width: currentOffset.width + momentumDelta.width * inertiaScale,
+                    height: currentOffset.height + momentumDelta.height * inertiaScale
+                )
+                let finalOffset = clampedBaseOffset(
+                    projectedOffset,
+                    targetRect: targetRect,
+                    containerSize: containerSize,
+                    scale: baseScale
+                )
+                let hasVisibleMovement =
+                    abs(finalOffset.width - currentOffset.width) > 0.5 ||
+                    abs(finalOffset.height - currentOffset.height) > 0.5
+                if hasVisibleMovement {
+                    let releaseVelocity = estimatedReleaseVelocity(from: value)
+                    let deltaX = finalOffset.width - currentOffset.width
+                    let deltaY = finalOffset.height - currentOffset.height
+                    let distance = hypot(
+                        finalOffset.width - currentOffset.width,
+                        finalOffset.height - currentOffset.height
                     )
-                    baseOffset = currentOffset
-                    dragOffset = .zero
-                    panSmoothedOffset = nil
-                    let momentumDelta = CGSize(
-                        width: value.predictedEndTranslation.width - value.translation.width,
-                        height: value.predictedEndTranslation.height - value.translation.height
+                    let direction = CGPoint(
+                        x: distance > 0.001 ? deltaX / distance : 0,
+                        y: distance > 0.001 ? deltaY / distance : 0
                     )
-                    let momentumMagnitude = hypot(momentumDelta.width, momentumDelta.height)
-                    let inertiaScale: CGFloat = 0.9
-                    let projectedOffset = CGSize(
-                        width: currentOffset.width + momentumDelta.width * inertiaScale,
-                        height: currentOffset.height + momentumDelta.height * inertiaScale
-                    )
-                    let finalOffset = clampedBaseOffset(
-                        projectedOffset,
-                        targetRect: targetRect,
-                        containerSize: containerSize,
-                        scale: baseScale
-                    )
-                    let hasVisibleMovement =
-                        abs(finalOffset.width - currentOffset.width) > 0.5 ||
-                        abs(finalOffset.height - currentOffset.height) > 0.5
-                    if hasVisibleMovement {
-                        let releaseVelocity = estimatedReleaseVelocity(from: value)
-                        let deltaX = finalOffset.width - currentOffset.width
-                        let deltaY = finalOffset.height - currentOffset.height
-                        let distance = hypot(
-                            finalOffset.width - currentOffset.width,
-                            finalOffset.height - currentOffset.height
-                        )
-                        let direction = CGPoint(
-                            x: distance > 0.001 ? deltaX / distance : 0,
-                            y: distance > 0.001 ? deltaY / distance : 0
-                        )
-                        let projectedSpeed =
-                            releaseVelocity.width * direction.x +
-                            releaseVelocity.height * direction.y
-                        let normalizedInitialVelocity = min(max(projectedSpeed / max(distance, 1), 0), 14)
-                        if momentumMagnitude > 4 {
-                            withAnimation(
-                                .interpolatingSpring(
-                                    mass: 1.0,
-                                    stiffness: 170,
-                                    damping: 23,
-                                    initialVelocity: normalizedInitialVelocity
-                                )
-                            ) {
-                                baseOffset = finalOffset
-                            }
-                        } else {
-                            withAnimation(.easeOut(duration: 0.18)) {
-                                baseOffset = finalOffset
-                            }
+                    let projectedSpeed =
+                        releaseVelocity.width * direction.x +
+                        releaseVelocity.height * direction.y
+                    let normalizedInitialVelocity = min(max(projectedSpeed / max(distance, 1), 0), 14)
+                    if momentumMagnitude > 4 {
+                        withAnimation(
+                            .interpolatingSpring(
+                                mass: 1.0,
+                                stiffness: 170,
+                                damping: 23,
+                                initialVelocity: normalizedInitialVelocity
+                            )
+                        ) {
+                            baseOffset = finalOffset
                         }
                     } else {
-                        baseOffset = finalOffset
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            baseOffset = finalOffset
+                        }
                     }
                 } else {
-                    panSmoothedOffset = nil
-                    let shouldDismiss = value.translation.height > 140 || value.predictedEndTranslation.height > 220
-                    if shouldDismiss {
-                        dismissAnimated(targetRect: targetRect)
-                    } else {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                            dismissDragY = 0
-                        }
-                    }
+                    baseOffset = finalOffset
                 }
             }
     }
-    
+
     private func dismissAnimated(targetRect: CGRect) {
         guard !isAnimatingDismiss else { return }
         pendingSingleTapDismiss?.cancel()
@@ -672,17 +936,22 @@ struct IOSMessageImageFullscreenPreview: View {
         panSmoothedOffset = nil
         onDismissWillStart()
         
-        withAnimation(.easeInOut(duration: 0.14)) {
-            backgroundFade = 0
-        }
-        
-        if !isZoomed {
-            let initial = initialTransition(for: targetRect)
-            withAnimation(.spring(response: 0.24, dampingFraction: 0.92)) {
-                transitionScale = initial.scale
-                transitionOffset = initial.offset
-                dismissDragY = 0
-            }
+        let initial = initialTransition(for: targetRect)
+        var returnTransaction = Transaction(
+            animation: .spring(response: 0.24, dampingFraction: 0.92)
+        )
+        returnTransaction.disablesAnimations = false
+        withTransaction(returnTransaction) {
+            transitionScale = initial.scale
+            transitionOffset = initial.offset
+            dismissDragY = 0
+            baseScale = 1
+            gestureScale = 1
+            baseOffset = .zero
+            dragOffset = .zero
+            isPinching = false
+            pinchSmoothedCenter = nil
+            panSmoothedOffset = nil
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
@@ -747,9 +1016,13 @@ struct IOSMessageImageFullscreenPreview: View {
 }
 
 private struct IOSPinchGestureBridge: UIViewRepresentable {
+    let isActive: Bool
+    let allowsVerticalDismiss: Bool
     let onBegan: (CGPoint) -> Void
     let onChanged: (CGFloat, CGPoint) -> Void
     let onEnded: () -> Void
+    let onVerticalDismissChanged: (CGFloat) -> Void
+    let onVerticalDismissEnded: (CGFloat, CGFloat) -> Void
     
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
@@ -760,7 +1033,11 @@ private struct IOSPinchGestureBridge: UIViewRepresentable {
     
     func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.parent = self
-        context.coordinator.attachIfNeeded(hostView: uiView)
+        if isActive {
+            context.coordinator.attachIfNeeded(hostView: uiView)
+        } else {
+            context.coordinator.detach()
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -780,6 +1057,13 @@ private struct IOSPinchGestureBridge: UIViewRepresentable {
             recognizer.delegate = self
             return recognizer
         }()
+        private lazy var verticalDismissRecognizer: UIPanGestureRecognizer = {
+            let recognizer = UIPanGestureRecognizer(target: self, action: #selector(handleVerticalDismiss(_:)))
+            recognizer.cancelsTouchesInView = false
+            recognizer.maximumNumberOfTouches = 1
+            recognizer.delegate = self
+            return recognizer
+        }()
         
         init(parent: IOSPinchGestureBridge) {
             self.parent = parent
@@ -788,9 +1072,11 @@ private struct IOSPinchGestureBridge: UIViewRepresentable {
         func attachIfNeeded(hostView: UIView) {
             DispatchQueue.main.async { [weak self, weak hostView] in
                 guard let self, let hostView, let window = hostView.window else { return }
+                guard self.parent.isActive else { return }
                 guard self.attachedView !== window else { return }
                 self.detach()
                 window.addGestureRecognizer(self.pinchRecognizer)
+                window.addGestureRecognizer(self.verticalDismissRecognizer)
                 self.attachedView = window
             }
         }
@@ -798,6 +1084,7 @@ private struct IOSPinchGestureBridge: UIViewRepresentable {
         func detach() {
             if let attachedView {
                 attachedView.removeGestureRecognizer(pinchRecognizer)
+                attachedView.removeGestureRecognizer(verticalDismissRecognizer)
             }
             attachedView = nil
         }
@@ -820,6 +1107,31 @@ private struct IOSPinchGestureBridge: UIViewRepresentable {
             default:
                 break
             }
+        }
+
+        @objc
+        private func handleVerticalDismiss(_ recognizer: UIPanGestureRecognizer) {
+            guard let targetView = attachedView else { return }
+            let translationY = recognizer.translation(in: targetView).y
+            switch recognizer.state {
+            case .began, .changed:
+                parent.onVerticalDismissChanged(translationY)
+            case .ended:
+                let velocityY = recognizer.velocity(in: targetView).y
+                parent.onVerticalDismissEnded(translationY, velocityY)
+            case .cancelled, .failed:
+                parent.onVerticalDismissEnded(0, 0)
+            default:
+                break
+            }
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard gestureRecognizer === verticalDismissRecognizer else { return true }
+            guard parent.isActive, parent.allowsVerticalDismiss,
+                  let targetView = attachedView else { return false }
+            let velocity = verticalDismissRecognizer.velocity(in: targetView)
+            return velocity.y > 0 && abs(velocity.y) > abs(velocity.x)
         }
         
         func gestureRecognizer(
@@ -1003,7 +1315,6 @@ struct MessagesView: View {
     @State private var latestTopAnchorMinY: CGFloat = 0
     @State private var topLayoutCompensationY: CGFloat = 01
     @State private var messagesLayoutCompensationY: CGFloat = 0
-    @State private var selectedImageForSend: PendingSendImage?
     @State private var messageImageFrames: [String: CGRect] = [:]
     
     private var hiddenPreviewSourceID: String? {
@@ -1018,7 +1329,7 @@ struct MessagesView: View {
         #if os(iOS)
         return appState.activeImagePreview != nil
         #else
-        return appState.activeMacImagePreview != nil
+        return false
         #endif
     }
     
@@ -1036,28 +1347,10 @@ struct MessagesView: View {
                 onTopAnchorFrameChanged: { frame in
                     handleTopAnchorFrameChange(frame)
                 },
-                onImageSelected: { image in selectedImageForSend = PendingSendImage(image: image) }
-            )
-            
-            // 2. 静态锚点层 (发送确认框挂在这里)
-            Color.clear
-                .allowsHitTesting(false)
-                // 挂载发送确认框 (Sheet)
-                .sheet(item: $selectedImageForSend) { item in
-                    ImageConfirmationView(
-                        image: item.image,
-                        onCancel: {
-                            InteractionFeedback.cancel()
-                            selectedImageForSend = nil
-                        },
-                        onSend: { imageToSend in
-                            await serverManager.sendImageMessage(image: imageToSend)
-                            selectedImageForSend = nil
-                        }
-                    )
-                    .presentationDetents([.medium , .large])
+                onImageSelected: { image in
+                    await serverManager.sendImageMessage(image: image)
                 }
-            
+            )
         }
         #if os(iOS)
         .onChange(of: appState.activeImagePreview?.id) { _, value in
@@ -1074,39 +1367,14 @@ struct MessagesView: View {
             appState.isImmersiveStatusBarHidden = false
         }
         #endif
-        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
-            let target = notification.userInfo?["target"] as? String
-            if target == nil || target == "imageSendConfirm" {
-                selectedImageForSend = nil
-            }
-        }
-        .onChange(of: selectedImageForSend?.id) { _, value in
-            if value != nil {
-                AppState.shared.setAutomationPresentedSheet("imageSendConfirm")
-            } else {
-                AppState.shared.clearAutomationPresentedSheet(ifMatches: "imageSendConfirm")
-            }
-        }
     }
     
     private func handleImageTap(payload: MessageImageTapPayload) {
+        guard let gallery = makeImagePreviewGallery(for: payload),
+              let selectedItem = gallery.selectedItem else { return }
+
         #if os(macOS)
-        // 防止快速连续点击导致预览状态错乱
-        guard appState.activeMacImagePreview == nil else { return }
-        appState.hiddenMacPreviewSourceID = nil
-        let preview = MessageImagePreviewItem(
-            id: payload.sourceID,
-            image: payload.image,
-            sourceFrame: payload.sourceFrame ?? messageImageFrames[payload.sourceID]
-        )
-        appState.activeMacImagePreview = preview
-        // Fallback: ensure source thumbnail gets hidden after entry animation window.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
-            if appState.activeMacImagePreview?.id == preview.id,
-               appState.hiddenMacPreviewSourceID == nil {
-                appState.hiddenMacPreviewSourceID = preview.id
-            }
-        }
+        MacMessageImageQuickLookPresenter.shared.present(gallery: gallery)
         #else
         isLayoutLockActive = true
         if latestTopAnchorMinY > 0 {
@@ -1115,12 +1383,19 @@ struct MessagesView: View {
         appState.isImmersiveStatusBarHidden = true
         // Keep source visible during entry animation; hide it after animation completes.
         appState.hiddenPreviewSourceID = nil
-        appState.activeImagePreview = MessageImagePreviewItem(
-            id: payload.sourceID,
-            image: payload.image,
-            sourceFrame: payload.sourceFrame ?? messageImageFrames[payload.sourceID]
-        )
+        appState.activeImagePreviewGallery = gallery
+        appState.activeImagePreview = selectedItem
         #endif
+    }
+
+    private func makeImagePreviewGallery(for payload: MessageImageTapPayload) -> MessageImagePreviewGallery? {
+        MessageImagePreviewGallery.make(
+            messages: serverManager.messages,
+            selectedSourceID: payload.sourceID,
+            sourceFrames: messageImageFrames,
+            selectedSourceFrame: payload.sourceFrame,
+            selectedLiveSourceFrame: payload.liveSourceFrame
+        )
     }
     
     private func handleTopAnchorFrameChange(_ frame: CGRect) {
@@ -1166,6 +1441,359 @@ struct MessagesView: View {
 }
 
 #if os(macOS)
+private final class MacImagePreviewExportRequest: @unchecked Sendable {
+    let id: String
+    let originalIndex: Int
+    let image: NSImage
+    let encodedData: Data?
+    let url: URL
+
+    init(id: String, originalIndex: Int, image: NSImage, encodedData: Data?, url: URL) {
+        self.id = id
+        self.originalIndex = originalIndex
+        self.image = image
+        self.encodedData = encodedData
+        self.url = url
+    }
+}
+
+private struct MacImagePreviewExportResult: Sendable {
+    let id: String
+    let originalIndex: Int
+    let url: URL
+}
+
+private struct MacImagePreviewTransition {
+    let fallbackSourceFrameOnScreen: NSRect
+    let liveSourceFrame: MessageImageLiveSourceFrame?
+    let image: NSImage
+}
+
+@MainActor
+final class MacMessageImageQuickLookPresenter: NSObject,
+                                                   @preconcurrency QLPreviewPanelDataSource,
+                                                   @preconcurrency QLPreviewPanelDelegate {
+    static let shared = MacMessageImageQuickLookPresenter()
+
+    private var previewItems: [NSURL] = []
+    private var transitionsByURL: [URL: MacImagePreviewTransition] = [:]
+    private var previewDirectory: URL?
+    private var previewGeneration = UUID()
+    private var preparationTask: Task<Void, Never>?
+
+    override private init() {
+        super.init()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(previewPanelWillClose(_:)),
+            name: NSWindow.willCloseNotification,
+            object: nil
+        )
+    }
+
+    func present(gallery: MessageImagePreviewGallery) {
+        guard let selectedItem = gallery.selectedItem else { return }
+
+        preparationTask?.cancel()
+        let generation = UUID()
+        previewGeneration = generation
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MumbleImagePreview-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            MumbleLogger.general.error("Failed to create Quick Look preview directory: \(error.localizedDescription)")
+            return
+        }
+
+        let requests = gallery.items.enumerated().map { index, item in
+            let pathExtension = Self.previewFileExtension(for: item.encodedData)
+            return MacImagePreviewExportRequest(
+                id: item.id,
+                originalIndex: index,
+                image: item.image,
+                encodedData: item.encodedData,
+                url: directory.appendingPathComponent(
+                    String(format: "image-%04d.%@", index + 1, pathExtension)
+                )
+            )
+        }
+        guard let selectedRequest = requests.first(where: { $0.id == selectedItem.id }) else { return }
+        let selectedSourceFrameOnScreen: NSRect? = selectedItem.sourceFrame
+
+        if let selectedResult = Self.writeEncodedPreviewImage(selectedRequest) {
+            activatePreview(
+                selectedResult: selectedResult,
+                selectedItem: selectedItem,
+                sourceFrameOnScreen: selectedSourceFrameOnScreen,
+                requests: requests,
+                directory: directory
+            )
+            preparationTask = Task { [weak self] in
+                await self?.exportRemainingPreviewImages(
+                    requests,
+                    excludingID: selectedResult.id,
+                    generation: generation
+                )
+            }
+            return
+        }
+
+        preparationTask = Task { [weak self] in
+            guard let self,
+                  let selectedResult = await Self.exportPreviewImage(selectedRequest),
+                  !Task.isCancelled,
+                  self.previewGeneration == generation else {
+                try? FileManager.default.removeItem(at: directory)
+                return
+            }
+
+            self.activatePreview(
+                selectedResult: selectedResult,
+                selectedItem: selectedItem,
+                sourceFrameOnScreen: selectedSourceFrameOnScreen,
+                requests: requests,
+                directory: directory
+            )
+            await self.exportRemainingPreviewImages(
+                requests,
+                excludingID: selectedResult.id,
+                generation: generation
+            )
+        }
+    }
+
+    private func activatePreview(
+        selectedResult: MacImagePreviewExportResult,
+        selectedItem: MessageImagePreviewItem,
+        sourceFrameOnScreen: NSRect?,
+        requests: [MacImagePreviewExportRequest],
+        directory: URL
+    ) {
+        let previouslyUsedDirectory = previewDirectory
+        previewDirectory = directory
+
+        // Keep the final order and selected index stable from the first frame.
+        // Quick Look can start loading the selected URL immediately and does
+        // not need to recreate the current preview when other files are ready.
+        previewItems = requests.map { $0.url as NSURL }
+        transitionsByURL.removeAll(keepingCapacity: true)
+        if let sourceFrameOnScreen = selectedItem.liveSourceFrame?() ?? sourceFrameOnScreen {
+            transitionsByURL[selectedResult.url.standardizedFileURL] = MacImagePreviewTransition(
+                fallbackSourceFrameOnScreen: sourceFrameOnScreen,
+                liveSourceFrame: selectedItem.liveSourceFrame,
+                image: selectedItem.image
+            )
+        }
+
+        showPreviewPanel(
+            initialIndex: selectedResult.originalIndex,
+            resetsDisplayState: true
+        )
+        if let previouslyUsedDirectory, previouslyUsedDirectory != directory {
+            try? FileManager.default.removeItem(at: previouslyUsedDirectory)
+        }
+    }
+
+    private func exportRemainingPreviewImages(
+        _ requests: [MacImagePreviewExportRequest],
+        excludingID: String,
+        generation: UUID
+    ) async {
+        for request in requests where request.id != excludingID {
+            guard !Task.isCancelled, previewGeneration == generation else { return }
+            _ = await Self.exportPreviewImage(request)
+        }
+
+        guard !Task.isCancelled, previewGeneration == generation,
+              let panel = QLPreviewPanel.shared(),
+              panel.currentPreviewItemIndex != requests.first(where: { $0.id == excludingID })?.originalIndex else {
+            return
+        }
+        // Only refresh when the user navigated to an item before its background
+        // export completed. The originally selected image is never reloaded.
+        panel.refreshCurrentPreviewItem()
+    }
+
+    private func showPreviewPanel(initialIndex: Int, resetsDisplayState: Bool) {
+        guard let panel = QLPreviewPanel.shared() else { return }
+        panel.dataSource = self
+        panel.delegate = self
+        if resetsDisplayState {
+            // Do not inherit the zoom/page state from the previously previewed
+            // image. Quick Look then opens this image at its default 100% state.
+            panel.displayState = nil
+        }
+        panel.reloadData()
+        panel.currentPreviewItemIndex = initialIndex
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+        previewItems.count
+    }
+
+    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
+        guard previewItems.indices.contains(index) else { return nil }
+        return previewItems[index]
+    }
+
+    func previewPanel(
+        _ panel: QLPreviewPanel!,
+        sourceFrameOnScreenFor item: (any QLPreviewItem)!
+    ) -> NSRect {
+        guard let transition = transition(for: item) else { return .zero }
+        return transition.liveSourceFrame?()
+            ?? transition.fallbackSourceFrameOnScreen
+    }
+
+    func previewPanel(
+        _ panel: QLPreviewPanel!,
+        transitionImageFor item: (any QLPreviewItem)!,
+        contentRect: UnsafeMutablePointer<NSRect>!
+    ) -> Any! {
+        guard let transition = transition(for: item) else { return nil }
+        let sourceFrame = transition.liveSourceFrame?()
+            ?? transition.fallbackSourceFrameOnScreen
+        let transitionImage = (transition.image.copy() as? NSImage) ?? transition.image
+        transitionImage.size = sourceFrame.size
+        contentRect?.pointee = NSRect(origin: .zero, size: sourceFrame.size)
+        return transitionImage
+    }
+
+    private func transition(for item: (any QLPreviewItem)?) -> MacImagePreviewTransition? {
+        guard let url = item?.previewItemURL else { return nil }
+        return transitionsByURL[url.standardizedFileURL]
+    }
+
+    nonisolated private static func writeEncodedPreviewImage(
+        _ request: MacImagePreviewExportRequest
+    ) -> MacImagePreviewExportResult? {
+        guard let data = request.encodedData else { return nil }
+        do {
+            // Embedded chat images are already bounded by the server message
+            // limit, so this direct write is tiny and avoids two task hops.
+            try data.write(to: request.url)
+            return MacImagePreviewExportResult(
+                id: request.id,
+                originalIndex: request.originalIndex,
+                url: request.url
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    nonisolated private static func exportPreviewImage(
+        _ request: MacImagePreviewExportRequest
+    ) async -> MacImagePreviewExportResult? {
+        await Task.detached(priority: .userInitiated) {
+            autoreleasepool {
+                guard !Task.isCancelled,
+                      let data = request.encodedData ?? previewJPEGData(from: request.image) else { return nil }
+                do {
+                    try data.write(to: request.url, options: .atomic)
+                    return MacImagePreviewExportResult(
+                        id: request.id,
+                        originalIndex: request.originalIndex,
+                        url: request.url
+                    )
+                } catch {
+                    return nil
+                }
+            }
+        }.value
+    }
+
+    nonisolated private static func previewFileExtension(for data: Data?) -> String {
+        guard let data,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let typeIdentifier = CGImageSourceGetType(source),
+              let type = UTType(typeIdentifier as String),
+              let pathExtension = type.preferredFilenameExtension else {
+            return "jpg"
+        }
+        return pathExtension
+    }
+
+    nonisolated private static func previewJPEGData(from image: NSImage) -> Data? {
+        var proposedRect = CGRect(origin: .zero, size: image.size)
+        guard let sourceImage = image.cgImage(
+            forProposedRect: &proposedRect,
+            context: nil,
+            hints: nil
+        ) else {
+            return nil
+        }
+
+        let sourceMaxDimension = CGFloat(max(sourceImage.width, sourceImage.height))
+        let ratio = min(3072 / max(sourceMaxDimension, 1), 1)
+        let width = max(1, Int(floor(CGFloat(sourceImage.width) * ratio)))
+        let height = max(1, Int(floor(CGFloat(sourceImage.height) * ratio)))
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+              ) else {
+            return nil
+        }
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.interpolationQuality = .high
+        context.draw(sourceImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let renderedImage = context.makeImage() else { return nil }
+
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+        let properties = [
+            kCGImageDestinationLossyCompressionQuality: CGFloat(0.92)
+        ] as CFDictionary
+        CGImageDestinationAddImage(destination, renderedImage, properties)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
+    }
+
+    @objc
+    private func previewPanelWillClose(_ notification: Notification) {
+        guard let closingPanel = notification.object as? QLPreviewPanel,
+              closingPanel === QLPreviewPanel.shared() else { return }
+
+        preparationTask?.cancel()
+        preparationTask = nil
+        let closingGeneration = UUID()
+        previewGeneration = closingGeneration
+
+        // Quick Look asks for the source frame and transition image while its
+        // close animation is running. Keep both alive until that native zoom
+        // transition has had enough time to finish.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+            guard let self, self.previewGeneration == closingGeneration else { return }
+            self.cleanupPreviewDirectory()
+        }
+    }
+
+    private func cleanupPreviewDirectory() {
+        if let previewDirectory {
+            try? FileManager.default.removeItem(at: previewDirectory)
+        }
+        previewDirectory = nil
+        previewItems = []
+        transitionsByURL = [:]
+    }
+}
+
 /// macOS 图片预览 overlay：全窗口覆盖，支持触控板/鼠标缩放，双击还原，Esc 关闭
 struct MacImagePreviewOverlay: View {
     let item: MessageImagePreviewItem
@@ -1704,7 +2332,7 @@ struct MessagesList: View {
     let onPreviewRequest: (MessageImageTapPayload) -> Void
     let onThumbnailFramesChanged: ([String: CGRect]) -> Void
     let onTopAnchorFrameChanged: (CGRect) -> Void
-    let onImageSelected: (PlatformImage) -> Void
+    let onImageSelected: (PlatformImage) async -> Void
     
     @State private var newMessage = ""
     @FocusState private var isTextFieldFocused: Bool
@@ -1851,8 +2479,7 @@ struct MessagesList: View {
                         onSendText: sendTextMessage,
                         onSendImage: { image in
                             isTextFieldFocused = false
-                            // ✅ 这里的图片也通过回调传给父视图
-                            onImageSelected(image)
+                            await onImageSelected(image)
                         }
                     )
                     .background(.clear)
@@ -2123,8 +2750,7 @@ struct MessagesList: View {
                 provider.loadObject(ofClass: PlatformImage.self) { image, error in
                     guard let uiImage = image as? PlatformImage else { return }
                     Task { @MainActor in
-                        // ✅ 不再自己处理，而是向上汇报
-                        onImageSelected(uiImage)
+                        await onImageSelected(uiImage)
                     }
                 }
                 return true
@@ -2497,6 +3123,9 @@ private struct MessageImageThumbnailButton: View {
     let onTap: (MessageImageTapPayload) -> Void
 
     @State private var thumbnail: PlatformImage?
+    #if os(macOS)
+    @StateObject private var sourceFrameProvider = MacThumbnailSourceFrameProvider()
+    #endif
 
     private static let cache = NSCache<NSString, PlatformImage>()
     private let maxDisplayDimension: CGFloat = 200
@@ -2521,8 +3150,10 @@ private struct MessageImageThumbnailButton: View {
                 onTap(
                     MessageImageTapPayload(
                         sourceID: sourceID,
-                        image: image,
-                        sourceFrame: geo.frame(in: .global)
+                        sourceFrame: previewSourceFrame(
+                            swiftUIGlobalFrame: geo.frame(in: .global)
+                        ),
+                        liveSourceFrame: previewLiveSourceFrame
                     )
                 )
             }) {
@@ -2540,6 +3171,11 @@ private struct MessageImageThumbnailButton: View {
                             }
                         }
                     }
+                    #if os(macOS)
+                    .background {
+                        MacThumbnailSourceFrameReader(provider: sourceFrameProvider)
+                    }
+                    #endif
                     #if os(macOS)
                     .cornerRadius(10)
                     #else
@@ -2560,6 +3196,27 @@ private struct MessageImageThumbnailButton: View {
         .task(id: sourceID) {
             loadThumbnailIfNeeded()
         }
+    }
+
+    private func previewSourceFrame(swiftUIGlobalFrame: CGRect) -> CGRect? {
+        #if os(macOS)
+        // This is already in NSScreen coordinates and is read synchronously at
+        // click time, so scrolling and window movement cannot make it stale.
+        return sourceFrameProvider.frameOnScreen
+        #else
+        return swiftUIGlobalFrame
+        #endif
+    }
+
+    private var previewLiveSourceFrame: MessageImageLiveSourceFrame? {
+        #if os(macOS)
+        let provider = sourceFrameProvider
+        return { [weak provider] in
+            provider?.frameOnScreen
+        }
+        #else
+        return nil
+        #endif
     }
 
     private func loadThumbnailIfNeeded() {
@@ -2807,59 +3464,6 @@ private struct MessageDeliveryFailedLabel: View {
     }
 }
 
-struct ImageConfirmationView: View {
-    let image: PlatformImage
-    let onCancel: () -> Void
-    let onSend: (PlatformImage) async -> Void
-    @State private var isSending = false
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            if isSending {
-                VStack(spacing: 20) {
-                    ProgressView()
-                    Text("Compressing and Sending...")
-                        .foregroundColor(.secondary)
-                }
-                    .padding(.vertical, 60)
-                    .padding(.horizontal, 80)
-            } else {
-                Text("Confirm Image")
-                    .font(.headline)
-                    .padding(.top, 20)
-                
-                Image(platformImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                
-                HStack(spacing: 20) {
-                    Button("Cancel", role: .cancel) {
-                        InteractionFeedback.cancel()
-                        onCancel()
-                    }
-                        .buttonStyle(.bordered).controlSize(.large)
-                        .keyboardShortcut(.cancelAction)
-                    Button("Send") {
-                        guard !isSending else { return }
-                        isSending = true
-                        Task { await onSend(image) }
-                    }
-                    .disabled(isSending)
-                    .buttonStyle(.borderedProminent).controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
-                }
-            }
-        }
-        .padding(.bottom)
-        .interactiveDismissDisabled(isSending)
-        .onAppear {
-            AppState.shared.setAutomationCurrentScreen("imageSendConfirm")
-        }
-    }
-}
-
 private struct TextInputBar: View {
     @Environment(\.colorScheme) private var colorScheme
     @Binding var text: String
@@ -2867,6 +3471,9 @@ private struct TextInputBar: View {
     let onSendText: () -> Void
     let onSendImage: (PlatformImage) async -> Void
     @State private var selectedPhoto: PhotosPickerItem?
+    #if os(macOS)
+    @State private var isLoadingPastedImage = false
+    #endif
     
     var body: some View {
         if #available(iOS 26.0, macOS 26.0, *) {
@@ -2949,9 +3556,24 @@ private struct TextInputBar: View {
     
     // MARK: - Shared Components
     
+    @MainActor
     private var photoPickerView: some View {
-        PhotosPicker(selection: $selectedPhoto, matching: .images) {
-            Image(systemName: "photo.on.rectangle.angled")
+        #if os(macOS)
+        let showsPasteProgress = isLoadingPastedImage
+        #endif
+        return PhotosPicker(selection: $selectedPhoto, matching: .images) {
+            Group {
+                #if os(macOS)
+                if showsPasteProgress {
+                    Image(systemName: "hourglass")
+                        .accessibilityLabel(NSLocalizedString("Sending image", comment: "Image send progress"))
+                } else {
+                    Image(systemName: "photo.on.rectangle.angled")
+                }
+                #else
+                Image(systemName: "photo.on.rectangle.angled")
+                #endif
+            }
                 #if os(macOS)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.indigo)
@@ -2964,6 +3586,7 @@ private struct TextInputBar: View {
         }
         #if os(macOS)
         .frame(width: 32, height: 32)
+        .disabled(isLoadingPastedImage)
         #else
         .frame(width: 40, height: 40)
         #endif
@@ -3033,61 +3656,137 @@ private struct TextInputBar: View {
     #if os(macOS)
     private func handleMacPasteFromPasteboard() -> Bool {
         let pb = NSPasteboard.general
-
-        if let image = NSImage(pasteboard: pb) {
-            Task { @MainActor in
-                isFocused = false
-                await onSendImage(image)
-            }
-            return true
+        guard !isLoadingPastedImage else { return true }
+        guard pb.availableType(from: [.png, .tiff]) != nil ||
+                pb.canReadItem(withDataConformingToTypes: [UTType.image.identifier]) else {
+            return false
         }
 
-        // Fallback: data representation (png/tiff/etc.)
-        if let data = pb.data(forType: .png), let image = NSImage(data: data) {
-            Task { @MainActor in
-                isFocused = false
-                await onSendImage(image)
-            }
-            return true
+        isFocused = false
+        isLoadingPastedImage = true
+        Task {
+            let data = await Self.readMacPasteboardImageData()
+            await finishLoadingPastedImage(data: data)
         }
-        if let data = pb.data(forType: .tiff), let image = NSImage(data: data) {
-            Task { @MainActor in
-                isFocused = false
-                await onSendImage(image)
-            }
-            return true
-        }
+        return true
+    }
 
-        return false
+    private func finishLoadingPastedImage(data: Data?) async {
+        defer { isLoadingPastedImage = false }
+        guard let data,
+              let preparedData = await Self.prepareMacImageDataForSending(data),
+              let image = NSImage(data: preparedData) else { return }
+        await onSendImage(image)
+    }
+
+    nonisolated private static func readMacPasteboardImageData() async -> Data? {
+        await Task.detached(priority: .userInitiated) {
+            autoreleasepool {
+                let pasteboard = NSPasteboard.general
+                if let data = pasteboard.data(forType: .png) {
+                    return data
+                }
+                if let data = pasteboard.data(forType: .tiff) {
+                    return data
+                }
+                guard let image = NSImage(pasteboard: pasteboard) else { return nil }
+                return image.tiffRepresentation
+            }
+        }.value
+    }
+
+    nonisolated private static func prepareMacImageDataForSending(_ data: Data) async -> Data? {
+        await Task.detached(priority: .userInitiated) {
+            autoreleasepool {
+                guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+                      let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+                      let width = properties[kCGImagePropertyPixelWidth] as? CGFloat,
+                      let height = properties[kCGImagePropertyPixelHeight] as? CGFloat else {
+                    return data
+                }
+
+                let maxDimension = max(width, height)
+                guard maxDimension > 2048 else { return data }
+                let options = [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 2048,
+                    kCGImageSourceShouldCacheImmediately: true
+                ] as CFDictionary
+                guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else {
+                    return data
+                }
+
+                let output = NSMutableData()
+                guard let destination = CGImageDestinationCreateWithData(
+                    output,
+                    UTType.jpeg.identifier as CFString,
+                    1,
+                    nil
+                ) else {
+                    return data
+                }
+                let destinationProperties = [
+                    kCGImageDestinationLossyCompressionQuality: CGFloat(0.94)
+                ] as CFDictionary
+                CGImageDestinationAddImage(destination, thumbnail, destinationProperties)
+                guard CGImageDestinationFinalize(destination) else { return data }
+                return output as Data
+            }
+        }.value
     }
     #endif
 
     private func handlePastedImages(_ providers: [NSItemProvider]) {
+        #if os(macOS)
+        guard !isLoadingPastedImage else { return }
+        isLoadingPastedImage = true
+        isFocused = false
+        #endif
+
         for provider in providers {
-            if provider.canLoadObject(ofClass: PlatformImage.self) {
-                provider.loadObject(ofClass: PlatformImage.self) { object, _ in
-                    guard let image = object as? PlatformImage else { return }
+            // 优先异步读取原始数据，避免 NSImage(pasteboard:) 在按键回调里同步解码。
+            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
                     Task { @MainActor in
-                        // 粘贴图片时通常会弹出确认弹窗；先收起键盘/取消焦点
+                        #if os(macOS)
+                        await finishLoadingPastedImage(data: data)
+                        #else
+                        guard let data, let image = PlatformImage(data: data) else { return }
                         isFocused = false
                         await onSendImage(image)
+                        #endif
                     }
                 }
                 return
             }
 
-            // Fallback: some apps provide image data rather than an object
-            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
-                    guard let data, let image = PlatformImage(data: data) else { return }
+            if provider.canLoadObject(ofClass: PlatformImage.self) {
+                provider.loadObject(ofClass: PlatformImage.self) { object, _ in
+                    guard let image = object as? PlatformImage else {
+                        #if os(macOS)
+                        Task { @MainActor in
+                            isLoadingPastedImage = false
+                        }
+                        #endif
+                        return
+                    }
+                    let imageBox = SendablePlatformImageBox(image)
                     Task { @MainActor in
                         isFocused = false
-                        await onSendImage(image)
+                        await onSendImage(imageBox.image)
+                        #if os(macOS)
+                        isLoadingPastedImage = false
+                        #endif
                     }
                 }
                 return
             }
         }
+
+        #if os(macOS)
+        isLoadingPastedImage = false
+        #endif
     }
     
     private var sendButton: some View {

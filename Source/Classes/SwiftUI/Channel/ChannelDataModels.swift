@@ -102,6 +102,7 @@ struct ChatMessage: Identifiable, Equatable {
     let attributedMessage: AttributedString
     let plainTextMessage: String
     let images: [PlatformImage]
+    let imageData: [Data]
     let timestamp: Date
     let isSentBySelf: Bool
     let senderSession: UInt?
@@ -109,13 +110,14 @@ struct ChatMessage: Identifiable, Equatable {
     let privatePeerName: String?
     let deliveryState: ChatMessageDeliveryState
     
-    init(id: UUID = UUID(), type: ChatMessageType, senderName: String, attributedMessage: AttributedString, images: [PlatformImage] = [], timestamp: Date = Date(), isSentBySelf: Bool, senderSession: UInt? = nil, privatePeerName: String? = nil, deliveryState: ChatMessageDeliveryState = .sent) {
+    init(id: UUID = UUID(), type: ChatMessageType, senderName: String, attributedMessage: AttributedString, images: [PlatformImage] = [], imageData: [Data] = [], timestamp: Date = Date(), isSentBySelf: Bool, senderSession: UInt? = nil, privatePeerName: String? = nil, deliveryState: ChatMessageDeliveryState = .sent) {
         self.id = id
         self.type = type
         self.senderName = senderName
         self.attributedMessage = attributedMessage
         self.plainTextMessage = String(attributedMessage.characters)
         self.images = images
+        self.imageData = imageData
         self.timestamp = timestamp
         self.isSentBySelf = isSentBySelf
         self.senderSession = senderSession

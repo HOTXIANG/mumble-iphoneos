@@ -377,13 +377,19 @@ extension ServerModelManager {
                     return
                 }
 
-                let images = imageData.compactMap { PlatformImage(data: $0) }
+                let decodedImages = imageData.compactMap { data -> (PlatformImage, Data)? in
+                    guard let image = PlatformImage(data: data) else { return nil }
+                    return (image, data)
+                }
+                let images = decodedImages.map(\.0)
+                let validImageData = decodedImages.map(\.1)
 
                 let pmMessage = ChatMessage(
                     type: .privateMessage,
                     senderName: senderName,
                     attributedMessage: self.attributedString(from: plainText),
                     images: images,
+                    imageData: validImageData,
                     timestamp: Date(),
                     isSentBySelf: false,
                     senderSession: senderSession,
@@ -887,13 +893,14 @@ extension ServerModelManager {
     }
 
     @discardableResult
-    func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [PlatformImage] = [], senderSession: UInt? = nil) -> Bool {
+    func appendUserMessage(senderName: String, text: String, isSentBySelf: Bool, images: [PlatformImage] = [], imageData: [Data] = [], senderSession: UInt? = nil) -> Bool {
         let newMessage = ChatMessage(
             id: UUID(),
             type: .userMessage,
             senderName: senderName,
             attributedMessage: attributedString(from: text),
             images: images,
+            imageData: imageData,
             timestamp: Date(),
             isSentBySelf: isSentBySelf,
             senderSession: senderSession
@@ -925,13 +932,19 @@ extension ServerModelManager {
     }
 
     func handleReceivedMessage(senderName: String, plainText: String, imageData: [Data], senderSession: UInt, connectedUserSession: UInt?) {
-        let images = imageData.compactMap { PlatformImage(data: $0) }
+        let decodedImages = imageData.compactMap { data -> (PlatformImage, Data)? in
+            guard let image = PlatformImage(data: data) else { return nil }
+            return (image, data)
+        }
+        let images = decodedImages.map(\.0)
+        let validImageData = decodedImages.map(\.1)
 
         let didAppend = appendUserMessage(
             senderName: senderName,
             text: plainText,
             isSentBySelf: senderSession == connectedUserSession,
             images: images,
+            imageData: validImageData,
             senderSession: senderSession
         )
 

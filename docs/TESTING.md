@@ -729,7 +729,7 @@ VAD onboarding 验证示例：
 | `message.sendPrivateImage` | `session`(必需), `path` 或 `base64`(必需) | 发送私聊图片消息 |
 | `message.listImages` | 无 | 列出包含图片的消息 |
 | `message.exportImage` | `messageID` 或 `messageIndex`, `imageIndex` | 导出消息图片到临时文件 |
-| `message.previewImage` | `messageID` 或 `messageIndex`, `imageIndex` | 打开消息图片预览 overlay |
+| `message.previewImage` | `messageID` 或 `messageIndex`, `imageIndex` | 打开消息图片预览（macOS 使用系统 Quick Look） |
 | `message.history` | `limit`(50) | 获取消息历史 |
 | `message.markRead` | 无 | 标记消息为已读并清除未读计数 |
 
@@ -815,7 +815,7 @@ VAD onboarding 验证示例：
 |------|------|------|
 | `ui.get` | 无 | 获取当前页面 / sheet / alert / overlay 状态 |
 | `ui.open` | `target`(必需) | 打开页面或 sheet。除基础目标外，还支持 `notificationSettings` / `ttsSettings` / `audioTransmissionSettings` / `advancedAudioSettings` / `certificateSettings` / `logSettings` / `about` / `aboutLicense` / `aboutAcknowledgements` / `audioPluginMixer` / `pluginBrowser` / `pluginEditor` / `channelProperties` / `channelEditACL` / `channelACLAcls` / `channelACLGroups` / `aclEntryEdit` / `groupEntryEdit` / `channelDelete` / `banAdd` / `certificateExportPassword` / `certificateDelete` / `favouriteDelete` |
-| `ui.dismiss` | `target`(可选) | 关闭当前或指定 UI。除 `toast` / `error` / `certTrust` / `imagePreview` 外，也支持上述各 sheet / alert，例如 `audioPluginMixer` / `pluginBrowser` / `pluginEditor` / `imageSendConfirm` / `channelDelete` / `banAdd` / `certificateExportPassword` / `certificateDelete` / `preferencesLanguageChanged` / `logReset` |
+| `ui.dismiss` | `target`(可选) | 关闭当前或指定 UI。除 `toast` / `error` / `certTrust` / `imagePreview` 外，也支持上述各 sheet / alert，例如 `audioPluginMixer` / `pluginBrowser` / `pluginEditor` / `channelDelete` / `banAdd` / `certificateExportPassword` / `certificateDelete` / `preferencesLanguageChanged` / `logReset` |
 | `ui.back` | 无 | 导航返回 |
 | `ui.root` | 无 | 导航回根页面 |
 

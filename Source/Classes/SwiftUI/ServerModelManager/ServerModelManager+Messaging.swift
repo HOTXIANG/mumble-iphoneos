@@ -4,6 +4,10 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import ImageIO
+import UniformTypeIdentifiers
+#endif
 
 private final class PlatformImageBox: @unchecked Sendable {
     let image: PlatformImage
@@ -12,6 +16,16 @@ private final class PlatformImageBox: @unchecked Sendable {
         self.image = image
     }
 }
+
+#if os(macOS)
+private final class CGImageBox: @unchecked Sendable {
+    let image: CGImage
+
+    init(_ image: CGImage) {
+        self.image = image
+    }
+}
+#endif
 
 extension ServerModelManager {
     func sendTextMessage(_ text: String) {
@@ -166,6 +180,7 @@ extension ServerModelManager {
             senderName: current.senderName,
             attributedMessage: current.attributedMessage,
             images: current.images,
+            imageData: current.imageData,
             timestamp: current.timestamp,
             isSentBySelf: current.isSentBySelf,
             senderSession: current.senderSession,
@@ -199,25 +214,59 @@ extension ServerModelManager {
     }
 
     private func sendImageMessageInternal(image: PlatformImage, targetUser: MKUser?) async {
+        guard let serverModel else {
+            reportImageSendFailure(NSLocalizedString("Not connected to a server.", comment: "Image send failure"))
+            return
+        }
+
+        let channel: MKChannel?
+        if targetUser == nil {
+            channel = serverModel.connectedUser()?.channel()
+            guard channel != nil else {
+                reportImageSendFailure(NSLocalizedString("No channel is available for this image.", comment: "Image send failure"))
+                return
+            }
+        } else {
+            channel = nil
+        }
+
         let htmlLimit = effectiveImageHTMLLimit()
         guard let data = await compressImageForHTMLLimitOffMain(image: image, htmlLimit: htmlLimit) else {
+            reportImageSendFailure(NSLocalizedString("The image could not be prepared within the server size limit.", comment: "Image send failure"))
             return
         }
 
         let base64Str = data.base64EncodedString(options: [])
         let htmlBody = "<img src=\"data:image/jpeg;base64,\(base64Str)\" />"
+        guard htmlBody.utf8.count <= htmlLimit else {
+            reportImageSendFailure(NSLocalizedString("The prepared image exceeds the server size limit.", comment: "Image send failure"))
+            return
+        }
         let msg = MKTextMessage(plainText: htmlBody)
 
         if let targetUser {
-            self.serverModel?.send(msg, to: targetUser)
-        } else if let channel = self.serverModel?.connectedUser()?.channel() {
-            self.serverModel?.send(msg, to: channel)
+            serverModel.send(msg, to: targetUser)
+        } else if let channel {
+            serverModel.send(msg, to: channel)
         }
 
-        await appendLocalMessage(image: image, targetUser: targetUser)
+        await appendLocalMessage(image: image, imageData: data, targetUser: targetUser)
     }
 
-    private func appendLocalMessage(image: PlatformImage, targetUser: MKUser?) async {
+    private func reportImageSendFailure(_ message: String) {
+        MumbleLogger.general.error("Image send failed: \(message)")
+        NotificationCenter.default.post(
+            name: .muAppShowMessage,
+            object: nil,
+            userInfo: [
+                "message": message,
+                "type": "error",
+                "jumpToMessages": true
+            ]
+        )
+    }
+
+    private func appendLocalMessage(image: PlatformImage, imageData: Data, targetUser: MKUser?) async {
         await MainActor.run {
             let selfName = self.serverModel?.connectedUser()?.userName() ?? NSLocalizedString("Me", comment: "")
             let localMessage: ChatMessage
@@ -229,6 +278,7 @@ extension ServerModelManager {
                     senderName: selfName,
                     attributedMessage: AttributedString(""),
                     images: [image],
+                    imageData: [imageData],
                     timestamp: Date(),
                     isSentBySelf: true,
                     senderSession: self.serverModel?.connectedUser()?.session(),
@@ -241,6 +291,7 @@ extension ServerModelManager {
                     senderName: selfName,
                     attributedMessage: AttributedString(""),
                     images: [image],
+                    imageData: [imageData],
                     timestamp: Date(),
                     isSentBySelf: true,
                     senderSession: self.serverModel?.connectedUser()?.session()
@@ -253,23 +304,184 @@ extension ServerModelManager {
     private func effectiveImageHTMLLimit() -> Int {
         // Same baseline as desktop Mumble's default uiImageLength.
         let fallback = 128 * 1024
-        return max(16 * 1024, serverImageMessageLengthBytes ?? fallback)
+        guard let serverLimit = serverImageMessageLengthBytes, serverLimit > 0 else {
+            return fallback
+        }
+        return serverLimit
     }
 
     private func compressImageForHTMLLimitOffMain(image: PlatformImage, htmlLimit: Int) async -> Data? {
+        #if os(macOS)
+        var proposedRect = CGRect(origin: .zero, size: image.size)
+        guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
+            return nil
+        }
+        let imageBox = CGImageBox(cgImage)
+        return await Task.detached(priority: .userInitiated) {
+            Self.compressCGImageForHTMLLimit(image: imageBox.image, htmlLimit: htmlLimit)
+        }.value
+        #else
         let imageBox = PlatformImageBox(image)
         return await Task.detached(priority: .userInitiated) {
             Self.compressImageForHTMLLimit(image: imageBox.image, htmlLimit: htmlLimit)
         }.value
+        #endif
     }
 
     nonisolated private static func compressImageForHTMLLimit(image: PlatformImage, htmlLimit: Int) -> Data? {
         let wrapperLen = "<img src=\"data:image/jpeg;base64,\" />".utf8.count
-        let payloadBudget = max(4 * 1024, htmlLimit - wrapperLen)
-        let binaryBudget = max(3 * 1024, (payloadBudget * 3) / 4)
+        let payloadBudget = htmlLimit - wrapperLen
+        guard payloadBudget >= 4 else { return nil }
+        // Base64 emits four characters for every three input bytes. Keeping the
+        // binary budget on a complete three-byte group guarantees the final HTML
+        // does not cross the server-advertised limit because of padding.
+        let binaryBudget = (payloadBudget / 4) * 3
 
         return smartCompress(image: image, to: binaryBudget)
     }
+
+    #if os(macOS)
+    nonisolated private static func compressCGImageForHTMLLimit(image: CGImage, htmlLimit: Int) -> Data? {
+        let wrapperLen = "<img src=\"data:image/jpeg;base64,\" />".utf8.count
+        let payloadBudget = htmlLimit - wrapperLen
+        guard payloadBudget >= 4 else { return nil }
+        let binaryBudget = (payloadBudget / 4) * 3
+        return smartCompress(cgImage: image, to: binaryBudget)
+    }
+
+    /// Core Graphics/ImageIO 全程在后台压缩，避免 NSImage.lockFocus/tiffRepresentation
+    /// 反复触发 AppKit 绘制，并根据首轮大小直接估算下一档分辨率。
+    nonisolated private static func smartCompress(cgImage: CGImage, to maxBytes: Int) -> Data? {
+        let originalMaxDimension = CGFloat(max(cgImage.width, cgImage.height))
+        guard var workingImage = opaqueCGImage(
+            from: cgImage,
+            maxDimension: min(originalMaxDimension, 2048)
+        ) else {
+            return nil
+        }
+
+        guard let initialData = jpegData(from: workingImage, quality: 0.86) else {
+            return nil
+        }
+        if initialData.count <= maxBytes {
+            return initialData
+        }
+
+        var currentMaxDimension = CGFloat(max(workingImage.width, workingImage.height))
+        let estimatedRatio = sqrt(CGFloat(maxBytes) / CGFloat(initialData.count))
+        let estimatedDimension = max(
+            640,
+            min(currentMaxDimension * 0.88, currentMaxDimension * estimatedRatio * 1.22)
+        )
+        if estimatedDimension < currentMaxDimension - 1,
+           let estimatedImage = opaqueCGImage(from: workingImage, maxDimension: estimatedDimension) {
+            workingImage = estimatedImage
+            currentMaxDimension = CGFloat(max(workingImage.width, workingImage.height))
+        }
+
+        var fallbackData: Data?
+        for _ in 0..<4 {
+            var lowQuality: CGFloat = 0.18
+            var highQuality: CGFloat = 0.9
+            var bestData: Data?
+            var bestQuality: CGFloat = 0
+
+            for _ in 0..<5 {
+                let quality = (lowQuality + highQuality) * 0.5
+                guard let candidate = jpegData(from: workingImage, quality: quality) else { continue }
+                if candidate.count <= maxBytes {
+                    bestData = candidate
+                    bestQuality = quality
+                    lowQuality = quality
+                } else {
+                    highQuality = quality
+                }
+            }
+
+            if let bestData {
+                fallbackData = bestData
+                if bestQuality >= 0.42 || currentMaxDimension <= 700 {
+                    return bestData
+                }
+            }
+
+            let nextDimension = max(512, floor(currentMaxDimension * 0.76))
+            guard nextDimension < currentMaxDimension - 1,
+                  let nextImage = opaqueCGImage(from: workingImage, maxDimension: nextDimension) else {
+                break
+            }
+            workingImage = nextImage
+            currentMaxDimension = CGFloat(max(workingImage.width, workingImage.height))
+        }
+
+        if let fallbackData {
+            return fallbackData
+        }
+
+        // Highly detailed/noisy images can still exceed a small server limit at
+        // 512 px. Continue reducing resolution and only return validated data.
+        for dimension in [384, 320, 256, 192, 128, 96] as [CGFloat] {
+            guard dimension < currentMaxDimension,
+                  let reducedImage = opaqueCGImage(from: workingImage, maxDimension: dimension) else {
+                continue
+            }
+            workingImage = reducedImage
+            currentMaxDimension = CGFloat(max(workingImage.width, workingImage.height))
+            for quality in [0.18, 0.12, 0.08] as [CGFloat] {
+                if let candidate = jpegData(from: workingImage, quality: quality),
+                   candidate.count <= maxBytes {
+                    return candidate
+                }
+            }
+        }
+        return nil
+    }
+
+    nonisolated private static func opaqueCGImage(from image: CGImage, maxDimension: CGFloat) -> CGImage? {
+        let sourceWidth = CGFloat(image.width)
+        let sourceHeight = CGFloat(image.height)
+        let sourceMaxDimension = max(sourceWidth, sourceHeight)
+        let ratio = min(maxDimension / max(sourceMaxDimension, 1), 1)
+        let width = max(1, Int(floor(sourceWidth * ratio)))
+        let height = max(1, Int(floor(sourceHeight * ratio)))
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+              ) else {
+            return nil
+        }
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
+    nonisolated private static func jpegData(from image: CGImage, quality: CGFloat) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+        let properties = [
+            kCGImageDestinationLossyCompressionQuality: quality
+        ] as CFDictionary
+        CGImageDestinationAddImage(destination, image, properties)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
+    }
+    #endif
 
     // 沿用现有流程：先降分辨率，再用二分搜索 JPEG 质量。
     nonisolated private static func smartCompress(image: PlatformImage, to maxBytes: Int) -> Data? {

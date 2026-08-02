@@ -615,15 +615,19 @@ final class MUTestCommandRouter {
 
         case "previewImage":
             let (message, imageIndex) = try requireMessageImage(params, messages: sm.messages)
-            let preview = MessageImagePreviewItem(
-                id: "ws-\(message.id.uuidString)-\(imageIndex)",
-                image: message.images[imageIndex],
-                sourceFrame: nil
-            )
+            let sourceID = "\(message.id.uuidString)-\(imageIndex)"
+            guard let gallery = MessageImagePreviewGallery.make(
+                messages: sm.messages,
+                selectedSourceID: sourceID
+            ), let preview = gallery.selectedItem else {
+                throw TestCommandError("Unable to build image preview gallery")
+            }
             #if os(iOS)
+            AppState.shared.activeImagePreviewGallery = gallery
             AppState.shared.activeImagePreview = preview
+            AppState.shared.isImmersiveStatusBarHidden = true
             #else
-            AppState.shared.activeMacImagePreview = preview
+            MacMessageImageQuickLookPresenter.shared.present(gallery: gallery)
             #endif
             return [
                 "messageID": message.id.uuidString,

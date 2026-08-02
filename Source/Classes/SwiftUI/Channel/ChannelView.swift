@@ -103,14 +103,15 @@ struct ChannelView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let activeLayoutMode = channelLayoutMode ?? immediateLayoutMode(for: geo.size.width)
+            let layoutWidth = sanitizedLayoutWidth(geo.size.width)
+            let activeLayoutMode = channelLayoutMode ?? immediateLayoutMode(for: layoutWidth)
 
             ZStack {
                 if activeLayoutMode == .split {
                     // [宽屏模式]
                     HStack(spacing: 0) {
                         ServerChannelView(serverManager: serverManager, isSplitLayout: true)
-                            .frame(maxWidth: .infinity)
+                            .frame(minWidth: 0, maxWidth: .infinity)
                         
                         ResizeHandle()
                             .gesture(
@@ -118,14 +119,14 @@ struct ChannelView: View {
                                     .onChanged { value in
                                         updateSplitHandleRatio(
                                             dragLocationX: value.location.x,
-                                            totalWidth: geo.size.width
+                                            totalWidth: layoutWidth
                                         )
                                     }
                             )
                             .zIndex(10)
                         
                         MessagesView(serverManager: serverManager, isSplitLayout: true)
-                            .frame(width: calculateEffectiveChatWidth(totalWidth: geo.size.width))
+                            .frame(width: calculateEffectiveChatWidth(totalWidth: layoutWidth))
                             .onAppear { appState.unreadMessageCount = 0 }
                     }
                     .transition(layoutModeTransition)
@@ -157,10 +158,14 @@ struct ChannelView: View {
             }
             .animation(layoutModeAnimation, value: activeLayoutMode)
             .onAppear {
-                applyChannelLayoutMode(for: geo.size.width, animated: false, delayed: false)
+                applyChannelLayoutMode(for: layoutWidth, animated: false, delayed: false)
             }
             .onChange(of: geo.size.width) { _, newWidth in
-                applyChannelLayoutMode(for: newWidth, animated: true, delayed: true)
+                applyChannelLayoutMode(
+                    for: sanitizedLayoutWidth(newWidth),
+                    animated: true,
+                    delayed: true
+                )
             }
         }
         .coordinateSpace(name: "ChannelViewSpace")
@@ -215,24 +220,47 @@ struct ChannelView: View {
     }
     
     private func calculateEffectiveChatWidth(totalWidth: CGFloat) -> CGFloat {
-        let preferred = totalWidth * (1 - splitHandlePositionRatio) - splitHandleWidth / 2
-        return clampedChatWidth(preferred, totalWidth: totalWidth)
+        let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
+        let preferred = safeTotalWidth * (1 - splitHandlePositionRatio) - splitHandleWidth / 2
+        return clampedChatWidth(preferred, totalWidth: safeTotalWidth)
     }
 
     private func updateSplitHandleRatio(dragLocationX: CGFloat, totalWidth: CGFloat) {
-        guard totalWidth > 0 else { return }
+        let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
+        guard safeTotalWidth > splitHandleWidth, dragLocationX.isFinite else { return }
 
-        let proposedChatWidth = totalWidth - dragLocationX - splitHandleWidth / 2
-        let chatWidth = clampedChatWidth(proposedChatWidth, totalWidth: totalWidth)
-        let handleCenterX = totalWidth - chatWidth - splitHandleWidth / 2
-        splitHandlePositionRatio = min(max(handleCenterX / totalWidth, 0), 1)
+        let proposedChatWidth = safeTotalWidth - dragLocationX - splitHandleWidth / 2
+        let chatWidth = clampedChatWidth(proposedChatWidth, totalWidth: safeTotalWidth)
+        let handleCenterX = safeTotalWidth - chatWidth - splitHandleWidth / 2
+        splitHandlePositionRatio = min(max(handleCenterX / safeTotalWidth, 0), 1)
     }
 
     private func clampedChatWidth(_ width: CGFloat, totalWidth: CGFloat) -> CGFloat {
-        let maxWidthForServerList = totalWidth - splitHandleWidth - minServerListWidth
-        let maxWidthForProportion = totalWidth * 0.7
-        let maximum = max(minChatWidth, min(maxWidthForServerList, maxWidthForProportion))
-        return min(max(width, minChatWidth), maximum)
+        let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
+        let availableWidth = max(0, safeTotalWidth - splitHandleWidth)
+        guard availableWidth > 0 else { return 0 }
+
+        // During the split-to-compact transition, the old split view remains
+        // alive for its fade-out animation while its parent can already be
+        // narrower than the normal split threshold. Never reserve more width
+        // than is actually available in that transient frame.
+        let effectiveMinimum = min(minChatWidth, availableWidth)
+        let maxWidthForServerList = max(
+            0,
+            safeTotalWidth - splitHandleWidth - minServerListWidth
+        )
+        let maxWidthForProportion = max(0, safeTotalWidth * 0.7)
+        let maximum = min(
+            availableWidth,
+            max(effectiveMinimum, min(maxWidthForServerList, maxWidthForProportion))
+        )
+        let safeWidth = width.isFinite ? width : effectiveMinimum
+        return min(max(safeWidth, effectiveMinimum), maximum)
+    }
+
+    private func sanitizedLayoutWidth(_ width: CGFloat) -> CGFloat {
+        guard width.isFinite else { return 0 }
+        return max(0, width)
     }
     
     private func configureTabBarAppearance() {
@@ -250,19 +278,20 @@ struct ChannelView: View {
     }
 
     private func immediateLayoutMode(for width: CGFloat) -> ChannelLayoutMode {
-        width > splitThreshold ? .split : .compact
+        sanitizedLayoutWidth(width) > splitThreshold ? .split : .compact
     }
 
     private func applyChannelLayoutMode(for width: CGFloat, animated: Bool, delayed: Bool) {
-        guard width > 0 else { return }
-        latestLayoutWidth = width
+        let safeWidth = sanitizedLayoutWidth(width)
+        guard safeWidth > 0 else { return }
+        latestLayoutWidth = safeWidth
 
         guard !isLayoutModeUpdateSuppressed() else {
             layoutModeUpdateScheduler.cancel()
             return
         }
 
-        let mode = immediateLayoutMode(for: width)
+        let mode = immediateLayoutMode(for: safeWidth)
 
         guard delayed else {
             layoutModeUpdateScheduler.cancel()
@@ -325,26 +354,32 @@ struct ChannelView: View {
     }
 
     private func setChannelLayoutMode(_ mode: ChannelLayoutMode, animated: Bool) {
-        let update = {
+        let updateLocalLayout = {
             if channelLayoutMode != mode {
                 channelLayoutMode = mode
-            }
-
-            let isSplitLayout = mode == .split
-            if appState.isChannelSplitLayout != isSplitLayout {
-                appState.isChannelSplitLayout = isSplitLayout
             }
         }
 
         if animated {
             withAnimation(layoutModeAnimation) {
-                update()
+                updateLocalLayout()
             }
         } else {
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                update()
+                updateLocalLayout()
+            }
+        }
+
+        // This flag is observed outside the channel layout and must not inherit
+        // the split-view geometry animation transaction.
+        let isSplitLayout = mode == .split
+        if appState.isChannelSplitLayout != isSplitLayout {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                appState.isChannelSplitLayout = isSplitLayout
             }
         }
     }
@@ -841,11 +876,11 @@ struct ChannelTreeRow: View {
                         }
                 } else {
                 HStack(spacing: 0) {
-                    
+
                     // [区域 1] 缩进占位符
                     Spacer()
                         .frame(width: CGFloat(level) * kIndentUnit)
-                    
+
                     // [区域 2] 箭头点击区
                     Color.clear
                         .frame(width: kArrowWidth + 24, height: kContentHeight + kRowPaddingV * 2)
@@ -2048,93 +2083,88 @@ extension MKChannel: Identifiable {
 
 // MARK: - 7. Private Message Input Dialog
 
-private struct PendingPrivateImage: Identifiable {
-    let id = UUID()
-    let image: PlatformImage
-}
-
 struct PrivateMessageInputView: View {
     let targetUser: MKUser
     @ObservedObject var serverManager: ServerModelManager
     
     @State private var messageText: String = ""
     @State private var selectedPhoto: PhotosPickerItem?
-    @State private var pendingPrivateImage: PendingPrivateImage?
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                // 目标用户
-                HStack(spacing: 10) {
-                    Image(systemName: "envelope.fill")
-                        .font(.title2)
-                        .foregroundColor(.accentColor)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Private Message")
-                            .font(.headline)
-                        Text("To: \(targetUser.userName() ?? NSLocalizedString("Unknown", comment: ""))")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+        ZStack {
+            NavigationStack {
+                VStack(spacing: 16) {
+                    // 目标用户
+                    HStack(spacing: 10) {
+                        Image(systemName: "envelope.fill")
+                            .font(.title2)
+                            .foregroundColor(.accentColor)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Private Message")
+                                .font(.headline)
+                            Text("To: \(targetUser.userName() ?? NSLocalizedString("Unknown", comment: ""))")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
                     }
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-                
-                // 输入区域
-                TextEditor(text: $messageText)
-                    .font(.body)
-                    .frame(minHeight: 100)
-                    .scrollContentBackground(.hidden)
-                    .padding(10)
-                    .background(Color.secondarySystemBackground, in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-                    )
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                    // 输入区域
+                    TextEditor(text: $messageText)
+                        .font(.body)
+                        .frame(minHeight: 100)
+                        .scrollContentBackground(.hidden)
+                        .padding(10)
+                        .background(Color.secondarySystemBackground, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                        )
+                        .padding(.horizontal)
+
+                    HStack {
+                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                            Label("Send Image", systemImage: "photo.on.rectangle.angled")
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
                     .padding(.horizontal)
 
-                HStack {
-                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                        Label("Send Image", systemImage: "photo.on.rectangle.angled")
-                    }
-                    .buttonStyle(.bordered)
                     Spacer()
                 }
-                .padding(.horizontal)
-                
-                Spacer()
-            }
-            .navigationTitle("Private Message")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        InteractionFeedback.cancel()
-                        dismiss()
+                .navigationTitle("Private Message")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            InteractionFeedback.cancel()
+                            dismiss()
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Send") {
+                            sendMessage()
+                        }
+                        .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Send") {
-                        sendMessage()
-                    }
-                    .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-            .onChange(of: selectedPhoto) { _, item in
-                Task {
-                    guard let item,
-                          let data = try? await item.loadTransferable(type: Data.self),
-                          let image = PlatformImage(data: data) else {
-                        await MainActor.run { selectedPhoto = nil }
-                        return
-                    }
-                    await MainActor.run {
-                        pendingPrivateImage = PendingPrivateImage(image: image)
+                .onChange(of: selectedPhoto) { _, item in
+                    Task {
+                        guard let item,
+                              let data = try? await item.loadTransferable(type: Data.self),
+                              let image = PlatformImage(data: data) else {
+                            await MainActor.run { selectedPhoto = nil }
+                            return
+                        }
                         selectedPhoto = nil
+                        await serverManager.sendPrivateImageMessage(image: image, to: targetUser)
+                        dismiss()
                     }
                 }
             }
@@ -2142,38 +2172,8 @@ struct PrivateMessageInputView: View {
         #if os(macOS)
         .frame(minWidth: 400, minHeight: 250)
         #endif
-        .sheet(item: $pendingPrivateImage) { pending in
-            ImageConfirmationView(
-                image: pending.image,
-                onCancel: {
-                    InteractionFeedback.cancel()
-                    pendingPrivateImage = nil
-                },
-                onSend: { image in
-                    await serverManager.sendPrivateImageMessage(image: image, to: targetUser)
-                    await MainActor.run {
-                        pendingPrivateImage = nil
-                        dismiss()
-                    }
-                }
-            )
-            .presentationDetents([.medium, .large])
-        }
         .onAppear {
             AppState.shared.setAutomationCurrentScreen("privateMessage")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
-            let target = notification.userInfo?["target"] as? String
-            if target == nil || target == "imageSendConfirm" {
-                pendingPrivateImage = nil
-            }
-        }
-        .onChange(of: pendingPrivateImage?.id) { _, value in
-            if value != nil {
-                AppState.shared.setAutomationPresentedSheet("imageSendConfirm")
-            } else if AppState.shared.automationPresentedSheet == "imageSendConfirm" {
-                AppState.shared.clearAutomationPresentedSheet(ifMatches: "imageSendConfirm")
-            }
         }
     }
     

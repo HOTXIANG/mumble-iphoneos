@@ -163,6 +163,7 @@ class AppState: ObservableObject {
     #if os(iOS)
     @Published var isImmersiveStatusBarHidden: Bool = false
     @Published var activeImagePreview: MessageImagePreviewItem? = nil
+    @Published var activeImagePreviewGallery: MessageImagePreviewGallery? = nil
     @Published var hiddenPreviewSourceID: String? = nil
     @Published var imagePreviewSourceFrames: [String: CGRect] = [:]
     #endif

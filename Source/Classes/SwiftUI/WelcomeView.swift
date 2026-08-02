@@ -1039,7 +1039,7 @@ struct AppRootView: View {
 
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     #if os(macOS)
-    @State private var splitVisibility: NavigationSplitViewVisibility = .detailOnly
+    @State private var splitVisibility: NavigationSplitViewVisibility = .all
     @State private var macSplitLayoutWidth: CGFloat = 0
     @State private var pendingMacSidebarOpenWorkItem: DispatchWorkItem?
     #else
@@ -1225,30 +1225,31 @@ struct AppRootView: View {
         #if os(iOS)
         // iOS 全局图片预览 overlay（覆盖整个 App 界面，包括 iPad 分栏）
         .overlay {
-            if let preview = appState.activeImagePreview {
-                IOSMessageImageFullscreenPreview(
-                    item: preview,
-                    liveSourceFrame: appState.imagePreviewSourceFrames[preview.id],
-                    onEntryAnimationCompleted: {
+            if let gallery = appState.activeImagePreviewGallery {
+                IOSMessageImageGalleryPreview(
+                    gallery: gallery,
+                    liveSourceFrames: appState.imagePreviewSourceFrames,
+                    onSelectionChanged: { index in
+                        selectIOSImagePreview(at: index)
+                    },
+                    onEntryAnimationCompleted: { previewID in
                         // Hide source thumbnail only after entry animation finishes.
-                        if appState.activeImagePreview?.id == preview.id {
-                            appState.hiddenPreviewSourceID = preview.id
+                        if appState.activeImagePreview?.id == previewID {
+                            appState.hiddenPreviewSourceID = previewID
                         }
                     },
-                    onDismissWillStart: {
+                    onDismissWillStart: { previewID in
+                        appState.hiddenPreviewSourceID = nil
                         appState.isImmersiveStatusBarHidden = false
-                        scheduleImagePreviewDismissFallback(previewID: preview.id)
+                        scheduleImagePreviewDismissFallback(previewID: previewID)
                     },
                     onDismiss: {
                         clearIOSImagePreview()
                     }
                 )
-                .id(preview.id)
-                .transition(.opacity)
                 .zIndex(10000)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: appState.activeImagePreview != nil)
         #endif
         // macOS 全窗口图片预览 overlay（覆盖整个 App 界面，包括分栏）
         #if os(macOS)
@@ -1381,22 +1382,19 @@ struct AppRootView: View {
             sidebarNavigationStack
         } detail: {
             detailContent
+                #if os(macOS)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 760, max: 10_000)
+                #endif
         }
-            .navigationSplitViewStyle(.prominentDetail)
+            .navigationSplitViewStyle(.balanced)
             .background(SplitViewOverlayBehaviorConfigurator(isOverlayEnabled: appState.isConnected))
             .onAppear {
                 preferredCompactColumn = appState.isConnected ? .detail : .sidebar
                 #if os(macOS)
-                guard !appState.isConnected else {
-                    setSplitVisibility(.detailOnly, animated: false)
-                    return
-                }
-
-                setSplitVisibility(.detailOnly, animated: false)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                    guard !appState.isConnected else { return }
-                    setSplitVisibility(.all, animated: true)
-                }
+                // The sidebar is part of the first rendered frame. Its 260pt
+                // minimum plus the detail's explicit 180pt minimum fits inside
+                // the 480pt minimum window, so toggling cannot widen the frame.
+                setSplitVisibility(appState.isConnected ? .detailOnly : .all, animated: false)
                 #else
                 setSplitVisibility(appState.isConnected ? .detailOnly : .all)
                 #endif
@@ -1706,8 +1704,22 @@ struct AppRootView: View {
     #if os(iOS)
     private func clearIOSImagePreview() {
         appState.activeImagePreview = nil
+        appState.activeImagePreviewGallery = nil
         appState.isImmersiveStatusBarHidden = false
         appState.hiddenPreviewSourceID = nil
+    }
+
+    private func selectIOSImagePreview(at index: Int) {
+        guard let gallery = appState.activeImagePreviewGallery else { return }
+        guard gallery.items.indices.contains(index), gallery.selectedIndex != index else { return }
+        let selectedGallery = MessageImagePreviewGallery(items: gallery.items, selectedIndex: index)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            appState.hiddenPreviewSourceID = selectedGallery.selectedItem?.id
+            appState.activeImagePreviewGallery = selectedGallery
+            appState.activeImagePreview = selectedGallery.selectedItem
+        }
     }
 
     private func scheduleImagePreviewDismissFallback(previewID: String) {

@@ -15,28 +15,7 @@ import AppKit
 enum MacMainWindowConfiguration {
     static let autosaveName = "MumbleMainWindowFrame"
     static let minSize = NSSize(width: 480, height: 400)
-    static let narrowWindowThreshold: CGFloat = 900
-
-    static var initialSplitVisibility: NavigationSplitViewVisibility {
-        // Match the first split layout to the restored frame so SwiftUI does not
-        // add the sidebar after launch and expand the window by that column width.
-        guard let savedWidth = autosavedFrameWidth else {
-            return .all
-        }
-        return savedWidth < narrowWindowThreshold ? .automatic : .all
-    }
-
-    private static var autosavedFrameWidth: CGFloat? {
-        guard let frameString = UserDefaults.standard.string(forKey: "NSWindow Frame \(autosaveName)") else {
-            return nil
-        }
-
-        let components = frameString
-            .split(whereSeparator: { $0 == " " || $0 == "\t" })
-            .compactMap { Double($0) }
-        guard components.count >= 4 else { return nil }
-        return CGFloat(components[2])
-    }
+    static let defaultSize = NSSize(width: 1_100, height: 820)
 }
 #endif
 
@@ -166,6 +145,12 @@ struct MumbleApp: App {
                     }
                 }
         }
+        #if os(macOS)
+        .defaultSize(
+            width: MacMainWindowConfiguration.defaultSize.width,
+            height: MacMainWindowConfiguration.defaultSize.height
+        )
+        #endif
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
