@@ -21,6 +21,17 @@ struct ToastView: View {
         return .infinity
         #endif
     }()
+
+    private let topClearance: CGFloat = {
+        #if os(macOS)
+        // The main window renders beneath its transparent titlebar. Keep
+        // in-app banners below the native toolbar instead of anchoring them
+        // to the extended content area's y = 0.
+        return 62
+        #else
+        return 8
+        #endif
+    }()
     
     var body: some View {
         HStack(spacing: 12) {
@@ -60,7 +71,7 @@ struct ToastView: View {
         .frame(maxWidth: maxBannerWidth)
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .padding(.horizontal, 16)
-        .padding(.top, 8) // 距离顶部的距离
+        .padding(.top, topClearance)
     }
 
     @ViewBuilder

@@ -2324,7 +2324,6 @@ struct MessagesList: View {
     @State private var isPinnedToBottom = true
     @State private var hasAppliedInitialLayoutScroll = false
     @State private var lastObservedMessageCount = 0
-    
     private let topID = "topOfMessages"
     private let bottomID = "bottomOfMessages"
     private let scrollCoordinateSpaceName = "MessagesListScrollView"
@@ -2428,7 +2427,13 @@ struct MessagesList: View {
                             )
                             .id(bottomID)
                     }
-                    .padding(.top, 16)
+                    .padding(.top, {
+                        #if os(macOS)
+                        return isSplitLayout ? CGFloat(74) : CGFloat(16)
+                        #else
+                        return CGFloat(16)
+                        #endif
+                    }())
                     .padding(.leading, isSplitLayout ? 4 : 16)
                     .padding(.trailing, 16)
                     .offset(y: layoutCompensationY)
@@ -2443,6 +2448,13 @@ struct MessagesList: View {
                 }
                 .coordinateSpace(name: scrollCoordinateSpaceName)
                 #if os(macOS)
+                .modifier(
+                    MacTitlebarOverlapScrollModifier(
+                        enabled: isSplitLayout,
+                        contentTopInset: 74,
+                        hasContent: !cachedRenderBlocks.isEmpty
+                    )
+                )
                 // A macOS TabView gives each tab its own framed content area.
                 // Keep compact chat rows inside that area instead of drawing
                 // over the native tab chrome; split layout keeps its existing

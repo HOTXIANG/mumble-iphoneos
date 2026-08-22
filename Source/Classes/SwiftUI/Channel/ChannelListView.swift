@@ -2,6 +2,86 @@
 
 import SwiftUI
 
+#if os(macOS)
+private enum MacChannelAudioControl {
+    case deafen
+    case mute
+}
+
+private struct MacChannelAudioToolbarButton: View {
+    @ObservedObject var serverManager: ServerModelManager
+    let control: MacChannelAudioControl
+
+    @State private var userStateRevision: UInt = 0
+    private let hapticGenerator = PlatformImpactFeedback(style: .medium)
+
+    private var isSelfDeafened: Bool {
+        _ = userStateRevision
+        return serverManager.serverModel?.connectedUser()?.isSelfDeafened() == true
+    }
+
+    private var isSelfMuted: Bool {
+        _ = userStateRevision
+        return serverManager.serverModel?.connectedUser()?.isSelfMuted() == true
+    }
+
+    private var title: String {
+        switch control {
+        case .deafen:
+            return isSelfDeafened ? "Undeafen" : "Deafen"
+        case .mute:
+            return isSelfMuted ? "Unmute" : "Mute"
+        }
+    }
+
+    var body: some View {
+        Button {
+            hapticGenerator.impactOccurred()
+            switch control {
+            case .deafen:
+                serverManager.toggleSelfDeafen()
+            case .mute:
+                serverManager.toggleSelfMute()
+            }
+            userStateRevision &+= 1
+        } label: {
+            icon
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 40, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(title)
+        .help(title)
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: ServerModelNotificationManager.userStateUpdatedNotification
+            )
+        ) { _ in
+            userStateRevision &+= 1
+        }
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        switch control {
+        case .deafen:
+            Image(systemName: isSelfDeafened ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(isSelfDeafened ? Color.red : Color.primary)
+        case .mute:
+            Image(systemName: isSelfMuted ? "mic.slash.fill" : "mic.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(
+                    isSelfDeafened
+                        ? Color.red
+                        : (isSelfMuted ? Color.orange : Color.primary)
+                )
+        }
+    }
+}
+#endif
+
 struct ChannelListView<RootSidebar: View>: View {
     private let rootSidebar: RootSidebar
     private let rootSplitVisibility: Binding<NavigationSplitViewVisibility>?
@@ -94,14 +174,15 @@ struct ChannelListView<RootSidebar: View>: View {
                 .zIndex(9999) // 确保在最上层
             }
         }
+        #if os(macOS)
+        .ignoresSafeArea(.container, edges: .top)
+        #endif
         .navigationBarBackButtonHidden(true)
         #if os(iOS)
         .toolbarBackground(.hidden, for: .navigationBar)
         #else
         .navigationTitle(Text(serverManager.serverName ?? NSLocalizedString("Channel", comment: "")))
         .toolbarTitleDisplayMode(.inline)
-        .toolbarBackground(.clear, for: .windowToolbar)
-        .toolbarBackground(.hidden, for: .windowToolbar)
         #endif
         #if os(iOS)
         // iPad 上不显示搜索框，避免占用服务器界面空间
@@ -109,7 +190,6 @@ struct ChannelListView<RootSidebar: View>: View {
         #endif
         #if os(macOS)
         .toolbar {
-            leadingToolbarItems
             trailingToolbarItems
         }
         #endif
@@ -303,10 +383,10 @@ struct ChannelListView<RootSidebar: View>: View {
         }
         #else
         ToolbarItem(id: "deafen", placement: .primaryAction) {
-            deafenToolbarButton
+            MacChannelAudioToolbarButton(serverManager: serverManager, control: .deafen)
         }
         ToolbarItem(id: "mute", placement: .primaryAction) {
-            muteToolbarButton
+            MacChannelAudioToolbarButton(serverManager: serverManager, control: .mute)
         }
         ToolbarItem(id: "disconnect", placement: .primaryAction) {
             disconnectToolbarButton
@@ -342,60 +422,6 @@ struct ChannelListView<RootSidebar: View>: View {
     #endif
 
     #if os(macOS)
-    private var deafenToolbarTitle: String {
-        serverManager.connectedUserState?.isSelfDeafened == true ? "Undeafen" : "Deafen"
-    }
-
-    private var muteToolbarTitle: String {
-        serverManager.connectedUserState?.isSelfMuted == true ? "Unmute" : "Mute"
-    }
-
-    private var deafenToolbarButton: some View {
-        Button(action: {
-            hapticGenerator.impactOccurred()
-            serverManager.toggleSelfDeafen()
-        }) {
-            Label(
-                deafenToolbarTitle,
-                systemImage: serverManager.connectedUserState?.isSelfDeafened == true
-                    ? "speaker.slash.fill"
-                    : "speaker.wave.2.fill"
-            )
-            .labelStyle(.iconOnly)
-            .font(.system(size: 18))
-            .foregroundColor(serverManager.connectedUserState?.isSelfDeafened == true ? .red : .primary)
-            .contentTransition(.symbolEffect(.replace))
-            .frame(width: 40, height: 28)
-        }
-        .buttonStyle(.borderless)
-        .accessibilityLabel(deafenToolbarTitle)
-        .help(deafenToolbarTitle)
-    }
-
-    private var muteToolbarButton: some View {
-        Button(action: {
-            hapticGenerator.impactOccurred()
-            serverManager.toggleSelfMute()
-        }) {
-            Label(
-                muteToolbarTitle,
-                systemImage: serverManager.connectedUserState?.isSelfMuted == true ? "mic.slash.fill" : "mic.fill"
-            )
-            .labelStyle(.iconOnly)
-            .font(.system(size: 18))
-            .foregroundColor(
-                serverManager.connectedUserState?.isSelfDeafened == true
-                    ? .red
-                    : (serverManager.connectedUserState?.isSelfMuted == true ? .orange : .primary)
-            )
-            .contentTransition(.symbolEffect(.replace))
-            .frame(width: 40, height: 28)
-        }
-        .buttonStyle(.borderless)
-        .accessibilityLabel(muteToolbarTitle)
-        .help(muteToolbarTitle)
-    }
-
     private var disconnectToolbarButton: some View {
         Button(action: {
             hapticGenerator.impactOccurred()

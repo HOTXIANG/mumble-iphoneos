@@ -28,6 +28,8 @@ private let kArrowWidth: CGFloat = 14.0   // 箭头占位宽度
 private let kChannelIconSize: CGFloat = 10.0
 private let kChannelIconWidth: CGFloat = 16.0
 private let kDropHighlightCornerRadius: CGFloat = 12.0 // 与 TintedGlassRowModifier 圆角一致
+private let kCompactTabTitlebarClearance: CGFloat = 58.0
+private let kSplitScrollTopContentInset: CGFloat = 68.0
 #else
 private let kRowSpacing: CGFloat = 7.0    // 行与行之间的间隙
 private let kRowPaddingV: CGFloat = 6.0   // 行内部的垂直边距
@@ -42,6 +44,7 @@ private let kArrowWidth: CGFloat = 16.0   // 箭头占位宽度
 private let kChannelIconSize: CGFloat = 12.0
 private let kChannelIconWidth: CGFloat = 20.0
 private let kDropHighlightCornerRadius: CGFloat = 13.0 // 与 TintedGlassRowModifier 圆角一致
+private let kSplitScrollTopContentInset: CGFloat = 10.0
 #endif
 
 // MARK: - 1. Main Layout Container
@@ -68,6 +71,8 @@ private struct MacChannelSplitSidebarRoot: View {
 
     var body: some View {
         ServerChannelView(serverManager: serverManager, isSplitLayout: true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea(.container, edges: .top)
             .environment(\.locale, locale)
     }
 }
@@ -79,6 +84,8 @@ private struct MacChannelSplitDetailRoot: View {
 
     var body: some View {
         MessagesView(serverManager: serverManager, isSplitLayout: true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea(.container, edges: .top)
             .environment(\.locale, locale)
             .onAppear {
                 appState.unreadMessageCount = 0
@@ -145,10 +152,16 @@ private struct MacLockedChannelSplitView: NSViewControllerRepresentable {
         splitController.minimumDetailWidth = minimumDetailWidth
 
         let sidebarController = NSHostingController(
-            rootView: MacChannelSplitSidebarRoot(serverManager: serverManager, locale: locale)
+            rootView: MacChannelSplitSidebarRoot(
+                serverManager: serverManager,
+                locale: locale
+            )
         )
         let detailController = NSHostingController(
-            rootView: MacChannelSplitDetailRoot(serverManager: serverManager, locale: locale)
+            rootView: MacChannelSplitDetailRoot(
+                serverManager: serverManager,
+                locale: locale
+            )
         )
 
         let sidebarItem = NSSplitViewItem(viewController: sidebarController)
@@ -212,8 +225,8 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
     private let splitLayoutActivationPadding: CGFloat = 24
     private let rootSidebar: RootSidebar
     private let rootSplitVisibility: Binding<NavigationSplitViewVisibility>?
-    private let leadingControls: LeadingControls
-    private let trailingControls: TrailingControls
+    private let leadingControls: () -> LeadingControls
+    private let trailingControls: () -> TrailingControls
     @Binding private var isSplitLayoutActive: Bool
 
     init(
@@ -221,15 +234,15 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
         rootSidebar: RootSidebar,
         rootSplitVisibility: Binding<NavigationSplitViewVisibility>?,
         isSplitLayoutActive: Binding<Bool>,
-        @ViewBuilder leadingControls: () -> LeadingControls,
-        @ViewBuilder trailingControls: () -> TrailingControls
+        @ViewBuilder leadingControls: @escaping () -> LeadingControls,
+        @ViewBuilder trailingControls: @escaping () -> TrailingControls
     ) {
         self.serverManager = serverManager
         self.rootSidebar = rootSidebar
         self.rootSplitVisibility = rootSplitVisibility
         self._isSplitLayoutActive = isSplitLayoutActive
-        self.leadingControls = leadingControls()
-        self.trailingControls = trailingControls()
+        self.leadingControls = leadingControls
+        self.trailingControls = trailingControls
     }
 
     private var usesIntegratedRootSplit: Bool {
@@ -357,7 +370,7 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarLeading) {
-                    leadingControls
+                    leadingControls()
                 }
             }
             .navigationSplitViewColumnWidth(
@@ -374,7 +387,7 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    trailingControls
+                    trailingControls()
                 }
             }
             .navigationSplitViewColumnWidth(
@@ -395,10 +408,10 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItemGroup(placement: .navigationBarLeading) {
-                            leadingControls
+                            leadingControls()
                         }
                         ToolbarItemGroup(placement: .navigationBarTrailing) {
-                            trailingControls
+                            trailingControls()
                         }
                     }
             }
@@ -431,6 +444,9 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
                 .tag(AppState.Tab.messages)
                 .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
         }
+        #if os(macOS)
+        .padding(.top, kCompactTabTitlebarClearance)
+        #endif
         #if os(iOS)
         .toolbarBackground(.clear, for: .tabBar)
         .toolbarBackground(.hidden, for: .tabBar)
@@ -662,7 +678,6 @@ struct ServerChannelView: View {
     @State private var selectedChannelForCreate: MKChannel? = nil
     @State private var selectedUserForRename: MKUser? = nil
     @State private var pendingNicknameInput: String = ""
-    
     var body: some View {
         let base = channelContent
             .overlay(alignment: .bottom, content: movingUserOverlay)
@@ -743,15 +758,26 @@ struct ServerChannelView: View {
     }
 
     private var channelContent: some View {
-        ZStack {
+        let hasChannelContent = MUConnectionController.shared()?.serverModel?.rootChannel() != nil
+
+        return ZStack {
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: kRowSpacing) {
-                    Color.clear.frame(height: 10)
+                    Color.clear.frame(height: isSplitLayout ? kSplitScrollTopContentInset : 10)
                     channelTreeContent
                     Color.clear.frame(height: 80)
                 }
                 .padding(.horizontal, 16)
             }
+            #if os(macOS)
+            .modifier(
+                MacTitlebarOverlapScrollModifier(
+                    enabled: isSplitLayout,
+                    contentTopInset: kSplitScrollTopContentInset,
+                    hasContent: hasChannelContent
+                )
+            )
+            #endif
         }
     }
 
