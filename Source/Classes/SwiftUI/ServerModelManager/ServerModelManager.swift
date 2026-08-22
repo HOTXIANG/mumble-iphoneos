@@ -47,8 +47,13 @@ class ServerModelManager: ObservableObject {
 
     @Published var modelItems: [ChannelNavigationItem] = []
     @Published var viewMode: ViewMode = .server
-    @Published var isConnected: Bool = false
+    // Runtime connection guard used by manager-side operations. No view reads
+    // this value directly, so publishing it would needlessly invalidate every
+    // view observing the large ServerModelManager object during setup/cleanup.
+    var isConnected: Bool = false
     @Published var isLocalAudioTestRunning: Bool = false
+    /// Drives the channel-tree transition when a user moves between channels.
+    @Published var userChannelMovementRevision: UInt = 0
     
     // --- 核心修改 1：添加 @Published 数组来存储聊天消息 ---
     @Published var messages: [ChatMessage] = []

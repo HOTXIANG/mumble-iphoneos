@@ -28,8 +28,7 @@ extension Notification.Name {
     static let muAutomationUIStateChanged = Notification.Name("MUAutomationUIStateChangedNotification")
     static let muLogFilePersistenceChanged = Notification.Name("MULogFilePersistenceChangedNotification")
     static let muChannelForceCompactLayout = Notification.Name("MUChannelForceCompactLayoutNotification")
-    static let muChannelSuppressLayoutUpdates = Notification.Name("MUChannelSuppressLayoutUpdatesNotification")
-
+    static let muChannelPrepareForContainerResize = Notification.Name("MUChannelPrepareForContainerResizeNotification")
     #if os(macOS)
     static let muMacAudioInputDevicesChanged = Notification.Name("MUMacAudioInputDevicesChanged")
     static let muMacAudioVPIOToHALTransition = Notification.Name("MUMacAudioVPIOToHALTransition")
@@ -153,8 +152,10 @@ class AppState: ObservableObject {
     
     // --- 核心修改 2：添加一个属性来跟踪当前显示的 Tab ---
     @Published var currentTab: Tab = .channels // 默认是频道列表
-    @Published var isInChannelView: Bool = false
-    @Published var isChannelSplitLayout: Bool = false
+    // Notification policy reads these as runtime context. They do not render
+    // UI, so changing them must not invalidate every AppState observer.
+    var isInChannelView: Bool = false
+    var isChannelSplitLayout: Bool = false
     @Published var automationCurrentScreen: String = "welcome"
     @Published var automationPresentedSheet: String? = nil
     @Published var automationPresentedAlert: String? = nil
@@ -240,9 +241,17 @@ class AppState: ObservableObject {
                     self.isRegistering = false
                 }
                 
+                #if os(macOS)
+                var connectionTransaction = Transaction()
+                connectionTransaction.disablesAnimations = true
+                withTransaction(connectionTransaction) {
+                    self.isConnected = true
+                }
+                #else
                 withAnimation(.spring()) {
                     self.isConnected = true
                 }
+                #endif
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     withAnimation(.easeOut(duration: 0.3)) {
                         self.isConnecting = false

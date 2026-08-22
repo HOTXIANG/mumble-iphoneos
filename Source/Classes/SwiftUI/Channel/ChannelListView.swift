@@ -2,7 +2,9 @@
 
 import SwiftUI
 
-struct ChannelListView: View {
+struct ChannelListView<RootSidebar: View>: View {
+    private let rootSidebar: RootSidebar
+    private let rootSplitVisibility: Binding<NavigationSplitViewVisibility>?
     @EnvironmentObject var serverManager: ServerModelManager
     @ObservedObject var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -14,6 +16,7 @@ struct ChannelListView: View {
     @State private var showingUserList = false
     @State private var showingTokens = false
     @State private var channelSearchText = ""
+    @State private var isSplitLayoutActive = false
     
     #if os(macOS)
     // macOS: 监听菜单栏通知
@@ -34,10 +37,34 @@ struct ChannelListView: View {
     private let hapticGenerator = PlatformImpactFeedback(style: .medium)
     private let notificationHaptic = PlatformNotificationFeedback()
 
+    init(
+        rootSplitVisibility: Binding<NavigationSplitViewVisibility>,
+        @ViewBuilder rootSidebar: () -> RootSidebar
+    ) {
+        self.rootSidebar = rootSidebar()
+        self.rootSplitVisibility = rootSplitVisibility
+    }
+
     var body: some View {
         ZStack {
-            // 背景由 ChannelView 内部提供
-            ChannelView(serverManager: serverManager)
+            ChannelView(
+                serverManager: serverManager,
+                rootSidebar: rootSidebar,
+                rootSplitVisibility: rootSplitVisibility,
+                isSplitLayoutActive: $isSplitLayoutActive
+            ) {
+                #if os(iOS)
+                leadingButtonsContent
+                #else
+                EmptyView()
+                #endif
+            } trailingControls: {
+                #if os(iOS)
+                trailingButtonsContent
+                #else
+                EmptyView()
+                #endif
+            }
             
             if appState.isRegistering {
                 ZStack {
@@ -68,13 +95,10 @@ struct ChannelListView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
-        // 注意：这里 serverName 可能是可选的，提供默认值
-        .navigationTitle(Text(serverManager.serverName ?? NSLocalizedString("Channel", comment: "")))
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        // 隐藏系统默认背景，使用自定义渐变
         .toolbarBackground(.hidden, for: .navigationBar)
         #else
+        .navigationTitle(Text(serverManager.serverName ?? NSLocalizedString("Channel", comment: "")))
         .toolbarTitleDisplayMode(.inline)
         .toolbarBackground(.clear, for: .windowToolbar)
         .toolbarBackground(.hidden, for: .windowToolbar)
@@ -83,10 +107,12 @@ struct ChannelListView: View {
         // iPad 上不显示搜索框，避免占用服务器界面空间
         .modifier(ChannelSearchModifier(searchText: $channelSearchText))
         #endif
+        #if os(macOS)
         .toolbar {
             leadingToolbarItems
             trailingToolbarItems
         }
+        #endif
         #if os(iOS)
         .sheet(isPresented: $showingPrefs) {
             NavigationStack {
@@ -455,6 +481,13 @@ struct ChannelListView: View {
     private func registerUserOnServer() {
         // 调用 serverManager 的注册逻辑
         serverManager.registerSelf()
+    }
+}
+
+extension ChannelListView where RootSidebar == EmptyView {
+    init() {
+        self.rootSidebar = EmptyView()
+        self.rootSplitVisibility = nil
     }
 }
 

@@ -470,9 +470,29 @@ class HandoffManager: NSObject, ObservableObject {
         let shouldSyncLocalAudio = UserDefaults.standard.object(forKey: MumbleHandoffSyncLocalAudioSettingsKey) as? Bool ?? true
 
         // 1. 恢复闭麦/不听状态
-        if self.pendingSelfMuted || self.pendingSelfDeafened {
-            serverModel.setSelfMuted(self.pendingSelfMuted, andSelfDeafened: self.pendingSelfDeafened)
-            MumbleLogger.audio.debug("Handoff: Restored mute=\(self.pendingSelfMuted), deaf=\(self.pendingSelfDeafened)")
+        // Always apply the received values. A false/false state must clear a
+        // stale mute/deafen state restored from this device's saved profile.
+        let restoredDeafened = self.pendingSelfDeafened
+        let restoredMuted = self.pendingSelfMuted || restoredDeafened
+        serverModel.setSelfMuted(restoredMuted, andSelfDeafened: restoredDeafened)
+        ServerModelManager.shared?.setSystemMuteFromApp(
+            restoredMuted,
+            reason: "handoff_restore"
+        )
+        if let connectedUser = serverModel.connectedUser() {
+            ServerModelManager.shared?.updateUserBySession(connectedUser.session())
+        }
+        MumbleLogger.audio.debug("Handoff: Restored mute=\(restoredMuted), deaf=\(restoredDeafened)")
+
+        // Connection setup normally starts MKAudio before this point. If the
+        // engine failed or lost a lifecycle race, restart it off the main
+        // thread so incoming talk packets and audio resume immediately.
+        if MKAudio.shared()?.isRunning() != true {
+            MumbleLogger.audio.warning("Handoff: Audio engine is not running after connection; restarting")
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard MKAudio.shared()?.isRunning() != true else { return }
+                MKAudio.shared()?.restart()
+            }
         }
 
         // 2. 恢复每个用户的本地音量和本地静音

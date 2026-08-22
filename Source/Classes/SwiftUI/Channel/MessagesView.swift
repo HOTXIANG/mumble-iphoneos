@@ -200,6 +200,7 @@ struct IOSMessageImageGalleryPreview: View {
     @State private var openingSourceID: String
     @State private var backdropOpacity: Double = 0
     @State private var isDismissing = false
+    @State private var hasCompletedOpeningTransition = false
 
     init(
         gallery: MessageImagePreviewGallery,
@@ -231,24 +232,13 @@ struct IOSMessageImageGalleryPreview: View {
                     IOSMessageImageFullscreenPreview(
                         item: item,
                         liveSourceFrame: liveSourceFrames[item.id],
-                        animatesFromSource: item.id == openingSourceID,
+                        animatesFromSource: item.id == openingSourceID
+                            && !hasCompletedOpeningTransition,
                         isActive: selectedIndex == index,
-                        onBackdropOpacityChanged: { opacity, animated in
-                            guard selectedIndex == index, !isDismissing else { return }
-                            if animated {
-                                withAnimation(.easeOut(duration: 0.18)) {
-                                    backdropOpacity = opacity
-                                }
-                            } else {
-                                var transaction = Transaction()
-                                transaction.disablesAnimations = true
-                                withTransaction(transaction) {
-                                    backdropOpacity = opacity
-                                }
-                            }
-                        },
                         onEntryAnimationCompleted: {
-                            guard item.id == openingSourceID else { return }
+                            guard item.id == openingSourceID,
+                                  !hasCompletedOpeningTransition else { return }
+                            hasCompletedOpeningTransition = true
                             onEntryAnimationCompleted(item.id)
                         },
                         onDismissWillStart: {
@@ -258,9 +248,10 @@ struct IOSMessageImageGalleryPreview: View {
                                 backdropOpacity = 0
                             }
 
-                            // Let the page commit its shrink transaction before
-                            // publishing app-wide state changes for the thumbnail.
-                            DispatchQueue.main.async {
+                            // Start the image transition immediately. Revealing
+                            // the source shortly afterwards avoids rebuilding the
+                            // message list on the gesture-release frame.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                                 onDismissWillStart(item.id)
                             }
                         },
@@ -309,7 +300,6 @@ struct IOSMessageImageFullscreenPreview: View {
     let liveSourceFrame: CGRect?
     let animatesFromSource: Bool
     let isActive: Bool
-    let onBackdropOpacityChanged: (Double, Bool) -> Void
     let onEntryAnimationCompleted: () -> Void
     let onDismissWillStart: () -> Void
     let onDismiss: () -> Void
@@ -355,12 +345,6 @@ struct IOSMessageImageFullscreenPreview: View {
             )
         }
         return CGSize(width: transitionOffset.width, height: transitionOffset.height + dismissDragY)
-    }
-    
-    private func backdropOpacity(forDismissTranslation translationY: CGFloat) -> Double {
-        if isZoomed { return 0.96 }
-        let progress = min(max(translationY / 260.0, 0.0), 1.0)
-        return 0.96 - (progress * 0.46)
     }
     
     private var isDismissDragInProgress: Bool {
@@ -454,10 +438,6 @@ struct IOSMessageImageFullscreenPreview: View {
                     },
                     onVerticalDismissChanged: { translationY in
                         dismissDragY = max(0, translationY)
-                        onBackdropOpacityChanged(
-                            backdropOpacity(forDismissTranslation: translationY),
-                            false
-                        )
                     },
                     onVerticalDismissEnded: { translationY, velocityY in
                         let shouldDismiss = translationY > 140
@@ -468,7 +448,6 @@ struct IOSMessageImageFullscreenPreview: View {
                             withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                                 dismissDragY = 0
                             }
-                            onBackdropOpacityChanged(0.96, true)
                         }
                     }
                 )
@@ -2463,7 +2442,15 @@ struct MessagesList: View {
                     )
                 }
                 .coordinateSpace(name: scrollCoordinateSpaceName)
+                #if os(macOS)
+                // A macOS TabView gives each tab its own framed content area.
+                // Keep compact chat rows inside that area instead of drawing
+                // over the native tab chrome; split layout keeps its existing
+                // edge-to-edge scroll rendering.
+                .scrollClipDisabled(isSplitLayout)
+                #else
                 .scrollClipDisabled(true)
+                #endif
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(
@@ -2814,206 +2801,48 @@ private struct NotificationMessageView: View, Equatable {
     }
 }
 
-#if os(macOS)
-private typealias MessagePlatformColor = NSColor
-private typealias MessagePlatformFont = NSFont
-#else
-private typealias MessagePlatformColor = UIColor
-private typealias MessagePlatformFont = UIFont
-#endif
-
 private let messageLinkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
 
 private func makeMessageBodyAttributedString(
-    text: String,
-    baseColor: MessagePlatformColor,
-    linkColor: MessagePlatformColor,
-    font: MessagePlatformFont
-) -> NSAttributedString {
-    let mutable = NSMutableAttributedString(string: text)
-    let fullRange = NSRange(location: 0, length: mutable.length)
-    let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.lineBreakMode = .byCharWrapping
-    
-    mutable.addAttributes(
-        [
-            .font: font,
-            .foregroundColor: baseColor,
-            .paragraphStyle: paragraphStyle
-        ],
-        range: fullRange
-    )
-    
-    if let detector = messageLinkDetector {
-        detector.enumerateMatches(in: text, options: [], range: fullRange) { result, _, _ in
-            guard let result, let url = result.url else { return }
-            mutable.addAttributes(
-                [
-                    .link: url,
-                    .foregroundColor: linkColor,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue
-                ],
-                range: result.range
-            )
-        }
+    text: String
+) -> AttributedString {
+    var attributedText = AttributedString(text)
+    let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
+
+    messageLinkDetector?.enumerateMatches(in: text, options: [], range: fullRange) { result, _, _ in
+        guard let result,
+              let url = result.url,
+              let stringRange = Range(result.range, in: text),
+              let attributedRange = Range(stringRange, in: attributedText) else { return }
+        attributedText[attributedRange].link = url
+        attributedText[attributedRange].foregroundColor = .pink
+        attributedText[attributedRange].underlineStyle = .single
     }
-    
-    return mutable
+
+    return attributedText
 }
 
 private struct MessageBodyTextView: View {
     let text: String
     let isSentBySelf: Bool
-    
-    #if os(macOS)
-    @Environment(\.colorScheme) private var colorScheme
-    #endif
-    
-    private var attributedText: NSAttributedString {
-        #if os(macOS)
-        let baseColor = isSentBySelf ? NSColor.white : NSColor.labelColor
-        let linkColor = NSColor.systemPink
-        let font = NSFont.systemFont(ofSize: 13)
-        #else
-        let baseColor = isSentBySelf ? UIColor.white : UIColor.label
-        let linkColor = UIColor.systemPink
-        let font = UIFont.systemFont(ofSize: 17)
-        #endif
-        
-        return makeMessageBodyAttributedString(
-            text: text,
-            baseColor: baseColor,
-            linkColor: linkColor,
-            font: font
-        )
+
+    private var attributedText: AttributedString {
+        makeMessageBodyAttributedString(text: text)
     }
     
     var body: some View {
-        Text(text)
+        Text(attributedText)
             #if os(macOS)
             .font(.system(size: 13))
             #else
             .font(.system(size: 17))
             #endif
+            .foregroundStyle(isSentBySelf ? Color.white : Color.primary)
+            .tint(.pink)
             .fixedSize(horizontal: false, vertical: true)
-            .hidden()
-            .overlay(alignment: .topLeading) {
-                PlatformMessageTextView(attributedText: attributedText)
-            }
+            .textSelection(.enabled)
     }
 }
-
-#if os(iOS)
-private struct PlatformMessageTextView: UIViewRepresentable {
-    let attributedText: NSAttributedString
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-    
-    func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView(frame: .zero)
-        textView.backgroundColor = .clear
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.isScrollEnabled = false
-        textView.delegate = context.coordinator
-        textView.textContainerInset = .zero
-        textView.textContainer.lineFragmentPadding = 0
-        textView.textContainer.lineBreakMode = .byCharWrapping
-        textView.adjustsFontForContentSizeCategory = true
-        textView.linkTextAttributes = [
-            .foregroundColor: UIColor.systemPink,
-            .underlineStyle: NSUnderlineStyle.single.rawValue
-        ]
-        return textView
-    }
-    
-    func updateUIView(_ uiView: UITextView, context: Context) {
-        if !uiView.attributedText.isEqual(to: attributedText) {
-            uiView.attributedText = attributedText
-        }
-    }
-    
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
-        let width = proposal.width ?? 0
-        guard width > 0 else { return nil }
-        let target = CGSize(width: width, height: CGFloat.greatestFiniteMagnitude)
-        let size = uiView.sizeThatFits(target)
-        return CGSize(width: width, height: ceil(size.height))
-    }
-    
-    final class Coordinator: NSObject, UITextViewDelegate {
-        func textView(
-            _ textView: UITextView,
-            primaryActionFor textItem: UITextItem,
-            defaultAction: UIAction
-        ) -> UIAction? {
-            if case .link(let url) = textItem.content {
-                return UIAction { _ in UIApplication.shared.open(url) }
-            }
-            return defaultAction
-        }
-    }
-}
-#else
-private struct PlatformMessageTextView: NSViewRepresentable {
-    let attributedText: NSAttributedString
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-    
-    func makeNSView(context: Context) -> NSTextView {
-        let textView = NSTextView(frame: .zero)
-        textView.drawsBackground = false
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.isRichText = true
-        textView.importsGraphics = false
-        textView.allowsUndo = false
-        textView.delegate = context.coordinator
-        textView.textContainerInset = .zero
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.lineBreakMode = .byCharWrapping
-        textView.isHorizontallyResizable = false
-        textView.isVerticallyResizable = true
-        textView.maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.linkTextAttributes = [
-            .foregroundColor: NSColor.systemPink,
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-            .cursor: NSCursor.pointingHand
-        ]
-        return textView
-    }
-    
-    func updateNSView(_ nsView: NSTextView, context: Context) {
-        if !nsView.attributedString().isEqual(to: attributedText) {
-            nsView.textStorage?.setAttributedString(attributedText)
-        }
-    }
-    
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSTextView, context: Context) -> CGSize? {
-        let width = proposal.width ?? 0
-        guard width > 0, let textContainer = nsView.textContainer, let layoutManager = nsView.layoutManager else {
-            return nil
-        }
-        textContainer.containerSize = CGSize(width: width, height: .greatestFiniteMagnitude)
-        layoutManager.ensureLayout(for: textContainer)
-        let usedRect = layoutManager.usedRect(for: textContainer)
-        return CGSize(width: width, height: ceil(usedRect.height))
-    }
-    
-    final class Coordinator: NSObject, NSTextViewDelegate {
-        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
-            guard let url = link as? URL else { return false }
-            NSWorkspace.shared.open(url)
-            return true
-        }
-    }
-}
-#endif
 
 private struct SenderStickyHeaderView: View {
     let title: String
@@ -3185,7 +3014,6 @@ private struct MessageImageThumbnailButton: View {
             .buttonStyle(.plain)
             .allowsHitTesting(!isHiddenForPreview)
             .opacity(isHiddenForPreview ? 0 : 1)
-            .animation(.easeOut(duration: 0.18), value: isHiddenForPreview)
             #if os(macOS)
             .cornerRadius(10)
             #else

@@ -87,7 +87,7 @@ extension ServerModelManager {
         }
     }
 
-    func sendLocalNotification(title: String, body: String) {
+    func sendLocalNotification(title: String, body: String, imageData: Data? = nil) {
         #if os(iOS)
         // iOS: 前台直接播放音效（不弹系统通知），后台发系统通知
         if UIApplication.shared.applicationState == .active {
@@ -97,18 +97,98 @@ extension ServerModelManager {
         #endif
         // macOS: 始终发送系统通知（前台也发，由 willPresent delegate 控制展示方式和音效）
         // iOS 后台: 也发送系统通知
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
+        Task.detached(priority: .utility) {
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
 
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            var attachmentDirectory: URL?
+            if let imageData,
+               let preparedAttachment = Self.makeNotificationImageAttachment(from: imageData) {
+                content.attachments = [preparedAttachment.attachment]
+                attachmentDirectory = preparedAttachment.directory
+            }
 
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: nil
+            )
+
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+            } catch {
                 MumbleLogger.notification.error("Failed to schedule notification: \(error)")
+                if !content.attachments.isEmpty {
+                    // A malformed attachment must not suppress the message
+                    // notification entirely. Retry once with text-only content.
+                    content.attachments = []
+                    let fallbackRequest = UNNotificationRequest(
+                        identifier: UUID().uuidString,
+                        content: content,
+                        trigger: nil
+                    )
+                    do {
+                        try await UNUserNotificationCenter.current().add(fallbackRequest)
+                    } catch {
+                        MumbleLogger.notification.error(
+                            "Failed to schedule fallback notification: \(error)"
+                        )
+                    }
+                }
+            }
+            if let attachmentDirectory {
+                try? FileManager.default.removeItem(at: attachmentDirectory)
             }
         }
+    }
+
+    nonisolated private static func makeNotificationImageAttachment(
+        from data: Data
+    ) -> (attachment: UNNotificationAttachment, directory: URL)? {
+        // UserNotifications accepts JPEG/PNG/GIF images up to 10 MB. Invalid
+        // attachments prevent the entire local notification from being scheduled.
+        guard data.count <= 10 * 1024 * 1024,
+              let fileType = notificationImageFileType(for: data) else { return nil }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MumbleNotification-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directory.appendingPathComponent("message-image.\(fileType.fileExtension)")
+
+        do {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            try data.write(to: fileURL, options: .atomic)
+            let attachment = try UNNotificationAttachment(
+                identifier: "message-image",
+                url: fileURL,
+                options: [UNNotificationAttachmentOptionsTypeHintKey: fileType.typeHint]
+            )
+            return (attachment, directory)
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            MumbleLogger.notification.error("Failed to prepare notification image: \(error)")
+            return nil
+        }
+    }
+
+    nonisolated private static func notificationImageFileType(
+        for data: Data
+    ) -> (fileExtension: String, typeHint: String)? {
+        if data.starts(with: [0xFF, 0xD8, 0xFF]) {
+            return ("jpg", "public.jpeg")
+        }
+        if data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+            return ("png", "public.png")
+        }
+        if data.starts(with: Array("GIF87a".utf8))
+            || data.starts(with: Array("GIF89a".utf8)) {
+            return ("gif", "com.compuserve.gif")
+        }
+        return nil
     }
 
     var currentNotificationTitle: String {
@@ -178,6 +258,9 @@ extension ServerModelManager {
                 let destChannelName = safeChannel.channelName() ?? NSLocalizedString("Unknown Channel", comment: "")
                 let destChannelId = safeChannel.channelId()
                 self.lastKnownChannelIdByUserSession[movingUserSession] = destChannelId
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+                    self.userChannelMovementRevision &+= 1
+                }
                 if let connectedUser = self.serverModel?.connectedUser() {
                     if movingUserSession == connectedUser.session() {
                         // 如果是通过密码进入的频道，标记为密码频道（橙色锁）
@@ -407,7 +490,8 @@ extension ServerModelManager {
                     let bodyText = plainText.isEmpty ? NSLocalizedString("[Image]", comment: "") : plainText
                     self.sendLocalNotification(
                         title: String(format: NSLocalizedString("PM from %@", comment: ""), senderName),
-                        body: bodyText
+                        body: bodyText,
+                        imageData: validImageData.first
                     )
                     self.postInAppChatMessageBanner(senderName: senderName, body: bodyText, senderSession: senderSession, isPrivateMessage: true)
                 }
@@ -965,7 +1049,11 @@ extension ServerModelManager {
                     TTSManager.shared.speak(notificationBody)
                 }
                 if notifyEnabled {
-                    sendLocalNotification(title: currentNotificationTitle, body: notificationBody)
+                    sendLocalNotification(
+                        title: currentNotificationTitle,
+                        body: notificationBody,
+                        imageData: validImageData.first
+                    )
                     postInAppChatMessageBanner(senderName: senderName, body: bodyText, senderSession: senderSession)
                 }
             }

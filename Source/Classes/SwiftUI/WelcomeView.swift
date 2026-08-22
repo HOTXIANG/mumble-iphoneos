@@ -39,21 +39,24 @@ struct WelcomeNavigationConfig: NavigationConfigurable {
 struct WelcomeContentView: View {
     @EnvironmentObject var navigationManager: NavigationManager
     @Environment(\.colorScheme) private var colorScheme
+    #if os(iOS)
+        @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
     @StateObject private var lanModel = LanDiscoveryModel()
     @ObservedObject private var recentManager = RecentServerManager.shared
     @ObservedObject private var appState = AppState.shared
-    
+
     @State private var favouriteServers: [MUFavouriteServer] = []
     @State private var showFavouritesSheet = false
 
     #if os(macOS)
-    private let logoSize: CGFloat = 130
-    private let logoShadowWidth: CGFloat = 130
-    private let logoShadowHeight: CGFloat = 110
+        private let logoSize: CGFloat = 130
+        private let logoShadowWidth: CGFloat = 130
+        private let logoShadowHeight: CGFloat = 110
     #else
-    private let logoSize: CGFloat = 190
-    private let logoShadowWidth: CGFloat = 150
-    private let logoShadowHeight: CGFloat = 120
+        private let logoSize: CGFloat = 190
+        private let logoShadowWidth: CGFloat = 150
+        private let logoShadowHeight: CGFloat = 120
     #endif
 
     private var logoBlockShadowColor: Color {
@@ -82,140 +85,169 @@ struct WelcomeContentView: View {
         colorScheme == .light ? 7 : 9
     }
 
+    private var isLandscapePhone: Bool {
+        #if os(iOS)
+            UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass == .compact
+        #else
+            false
+        #endif
+    }
+
+    private var welcomeLayout: AnyLayout {
+        if isLandscapePhone {
+            return AnyLayout(HStackLayout(alignment: .top, spacing: 0))
+        }
+        return AnyLayout(VStackLayout(spacing: 0))
+    }
+
+    private var effectiveLogoSize: CGFloat {
+        isLandscapePhone ? 112 : logoSize
+    }
+
+    private var effectiveLogoScale: CGFloat {
+        effectiveLogoSize / logoSize
+    }
+
     private var recentConnectionsRowBackground: AnyView {
         #if os(macOS)
-        return AnyView(Color.clear)
+            return AnyView(Color.clear)
         #else
-        return AnyView(
-            Rectangle()
-                .fill(.regularMaterial)
-                .overlay(Color.black.opacity(colorScheme == .light ? 0.06 : 0.04))
-        )
+            return AnyView(
+                Rectangle()
+                    .fill(.regularMaterial)
+                    .overlay(Color.black.opacity(colorScheme == .light ? 0.06 : 0.04))
+            )
         #endif
     }
 
     private var lanServerRowBackground: AnyView {
         #if os(macOS)
-        return AnyView(Color.clear)
+            return AnyView(Color.clear)
         #else
-        return AnyView(Rectangle().fill(.regularMaterial))
+            return AnyView(Rectangle().fill(.regularMaterial))
         #endif
     }
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                if colorScheme == .dark {
-                    Ellipse()
-                        .fill(logoBlockShadowColor)
-                        .frame(width: logoShadowWidth, height: logoShadowHeight)
-                        .blur(radius: logoBlockShadowRadius)
-                        .offset(y: logoBlockShadowYOffset)
-                }
-                Image(preferredLogoName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: logoSize, height: logoSize)
-                    .shadow(color: logoGlowColor, radius: logoGlowRadius, x: 0, y: 0)
-                    .shadow(color: logoGlowColor.opacity(0.30), radius: logoGlowRadius * 0.35, x: 0, y: 0)
-            }
-                .padding(.top, 8)
-                .padding(.bottom, 10)
 
-            VStack(spacing: 6) {
-                Text(NSLocalizedString("Join a Server", comment: ""))
-                    .font(.system(.title2, design: .rounded, weight: .semibold))
-                    .foregroundColor(.primary)
-                Text(NSLocalizedString("Choose a favourite server to connect quickly", comment: ""))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.bottom, 16)
-            
+    var body: some View {
+        welcomeLayout {
             VStack(spacing: 0) {
-                
-                Button(action: {
-                    #if os(iOS)
-                    if UIDevice.current.userInterfaceIdiom == .phone {
-                        navigationManager.navigate(to: .swiftUI(.favouriteServerList))
-                    } else {
-                        showFavouritesSheet = true
+                ZStack {
+                    if colorScheme == .dark {
+                        Ellipse()
+                            .fill(logoBlockShadowColor)
+                            .frame(
+                                width: logoShadowWidth * effectiveLogoScale,
+                                height: logoShadowHeight * effectiveLogoScale
+                            )
+                            .blur(radius: logoBlockShadowRadius * effectiveLogoScale)
+                            .offset(y: logoBlockShadowYOffset * effectiveLogoScale)
                     }
-                    #else
-                    showFavouritesSheet = true
-                    #endif
-                }) {
-                    ViewThatFits(in: .horizontal) {
-                        // 宽度足够时：完整显示星星 + 文字 + 箭头
-                        HStack(spacing: 16) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(.yellow)
-                                .frame(width: 30)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(NSLocalizedString("Favourite Servers", comment: ""))
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                Text(NSLocalizedString("Your saved servers", comment: ""))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                    Image(preferredLogoName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: effectiveLogoSize, height: effectiveLogoSize)
+                        .shadow(color: logoGlowColor, radius: logoGlowRadius, x: 0, y: 0)
+                        .shadow(color: logoGlowColor.opacity(0.30), radius: logoGlowRadius * 0.35, x: 0, y: 0)
+                }
+                .padding(.top, isLandscapePhone ? 2 : 8)
+                .padding(.bottom, isLandscapePhone ? 2 : 10)
+
+                VStack(spacing: 6) {
+                    Text(NSLocalizedString("Join a Server", comment: ""))
+                        .font(.system(.title2, design: .rounded, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text(NSLocalizedString("Choose a favourite server to connect quickly", comment: ""))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, isLandscapePhone ? 8 : 16)
+
+                VStack(spacing: 0) {
+
+                    Button(action: {
+                        #if os(iOS)
+                            if UIDevice.current.userInterfaceIdiom == .phone {
+                                navigationManager.navigate(to: .swiftUI(.favouriteServerList))
+                            } else {
+                                showFavouritesSheet = true
                             }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.indigo)
-                        }
-                        
-                        // 宽度不够时
-                        HStack {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(.yellow)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(NSLocalizedString("Favourite", comment: ""))
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                Text(NSLocalizedString("Servers", comment: ""))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                        #else
+                            showFavouritesSheet = true
+                        #endif
+                    }) {
+                        ViewThatFits(in: .horizontal) {
+                            // 宽度足够时：完整显示星星 + 文字 + 箭头
+                            HStack(spacing: 16) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.yellow)
+                                    .frame(width: 30)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(NSLocalizedString("Favourite Servers", comment: ""))
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Text(NSLocalizedString("Your saved servers", comment: ""))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.indigo)
                             }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.indigo)
+
+                            // 宽度不够时
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.yellow)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(NSLocalizedString("Favourite", comment: ""))
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Text(NSLocalizedString("Servers", comment: ""))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.indigo)
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        #if os(macOS)
+                            .padding(.vertical, 9)
+                        #else
+                            .padding(.vertical, isLandscapePhone ? 10 : 16)
+                        #endif
+                        .contentShape(Rectangle())
+                        #if os(macOS)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .fill(Color.primary.opacity(0.06))
+                            )
+                        #else
+                            .modifier(GlassEffectModifier(cornerRadius: 27))
+                        #endif
                     }
                     .padding(.horizontal, 20)
-                    #if os(macOS)
-                    .padding(.vertical, 9)
-                    #else
-                    .padding(.vertical, 16)
-                    #endif
-                    .contentShape(Rectangle())
-                    #if os(macOS)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color.primary.opacity(0.06))
-                    )
-                    #else
-                    .modifier(GlassEffectModifier(cornerRadius: 27))
-                    #endif
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 20)
-                .buttonStyle(.plain)
+                .padding(.bottom, 12)
             }
-            .padding(.bottom, 12)
-            
+            .frame(maxWidth: isLandscapePhone ? .infinity : nil)
+
             List {
                 // --- 最近访问 ---
                 if !recentManager.recents.isEmpty {
@@ -227,22 +259,25 @@ struct WelcomeContentView: View {
                                 icon: "clock.fill",
                                 iconColor: .blue
                             ) {
-                                connectTo(hostname: server.hostname, port: server.port, username: server.username, displayName: server.displayName)
+                                connectTo(
+                                    hostname: server.hostname, port: server.port, username: server.username,
+                                    displayName: server.displayName)
                             }
                             #if os(macOS)
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    deleteRecentConnection(hostname: server.hostname, port: server.port, username: server.username)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        deleteRecentConnection(
+                                            hostname: server.hostname, port: server.port, username: server.username)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
-                            }
                             #endif
                         }
                         #if os(iOS)
-                        .onDelete { indexSet in
-                            recentManager.recents.remove(atOffsets: indexSet)
-                        }
+                            .onDelete { indexSet in
+                                recentManager.recents.remove(atOffsets: indexSet)
+                            }
                         #endif
                     }
                     .listRowBackground(recentConnectionsRowBackground)
@@ -256,7 +291,7 @@ struct WelcomeContentView: View {
                             .listRowBackground(Color.clear)
                     }
                 }
-                
+
                 // --- LAN ---
                 if !lanModel.servers.isEmpty {
                     Section(header: Text(NSLocalizedString("Local Network", comment: ""))) {
@@ -267,8 +302,11 @@ struct WelcomeContentView: View {
                                 icon: "network",
                                 iconColor: .green
                             ) {
-                                let defaultUser = UserDefaults.standard.string(forKey: "DefaultUserName") ?? "MumbleUser"
-                                connectTo(hostname: server.hostname, port: server.port, username: defaultUser, displayName: server.name)
+                                let defaultUser =
+                                    UserDefaults.standard.string(forKey: "DefaultUserName") ?? "MumbleUser"
+                                connectTo(
+                                    hostname: server.hostname, port: server.port, username: defaultUser,
+                                    displayName: server.name)
                             }
                         }
                     }
@@ -277,9 +315,9 @@ struct WelcomeContentView: View {
             }
             .scrollContentBackground(.hidden)
             #if os(iOS)
-            .listStyle(.insetGrouped)
+                .listStyle(.insetGrouped)
             #else
-            .listStyle(.inset)
+                .listStyle(.inset)
             #endif
         }
         .background(Color.clear)
@@ -951,71 +989,14 @@ private struct VADOnboardingSplashView: View {
     #endif
 }
 
-private struct SplitViewOverlayBehaviorConfigurator: View {
-    let isOverlayEnabled: Bool
+#if os(macOS)
+private final class MacAppRootSplitRuntime: ObservableObject {
+    var totalWidth: CGFloat = 0
+    var sidebarWidth: CGFloat = 340
+    var pendingSidebarTransitionWorkItem: DispatchWorkItem?
 
-    var body: some View {
-        #if os(iOS)
-        SplitViewOverlayBehaviorUIView(isOverlayEnabled: isOverlayEnabled)
-        #else
-        EmptyView()
-        #endif
-    }
-}
-
-#if os(iOS)
-private struct SplitViewOverlayBehaviorUIView: UIViewRepresentable {
-    let isOverlayEnabled: Bool
-
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
-        view.isUserInteractionEnabled = false
-        configure(from: view, isOverlayEnabled: isOverlayEnabled)
-        return view
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        configure(from: uiView, isOverlayEnabled: isOverlayEnabled)
-    }
-
-    private func configure(from view: UIView, isOverlayEnabled: Bool, attempt: Int = 0) {
-        DispatchQueue.main.async {
-            guard let splitViewController = view.enclosingSplitViewController else {
-                if attempt < 12 {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        configure(from: view, isOverlayEnabled: isOverlayEnabled, attempt: attempt + 1)
-                    }
-                }
-                return
-            }
-
-            let preferredBehavior: UISplitViewController.SplitBehavior = isOverlayEnabled ? .overlay : .tile
-            if splitViewController.preferredSplitBehavior != preferredBehavior {
-                splitViewController.preferredSplitBehavior = preferredBehavior
-            }
-        }
-    }
-}
-
-private extension UIView {
-    var enclosingSplitViewController: UISplitViewController? {
-        var responder: UIResponder? = self
-        while let current = responder {
-            if let splitViewController = current as? UISplitViewController {
-                return splitViewController
-            }
-            if let viewController = current as? UIViewController {
-                var parent = viewController.parent
-                while let candidate = parent {
-                    if let splitViewController = candidate as? UISplitViewController {
-                        return splitViewController
-                    }
-                    parent = candidate.parent
-                }
-            }
-            responder = current.next
-        }
-        return nil
+    deinit {
+        pendingSidebarTransitionWorkItem?.cancel()
     }
 }
 #endif
@@ -1030,28 +1011,21 @@ struct AppRootView: View {
     @AppStorage("HasCompletedVADOnboarding") private var hasCompletedVADOnboarding: Bool = false
     @State private var showVADOnboarding = false
     
-    // iPhone 使用的单一导航管理器
-    @StateObject private var navigationManager = NavigationManager()
-    
-    // iPad 使用的侧边栏导航管理器 (让 Detail 独立变化)
+    // 原生分栏的侧边栏与详情分别维护导航状态。
     @StateObject private var sidebarNavigationManager = NavigationManager()
     @StateObject private var channelNavigationManager = NavigationManager()
 
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     #if os(macOS)
     @State private var splitVisibility: NavigationSplitViewVisibility = .all
-    @State private var macSplitLayoutWidth: CGFloat = 0
-    @State private var pendingMacSidebarOpenWorkItem: DispatchWorkItem?
+    @StateObject private var macSplitRuntime = MacAppRootSplitRuntime()
     #else
     @State private var splitVisibility: NavigationSplitViewVisibility = .all
     #endif
 
     #if os(macOS)
-    private let macProjectedSidebarWidth: CGFloat = 340
-    private let macChannelSplitThreshold: CGFloat = 624
-    private let macSidebarOpenDelayAfterCompact: TimeInterval = 0.06
-    private let macSidebarOpenLayoutSuppressionDuration: TimeInterval = 0.36
-    private let macSidebarCloseLayoutSuppressionDuration: TimeInterval = 0.28
+    private let macSidebarLayoutSuppressionDuration: TimeInterval = 0.34
+    private let macOuterSplitDividerAllowance: CGFloat = 2
     #endif
 
     private var selectedAppColorScheme: AppColorSchemeOption {
@@ -1063,18 +1037,9 @@ struct AppRootView: View {
     }
     
     var body: some View {
-        // 内容区域
-        Group {
-            #if os(iOS)
-            if UIDevice.current.userInterfaceIdiom == .pad {
-                iPadLayout
-            } else {
-                iPhoneLayout
-            }
-            #else
-            iPadLayout
-            #endif
-        }
+        // NavigationSplitView 在窄屏自动折叠，在 iPad 与横屏 iPhone
+        // 有足够空间时使用系统原生并排分栏。
+        adaptiveSplitLayout
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .preferredColorScheme(selectedAppColorScheme.preferredColorScheme)
         .environmentObject(serverManager)
@@ -1359,15 +1324,23 @@ struct AppRootView: View {
         .animation(.easeInOut(duration: 0.2), value: showVADOnboarding)
     }
     
-    // MARK: - iPad Split View Layout
+    // MARK: - Adaptive Native Split View Layout
     
-    var iPadLayout: some View {
-        iPadOverlaySplitLayout
-    }
-
-    private var iPadOverlaySplitLayout: some View {
+    private var adaptiveSplitLayout: some View {
         GeometryReader { geo in
-            splitLayout
+            Group {
+                #if os(iOS)
+                if UIDevice.current.userInterfaceIdiom == .phone {
+                    phoneRootLayout
+                } else if appState.isConnected {
+                    iPadConnectedRootLayout
+                } else {
+                    splitLayout
+                }
+                #else
+                splitLayout
+                #endif
+            }
                 .onAppear {
                     updateMacSplitLayoutWidth(geo.size.width)
                 }
@@ -1376,6 +1349,29 @@ struct AppRootView: View {
                 }
         }
     }
+
+    #if os(iOS)
+    @ViewBuilder
+    private var phoneRootLayout: some View {
+        if appState.isConnected {
+            ChannelListView()
+                .environmentObject(channelNavigationManager)
+        } else {
+            sidebarNavigationStack
+        }
+    }
+
+    private var iPadConnectedRootLayout: some View {
+        ChannelListView(rootSplitVisibility: splitVisibilityBinding) {
+            sidebarNavigationStack
+        }
+        .environmentObject(channelNavigationManager)
+        .onAppear {
+            preferredCompactColumn = .detail
+            setSplitVisibility(.doubleColumn, animated: false)
+        }
+    }
+    #endif
 
     private var splitLayout: some View {
         NavigationSplitView(columnVisibility: splitVisibilityBinding, preferredCompactColumn: $preferredCompactColumn) {
@@ -1387,7 +1383,6 @@ struct AppRootView: View {
                 #endif
         }
             .navigationSplitViewStyle(.balanced)
-            .background(SplitViewOverlayBehaviorConfigurator(isOverlayEnabled: appState.isConnected))
             .onAppear {
                 preferredCompactColumn = appState.isConnected ? .detail : .sidebar
                 #if os(macOS)
@@ -1401,7 +1396,14 @@ struct AppRootView: View {
             }
             .onChange(of: appState.isConnected) { _, isConnected in
                 preferredCompactColumn = isConnected ? .detail : .sidebar
+                #if os(macOS)
+                // The detail content changes in the same update. Keep the
+                // outer split view out of intermediate animated widths where
+                // the old and new minimum constraints cannot both be valid.
+                setSplitVisibility(isConnected ? .detailOnly : .all, animated: false)
+                #else
                 setSplitVisibility(isConnected ? .detailOnly : .all, animated: true)
+                #endif
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.clear)
@@ -1427,16 +1429,34 @@ struct AppRootView: View {
         }
         .environmentObject(sidebarNavigationManager)
         .background(Color.clear)
+        #if os(macOS)
+        .background {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear {
+                        updateMacSidebarWidth(geo.size.width)
+                    }
+                    .onChange(of: geo.size.width) { _, width in
+                        updateMacSidebarWidth(width)
+                    }
+            }
+        }
+        #endif
         .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 420)
     }
 
     private var detailContent: some View {
         ZStack {
             if appState.isConnected {
+                #if os(macOS)
                 NavigationStack {
                     ChannelListView()
                         .environmentObject(channelNavigationManager)
                 }
+                #else
+                ChannelListView()
+                    .environmentObject(channelNavigationManager)
+                #endif
             } else {
                 ContentUnavailableView {
                     Label(NSLocalizedString("No Server Connected", comment: ""), systemImage: "server.rack")
@@ -1477,34 +1497,30 @@ struct AppRootView: View {
 
     private func handleSplitVisibilityRequest(_ requestedVisibility: NavigationSplitViewVisibility) {
         #if os(macOS)
-        cancelPendingMacSidebarOpen()
+        cancelPendingMacSidebarTransition()
 
-        if shouldPrecompactBeforeOpeningMacSidebar(requestedVisibility: requestedVisibility) {
+        if appState.isConnected,
+           let targetDetailWidth = projectedMacDetailWidth(for: requestedVisibility) {
             NotificationCenter.default.post(
-                name: .muChannelForceCompactLayout,
+                name: .muChannelPrepareForContainerResize,
                 object: nil,
-                userInfo: ["duration": macSidebarOpenLayoutSuppressionDuration]
+                userInfo: [
+                    "targetWidth": targetDetailWidth,
+                    "duration": macSidebarLayoutSuppressionDuration
+                ]
             )
 
             let workItem = DispatchWorkItem {
-                setSplitVisibility(.all, animated: true)
-                pendingMacSidebarOpenWorkItem = nil
+                setSplitVisibility(requestedVisibility, animated: true)
+                macSplitRuntime.pendingSidebarTransitionWorkItem = nil
             }
-            pendingMacSidebarOpenWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + macSidebarOpenDelayAfterCompact, execute: workItem)
+            macSplitRuntime.pendingSidebarTransitionWorkItem = workItem
+            // Let the channel page commit its final layout mode before AppKit
+            // starts resizing the outer split-view columns.
+            DispatchQueue.main.async(execute: workItem)
             return
         }
 
-        if shouldApplyMacChannelLayoutAfterClosingSidebar(requestedVisibility: requestedVisibility) {
-            NotificationCenter.default.post(
-                name: .muChannelSuppressLayoutUpdates,
-                object: nil,
-                userInfo: [
-                    "duration": macSidebarCloseLayoutSuppressionDuration,
-                    "applyAfter": true
-                ]
-            )
-        }
         #endif
 
         setSplitVisibility(requestedVisibility, animated: true)
@@ -1512,58 +1528,47 @@ struct AppRootView: View {
 
     private func updateMacSplitLayoutWidth(_ width: CGFloat) {
         #if os(macOS)
-        guard width > 0, abs(width - macSplitLayoutWidth) > 0.5 else { return }
-        macSplitLayoutWidth = width
+        guard width.isFinite, width > 0 else { return }
+        macSplitRuntime.totalWidth = width
         #endif
     }
 
     #if os(macOS)
-    private func shouldPrecompactBeforeOpeningMacSidebar(requestedVisibility: NavigationSplitViewVisibility) -> Bool {
-        guard appState.isConnected else { return false }
-        guard splitVisibility == .detailOnly else { return false }
-        guard requestedVisibility == .all || requestedVisibility == .automatic else { return false }
-        guard macSplitLayoutWidth > 0 else { return false }
-
-        let projectedDetailWidth = macSplitLayoutWidth - macProjectedSidebarWidth
-        return projectedDetailWidth <= macChannelSplitThreshold
+    private func updateMacSidebarWidth(_ width: CGFloat) {
+        guard width.isFinite, width >= 260 else { return }
+        macSplitRuntime.sidebarWidth = width
     }
 
-    private func shouldApplyMacChannelLayoutAfterClosingSidebar(requestedVisibility: NavigationSplitViewVisibility) -> Bool {
-        guard appState.isConnected else { return false }
-        guard splitVisibility != .detailOnly else { return false }
-        guard requestedVisibility == .detailOnly || requestedVisibility == .automatic else { return false }
-        guard macSplitLayoutWidth > 0 else { return false }
+    private func projectedMacDetailWidth(
+        for requestedVisibility: NavigationSplitViewVisibility
+    ) -> CGFloat? {
+        let totalWidth = macSplitRuntime.totalWidth
+        guard totalWidth > 0 else { return nil }
 
-        return macSplitLayoutWidth > macChannelSplitThreshold
+        let isOpeningSidebar = splitVisibility == .detailOnly && (
+            requestedVisibility == .all ||
+            requestedVisibility == .doubleColumn ||
+            requestedVisibility == .automatic
+        )
+        if isOpeningSidebar {
+            return max(
+                0,
+                totalWidth - macSplitRuntime.sidebarWidth - macOuterSplitDividerAllowance
+            )
+        }
+
+        if requestedVisibility == .detailOnly && splitVisibility != .detailOnly {
+            return totalWidth
+        }
+
+        return nil
     }
 
-    private func cancelPendingMacSidebarOpen() {
-        pendingMacSidebarOpenWorkItem?.cancel()
-        pendingMacSidebarOpenWorkItem = nil
+    private func cancelPendingMacSidebarTransition() {
+        macSplitRuntime.pendingSidebarTransitionWorkItem?.cancel()
+        macSplitRuntime.pendingSidebarTransitionWorkItem = nil
     }
     #endif
-    
-    // MARK: - iPhone Stack Layout
-    
-    var iPhoneLayout: some View {
-        NavigationStack(path: $navigationManager.navigationPath) {
-            WelcomeView()
-                .navigationDestination(for: NavigationDestination.self) { destination in
-                    destinationView(for: destination, navigationManager: navigationManager)
-                        .environmentObject(navigationManager)
-                }
-        }
-        .environmentObject(navigationManager)
-        .background(Color.clear)
-        // iPhone 需要手动监听连接状态来 Push 界面
-        .onChange(of: appState.isConnected) { _, isConnected in
-            if isConnected {
-                navigationManager.navigate(to: .swiftUI(.channelList))
-            } else {
-                navigationManager.goToRoot()
-            }
-        }
-    }
     
     // MARK: - Helper
     
@@ -1595,26 +1600,12 @@ struct AppRootView: View {
     private func handleAutomationOpen(target: String) {
         switch target {
         case "welcome":
-            navigationManager.goToRoot()
             sidebarNavigationManager.goToRoot()
             appState.setAutomationCurrentScreen("welcome")
         case "favouriteList":
-            #if os(iOS)
-            if UIDevice.current.userInterfaceIdiom == .phone {
-                navigationManager.navigate(to: .swiftUI(.favouriteServerList))
-            } else {
-                sidebarNavigationManager.navigate(to: .swiftUI(.favouriteServerList))
-            }
-            #else
             sidebarNavigationManager.navigate(to: .swiftUI(.favouriteServerList))
-            #endif
         case "channelList":
             guard appState.isConnected else { return }
-            #if os(iOS)
-            if UIDevice.current.userInterfaceIdiom == .phone {
-                navigationManager.navigate(to: .swiftUI(.channelList))
-            }
-            #endif
             appState.setAutomationCurrentScreen("channelList")
         case "vadOnboarding":
             showVADOnboarding = true
@@ -1653,17 +1644,8 @@ struct AppRootView: View {
     private func handleAutomationNavigation(command: String) {
         switch command {
         case "back":
-            #if os(iOS)
-            if UIDevice.current.userInterfaceIdiom == .phone {
-                navigationManager.goBack()
-            } else {
-                sidebarNavigationManager.goBack()
-            }
-            #else
             sidebarNavigationManager.goBack()
-            #endif
         case "root":
-            navigationManager.goToRoot()
             sidebarNavigationManager.goToRoot()
         default:
             break
@@ -1711,14 +1693,17 @@ struct AppRootView: View {
 
     private func selectIOSImagePreview(at index: Int) {
         guard let gallery = appState.activeImagePreviewGallery else { return }
-        guard gallery.items.indices.contains(index), gallery.selectedIndex != index else { return }
-        let selectedGallery = MessageImagePreviewGallery(items: gallery.items, selectedIndex: index)
+        guard gallery.items.indices.contains(index) else { return }
+        let selectedItem = gallery.items[index]
+        guard appState.activeImagePreview?.id != selectedItem.id else { return }
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            appState.hiddenPreviewSourceID = selectedGallery.selectedItem?.id
-            appState.activeImagePreviewGallery = selectedGallery
-            appState.activeImagePreview = selectedGallery.selectedItem
+            // The native pager owns its selected index. Keep the gallery input
+            // stable so revisiting the opening page cannot recreate its entry
+            // transition state.
+            appState.hiddenPreviewSourceID = selectedItem.id
+            appState.activeImagePreview = selectedItem
         }
     }
 

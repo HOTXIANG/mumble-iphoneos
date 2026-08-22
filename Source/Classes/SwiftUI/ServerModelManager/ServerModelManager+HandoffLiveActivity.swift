@@ -155,6 +155,12 @@ extension ServerModelManager {
     }
 
     func updateLiveActivity(syncHandoffAudioState: Bool = true) {
+        // Handoff exists on both iOS and macOS. Keep its audio state fresh even
+        // when there is no iOS Live Activity to update.
+        if syncHandoffAudioState {
+            updateHandoffAudioState()
+        }
+
         #if os(iOS)
         guard let activity = liveActivity else { return }
 
@@ -192,10 +198,6 @@ extension ServerModelManager {
             )
         }
 
-        // 同步更新 Handoff Activity 的音频状态
-        if syncHandoffAudioState {
-            updateHandoffAudioState()
-        }
         #endif
     }
 

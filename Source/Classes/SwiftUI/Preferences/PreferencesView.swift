@@ -615,16 +615,7 @@ struct AdvancedAudioSettingsView: View {
         }
 #if os(iOS)
         .fullScreenCover(isPresented: $showPluginMixer) {
-            NavigationStack {
-                AudioPluginMixerView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") {
-                                showPluginMixer = false
-                            }
-                        }
-                    }
-            }
+            AudioPluginMixerView()
         }
         #endif
         .onChange(of: enableStereoOutput) { PreferencesModel.shared.notifySettingsChanged() }

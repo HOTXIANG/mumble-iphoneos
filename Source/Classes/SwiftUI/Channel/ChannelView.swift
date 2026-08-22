@@ -8,6 +8,9 @@
 import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Configuration Constants (UI 尺寸配置)
 
@@ -48,127 +51,232 @@ private enum ChannelLayoutMode: Equatable {
     case compact
 }
 
-private final class ChannelLayoutModeUpdateScheduler: ObservableObject {
-    private var workItem: DispatchWorkItem?
-    private var pendingMode: ChannelLayoutMode?
+private final class ChannelLayoutRuntimeState: ObservableObject {
+    var latestWidth: CGFloat = 0
+    var updateSuppressedUntil: Date?
+    var suppressionReleaseWorkItem: DispatchWorkItem?
 
-    func scheduleTransition(to mode: ChannelLayoutMode, after delay: TimeInterval, _ action: @escaping () -> Void) {
-        guard pendingMode != mode else { return }
-
-        cancel()
-        pendingMode = mode
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard self?.pendingMode == mode else { return }
-            self?.workItem = nil
-            self?.pendingMode = nil
-            action()
-        }
-        self.workItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-    }
-
-    func cancel() {
-        workItem?.cancel()
-        workItem = nil
-        pendingMode = nil
+    deinit {
+        suppressionReleaseWorkItem?.cancel()
     }
 }
 
-struct ChannelView: View {
+#if os(macOS)
+private struct MacChannelSplitSidebarRoot: View {
+    @ObservedObject var serverManager: ServerModelManager
+    let locale: Locale
+
+    var body: some View {
+        ServerChannelView(serverManager: serverManager, isSplitLayout: true)
+            .environment(\.locale, locale)
+    }
+}
+
+private struct MacChannelSplitDetailRoot: View {
+    @ObservedObject var serverManager: ServerModelManager
+    @StateObject private var appState = AppState.shared
+    let locale: Locale
+
+    var body: some View {
+        MessagesView(serverManager: serverManager, isSplitLayout: true)
+            .environment(\.locale, locale)
+            .onAppear {
+                appState.unreadMessageCount = 0
+            }
+    }
+}
+
+private final class LockedChannelSplitViewController: NSSplitViewController {
+    var initialSidebarWidth: CGFloat = 300
+    var minimumSidebarWidth: CGFloat = 300
+    var maximumSidebarWidth: CGFloat = 1_200
+    var minimumDetailWidth: CGFloat = 300
+    private var hasAppliedInitialPosition = false
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+
+        guard !hasAppliedInitialPosition else { return }
+        let availableWidth = splitView.bounds.width - splitView.dividerThickness
+        guard availableWidth >= minimumSidebarWidth + minimumDetailWidth else { return }
+
+        hasAppliedInitialPosition = true
+        let maximumSidebarWidth = availableWidth - minimumDetailWidth
+        let proportionalWidth = availableWidth / 3
+        let sidebarWidth = min(
+            max(initialSidebarWidth, proportionalWidth, minimumSidebarWidth),
+            maximumSidebarWidth,
+            self.maximumSidebarWidth
+        )
+        splitView.setPosition(sidebarWidth, ofDividerAt: 0)
+    }
+
+    override func splitView(_ splitView: NSSplitView, canCollapseSubview subview: NSView) -> Bool {
+        _ = super.splitView(splitView, canCollapseSubview: subview)
+        return false
+    }
+}
+
+private struct MacLockedChannelSplitView: NSViewControllerRepresentable {
+    let serverManager: ServerModelManager
+    let initialSidebarWidth: CGFloat
+    let minimumSidebarWidth: CGFloat
+    let maximumSidebarWidth: CGFloat
+    let minimumDetailWidth: CGFloat
+    let maximumDetailWidth: CGFloat
+    @Environment(\.locale) private var locale
+
+    final class Coordinator {
+        var sidebarController: NSHostingController<MacChannelSplitSidebarRoot>?
+        var detailController: NSHostingController<MacChannelSplitDetailRoot>?
+        var serverManagerIdentity: ObjectIdentifier?
+        var localeIdentifier: String?
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSViewController(context: Context) -> LockedChannelSplitViewController {
+        let splitController = LockedChannelSplitViewController()
+        splitController.initialSidebarWidth = initialSidebarWidth
+        splitController.minimumSidebarWidth = minimumSidebarWidth
+        splitController.maximumSidebarWidth = maximumSidebarWidth
+        splitController.minimumDetailWidth = minimumDetailWidth
+
+        let sidebarController = NSHostingController(
+            rootView: MacChannelSplitSidebarRoot(serverManager: serverManager, locale: locale)
+        )
+        let detailController = NSHostingController(
+            rootView: MacChannelSplitDetailRoot(serverManager: serverManager, locale: locale)
+        )
+
+        let sidebarItem = NSSplitViewItem(viewController: sidebarController)
+        sidebarItem.canCollapse = false
+        sidebarItem.canCollapseFromWindowResize = false
+        sidebarItem.minimumThickness = minimumSidebarWidth
+        sidebarItem.maximumThickness = maximumSidebarWidth
+        sidebarItem.preferredThicknessFraction = 1 / 3
+
+        let detailItem = NSSplitViewItem(viewController: detailController)
+        detailItem.canCollapse = false
+        detailItem.canCollapseFromWindowResize = false
+        detailItem.minimumThickness = minimumDetailWidth
+        detailItem.maximumThickness = maximumDetailWidth
+
+        splitController.addSplitViewItem(sidebarItem)
+        splitController.addSplitViewItem(detailItem)
+        splitController.splitView.dividerStyle = .thin
+
+        context.coordinator.sidebarController = sidebarController
+        context.coordinator.detailController = detailController
+        context.coordinator.serverManagerIdentity = ObjectIdentifier(serverManager)
+        context.coordinator.localeIdentifier = locale.identifier
+        return splitController
+    }
+
+    func updateNSViewController(_ splitController: LockedChannelSplitViewController, context: Context) {
+        let managerIdentity = ObjectIdentifier(serverManager)
+        guard context.coordinator.serverManagerIdentity != managerIdentity ||
+                context.coordinator.localeIdentifier != locale.identifier else {
+            return
+        }
+
+        context.coordinator.sidebarController?.rootView = MacChannelSplitSidebarRoot(
+            serverManager: serverManager,
+            locale: locale
+        )
+        context.coordinator.detailController?.rootView = MacChannelSplitDetailRoot(
+            serverManager: serverManager,
+            locale: locale
+        )
+        context.coordinator.serverManagerIdentity = managerIdentity
+        context.coordinator.localeIdentifier = locale.identifier
+    }
+}
+#endif
+
+struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: View>: View {
     @ObservedObject var serverManager: ServerModelManager
     @StateObject private var appState = AppState.shared
     @StateObject private var languageManager = AppLanguageManager.shared
-    @StateObject private var layoutModeUpdateScheduler = ChannelLayoutModeUpdateScheduler()
-    @Environment(\.colorScheme) private var colorScheme
-    
-    @State private var splitHandlePositionRatio: CGFloat = 0.5
-    @State private var channelLayoutMode: ChannelLayoutMode?
-    @State private var latestLayoutWidth: CGFloat = 0
-    @State private var layoutModeUpdateSuppressedUntil: Date?
-    @State private var layoutModeSuppressionReleaseWorkItem: DispatchWorkItem?
-    private let minChatWidth: CGFloat = 300
-    private let splitHandleWidth: CGFloat = 24
-    private let minServerListWidth: CGFloat = 300
-    private let layoutModeUpdateDelay: TimeInterval = 0.06
-    private let layoutModeAnimation: Animation = .easeInOut(duration: 0.16)
+    @StateObject private var layoutRuntime = ChannelLayoutRuntimeState()
 
-    private var layoutModeTransition: AnyTransition {
-        .opacity
+    @State private var channelLayoutMode: ChannelLayoutMode?
+    @State private var preferredServerListWidth: CGFloat = 300
+    private let minChatWidth: CGFloat = 300
+    private let minServerListWidth: CGFloat = 300
+    private let maxServerListWidth: CGFloat = 1_200
+    private let maxChatWidth: CGFloat = 2_400
+    private let splitDividerAllowance: CGFloat = 2
+    private let splitLayoutActivationPadding: CGFloat = 24
+    private let rootSidebar: RootSidebar
+    private let rootSplitVisibility: Binding<NavigationSplitViewVisibility>?
+    private let leadingControls: LeadingControls
+    private let trailingControls: TrailingControls
+    @Binding private var isSplitLayoutActive: Bool
+
+    init(
+        serverManager: ServerModelManager,
+        rootSidebar: RootSidebar,
+        rootSplitVisibility: Binding<NavigationSplitViewVisibility>?,
+        isSplitLayoutActive: Binding<Bool>,
+        @ViewBuilder leadingControls: () -> LeadingControls,
+        @ViewBuilder trailingControls: () -> TrailingControls
+    ) {
+        self.serverManager = serverManager
+        self.rootSidebar = rootSidebar
+        self.rootSplitVisibility = rootSplitVisibility
+        self._isSplitLayoutActive = isSplitLayoutActive
+        self.leadingControls = leadingControls()
+        self.trailingControls = trailingControls()
     }
 
-    private var splitThreshold: CGFloat {
-        minChatWidth + splitHandleWidth + minServerListWidth
+    private var usesIntegratedRootSplit: Bool {
+        rootSplitVisibility != nil
+    }
+
+    private var splitDeactivationThreshold: CGFloat {
+        minChatWidth + minServerListWidth + splitDividerAllowance
+    }
+
+    private var splitActivationThreshold: CGFloat {
+        splitDeactivationThreshold + splitLayoutActivationPadding
     }
 
     var body: some View {
         GeometryReader { geo in
             let layoutWidth = sanitizedLayoutWidth(geo.size.width)
-            let activeLayoutMode = channelLayoutMode ?? immediateLayoutMode(for: layoutWidth)
+            let activeLayoutMode: ChannelLayoutMode = usesIntegratedRootSplit
+                ? .split
+                : renderedLayoutMode(for: layoutWidth)
 
-            ZStack {
+            Group {
                 if activeLayoutMode == .split {
-                    // [宽屏模式]
-                    HStack(spacing: 0) {
-                        ServerChannelView(serverManager: serverManager, isSplitLayout: true)
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                        
-                        ResizeHandle()
-                            .gesture(
-                                DragGesture(minimumDistance: 1, coordinateSpace: .named("ChannelViewSpace"))
-                                    .onChanged { value in
-                                        updateSplitHandleRatio(
-                                            dragLocationX: value.location.x,
-                                            totalWidth: layoutWidth
-                                        )
-                                    }
-                            )
-                            .zIndex(10)
-                        
-                        MessagesView(serverManager: serverManager, isSplitLayout: true)
-                            .frame(width: calculateEffectiveChatWidth(totalWidth: layoutWidth))
-                            .onAppear { appState.unreadMessageCount = 0 }
-                    }
-                    .transition(layoutModeTransition)
+                    splitLayout
+                        .transition(.identity)
                 } else {
-                    // [窄屏模式]
-                    TabView(selection: $appState.currentTab) {
-                        ServerChannelView(serverManager: serverManager, isSplitLayout: false)
-                            .tabItem { Label("Channels", systemImage: "person.3.fill") }
-                            .tag(AppState.Tab.channels)
-                        
-                        MessagesView(serverManager: serverManager, isSplitLayout: false)
-                            .tabItem { Label("Messages", systemImage: "message.fill") }
-                            .tag(AppState.Tab.messages)
-                            .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
-                    }
-                    #if os(iOS)
-                    .toolbarBackground(.clear, for: .tabBar)
-                    .toolbarBackground(.hidden, for: .tabBar)
-                    #endif
-                    .onChange(of: appState.currentTab) {
-                        if appState.currentTab == .messages { serverManager.markAsRead() }
-                    }
-                    .onAppear { configureTabBarAppearance() }
-                    .transition(layoutModeTransition)
+                    compactLayout
+                        .transition(.identity)
                 }
-
-                globalGradient
-                    .allowsHitTesting(false)
             }
-            .animation(layoutModeAnimation, value: activeLayoutMode)
+            #if os(iOS)
+            // A landscape iPhone can have enough physical width for two
+            // columns while UIKit still reports a compact phone trait. Drive
+            // the native split view from the actual container width, and keep
+            // narrow nested detail columns compact when the outer sidebar opens.
+            .environment(
+                \.horizontalSizeClass,
+                activeLayoutMode == .split ? .regular : .compact
+            )
+            #endif
             .onAppear {
-                applyChannelLayoutMode(for: layoutWidth, animated: false, delayed: false)
+                applyChannelLayoutMode(for: layoutWidth)
             }
             .onChange(of: geo.size.width) { _, newWidth in
-                applyChannelLayoutMode(
-                    for: sanitizedLayoutWidth(newWidth),
-                    animated: true,
-                    delayed: true
-                )
+                applyChannelLayoutMode(for: sanitizedLayoutWidth(newWidth))
             }
         }
-        .coordinateSpace(name: "ChannelViewSpace")
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .id(languageManager.localeIdentifier)
         .onAppear {
@@ -184,78 +292,213 @@ struct ChannelView: View {
             if appState.isChannelSplitLayout {
                 appState.isChannelSplitLayout = false
             }
+            if isSplitLayoutActive {
+                isSplitLayoutActive = false
+            }
             let shouldCleanup = !appState.isConnected && !appState.isConnecting && !appState.isReconnecting
             if shouldCleanup {
                 serverManager.cleanup()
             }
-            layoutModeUpdateScheduler.cancel()
-            layoutModeSuppressionReleaseWorkItem?.cancel()
+            layoutRuntime.suppressionReleaseWorkItem?.cancel()
         }
         .onReceive(NotificationCenter.default.publisher(for: .muChannelForceCompactLayout)) { notification in
             let duration = notification.userInfo?["duration"] as? TimeInterval
             forceCompactLayout(suppressingLayoutUpdatesFor: duration ?? 0)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .muChannelSuppressLayoutUpdates)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .muChannelPrepareForContainerResize)) { notification in
+            let targetWidth = notification.userInfo?["targetWidth"] as? CGFloat
             let duration = notification.userInfo?["duration"] as? TimeInterval
-            let applyAfter = notification.userInfo?["applyAfter"] as? Bool
-            suppressLayoutModeUpdates(for: duration ?? 0, applyAfter: applyAfter ?? false)
+            prepareForContainerResize(
+                targetWidth: targetWidth ?? layoutRuntime.latestWidth,
+                duration: duration ?? 0
+            )
         }
     }
-    
-    private var globalGradient: some View {
+
+    @ViewBuilder
+    private var splitLayout: some View {
         #if os(macOS)
-        Color.clear
-            .ignoresSafeArea()
-        #else
-        LinearGradient(
-            colors: [
-                Color(red: 0.30, green: 0.30, blue: 0.62).opacity(0.07),
-                Color(red: 0.33, green: 0.32, blue: 0.75).opacity(0.10)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
+        MacLockedChannelSplitView(
+            serverManager: serverManager,
+            initialSidebarWidth: preferredServerListWidth,
+            minimumSidebarWidth: minServerListWidth,
+            maximumSidebarWidth: maxServerListWidth,
+            minimumDetailWidth: minChatWidth,
+            maximumDetailWidth: maxChatWidth
         )
-        .ignoresSafeArea()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #else
+        if let rootSplitVisibility {
+            NavigationSplitView(columnVisibility: rootSplitVisibility) {
+                rootSidebar
+            } content: {
+                channelSplitColumn
+            } detail: {
+                messagesSplitColumn
+            }
+            .navigationSplitViewStyle(.balanced)
+        } else {
+            NavigationSplitView(columnVisibility: lockedSplitVisibility) {
+                channelSplitColumn
+                    .toolbar(removing: .sidebarToggle)
+            } detail: {
+                messagesSplitColumn
+            }
+            .navigationSplitViewStyle(.balanced)
+        }
         #endif
     }
-    
-    private func calculateEffectiveChatWidth(totalWidth: CGFloat) -> CGFloat {
-        let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
-        let preferred = safeTotalWidth * (1 - splitHandlePositionRatio) - splitHandleWidth / 2
-        return clampedChatWidth(preferred, totalWidth: safeTotalWidth)
+
+    #if os(iOS)
+    private var channelSplitColumn: some View {
+        ServerChannelView(serverManager: serverManager, isSplitLayout: true)
+            .toolbar(.visible, for: .navigationBar)
+            .navigationTitle(channelTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
+                    leadingControls
+                }
+            }
+            .navigationSplitViewColumnWidth(
+                min: preferredServerListMinimumWidth,
+                ideal: preferredServerListWidth,
+                max: preferredServerListMaximumWidth
+            )
     }
 
-    private func updateSplitHandleRatio(dragLocationX: CGFloat, totalWidth: CGFloat) {
-        let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
-        guard safeTotalWidth > splitHandleWidth, dragLocationX.isFinite else { return }
+    private var messagesSplitColumn: some View {
+        MessagesView(serverManager: serverManager, isSplitLayout: true)
+            .toolbar(.visible, for: .navigationBar)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    trailingControls
+                }
+            }
+            .navigationSplitViewColumnWidth(
+                min: minChatWidth,
+                ideal: preferredChatWidth,
+                max: maxChatWidth
+            )
+            .onAppear { appState.unreadMessageCount = 0 }
+    }
+    #endif
 
-        let proposedChatWidth = safeTotalWidth - dragLocationX - splitHandleWidth / 2
-        let chatWidth = clampedChatWidth(proposedChatWidth, totalWidth: safeTotalWidth)
-        let handleCenterX = safeTotalWidth - chatWidth - splitHandleWidth / 2
-        splitHandlePositionRatio = min(max(handleCenterX / safeTotalWidth, 0), 1)
+    private var compactLayout: some View {
+        Group {
+            #if os(iOS)
+            NavigationStack {
+                compactTabView
+                    .navigationTitle(channelTitle)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .navigationBarLeading) {
+                            leadingControls
+                        }
+                        ToolbarItemGroup(placement: .navigationBarTrailing) {
+                            trailingControls
+                        }
+                    }
+            }
+            #else
+            compactTabView
+            #endif
+        }
+        .onChange(of: appState.currentTab) {
+            if appState.currentTab == .messages { serverManager.markAsRead() }
+        }
+        .onAppear { configureTabBarAppearance() }
     }
 
-    private func clampedChatWidth(_ width: CGFloat, totalWidth: CGFloat) -> CGFloat {
-        let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
-        let availableWidth = max(0, safeTotalWidth - splitHandleWidth)
-        guard availableWidth > 0 else { return 0 }
+    private var compactTabView: some View {
+        TabView(selection: $appState.currentTab) {
+            ServerChannelView(serverManager: serverManager, isSplitLayout: false)
+                #if os(macOS)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                #endif
+                .tabItem { Label("Channels", systemImage: "person.3.fill") }
+                .tag(AppState.Tab.channels)
 
-        // During the split-to-compact transition, the old split view remains
-        // alive for its fade-out animation while its parent can already be
-        // narrower than the normal split threshold. Never reserve more width
-        // than is actually available in that transient frame.
-        let effectiveMinimum = min(minChatWidth, availableWidth)
-        let maxWidthForServerList = max(
-            0,
-            safeTotalWidth - splitHandleWidth - minServerListWidth
+            MessagesView(serverManager: serverManager, isSplitLayout: false)
+                #if os(macOS)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                #endif
+                .tabItem { Label("Messages", systemImage: "message.fill") }
+                .tag(AppState.Tab.messages)
+                .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
+        }
+        #if os(iOS)
+        .toolbarBackground(.clear, for: .tabBar)
+        .toolbarBackground(.hidden, for: .tabBar)
+        #endif
+    }
+
+    private var channelTitle: Text {
+        Text(serverManager.serverName ?? NSLocalizedString("Channel", comment: ""))
+    }
+
+    private var preferredChatWidth: CGFloat {
+        #if os(iOS)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            return min(maxChatWidth, max(minChatWidth, preferredServerListWidth))
+        }
+        #endif
+        return min(maxChatWidth, max(minChatWidth, preferredServerListWidth * 2))
+    }
+
+    private var preferredServerListMinimumWidth: CGFloat {
+        #if os(iOS)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            return preferredServerListWidth
+        }
+        #endif
+        return minServerListWidth
+    }
+
+    private var preferredServerListMaximumWidth: CGFloat {
+        #if os(iOS)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            return preferredServerListWidth
+        }
+        #endif
+        return maxServerListWidth
+    }
+
+    private var lockedSplitVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { .all },
+            set: { _ in
+                // The wide layout always requires both columns. Ignore AppKit's
+                // collapse request when the divider reaches an edge or the
+                // system sidebar command is invoked.
+            }
         )
-        let maxWidthForProportion = max(0, safeTotalWidth * 0.7)
-        let maximum = min(
-            availableWidth,
-            max(effectiveMinimum, min(maxWidthForServerList, maxWidthForProportion))
+    }
+
+    private func calculatedPreferredServerListWidth(totalWidth: CGFloat) -> CGFloat {
+        let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
+        let maximumAvailableWidth = max(minServerListWidth, safeTotalWidth - minChatWidth)
+        #if os(iOS)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            return min(
+                max(minServerListWidth, (safeTotalWidth - splitDividerAllowance) / 2),
+                maximumAvailableWidth,
+                maxServerListWidth
+            )
+        }
+        let columnCountRatio: CGFloat = 3
+        #else
+        let columnCountRatio: CGFloat = 3
+        #endif
+        return min(
+            max(minServerListWidth, safeTotalWidth / columnCountRatio),
+            maximumAvailableWidth,
+            maxServerListWidth
         )
-        let safeWidth = width.isFinite ? width : effectiveMinimum
-        return min(max(safeWidth, effectiveMinimum), maximum)
     }
 
     private func sanitizedLayoutWidth(_ width: CGFloat) -> CGFloat {
@@ -278,109 +521,127 @@ struct ChannelView: View {
     }
 
     private func immediateLayoutMode(for width: CGFloat) -> ChannelLayoutMode {
-        sanitizedLayoutWidth(width) > splitThreshold ? .split : .compact
+        let safeWidth = sanitizedLayoutWidth(width)
+
+        // Use a small hysteresis band instead of a time debounce. Geometry
+        // changes are applied in the current frame, while widths hovering near
+        // the boundary do not repeatedly rebuild the whole container.
+        switch channelLayoutMode {
+        case .split:
+            return safeWidth < splitDeactivationThreshold ? .compact : .split
+        case .compact:
+            return safeWidth > splitActivationThreshold ? .split : .compact
+        case nil:
+            return safeWidth > splitActivationThreshold ? .split : .compact
+        }
     }
 
-    private func applyChannelLayoutMode(for width: CGFloat, animated: Bool, delayed: Bool) {
+    private func renderedLayoutMode(for width: CGFloat) -> ChannelLayoutMode {
+        if let channelLayoutMode,
+           let suppressedUntil = layoutRuntime.updateSuppressedUntil,
+           Date() < suppressedUntil {
+            return channelLayoutMode
+        }
+        return immediateLayoutMode(for: width)
+    }
+
+    private func applyChannelLayoutMode(for width: CGFloat) {
         let safeWidth = sanitizedLayoutWidth(width)
         guard safeWidth > 0 else { return }
-        latestLayoutWidth = safeWidth
+        // This is deliberately stored outside SwiftUI-observed state. Window
+        // resizing can report a new width every frame; publishing every value
+        // would invalidate and rebuild the complete channel/message hierarchy.
+        layoutRuntime.latestWidth = safeWidth
 
-        guard !isLayoutModeUpdateSuppressed() else {
-            layoutModeUpdateScheduler.cancel()
+        if usesIntegratedRootSplit {
+            guard channelLayoutMode != .split else { return }
+            setChannelLayoutMode(.split)
             return
         }
+
+        guard !isLayoutModeUpdateSuppressed() else { return }
 
         let mode = immediateLayoutMode(for: safeWidth)
-
-        guard delayed else {
-            layoutModeUpdateScheduler.cancel()
-            setChannelLayoutMode(mode, animated: animated)
-            return
-        }
-
-        guard let currentMode = channelLayoutMode else {
-            layoutModeUpdateScheduler.cancel()
-            setChannelLayoutMode(mode, animated: animated)
-            return
-        }
-
-        if currentMode == mode {
-            layoutModeUpdateScheduler.cancel()
-        } else {
-            layoutModeUpdateScheduler.scheduleTransition(to: mode, after: layoutModeUpdateDelay) {
-                setChannelLayoutMode(mode, animated: animated)
-            }
-        }
+        guard channelLayoutMode != mode else { return }
+        setChannelLayoutMode(mode)
     }
 
     private func forceCompactLayout(suppressingLayoutUpdatesFor duration: TimeInterval = 0) {
-        layoutModeUpdateScheduler.cancel()
-        suppressLayoutModeUpdates(for: duration, applyAfter: false)
-        setChannelLayoutMode(.compact, animated: true)
+        // Re-evaluate once the outer sidebar animation finishes so a cancelled
+        // or reversed sidebar transition cannot leave this view stuck compact.
+        suppressLayoutModeUpdates(for: duration)
+        setChannelLayoutMode(.compact)
     }
 
-    private func suppressLayoutModeUpdates(for duration: TimeInterval, applyAfter: Bool) {
+    private func prepareForContainerResize(targetWidth: CGFloat, duration: TimeInterval) {
+        let safeTargetWidth = sanitizedLayoutWidth(targetWidth)
+        guard safeTargetWidth > 0 else { return }
+
+        // Pick the mode from the final container width before the outer split
+        // animation starts, then hold it for the complete animation. Live
+        // geometry can still be recorded, but cannot cause a transient swap.
+        let targetMode = immediateLayoutMode(for: safeTargetWidth)
+        suppressLayoutModeUpdates(for: duration)
+        setChannelLayoutMode(targetMode)
+    }
+
+    private func suppressLayoutModeUpdates(for duration: TimeInterval) {
         guard duration > 0 else { return }
 
         let until = Date().addingTimeInterval(duration)
-        if layoutModeUpdateSuppressedUntil.map({ $0 < until }) ?? true {
-            layoutModeUpdateSuppressedUntil = until
+        if layoutRuntime.updateSuppressedUntil.map({ $0 < until }) ?? true {
+            layoutRuntime.updateSuppressedUntil = until
         }
 
-        layoutModeUpdateScheduler.cancel()
-        layoutModeSuppressionReleaseWorkItem?.cancel()
-
-        guard applyAfter else { return }
+        layoutRuntime.suppressionReleaseWorkItem?.cancel()
 
         let workItem = DispatchWorkItem {
-            layoutModeUpdateSuppressedUntil = nil
-            layoutModeSuppressionReleaseWorkItem = nil
-            applyChannelLayoutMode(for: latestLayoutWidth, animated: true, delayed: false)
+            layoutRuntime.updateSuppressedUntil = nil
+            layoutRuntime.suppressionReleaseWorkItem = nil
+            applyChannelLayoutMode(for: layoutRuntime.latestWidth)
         }
-        layoutModeSuppressionReleaseWorkItem = workItem
+        layoutRuntime.suppressionReleaseWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: workItem)
     }
 
     private func isLayoutModeUpdateSuppressed() -> Bool {
-        guard let until = layoutModeUpdateSuppressedUntil else { return false }
+        guard let until = layoutRuntime.updateSuppressedUntil else { return false }
 
         if Date() < until {
             return true
         }
 
-        layoutModeUpdateSuppressedUntil = nil
+        layoutRuntime.updateSuppressedUntil = nil
         return false
     }
 
-    private func setChannelLayoutMode(_ mode: ChannelLayoutMode, animated: Bool) {
+    private func setChannelLayoutMode(_ mode: ChannelLayoutMode) {
+        let isTransitioningToSplit = mode == .split && channelLayoutMode != .split
         let updateLocalLayout = {
+            if isTransitioningToSplit {
+                preferredServerListWidth = calculatedPreferredServerListWidth(
+                    totalWidth: layoutRuntime.latestWidth
+                )
+            }
             if channelLayoutMode != mode {
                 channelLayoutMode = mode
             }
         }
 
-        if animated {
-            withAnimation(layoutModeAnimation) {
-                updateLocalLayout()
-            }
-        } else {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                updateLocalLayout()
-            }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            updateLocalLayout()
         }
 
         // This flag is observed outside the channel layout and must not inherit
         // the split-view geometry animation transaction.
         let isSplitLayout = mode == .split
+        if isSplitLayoutActive != isSplitLayout {
+            isSplitLayoutActive = isSplitLayout
+        }
         if appState.isChannelSplitLayout != isSplitLayout {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                appState.isChannelSplitLayout = isSplitLayout
-            }
+            appState.isChannelSplitLayout = isSplitLayout
         }
     }
 }
@@ -391,6 +652,7 @@ struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
     let isSplitLayout: Bool
     @Environment(\.colorScheme) private var colorScheme
+    @Namespace private var userMovementNamespace
     @State private var selectedUserForConfig: MKUser? = nil
     @State private var selectedUserForInfo: MKUser? = nil
     @State private var selectedUserForStats: MKUser? = nil
@@ -405,6 +667,10 @@ struct ServerChannelView: View {
         let base = channelContent
             .overlay(alignment: .bottom, content: movingUserOverlay)
             .animation(.easeInOut(duration: 0.25), value: serverManager.movingUser != nil)
+            .animation(
+                .spring(response: 0.38, dampingFraction: 0.86),
+                value: serverManager.userChannelMovementRevision
+            )
             .scrollContentBackground(.hidden)
             .background(Color.clear)
         return transientAutomationState(remainingSheetAutomationState(sheetAutomationState(automationNotifications(alerts(sheets(base))))))
@@ -484,8 +750,7 @@ struct ServerChannelView: View {
                     channelTreeContent
                     Color.clear.frame(height: 80)
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, isSplitLayout ? 4 : 16)
+                .padding(.horizontal, 16)
             }
         }
     }
@@ -500,6 +765,7 @@ struct ServerChannelView: View {
                 level: 0,
                 currentChannelId: currentChannelId,
                 serverManager: serverManager,
+                userMovementNamespace: userMovementNamespace,
                 onUserTap: { user in
                     selectedUserForConfig = user
                 },
@@ -833,6 +1099,7 @@ struct ChannelTreeRow: View {
     let level: Int
     let currentChannelId: UInt?
     @ObservedObject var serverManager: ServerModelManager
+    let userMovementNamespace: Namespace.ID
     
     let onUserTap: (MKUser) -> Void
     let onUserInfoTap: (MKUser) -> Void
@@ -1172,6 +1439,10 @@ struct ChannelTreeRow: View {
                         onStatsTap: onUserStatsTap,
                         onRenameTap: onUserRenameTap
                     )
+                    .matchedGeometryEffect(
+                        id: user.session(),
+                        in: userMovementNamespace
+                    )
                     .opacity(isInMoveMode ? 0.3 : 1.0)
                     .allowsHitTesting(!isInMoveMode)
                     .listRowSeparator(.hidden)
@@ -1202,6 +1473,7 @@ struct ChannelTreeRow: View {
                         level: level + 1,
                         currentChannelId: currentChannelId,
                         serverManager: serverManager,
+                        userMovementNamespace: userMovementNamespace,
                         onUserTap: onUserTap,
                         onUserInfoTap: onUserInfoTap,
                         onChannelInfoTap: onChannelInfoTap,
@@ -2041,31 +2313,6 @@ private struct TalkingAvatarView: View {
         default:
             return false
         }
-    }
-}
-
-struct ResizeHandle: View {
-    @State private var isHovering = false
-    
-    var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: 24)
-                .padding(.bottom, 8)
-                .contentShape(Rectangle())
-            Rectangle()
-                #if os(macOS)
-                .fill(Color.secondary.opacity(0.45))
-                .frame(width: isHovering ? 3 : 1)
-                #else
-                .fill(isHovering ? Color.primary.opacity(0.35) : Color.primary.opacity(0.12))
-                .frame(width: 4)
-                #endif
-                .padding(.bottom, 8)
-                .cornerRadius(2)
-        }
-        .onHover { hovering in withAnimation { isHovering = hovering } }
     }
 }
 

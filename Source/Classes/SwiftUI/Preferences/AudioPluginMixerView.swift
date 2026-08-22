@@ -332,6 +332,9 @@ struct AudioPluginMixerView: View {
     private let maxInsertSlots: Int = 100
     private let liveTrackRefreshTimer = Timer.publish(every: 0.75, on: .main, in: .common).autoconnect()
     @ObservedObject private var sharedRackManager = AudioPluginRackManager.shared
+    #if os(iOS)
+    @Environment(\.dismiss) private var dismiss
+    #endif
 
     private struct HearableUser: Identifiable, Hashable {
         let id: String       // userHash（持久化键）
@@ -726,6 +729,7 @@ struct AudioPluginMixerView: View {
             Divider()
             GeometryReader { geometry in
                 let isCompact = geometry.size.width < 500
+                let usesCompactWorkspace = isCompact || UIDevice.current.userInterfaceIdiom == .phone
                 Group {
                     if isCompact {
                         VStack(spacing: 0) {
@@ -738,7 +742,9 @@ struct AudioPluginMixerView: View {
                             mixerTrackSidebar
                                 .frame(width: min(340, max(260, geometry.size.width * 0.33)))
                             Divider()
-                            mixerWorkspace(compact: false)
+                            mixerWorkspace(compact: usesCompactWorkspace)
+                                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+                                .clipped()
                         }
                     }
                 }
@@ -761,6 +767,10 @@ struct AudioPluginMixerView: View {
     @ViewBuilder
     private func mixerTransportBarContent(compact: Bool) -> some View {
         HStack(spacing: compact ? 8 : 10) {
+            #if os(iOS)
+            mixerCloseButton
+            #endif
+
             Text(NSLocalizedString("Audio Plugin Mixer", comment: ""))
                 .font(.headline)
                 .lineLimit(1)
@@ -815,6 +825,35 @@ struct AudioPluginMixerView: View {
         }
     }
 
+    #if os(iOS)
+    @ViewBuilder
+    private var mixerCloseButton: some View {
+        if #available(iOS 26.0, *) {
+            mixerCloseButtonContent
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(.primary)
+        } else {
+            mixerCloseButtonContent
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .tint(.primary)
+        }
+    }
+
+    private var mixerCloseButtonContent: some View {
+        Button {
+            dismiss()
+        } label: {
+            Label(NSLocalizedString("Close", comment: ""), systemImage: "xmark")
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                .frame(width: 28, height: 28)
+                .contentShape(Circle())
+        }
+    }
+    #endif
+
     // MARK: - Compact Track Picker (iPhone 竖屏)
 
     private var compactTrackPicker: some View {
@@ -856,7 +895,7 @@ struct AudioPluginMixerView: View {
         // macOS: 使用系统原生 List sidebar 风格
         VStack(spacing: 0) {
             List(allTracks, id: \.self, selection: selectedTrackBinding) { track in
-                mixerTrackLabel(track)
+                mixerTrackLabel(track, isSelected: selectedTrack == track)
                     .tag(track)
             }
             .listStyle(.sidebar)
@@ -974,15 +1013,15 @@ struct AudioPluginMixerView: View {
         }
     }
 
-    private func mixerTrackLabel(_ track: MixerTrack) -> some View {
+    private func mixerTrackLabel(_ track: MixerTrack, isSelected: Bool) -> some View {
         HStack(spacing: 8) {
             Text(track.shortLabel)
                 .font(.caption.monospaced())
-                .foregroundColor(.accentColor)
+                .foregroundColor(isSelected ? .primary : .accentColor)
                 .frame(width: 34, height: 22)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.15))
+                        .fill(isSelected ? Color.primary.opacity(0.18) : Color.accentColor.opacity(0.15))
                 )
 
             VStack(alignment: .leading, spacing: 2) {
@@ -1045,6 +1084,7 @@ struct AudioPluginMixerView: View {
                 pluginChainPanel(compact: compact)
             }
             .padding(compact ? 10 : 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -1479,7 +1519,7 @@ struct AudioPluginMixerView: View {
                     .font(.caption)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .frame(maxWidth: width, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -1490,10 +1530,10 @@ struct AudioPluginMixerView: View {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(Color.secondary.opacity(0.12))
             )
+            .frame(width: width)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder
@@ -3003,6 +3043,11 @@ struct AudioPluginMixerView: View {
         sampleRate: Double,
         loadedKey: String
     ) async -> String? {
+        guard AudioUnitHostSecurity.canHostSecurely(description) else {
+            MumbleLogger.plugin.warning("MKAudio: refused an AU that is not safe for sandboxed hosting")
+            return AudioUnitHostSecurity.incompatiblePluginMessage
+        }
+
         // Try with required channels first
         if let error = await tryInstantiateWithChannels(
             description: description,
@@ -3056,36 +3101,10 @@ struct AudioPluginMixerView: View {
             return nil
         }
 
-        let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
-            AVAudioUnit.instantiate(with: description, options: []) { unit, error in
-                c.resume(returning: (unit, error as NSError?))
-            }
-        }
-
-        if let unitDefault, self.configureAudioUnit(unitDefault, format: format) {
-            self.loadedAudioUnits[loadedKey] = unitDefault
-            MumbleLogger.plugin.info("MKAudio: AU loaded successfully with \(channels) channels (default)")
-            return nil
-        }
-
-        // Built-in/system AUs can still succeed in-process.
-        let (unitIn, errorIn) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
-            AVAudioUnit.instantiate(with: description, options: [.loadInProcess]) { unit, error in
-                c.resume(returning: (unit, error as NSError?))
-            }
-        }
-
-        if let unitIn, self.configureAudioUnit(unitIn, format: format) {
-            self.loadedAudioUnits[loadedKey] = unitIn
-            MumbleLogger.plugin.info("MKAudio: AU loaded successfully with \(channels) channels (loadInProcess)")
-            return nil
-        }
-
-        let finalError = (errorOut ?? errorDefault ?? errorIn)
-        if finalError?.domain == NSOSStatusErrorDomain, finalError?.code == -3000 {
+        if errorOut?.domain == NSOSStatusErrorDomain, errorOut?.code == -3000 {
             return NSLocalizedString("Audio Unit host compatibility error (-3000). Try another AU or restart audio engine.", comment: "")
         }
-        return finalError?.localizedDescription ?? NSLocalizedString("Unknown error", comment: "")
+        return errorOut?.localizedDescription ?? NSLocalizedString("Unable to load this Audio Unit in the system's isolated host.", comment: "")
 #else
         let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
             AVAudioUnit.instantiate(with: description, options: []) { unit, error in

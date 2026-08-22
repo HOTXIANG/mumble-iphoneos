@@ -2,6 +2,33 @@ import Foundation
 import Combine
 import AVFoundation
 
+enum AudioUnitHostSecurity {
+    static let incompatiblePluginMessage = NSLocalizedString(
+        "This Audio Unit cannot be loaded without lowering Mumble's security. Use an AUv3 or sandbox-safe version of the plugin.",
+        comment: ""
+    )
+
+    static func canHostSecurely(_ description: AudioComponentDescription) -> Bool {
+#if os(macOS)
+        let components = AVAudioUnitComponentManager.shared()
+            .components(matching: description)
+        return !components.isEmpty && components.allSatisfy(canHostSecurely)
+#else
+        true
+#endif
+    }
+
+    static func canHostSecurely(_ component: AVAudioUnitComponent) -> Bool {
+#if os(macOS)
+        let flags = component.audioComponentDescription.componentFlags
+        let isAudioUnitV3 = (flags & AudioComponentFlags.isV3AudioUnit.rawValue) != 0
+        return component.isSandboxSafe || isAudioUnitV3
+#else
+        true
+#endif
+    }
+}
+
 struct AudioPluginDiscovery: Identifiable, Hashable {
     let id: String
     let name: String
@@ -510,14 +537,14 @@ final class AudioPluginRackManager: ObservableObject {
         MumbleLogger.plugin.info("AudioPluginRackManager: loading \(targets.count) persisted plugins")
 
         for plugin in targets {
-            _ = await loadAudioUnit(for: plugin, allowInProcessFallback: true)
+            _ = await loadAudioUnit(for: plugin)
         }
 
         // Final sync after all plugins loaded
         syncAllDSPChains()
     }
 
-    private func loadAudioUnit(for plugin: TrackPlugin, allowInProcessFallback: Bool = true) async -> Bool {
+    private func loadAudioUnit(for plugin: TrackPlugin) async -> Bool {
         guard !isSafeModeActive else {
             lastLoadErrorByPlugin[plugin.id] = NSLocalizedString("Safe Mode is active. Restart normally to load plugins.", comment: "")
             return false
@@ -555,8 +582,7 @@ final class AudioPluginRackManager: ObservableObject {
             description: description,
             requiredChannels: channelCount(for: trackKey),
             sampleRate: pluginSampleRate(for: trackKey),
-            loadedKey: loadedKey,
-            allowInProcessFallback: allowInProcessFallback
+            loadedKey: loadedKey
         )
         if let message {
             lastLoadErrorByPlugin[plugin.id] = message
@@ -1072,15 +1098,18 @@ final class AudioPluginRackManager: ObservableObject {
         description: AudioComponentDescription,
         requiredChannels: UInt,
         sampleRate: Double,
-        loadedKey: String,
-        allowInProcessFallback: Bool = true
+        loadedKey: String
     ) async -> String? {
+        guard AudioUnitHostSecurity.canHostSecurely(description) else {
+            MumbleLogger.plugin.warning("AudioPluginRackManager: refused an AU that is not safe for sandboxed hosting")
+            return AudioUnitHostSecurity.incompatiblePluginMessage
+        }
+
         if let error = await tryInstantiateWithChannels(
             description: description,
             channels: requiredChannels,
             sampleRate: sampleRate,
-            loadedKey: loadedKey,
-            allowInProcessFallback: allowInProcessFallback
+            loadedKey: loadedKey
         ) {
             if requiredChannels == 2 {
                 MumbleLogger.plugin.warning("AudioPluginRackManager: failed to load AU with 2 channels, trying 1 channel")
@@ -1088,8 +1117,7 @@ final class AudioPluginRackManager: ObservableObject {
                     description: description,
                     channels: 1,
                     sampleRate: sampleRate,
-                    loadedKey: loadedKey,
-                    allowInProcessFallback: allowInProcessFallback
+                    loadedKey: loadedKey
                 ) {
                     return monoError
                 }
@@ -1104,8 +1132,7 @@ final class AudioPluginRackManager: ObservableObject {
         description: AudioComponentDescription,
         channels: UInt,
         sampleRate: Double,
-        loadedKey: String,
-        allowInProcessFallback: Bool = true
+        loadedKey: String
     ) async -> String? {
         let effectiveSampleRate = sampleRate > 0 ? sampleRate : 48_000
         guard let format = AVAudioFormat(
@@ -1126,38 +1153,10 @@ final class AudioPluginRackManager: ObservableObject {
             return nil
         }
 
-        guard allowInProcessFallback else {
-            return errorOut?.localizedDescription ?? NSLocalizedString(
-                "This Audio Unit requires manual authorization before it can be loaded.",
-                comment: ""
-            )
-        }
-
-        let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
-            AVAudioUnit.instantiate(with: description, options: []) { unit, error in
-                c.resume(returning: (unit, error as NSError?))
-            }
-        }
-        if let unitDefault, configureAudioUnit(unitDefault, format: format) {
-            loadedAudioUnits[loadedKey] = unitDefault
-            return nil
-        }
-
-        let (unitIn, errorIn) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
-            AVAudioUnit.instantiate(with: description, options: [.loadInProcess]) { unit, error in
-                c.resume(returning: (unit, error as NSError?))
-            }
-        }
-        if let unitIn, configureAudioUnit(unitIn, format: format) {
-            loadedAudioUnits[loadedKey] = unitIn
-            return nil
-        }
-
-        let finalError = errorOut ?? errorDefault ?? errorIn
-        if finalError?.domain == NSOSStatusErrorDomain, finalError?.code == -3000 {
+        if errorOut?.domain == NSOSStatusErrorDomain, errorOut?.code == -3000 {
             return NSLocalizedString("Audio Unit host compatibility error (-3000). Try another AU or restart audio engine.", comment: "")
         }
-        return finalError?.localizedDescription ?? NSLocalizedString("Unknown error", comment: "")
+        return errorOut?.localizedDescription ?? NSLocalizedString("Unable to load this Audio Unit in the system's isolated host.", comment: "")
 #else
         let (unitDefault, errorDefault) = await withUnsafeContinuation { (c: UnsafeContinuation<(AVAudioUnit?, NSError?), Never>) in
             AVAudioUnit.instantiate(with: description, options: []) { unit, error in
