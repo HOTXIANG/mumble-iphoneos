@@ -17,6 +17,7 @@ enum MacMainWindowConfiguration {
     static let minSize = NSSize(width: 480, height: 400)
     static let defaultSize = NSSize(width: 1_100, height: 820)
 }
+
 #endif
 
 // MARK: - FocusedValue for menu bar access
@@ -66,8 +67,7 @@ struct MumbleApp: App {
                 #endif
                 #if os(macOS)
                 .frame(minWidth: 480, minHeight: 400)
-                .ignoresSafeArea(.container, edges: .top)
-                .modifier(MacTransparentWindowToolbarModifier())
+                .modifier(MacServerScrollEdgeModifier())
                 .background(
                     WindowMinSizeSetter(
                         minSize: MacMainWindowConfiguration.minSize,
@@ -414,150 +414,13 @@ extension Notification.Name {
     static let mumbleShowRegisteredUsers = Notification.Name("MumbleShowRegisteredUsersNotification")
 }
 
-struct MacTitlebarOverlapScrollModifier: ViewModifier {
-    let enabled: Bool
-    let contentTopInset: CGFloat
-    let hasContent: Bool
-    @State private var overlapsTitlebar = false
-
-    private let titlebarEffectHeight: CGFloat = 54
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(macOS 15.0, *), enabled {
-            content
-                .onScrollGeometryChange(for: Bool.self) { geometry in
-                    let normalizedOffset = geometry.contentOffset.y + geometry.contentInsets.top
-                    let contentArrivalOffset = max(0, contentTopInset - titlebarEffectHeight)
-                    return hasContent && normalizedOffset > contentArrivalOffset
-                } action: { _, overlapsTitlebar in
-                    self.overlapsTitlebar = overlapsTitlebar
-                }
-                .overlay(alignment: .top) {
-                    ZStack {
-                        if overlapsTitlebar {
-                            MacPaneTitlebarMaterial()
-                                .allowsHitTesting(false)
-                        }
-                        MacTitlebarWindowDragRegion()
-                    }
-                    .frame(height: titlebarEffectHeight)
-                }
-                .onDisappear { overlapsTitlebar = false }
-        } else {
-            content
-        }
-    }
-}
-
-private struct MacTitlebarWindowDragRegion: NSViewRepresentable {
-    func makeNSView(context: Context) -> MacPaneTitlebarDragCaptureView {
-        MacPaneTitlebarDragCaptureView()
-    }
-
-    func updateNSView(_ nsView: MacPaneTitlebarDragCaptureView, context: Context) {}
-}
-
-private final class MacPaneTitlebarDragCaptureView: NSView {
-    private var isResolvingUnderlyingHit = false
-
-    override var mouseDownCanMoveWindow: Bool {
-        true
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        if isResolvingUnderlyingHit {
-            return nil
-        }
-        guard bounds.contains(point), !isOverNativeControl(at: point) else {
-            return nil
-        }
-        return self
-    }
-
-    private func isOverNativeControl(at point: NSPoint) -> Bool {
-        guard let contentView = window?.contentView,
-              let windowFrameView = contentView.superview else {
-            return false
-        }
-        let pointInWindowFrame = convert(point, to: windowFrameView)
-
-        // Ask AppKit which view would receive this point if the SwiftUI drag
-        // surface were absent. This preserves native toolbar controls without
-        // treating interactive channel rows underneath the titlebar as drag
-        // blockers.
-        isResolvingUnderlyingHit = true
-        defer { isResolvingUnderlyingHit = false }
-        guard let underlyingView = windowFrameView.hitTest(pointInWindowFrame) else {
-            return false
-        }
-
-        var candidate: NSView? = underlyingView
-        while let view = candidate {
-            if view.accessibilityRole() == .toolbar
-                || String(describing: type(of: view)).contains("Toolbar") {
-                return true
-            }
-            if view === windowFrameView {
-                break
-            }
-            candidate = view.superview
-        }
-        return false
-    }
-}
-
-private struct MacPaneTitlebarMaterial: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        MacPaneTitlebarVisualEffectView()
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
-}
-
-private final class MacPaneTitlebarVisualEffectView: NSVisualEffectView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.masksToBounds = true
-        blendingMode = .withinWindow
-        state = .active
-        isEmphasized = false
-        updateMaterialForAppearance()
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        updateMaterialForAppearance()
-    }
-
-    private func updateMaterialForAppearance() {
-        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        // `underWindowBackground` samples from a comparatively broad area,
-        // which lets a strongly tinted row colour most of the titlebar band.
-        // Header material keeps the same opaque-backdrop blur behaviour while
-        // localising that colour contribution to the content nearest the bar.
-        material = isDark ? .headerView : .titlebar
-    }
-}
-
-private struct MacTransparentWindowToolbarModifier: ViewModifier {
-    @ViewBuilder
+/// 系统根据真实的标题栏遮挡区域生成背景模糊；不叠加自定义材质或遮罩。
+struct MacServerScrollEdgeModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
-            content
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        } else if #available(macOS 15.0, *) {
-            content
-                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+            content.scrollEdgeEffectStyle(.soft, for: .top)
         } else {
             content
-                .toolbarBackground(.clear, for: .windowToolbar)
-                .toolbarBackground(.hidden, for: .windowToolbar)
         }
     }
 }
@@ -598,15 +461,13 @@ struct WindowMinSizeSetter: NSViewRepresentable {
     }
 
     private func configure(window: NSWindow, context: Context) {
-        // Let SwiftUI render the split-view surface beneath the native
-        // titlebar. The window itself remains opaque; only the titlebar's own
-        // backing is removed, so content is visible instead of being clipped.
+        // 由系统标题栏和滚动视图共同管理毛玻璃效果与内容安全区域。
         window.styleMask.insert(.fullSizeContentView)
         window.isOpaque = true
         window.backgroundColor = .windowBackgroundColor
-        window.titlebarAppearsTransparent = true
-        window.titlebarSeparatorStyle = .none
-        window.toolbar?.showsBaselineSeparator = false
+        window.titlebarAppearsTransparent = false
+        window.titlebarSeparatorStyle = .automatic
+        window.toolbar?.showsBaselineSeparator = true
 
         // 禁用 macOS 系统状态恢复，防止隔很长时间后重新打开时系统用缓存的旧尺寸覆盖窗口
         window.isRestorable = false

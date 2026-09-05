@@ -28,8 +28,7 @@ private let kArrowWidth: CGFloat = 14.0   // 箭头占位宽度
 private let kChannelIconSize: CGFloat = 10.0
 private let kChannelIconWidth: CGFloat = 16.0
 private let kDropHighlightCornerRadius: CGFloat = 12.0 // 与 TintedGlassRowModifier 圆角一致
-private let kCompactTabTitlebarClearance: CGFloat = 58.0
-private let kSplitScrollTopContentInset: CGFloat = 68.0
+private let kSplitScrollTopContentInset: CGFloat = 14.0
 #else
 private let kRowSpacing: CGFloat = 7.0    // 行与行之间的间隙
 private let kRowPaddingV: CGFloat = 6.0   // 行内部的垂直边距
@@ -72,7 +71,6 @@ private struct MacChannelSplitSidebarRoot: View {
     var body: some View {
         ServerChannelView(serverManager: serverManager, isSplitLayout: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea(.container, edges: .top)
             .environment(\.locale, locale)
     }
 }
@@ -85,7 +83,6 @@ private struct MacChannelSplitDetailRoot: View {
     var body: some View {
         MessagesView(serverManager: serverManager, isSplitLayout: true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea(.container, edges: .top)
             .environment(\.locale, locale)
             .onAppear {
                 appState.unreadMessageCount = 0
@@ -340,6 +337,8 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
             maximumDetailWidth: maxChatWidth
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 让原生分栏延伸至标题栏；内层 HostingController 保留系统安全区域。
+        .ignoresSafeArea(.container, edges: .top)
         #else
         if let rootSplitVisibility {
             NavigationSplitView(columnVisibility: rootSplitVisibility) {
@@ -444,9 +443,6 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
                 .tag(AppState.Tab.messages)
                 .badge(appState.unreadMessageCount > 0 ? "\(appState.unreadMessageCount)" : nil)
         }
-        #if os(macOS)
-        .padding(.top, kCompactTabTitlebarClearance)
-        #endif
         #if os(iOS)
         .toolbarBackground(.clear, for: .tabBar)
         .toolbarBackground(.hidden, for: .tabBar)
@@ -758,25 +754,19 @@ struct ServerChannelView: View {
     }
 
     private var channelContent: some View {
-        let hasChannelContent = MUConnectionController.shared()?.serverModel?.rootChannel() != nil
-
-        return ZStack {
+        ZStack {
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: kRowSpacing) {
                     Color.clear.frame(height: isSplitLayout ? kSplitScrollTopContentInset : 10)
                     channelTreeContent
                     Color.clear.frame(height: 80)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, UIConstants.Spacing.paneHorizontalPadding)
             }
             #if os(macOS)
-            .modifier(
-                MacTitlebarOverlapScrollModifier(
-                    enabled: isSplitLayout,
-                    contentTopInset: kSplitScrollTopContentInset,
-                    hasContent: hasChannelContent
-                )
-            )
+            .modifier(MacServerScrollEdgeModifier())
+            #else
+            .modifier(ChannelTopScrollEdgeModifier())
             #endif
         }
     }

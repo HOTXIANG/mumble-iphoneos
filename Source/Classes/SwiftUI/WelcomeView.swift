@@ -1044,6 +1044,14 @@ struct AppRootView: View {
         .preferredColorScheme(selectedAppColorScheme.preferredColorScheme)
         .environmentObject(serverManager)
         .focusedValue(\.serverManager, serverManager)
+        .onChange(of: appState.isConnected, initial: true) { _, isConnected in
+            updateSplitVisibilityForConnection(isConnected)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .muConnectionOpened)) { _ in
+            // Re-entry can preserve isConnected, for example during registration.
+            // Every successful entry should still dismiss the server sidebar.
+            updateSplitVisibilityForConnection(true)
+        }
         // --- 全局覆盖层 (Toast, PTT, Connect Loading) ---
         .overlay(alignment: .top) {
             if let toast = appState.activeToast {
@@ -1366,10 +1374,6 @@ struct AppRootView: View {
             sidebarNavigationStack
         }
         .environmentObject(channelNavigationManager)
-        .onAppear {
-            preferredCompactColumn = .detail
-            setSplitVisibility(.doubleColumn, animated: false)
-        }
     }
     #endif
 
@@ -1383,28 +1387,6 @@ struct AppRootView: View {
                 #endif
         }
             .navigationSplitViewStyle(.balanced)
-            .onAppear {
-                preferredCompactColumn = appState.isConnected ? .detail : .sidebar
-                #if os(macOS)
-                // The sidebar is part of the first rendered frame. Its 260pt
-                // minimum plus the detail's explicit 180pt minimum fits inside
-                // the 480pt minimum window, so toggling cannot widen the frame.
-                setSplitVisibility(appState.isConnected ? .detailOnly : .all, animated: false)
-                #else
-                setSplitVisibility(appState.isConnected ? .detailOnly : .all)
-                #endif
-            }
-            .onChange(of: appState.isConnected) { _, isConnected in
-                preferredCompactColumn = isConnected ? .detail : .sidebar
-                #if os(macOS)
-                // The detail content changes in the same update. Keep the
-                // outer split view out of intermediate animated widths where
-                // the old and new minimum constraints cannot both be valid.
-                setSplitVisibility(isConnected ? .detailOnly : .all, animated: false)
-                #else
-                setSplitVisibility(isConnected ? .detailOnly : .all, animated: true)
-                #endif
-            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.clear)
     }
@@ -1467,6 +1449,23 @@ struct AppRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
+    }
+
+    private func updateSplitVisibilityForConnection(_ isConnected: Bool) {
+        preferredCompactColumn = isConnected ? .detail : .sidebar
+
+        #if os(macOS)
+        cancelPendingMacSidebarTransition()
+        // The detail content changes in the same update. Avoid intermediate
+        // widths where the old and new minimum constraints cannot both fit.
+        setSplitVisibility(isConnected ? .detailOnly : .all, animated: false)
+        #else
+        // iPad keeps channels and chat visible in its three-column split while
+        // hiding the server sidebar. iPhone switches its root page directly.
+        let connectedVisibility: NavigationSplitViewVisibility =
+            UIDevice.current.userInterfaceIdiom == .pad ? .doubleColumn : .detailOnly
+        setSplitVisibility(isConnected ? connectedVisibility : .all, animated: false)
+        #endif
     }
 
     private func setSplitVisibility(_ visibility: NavigationSplitViewVisibility, animated: Bool = true) {

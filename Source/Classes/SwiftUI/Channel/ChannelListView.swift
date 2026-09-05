@@ -174,9 +174,6 @@ struct ChannelListView<RootSidebar: View>: View {
                 .zIndex(9999) // 确保在最上层
             }
         }
-        #if os(macOS)
-        .ignoresSafeArea(.container, edges: .top)
-        #endif
         .navigationBarBackButtonHidden(true)
         #if os(iOS)
         .toolbarBackground(.hidden, for: .navigationBar)

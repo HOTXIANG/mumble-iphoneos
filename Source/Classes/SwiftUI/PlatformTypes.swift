@@ -58,6 +58,19 @@ extension Color {
 }
 #endif
 
+#if os(iOS)
+/// 让系统导航栏的滚动遮挡使用清晰边缘，并保留系统对出现时机的控制。
+struct ChannelTopScrollEdgeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content
+        }
+    }
+}
+#endif
+
 // MARK: - GlassEffect Availability Wrapper
 
 /// ViewModifier that applies glassEffect when available (iOS 26.0+ / macOS 26.0+),

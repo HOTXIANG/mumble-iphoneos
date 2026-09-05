@@ -2429,13 +2429,12 @@ struct MessagesList: View {
                     }
                     .padding(.top, {
                         #if os(macOS)
-                        return isSplitLayout ? CGFloat(74) : CGFloat(16)
+                        return isSplitLayout ? CGFloat(20) : CGFloat(16)
                         #else
                         return CGFloat(16)
                         #endif
                     }())
-                    .padding(.leading, isSplitLayout ? 4 : 16)
-                    .padding(.trailing, 16)
+                    .padding(.horizontal, UIConstants.Spacing.paneHorizontalPadding)
                     .offset(y: layoutCompensationY)
                     .background(
                         GeometryReader { geo in
@@ -2448,19 +2447,14 @@ struct MessagesList: View {
                 }
                 .coordinateSpace(name: scrollCoordinateSpaceName)
                 #if os(macOS)
-                .modifier(
-                    MacTitlebarOverlapScrollModifier(
-                        enabled: isSplitLayout,
-                        contentTopInset: 74,
-                        hasContent: !cachedRenderBlocks.isEmpty
-                    )
-                )
+                .modifier(MacServerScrollEdgeModifier())
                 // A macOS TabView gives each tab its own framed content area.
                 // Keep compact chat rows inside that area instead of drawing
                 // over the native tab chrome; split layout keeps its existing
                 // edge-to-edge scroll rendering.
                 .scrollClipDisabled(isSplitLayout)
                 #else
+                .modifier(ChannelTopScrollEdgeModifier())
                 .scrollClipDisabled(true)
                 #endif
                 .background(
@@ -3353,7 +3347,7 @@ private struct TextInputBar: View {
                     .glassEffect(.regular.interactive().tint(sendButtonGlassTint), in: .circle)
                     .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, UIConstants.Spacing.paneHorizontalPadding)
             .padding(.vertical, 8)
         }
     }
@@ -3388,7 +3382,7 @@ private struct TextInputBar: View {
                 )
                 .shadow(color: inputControlShadowColor, radius: inputControlShadowRadius, x: 0, y: inputControlShadowYOffset)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, UIConstants.Spacing.paneHorizontalPadding)
         .padding(.vertical, 8)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))

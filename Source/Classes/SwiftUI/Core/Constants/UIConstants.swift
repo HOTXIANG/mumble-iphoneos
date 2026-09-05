@@ -14,6 +14,9 @@ enum UIConstants {
     // MARK: - Spacing
 
     enum Spacing {
+        /// 频道和聊天栏使用相同的左右内容边距
+        static let paneHorizontalPadding: CGFloat = 16.0
+
         /// 行与行之间的间隙
         #if os(macOS)
         static let rowSpacing: CGFloat = 6.0
