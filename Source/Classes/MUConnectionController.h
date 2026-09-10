@@ -41,5 +41,14 @@ extern NSString *MUCertificateTrustFailureNotification;
 @property (nonatomic, readonly) NSData *currentCertificateRef;
 
 @property (nonatomic, readonly) MKConnection *connection;
+/// Identifies a user connection request; automatic retries retain this value.
+@property (nonatomic, readonly) NSUInteger connectionRequestGeneration;
+/// Includes preparation, offline waiting and automatic recovery until cancellation.
+@property (nonatomic, readonly) BOOL hasConnectionIntent;
+/// Serializes local test and connection audio ownership changes.
+@property (nonatomic, readonly) dispatch_queue_t audioLifecycleQueue;
+#if DEBUG
+- (void)simulateNetworkPathSatisfied:(BOOL)satisfied interfaces:(NSUInteger)interfaces;
+#endif
 
 @end

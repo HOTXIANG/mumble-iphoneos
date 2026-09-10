@@ -123,6 +123,8 @@ extension ServerModelManager {
 
     /// 设置 access token 并尝试加入频道
     func submitPasswordAndJoin(channel: MKChannel, password: String) {
+        guard let model = serverModel, isCurrentServerModel(model),
+              model.channel(withId: channel.channelId()) === channel else { return }
         var tokens = currentAccessTokens
         if !tokens.contains(password) {
             tokens.append(password)
@@ -131,12 +133,16 @@ extension ServerModelManager {
         serverModel?.setAccessTokens(tokens)
 
         pendingPasswordChannelId = channel.channelId()
+        passwordJoinSequence &+= 1
+        let sequence = passwordJoinSequence
         markUserInitiatedJoin(channelId: channel.channelId())
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.serverModel?.join(channel)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-                self?.pendingPasswordChannelId = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, weak model] in
+            guard let self, let model, self.isCurrentServerModel(model), self.passwordJoinSequence == sequence else { return }
+            model.join(channel)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self, weak model] in
+                guard let self, let model, self.isCurrentServerModel(model), self.passwordJoinSequence == sequence else { return }
+                self.pendingPasswordChannelId = nil
             }
         }
     }
@@ -144,8 +150,10 @@ extension ServerModelManager {
     /// 标记用户主动加入某频道（外部调用）
     func markUserInitiatedJoin(channelId: UInt) {
         userInitiatedJoinChannelId = channelId
+        userInitiatedJoinSequence &+= 1
+        let sequence = userInitiatedJoinSequence
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            if self?.userInitiatedJoinChannelId == channelId {
+            if self?.userInitiatedJoinSequence == sequence {
                 self?.userInitiatedJoinChannelId = nil
             }
         }
@@ -155,10 +163,16 @@ extension ServerModelManager {
 
     /// 重连后恢复之前保存的监听频道
     func reRegisterListeningChannels() {
-        guard !savedListeningChannelIds.isEmpty else { return }
+        guard let model = serverModel, isCurrentServerModel(model),
+              !savedListeningChannelIds.isEmpty else { return }
+        guard savedListeningSessionScope == listeningSessionScope(for: model) else {
+            savedListeningChannelIds.removeAll()
+            savedListeningSessionScope = nil
+            return
+        }
         MumbleLogger.model.info("Re-registering \(savedListeningChannelIds.count) listening channels after reconnect")
         for channelId in savedListeningChannelIds {
-            if let channel = serverModel?.channel(withId: channelId) {
+            if let channel = model.channel(withId: channelId) {
                 startListening(to: channel)
                 MumbleLogger.model.debug("Re-registered listening on channel: \(channel.channelName() ?? "?")")
             } else {
@@ -170,6 +184,8 @@ extension ServerModelManager {
 
     /// 开始监听某频道（接收其音频，不加入）
     func startListening(to channel: MKChannel) {
+        guard let model = serverModel, isCurrentServerModel(model),
+              model.channel(withId: channel.channelId()) === channel else { return }
         let channelId = channel.channelId()
         let isAlreadyListening = listeningChannels.contains(channelId)
         let isPendingAdd = pendingListeningAdds.contains(channelId)
@@ -182,11 +198,13 @@ extension ServerModelManager {
         if isChannelCollapsed(Int(channelId)) {
             toggleChannelCollapse(Int(channelId))
         }
-        serverModel?.addListening(channel)
+        model.addListening(channel)
     }
 
     /// 停止监听某频道
     func stopListening(to channel: MKChannel) {
+        guard let model = serverModel, isCurrentServerModel(model),
+              model.channel(withId: channel.channelId()) === channel else { return }
         let channelId = channel.channelId()
         let isListening = listeningChannels.contains(channelId)
         let isPendingAdd = pendingListeningAdds.contains(channelId)
@@ -196,7 +214,8 @@ extension ServerModelManager {
         pendingListeningAdds.remove(channelId)
         pendingListeningRemoves.insert(channelId)
 
-        serverModel?.removeListening(channel)
+        savedListeningChannelIds.remove(channelId)
+        model.removeListening(channel)
     }
 
     /// 获取某频道的所有监听者用户对象

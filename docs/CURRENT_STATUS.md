@@ -1,8 +1,20 @@
 # Current Project Status
 
-Last updated: 2026-06-22
+Last updated: 2026-09-10
 
 This document is the short, current source of truth for recent audio, network, UI-performance, and automation changes. Older investigation notes are kept for history, but this file should be checked first when deciding expected behavior.
+
+## Voice and Connection Recovery (2026-09-10)
+
+See [VOICE_RECOVERY.md](VOICE_RECOVERY.md) for behavior, thresholds, reproducible tests, and remaining device validation.
+
+- Completed input/output callbacks determine audio health; either direction stalling for 5 seconds triggers a visible recovery state and graph rebuild.
+- Correlated heartbeat replies determine TCP/UDP round-trip health. Downlink traffic alone cannot hide an uplink failure; UDP falls back after 8 seconds and TCP reconnects after 30 seconds without valid replies.
+- Default path/interface updates no longer tear down an existing connection: only actual I/O failure or missing heartbeats trigger replacement. This fixes the phone's immediate `network changed` reconnect loop.
+- Offline waiting preserves retry capacity. Consecutive automatic failures wait at least 5/15/30/60/120/300 seconds; brief successful joins do not reset backoff, and path restoration cannot bypass cooldown. A session healthy for 60 seconds resets this failure streak on its next failure.
+- Connection generations and model identity checks isolate cancellation, certificate prompts, deferred registration, listening-channel restoration, and old transport callbacks.
+- Local test and call audio lifecycle actions share one serial queue; obsolete permission callbacks cannot reopen the microphone.
+- iOS and macOS integration builds, native fault tests, and macOS loopback/device recovery tests pass. Real iOS background and hardware transition acceptance remains outstanding.
 
 ## Audio Lifecycle
 

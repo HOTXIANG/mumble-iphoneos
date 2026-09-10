@@ -32,11 +32,6 @@ extension ServerModelManager {
 
         MumbleLogger.certificate.info("Certificate generated. Binding to favourite server")
 
-        DispatchQueue.main.async {
-            AppState.shared.isRegistering = true
-            AppState.shared.pendingRegistration = true
-        }
-
         // 4. 找到对应的 Favourite Server 条目并更新
         let rawFavs = MUDatabase.fetchAllFavourites() as? [Any] ?? []
         let allFavs = rawFavs.compactMap { $0 as? MUFavouriteServer }
@@ -58,8 +53,7 @@ extension ServerModelManager {
             }
         }
 
-        AppState.shared.pendingRegistration = true
-
+        let serverToConnect: MUFavouriteServer
         if let serverToUpdate = targetServer {
             serverToUpdate.certificateRef = newCertRef
             if serverToUpdate.userName == nil || serverToUpdate.userName!.isEmpty {
@@ -67,18 +61,7 @@ extension ServerModelManager {
             }
             MUDatabase.storeFavourite(serverToUpdate)
 
-            connectionController.disconnectFromServer()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                connectionController.connect(
-                    toHostname: serverToUpdate.hostName,
-                    port: UInt(serverToUpdate.port),
-                    withUsername: serverToUpdate.userName,
-                    andPassword: serverToUpdate.password,
-                    certificateRef: serverToUpdate.certificateRef,
-                    displayName: serverToUpdate.displayName
-                )
-            }
+            serverToConnect = serverToUpdate
         } else {
             // 如果不在收藏夹，新建一个
             // 注意：这里需要 DisplayName，我们还是得从 AppState 取一下作为新建收藏的默认名
@@ -97,18 +80,20 @@ extension ServerModelManager {
 
             MUDatabase.storeFavourite(newFav)
 
-            connectionController.disconnectFromServer()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                connectionController.connect(
-                    toHostname: newFav.hostName,
-                    port: UInt(newFav.port),
-                    withUsername: newFav.userName,
-                    andPassword: newFav.password,
-                    certificateRef: newFav.certificateRef,
-                    displayName: newFav.displayName
-                )
-            }
+            serverToConnect = newFav
         }
+
+        // 连接控制器统一管理切换延迟，取消后不会有独立的注册计时器复活旧会话。
+        AppState.shared.isRegistering = true
+        AppState.shared.pendingRegistration = true
+        AppState.shared.pendingRegistrationRequestGeneration = connectionController.connectionRequestGeneration &+ 1
+        connectionController.connect(
+            toHostname: serverToConnect.hostName,
+            port: UInt(serverToConnect.port),
+            withUsername: serverToConnect.userName,
+            andPassword: serverToConnect.password,
+            certificateRef: serverToConnect.certificateRef,
+            displayName: serverToConnect.displayName
+        )
     }
 }

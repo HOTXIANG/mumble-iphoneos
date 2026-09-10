@@ -12,7 +12,8 @@ import AVFAudio
 extension ServerModelManager {
     func setupServerModel() {
         guard let connectionController = MUConnectionController.existingShared(),
-              let model = connectionController.serverModel else {
+              let model = connectionController.serverModel,
+              model.connectedUser() != nil else {
             return
         }
 
@@ -32,6 +33,11 @@ extension ServerModelManager {
 
         MumbleLogger.connection.info("Binding new ServerModel...")
         self.serverModel = newModel
+        boundListeningSessionScope = listeningSessionScope(for: newModel)
+        if savedListeningSessionScope != boundListeningSessionScope {
+            savedListeningChannelIds.removeAll()
+            savedListeningSessionScope = nil
+        }
 
         let wrapper = ServerModelDelegateWrapper()
         newModel.addDelegate(wrapper)
@@ -93,6 +99,10 @@ extension ServerModelManager {
 
     func cleanup(preserveSessionActivities: Bool = false) {
         MumbleLogger.connection.info("ServerModelManager: CLEANUP (Data Only)")
+        pendingConnectionRestoreTask?.cancel()
+        pendingConnectionRestoreTask = nil
+        pendingModelRebuildWorkItem?.cancel()
+        pendingModelRebuildWorkItem = nil
         keepAliveTimer?.invalidate()
         keepAliveTimer = nil
         pendingAvatarRefreshTask?.cancel()
@@ -103,7 +113,25 @@ extension ServerModelManager {
         pendingPermissionScanFlushWorkItem = nil
 
         userVolumes.removeAll()
+        localNicknames.removeAll()
         previousMuteStates.removeAll()
+        wasMutedBeforeServerDeafen.removeAll()
+        currentAccessTokens.removeAll()
+        pendingPasswordChannelId = nil
+        userInitiatedJoinChannelId = nil
+        passwordJoinSequence &+= 1
+        userInitiatedJoinSequence &+= 1
+        audioRouteChangeSequence &+= 1
+        appDrivenSystemMuteSequence &+= 1
+        isScanningACLs = false
+        isRestoringMuteState = false
+        isApplyingAppDrivenSystemMute = false
+        savedMuteBeforeRestart = nil
+        savedDeafenBeforeRestart = nil
+        isInputSettingsPreviewOverrideActive = false
+        inputSettingsRestoreSystemMute = nil
+        serverImageMessageLengthBytes = nil
+        pendingOutgoingMessages.removeAll()
         channelsWithPassword.removeAll()
         channelsUserCanEnter.removeAll()
         channelPermissions.removeAll()
@@ -114,10 +142,14 @@ extension ServerModelManager {
         userAvatars.removeAll()
         userAvatarFingerprints.removeAll()
         pendingAvatarFetchSessions.removeAll()
-        // 保存当前监听频道以便重连后恢复
-        if !listeningChannels.isEmpty {
-            self.savedListeningChannelIds = listeningChannels
-            MumbleLogger.connection.debug("Saved \(self.savedListeningChannelIds.count) listening channels for reconnect")
+        // 将尚未确认的 add/remove 也算入用户意图，断线发生在回包前仍可正确恢复。
+        if let scope = boundListeningSessionScope {
+            let desired = listeningChannels.union(pendingListeningAdds).subtracting(pendingListeningRemoves)
+            if savedListeningSessionScope != scope || !listeningChannels.isEmpty || !pendingListeningAdds.isEmpty || !pendingListeningRemoves.isEmpty {
+                savedListeningChannelIds = desired
+                savedListeningSessionScope = scope
+                MumbleLogger.connection.debug("Saved \(savedListeningChannelIds.count) listening channels for reconnect")
+            }
         }
         listeningChannels.removeAll()
         channelListeners.removeAll()
@@ -129,6 +161,7 @@ extension ServerModelManager {
 
         self.delegateToken = nil
         self.serverModel = nil
+        boundListeningSessionScope = nil
         modelItems = []
         userIndexMap = [:]
         channelIndexMap = [:]
@@ -149,5 +182,17 @@ extension ServerModelManager {
             // 停止广播 Handoff Activity
             HandoffManager.shared.invalidateActivity()
         }
+    }
+
+    func isCurrentServerModel(_ model: MKServerModel) -> Bool {
+        isConnected && serverModel === model && MUConnectionController.existingShared()?.serverModel === model
+    }
+
+    func listeningSessionScope(for model: MKServerModel) -> ListeningSessionScope {
+        ListeningSessionScope(
+            hostname: (model.hostname() ?? "").lowercased(),
+            port: UInt(model.port()),
+            username: model.connectedUser()?.userName() ?? ""
+        )
     }
 }

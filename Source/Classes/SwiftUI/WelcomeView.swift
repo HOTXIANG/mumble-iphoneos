@@ -1016,6 +1016,10 @@ struct AppRootView: View {
     @StateObject private var channelNavigationManager = NavigationManager()
 
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
+    #if os(iOS)
+    // The disconnected two-column layout must not overwrite the connected three-column state.
+    @State private var iPadConnectedSplitVisibility: NavigationSplitViewVisibility = .doubleColumn
+    #endif
     #if os(macOS)
     @State private var splitVisibility: NavigationSplitViewVisibility = .all
     @StateObject private var macSplitRuntime = MacAppRootSplitRuntime()
@@ -1269,11 +1273,13 @@ struct AppRootView: View {
                 title: Text(title),
                 message: Text(body),
                 primaryButton: .default(Text(NSLocalizedString("Trust", comment: ""))) {
+                    guard info.isCurrent else { return }
                     MUConnectionController.shared()?.acceptCertificateTrust()
                 },
                 secondaryButton: .cancel {
                     InteractionFeedback.cancel()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        guard info.isCurrent else { return }
                         MUConnectionController.shared()?.rejectCertificateTrust()
                     }
                 }
@@ -1370,7 +1376,7 @@ struct AppRootView: View {
     }
 
     private var iPadConnectedRootLayout: some View {
-        ChannelListView(rootSplitVisibility: splitVisibilityBinding) {
+        ChannelListView(rootSplitVisibility: $iPadConnectedSplitVisibility) {
             sidebarNavigationStack
         }
         .environmentObject(channelNavigationManager)
@@ -1460,11 +1466,10 @@ struct AppRootView: View {
         // widths where the old and new minimum constraints cannot both fit.
         setSplitVisibility(isConnected ? .detailOnly : .all, animated: false)
         #else
-        // iPad keeps channels and chat visible in its three-column split while
-        // hiding the server sidebar. iPhone switches its root page directly.
-        let connectedVisibility: NavigationSplitViewVisibility =
-            UIDevice.current.userInterfaceIdiom == .pad ? .doubleColumn : .detailOnly
-        setSplitVisibility(isConnected ? connectedVisibility : .all, animated: false)
+        // Hide the server list in the connected iPad layout, keeping channels and chat.
+        // Its state is independent of the outgoing welcome split view.
+        iPadConnectedSplitVisibility = .doubleColumn
+        setSplitVisibility(isConnected ? .detailOnly : .all, animated: false)
         #endif
     }
 
@@ -1626,7 +1631,9 @@ struct AppRootView: View {
         case "error":
             appState.activeError = nil
         case "certTrust":
-            MUConnectionController.shared()?.rejectCertificateTrust()
+            if appState.pendingCertTrust?.isCurrent == true {
+                MUConnectionController.shared()?.rejectCertificateTrust()
+            }
             appState.pendingCertTrust = nil
         case "imagePreview":
             #if os(iOS)

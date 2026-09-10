@@ -13,6 +13,7 @@ extension ServerModelManager {
 
     /// 进入设置界面时调用：临时开启麦克风
     func startAudioTest() {
+        localAudioTestRequested = true
         if isLocalAudioTestRunning {
             if MKAudio.shared().isRunning() {
                 return
@@ -47,7 +48,7 @@ extension ServerModelManager {
         #endif
 
         // 连接中但无需临时覆盖时，不启动本地测试引擎
-        if self.isConnected {
+        if self.isConnected || MUConnectionController.existingShared()?.hasConnectionIntent == true {
             return
         }
 
@@ -62,7 +63,8 @@ extension ServerModelManager {
                 Task { @MainActor in
                     guard let self = self else { return }
                     self.isRequestingMicrophonePermission = false
-                    guard granted, !self.isConnected else { return }
+                    guard granted, self.localAudioTestRequested, !self.isConnected,
+                          MUConnectionController.existingShared()?.hasConnectionIntent != true else { return }
                     if self.isLocalAudioTestRunning {
                         guard !MKAudio.shared().isRunning() else { return }
                         self.isLocalAudioTestRunning = false
@@ -86,6 +88,10 @@ extension ServerModelManager {
             MumbleLogger.audio.debug("Keeping Local Audio running while transitioning from input settings to VAD onboarding")
             return
         }
+        // 权限弹窗尚未返回时 running 仍为 false，也必须撤销页面的开麦请求。
+        localAudioTestRequested = false
+        localAudioTestStartSequence &+= 1
+        isLocalAudioTestStarting = false
 
         #if os(iOS)
         if isInputSettingsPreviewOverrideActive {
@@ -109,14 +115,13 @@ extension ServerModelManager {
         }
 
         let connectionController = MUConnectionController.existingShared()
-        let connectionInProgressOrActive = connectionController?.isConnected() ?? false
+        let connectionInProgressOrActive = connectionController?.hasConnectionIntent ?? false
         
         // 如果当前连接着服务器，绝对不能关麦，否则通话断了
         if self.isConnected || connectionInProgressOrActive {
             // We're leaving local test mode; do not stop engine when server connection is active/starting.
             isLocalAudioTestRunning = false
             isLocalAudioTestStarting = false
-            localAudioTestStartSequence &+= 1
             MumbleLogger.audio.debug("Connection active/in-progress, keeping audio engine running")
             return
         }
@@ -124,26 +129,21 @@ extension ServerModelManager {
         MumbleLogger.audio.info("Stopping Local Audio (Settings closed)")
         isLocalAudioTestRunning = false
         isLocalAudioTestStarting = false
-        localAudioTestStartSequence &+= 1
         #if os(iOS)
         restoreLocalAudioTestSystemMuteIfNeeded()
         #endif
-        // 关闭引擎并释放 AudioSession
-        Task.detached(priority: .userInitiated) {
-            if MUConnectionController.existingShared()?.isConnected() == true {
-                // A server connection was started right after dismissal; keep engine alive.
-                return
+        // 本地 start/stop 串行执行，关闭页后排队中的旧 start 不得再次打开麦克风。
+        MUConnectionController.shared()?.audioLifecycleQueue.async { [weak self] in
+            let shouldStop = DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    guard let self else { return false }
+                    return !self.localAudioTestRequested
+                        && MUConnectionController.existingShared()?.hasConnectionIntent != true
+                }
             }
+            guard shouldStop else { return }
+            // MKAudio 在自己的图队列上负责停用 AVAudioSession。
             MKAudio.shared().stop()
-
-            #if os(iOS)
-            // 显式停用 Session 以消除橙色点
-            do {
-                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            } catch {
-                MumbleLogger.audio.warning("Failed to deactivate session: \(error)")
-            }
-            #endif
         }
     }
 
@@ -171,7 +171,8 @@ extension ServerModelManager {
     }
 
     private func startLocalAudioEngineForSettings() {
-        guard !isLocalAudioTestStarting else { return }
+        guard localAudioTestRequested, !isLocalAudioTestStarting,
+              MUConnectionController.existingShared()?.hasConnectionIntent != true else { return }
 
         MumbleLogger.audio.info("Starting Local Audio for Settings/Testing")
         isLocalAudioTestRunning = true
@@ -181,9 +182,17 @@ extension ServerModelManager {
         #if os(iOS)
         captureLocalAudioTestSystemMuteStateIfNeeded()
         #endif
-        Task.detached(priority: .userInitiated) { [weak self] in
+        MUConnectionController.shared()?.audioLifecycleQueue.async { [weak self] in
+            let shouldStart = DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    guard let self else { return false }
+                    return self.localAudioTestRequested && self.localAudioTestStartSequence == startSequence
+                        && MUConnectionController.existingShared()?.hasConnectionIntent != true
+                }
+            }
+            guard shouldStart else { return }
             MKAudio.shared().start()
-            await MainActor.run { [weak self] in
+            Task { @MainActor [weak self] in
                 guard let self, self.localAudioTestStartSequence == startSequence else { return }
                 self.isLocalAudioTestStarting = false
                 guard self.isLocalAudioTestRunning else { return }
@@ -257,9 +266,10 @@ extension ServerModelManager {
 
     func restoreAllUserPreferences() {
         MumbleLogger.model.info("Restoring preferences for ALL users")
-        guard let root = serverModel?.rootChannel() else { return }
-        Task { @MainActor in
-            await recursiveRestore(channel: root)
+        guard let model = serverModel, isCurrentServerModel(model), let root = model.rootChannel() else { return }
+        Task { @MainActor [weak self, weak model] in
+            guard let self, let model, self.isCurrentServerModel(model) else { return }
+            await self.recursiveRestore(channel: root, model: model)
         }
     }
 
@@ -279,7 +289,7 @@ extension ServerModelManager {
     /// 连接后扫描所有频道的权限，检测哪些频道限制进入
     /// 使用 PermissionQuery（所有用户可用），而非 ACL 查询（仅管理员可用）
     func scanAllChannelPermissions() {
-        guard let root = serverModel?.rootChannel() else {
+        guard let model = serverModel, isCurrentServerModel(model), let root = model.rootChannel() else {
             MumbleLogger.model.warning("scanAllChannelPermissions: No root channel available")
             return
         }
@@ -288,8 +298,8 @@ extension ServerModelManager {
         MumbleLogger.model.info("scanAllChannelPermissions: Requested permissions for \(count) channels")
 
         // 只有拥有 Write 权限的用户（管理员）才额外请求 ACL 来区分密码频道和纯权限限制频道
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let self = self else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self, weak model] in
+            guard let self, let model, self.isCurrentServerModel(model) else { return }
             if self.hasRootPermission(MKPermissionWrite) {
                 var aclCount = 0
                 self.recursiveRequestACL(channel: root, count: &aclCount)
@@ -300,8 +310,8 @@ extension ServerModelManager {
         }
 
         // 延迟后关闭扫描标记（给服务器足够时间响应）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-            guard let self = self else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self, weak model] in
+            guard let self, let model, self.isCurrentServerModel(model) else { return }
             self.flushPendingPermissionScanUpdates(reason: "permission_scan_finished")
             self.isScanningACLs = false
         }
@@ -333,7 +343,8 @@ extension ServerModelManager {
         }
     }
 
-    private func recursiveRestore(channel: MKChannel) async {
+    private func recursiveRestore(channel: MKChannel, model: MKServerModel) async {
+        guard !Task.isCancelled, isCurrentServerModel(model) else { return }
         if let users = channel.users() as? [MKUser] {
             for user in users {
                 applySavedUserPreferences(user: user)
@@ -344,13 +355,15 @@ extension ServerModelManager {
 
         if let subs = channel.channels() as? [MKChannel] {
             for sub in subs {
-                await recursiveRestore(channel: sub)
+                await recursiveRestore(channel: sub, model: model)
             }
         }
     }
 
     func applySavedUserPreferences(user: MKUser) {
-        guard let serverHost = serverModel?.hostname(),
+        guard let model = serverModel, isCurrentServerModel(model),
+              model.user(withSession: user.session()) === user,
+              let serverHost = model.hostname(),
               let name = user.userName() else { return }
 
         if let connectedUser = serverModel?.connectedUser(),

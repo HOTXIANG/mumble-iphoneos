@@ -16,6 +16,7 @@ extension Notification.Name {
     static let muMessageSendFailed    = Notification.Name("MUMessageSendFailed")
 
     static let mkAudioDidRestart         = Notification.Name("MKAudioDidRestartNotification")
+    static let mkAudioHealthChanged      = Notification.Name("MKAudioHealthChangedNotification")
     static let mkAudioError              = Notification.Name("MKAudioErrorNotification")
     static let mkListeningChannelAdd     = Notification.Name("MKListeningChannelAddNotification")
     static let mkListeningChannelRemove  = Notification.Name("MKListeningChannelRemoveNotification")
@@ -93,6 +94,14 @@ struct CertTrustInfo: Identifiable {
     let notBefore: String
     let notAfter: String
     let isChanged: Bool
+    let requestGeneration: UInt
+    let connection: MKConnection
+
+    @MainActor var isCurrent: Bool {
+        guard let controller = MUConnectionController.existingShared() else { return false }
+        return controller.hasConnectionIntent && controller.connectionRequestGeneration == requestGeneration
+            && controller.connection === connection
+    }
 }
 
 @objc class CertTrustBridge: NSObject {
@@ -107,7 +116,14 @@ struct CertTrustInfo: Identifiable {
         let notAfter    = info["notAfter"]    as? String ?? "—"
         let isChanged   = (info["isChanged"]  as? NSNumber)?.boolValue ?? false
 
+        guard let generation = (info["requestGeneration"] as? NSNumber)?.uintValue,
+              let connection = info["connection"] as? MKConnection else { return }
+        let connectionID = ObjectIdentifier(connection)
         DispatchQueue.main.async {
+            guard let controller = MUConnectionController.existingShared(),
+                  controller.hasConnectionIntent, controller.connectionRequestGeneration == generation,
+                  let currentConnection = controller.connection,
+                  ObjectIdentifier(currentConnection) == connectionID else { return }
             let state = AppState.shared
             state.isConnecting = false
             state.pendingCertTrust = CertTrustInfo(
@@ -115,7 +131,7 @@ struct CertTrustInfo: Identifiable {
                 subjectName: subjectName, issuerName: issuerName,
                 fingerprint: fingerprint,
                 notBefore: notBefore, notAfter: notAfter,
-                isChanged: isChanged
+                isChanged: isChanged, requestGeneration: generation, connection: currentConnection
             )
             MumbleLogger.certificate.info("CertTrustBridge: isConnecting=\(state.isConnecting) pendingCertTrust=\(state.pendingCertTrust != nil ? "set" : "nil")")
         }
@@ -132,6 +148,7 @@ class AppState: ObservableObject {
     
     @Published var isConnected: Bool = false
     @Published var isConnecting: Bool = false
+    @Published var voiceHealthMessage: String? = nil
     @Published var isReconnecting: Bool = false
     @Published var reconnectAttempt: Int = 0
     @Published var reconnectMaxAttempts: Int = 0
@@ -143,6 +160,7 @@ class AppState: ObservableObject {
     @Published var isRegistering: Bool = false
     
     var pendingRegistration = false
+    var pendingRegistrationRequestGeneration: UInt?
     
     // --- 核心修改：添加一个属性来临时存储服务器的显示名称 ---
     @Published var serverDisplayName: String? = nil
@@ -203,6 +221,16 @@ class AppState: ObservableObject {
         #endif
     }
     
+    private func isCurrentConnectionNotification(_ notification: Notification) -> Bool {
+        guard let generation = notification.userInfo?["requestGeneration"] as? NSNumber else { return true }
+        guard let controller = MUConnectionController.existingShared() else { return false }
+        guard generation.uintValue == controller.connectionRequestGeneration else { return false }
+        if let connection = notification.userInfo?["connection"] as? MKConnection {
+            return connection === controller.connection
+        }
+        return true
+    }
+
     private func setupObservers() {
         let center = NotificationCenter.default
         
@@ -210,8 +238,9 @@ class AppState: ObservableObject {
         center.publisher(for: .muConnectionOpened)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
-                guard let self = self else { return }
+                guard let self = self, self.isCurrentConnectionNotification(notification) else { return }
                 
+                let openedConnection = MUConnectionController.shared()?.connection
                 MumbleLogger.connection.info("Connection opened")
                 self.suppressNextUDPAvailableToast = true
                 self.lastUDPTransientToastAt = .distantPast
@@ -220,17 +249,21 @@ class AppState: ObservableObject {
                     self.serverDisplayName = displayName
                 }
                 
-                if self.pendingRegistration {
+                if self.pendingRegistration,
+                   self.pendingRegistrationRequestGeneration == (notification.userInfo?["requestGeneration"] as? NSNumber)?.uintValue {
                     MumbleLogger.connection.info("Reconnection successful, executing pending registration")
                     
                     // 延迟 0.5 秒确保连接稳定
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        guard self.isCurrentConnectionNotification(notification),
+                              openedConnection === MUConnectionController.shared()?.connection else { return }
                         if let model = MUConnectionController.shared()?.serverModel {
                             // 发送 Mumble 协议的注册指令
                             model.registerConnectedUser()
                         }
                         // 重置标记
                         self.pendingRegistration = false
+                        self.pendingRegistrationRequestGeneration = nil
                         
                         withAnimation {
                             self.isRegistering = false
@@ -253,8 +286,13 @@ class AppState: ObservableObject {
                 }
                 #endif
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    guard self.isCurrentConnectionNotification(notification),
+                          openedConnection === MUConnectionController.shared()?.connection else { return }
                     withAnimation(.easeOut(duration: 0.3)) {
                         self.isConnecting = false
+                        self.isReconnecting = false
+                        self.reconnectAttempt = 0
+                        self.reconnectReason = nil
                     }
                 }
             }
@@ -263,15 +301,16 @@ class AppState: ObservableObject {
         // 2. 监听连接断开
         center.publisher(for: .muConnectionClosed)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self = self else { return }
+            .sink { [weak self] notification in
+                guard let self = self, self.isCurrentConnectionNotification(notification) else { return }
     
-                if self.isRegistering {
-                    MumbleLogger.connection.debug("Keeping UI alive for registration (ignoring disconnect)")
-                    return
-                }
+                self.isRegistering = false
+                self.pendingRegistration = false
+                self.pendingRegistrationRequestGeneration = nil
+                self.pendingCertTrust = nil
                 
                 MumbleLogger.connection.info("Connection closed")
+                self.voiceHealthMessage = nil
                 self.isConnecting = false
                 self.isReconnecting = false
                 self.reconnectAttempt = 0
@@ -291,9 +330,14 @@ class AppState: ObservableObject {
         center.publisher(for: .muConnectionConnecting)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
-                guard let self = self else { return }
+                guard let self = self, self.isCurrentConnectionNotification(notification) else { return }
                 // 如果正在注册，不需要显示常规的 Connecting 状态，因为会有遮罩
-                if self.isRegistering { return }
+                if self.isRegistering,
+                   self.pendingRegistrationRequestGeneration == (notification.userInfo?["requestGeneration"] as? NSNumber)?.uintValue { return }
+                self.isRegistering = false
+                self.pendingRegistration = false
+                self.pendingRegistrationRequestGeneration = nil
+                self.pendingCertTrust = nil
                 
                 let isReconnecting = (notification.userInfo?["isReconnecting"] as? Bool) ?? false
                 let reconnectAttempt =
@@ -321,8 +365,9 @@ class AppState: ObservableObject {
         center.publisher(for: .muConnectionError)
             .receive(on: RunLoop.main)
             .sink { [weak self] notification in
-                guard let self = self else { return }
+                guard let self = self, self.isCurrentConnectionNotification(notification) else { return }
                 
+                self.voiceHealthMessage = nil
                 self.isConnecting = false
                 self.isReconnecting = false
                 self.reconnectAttempt = 0
@@ -331,6 +376,9 @@ class AppState: ObservableObject {
                 self.isConnected = false
                 self.isUserAuthenticated = false
                 self.pendingRegistration = false
+                self.pendingRegistrationRequestGeneration = nil
+                self.isRegistering = false
+                self.pendingCertTrust = nil
                 // 解析 ObjC 传来的 userInfo
                 if let userInfo = notification.userInfo,
                    let title = userInfo["title"] as? String,
@@ -341,6 +389,24 @@ class AppState: ObservableObject {
             }
             .store(in: &cancellables)
         
+        center.publisher(for: .mkAudioHealthChanged)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                let state = notification.userInfo?["state"] as? String ?? "unavailable"
+                switch state {
+                case "healthy", "stopped":
+                    self.voiceHealthMessage = nil
+                case "interrupted":
+                    self.voiceHealthMessage = NSLocalizedString("Voice is interrupted by the system. Waiting to resume…", comment: "Voice health")
+                case "unavailable":
+                    self.voiceHealthMessage = NSLocalizedString("Voice is unavailable. Check microphone access and your audio device.", comment: "Voice health")
+                default:
+                    self.voiceHealthMessage = NSLocalizedString("Voice is recovering. You may not be heard or hear others yet.", comment: "Voice health")
+                }
+            }
+            .store(in: &cancellables)
+
         // Certificate trust failure is now handled directly via CertTrustBridge.handleTrustFailure(_:)
 
         center.publisher(for: .muConnectionUDPTransportStatus)

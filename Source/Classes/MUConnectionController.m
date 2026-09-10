@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 #import "MUConnectionController.h"
+#import "MUConnectionRecoveryPolicy.h"
 #import "MUCertificateController.h"
 #import "MUCertificateChainBuilder.h"
 #import "MUDatabase.h"
@@ -16,8 +17,11 @@
 #import <UserNotifications/UserNotifications.h>
 #import <Network/Network.h>
 #import <QuartzCore/QuartzCore.h>
+#include <math.h>
 #if TARGET_OS_IOS
 #import <UIKit/UIKit.h>
+#else
+#import <AppKit/AppKit.h>
 #endif
 @import Security;
 
@@ -121,8 +125,10 @@ static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
     
     BOOL            _isUserInitiatedDisconnect;
     BOOL            _waitingForCertDecision;
-    NSTimer         *_reconnectTimer;
     NSUInteger      _reconnectGeneration;
+    NSUInteger      _connectionRequestGeneration;
+    BOOL            _connectionDesired;
+    BOOL            _connectionSetupInProgress;
     NSInteger       _retryCount; // 重试计数器
     NSDictionary    *_pendingReconnectFailureInfo;
     BOOL            _suppressReconnectForDisconnect;
@@ -146,11 +152,19 @@ static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
     
     nw_path_monitor_t _pathMonitor;
     BOOL              _networkWasSatisfied;
+    BOOL              _networkPathKnown;
+    NSUInteger        _networkInterfaceMask;
+    NSUInteger        _networkMonitorGeneration;
+    uint32_t          _recoveryFailureStreak;
+    CFTimeInterval    _lastJoinedAt;
+    CFTimeInterval    _nextReconnectAllowedAt;
 }
 - (void) establishConnection;
-- (void) establishConnectionForGeneration:(NSUInteger)generation;
+- (void)handleNetworkPathSatisfied:(BOOL)satisfied interfaces:(NSUInteger)interfaces;
+- (void) establishConnectionForGeneration:(NSUInteger)generation hostname:(NSString *)hostname port:(NSUInteger)port certificateRef:(NSData *)certificateRef;
 - (BOOL) isCurrentConnectionSetupGeneration:(NSUInteger)generation;
 - (void) teardownConnection;
+- (void) teardownConnectionPostingClosed:(BOOL)postClosed;
 - (void) applyNetworkForceTCPSetting;
 - (void) applyNetworkQoSSetting;
 - (void) showConnectingView;
@@ -167,6 +181,9 @@ static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
 - (void) loadSavedMuteStateForUsername:(NSString *)username;
 - (void) applyCachedMuteStateToAudio;
 - (BOOL) loadSavedBoolForKey:(NSString *)key value:(BOOL *)value;
+- (void) postConnectionNotification:(NSString *)name userInfo:(NSDictionary *)info;
+- (void) recoverConnectionAfterWake:(NSNotification *)notification;
+- (void) discardCurrentTransport;
 #if TARGET_OS_IOS
 - (void) beginReconnectBackgroundTask;
 - (void) endReconnectBackgroundTask;
@@ -178,6 +195,7 @@ static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
 @synthesize currentCertificateRef = _certificateRef; // 将内部变量 _certificateRef 暴露为只读属性
 
 @synthesize connection = _connection;
+@synthesize connectionRequestGeneration = _connectionRequestGeneration;
 
 static MUConnectionController *sSharedConnectionController;
 
@@ -219,14 +237,29 @@ static MUConnectionController *sSharedConnectionController;
                                                  selector:@selector(defaultsDidChange:)
                                                      name:NSUserDefaultsDidChangeNotification
                                                    object:nil];
+#if TARGET_OS_IOS
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(recoverConnectionAfterWake:)
+                                                     name:UIApplicationDidBecomeActiveNotification object:nil];
+#else
+        [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self selector:@selector(recoverConnectionAfterWake:)
+                                                                  name:NSWorkspaceDidWakeNotification object:nil];
+#endif
     }
     return self;
 }
 
 - (void) defaultsDidChange:(NSNotification *)notification {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self defaultsDidChange:notification]; });
+        return;
+    }
     (void)notification;
     [self applyNetworkForceTCPSetting];
     [self applyNetworkQoSSetting];
+    id autoReconnect = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
+    if (autoReconnect && ![autoReconnect boolValue] && _connectFlowIsReconnect && [_serverModel connectedUser] == nil) {
+        [self disconnectFromServer];
+    }
 }
 
 - (MKServerModel *)serverModel {
@@ -239,18 +272,26 @@ static MUConnectionController *sSharedConnectionController;
               andPassword:(NSString *)password
            certificateRef:(NSData *)certRef
               displayName:(NSString *)displayName {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self connectToHostname:hostName port:port withUsername:userName andPassword:password certificateRef:certRef displayName:displayName];
+        });
+        return;
+    }
     
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
     @synchronized (self) {
         _connectionSetupGeneration++;
     }
     
-    BOOL wasConnected = (_connection != nil || _serverModel != nil);
+    BOOL wasConnected = (_connectionDesired || _connection != nil || _serverModel != nil);
+    NSUInteger previousRequest = _connectionRequestGeneration;
     
     if (wasConnected) {
         MULogInfo(Connection, @"Switching servers: Force disconnecting previous session...");
         // 模拟用户点击断开：这会停止线程、发送 Bye 消息、清理状态
         [self disconnectFromServer];
+        if (_connectionRequestGeneration != previousRequest) return;
     }
     
     _hostname = [hostName copy];
@@ -259,16 +300,30 @@ static MUConnectionController *sSharedConnectionController;
     _password = [password copy];
     _certificateRef = [certRef copy];
     _displayName = [displayName copy];
+    _connectionRequestGeneration++;
+    _connectionDesired = YES;
+    _isUserInitiatedDisconnect = NO;
+    _waitingForCertDecision = NO;
+    _reconnectGeneration++;
     
     // 重置重试计数
     _retryCount = 0;
     _pendingReconnectFailureInfo = nil;
+    _recoveryFailureStreak = 0;
+    _lastJoinedAt = 0;
+    _nextReconnectAllowedAt = 0;
     _suppressReconnectForDisconnect = NO;
     _preserveAudioSessionForReconnect = NO;
     _hasJoinedServerForCurrentSession = NO;
     [self beginPerformanceConnectFlowIsReconnect:NO attempt:0 reason:@"manual-connect"];
     
-    [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil];
+    [self postConnectionNotification:MUConnectionConnectingNotification userInfo:nil];
+    if (_connectionRequestGeneration != previousRequest + 1 || !_connectionDesired) return;
+    if (hostName.length == 0 || port == 0 || port > UINT16_MAX || userName.length == 0) {
+        [self postErrorWithTitle:NSLocalizedString(@"Connection Failed", nil) message:NSLocalizedString(@"Invalid server address or username", nil)];
+        return;
+    }
+    [self startNetworkMonitor];
     
     if (wasConnected) {
         MULogDebug(Connection, @"Waiting 0.5s for socket cleanup...");
@@ -280,10 +335,22 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 - (BOOL) isConnected {
-    return _connection != nil;
+    return _connection != nil && [_serverModel connectedUser] != nil;
+}
+
+- (BOOL) hasConnectionIntent {
+    return _connectionDesired;
+}
+
+- (dispatch_queue_t) audioLifecycleQueue {
+    return _audioLifecycleQueue;
 }
 
 - (void) disconnectFromServer {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self disconnectFromServer]; });
+        return;
+    }
     MULogInfo(Connection, @"User initiated disconnect/cancel.");
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
     @synchronized (self) {
@@ -292,10 +359,6 @@ static MUConnectionController *sSharedConnectionController;
     _isUserInitiatedDisconnect = YES;
     _suppressReconnectForDisconnect = NO;
     _preserveAudioSessionForReconnect = NO;
-    if ([_reconnectTimer isValid]) {
-        [_reconnectTimer invalidate];
-    }
-    _reconnectTimer = nil;
     _reconnectGeneration++;
     
     if (_connection) {
@@ -316,7 +379,7 @@ static MUConnectionController *sSharedConnectionController;
                                                      message:msg
                                               preferredStyle:UIAlertControllerStyleAlert];
     [_alertCtrl addAction: [UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil) style:UIAlertActionStyleCancel handler:^(UIAlertAction * _Nonnull action) {
-            [self teardownConnection];
+            [self disconnectFromServer];
     }]];
     
     if (_parentViewController) {
@@ -362,65 +425,103 @@ static MUConnectionController *sSharedConnectionController;
 #endif
 }
 
+- (void) postConnectionNotification:(NSString *)name userInfo:(NSDictionary *)info {
+    NSMutableDictionary *payload = [NSMutableDictionary dictionaryWithDictionary:info ?: @{}];
+    payload[@"requestGeneration"] = @(_connectionRequestGeneration);
+    [[NSNotificationCenter defaultCenter] postNotificationName:name object:self userInfo:payload];
+}
+
 - (void) startNetworkMonitor {
     if (_pathMonitor) return;
-    
     _pathMonitor = nw_path_monitor_create();
     nw_path_monitor_set_queue(_pathMonitor, dispatch_get_main_queue());
-    _networkWasSatisfied = YES;
-    
+    _networkPathKnown = NO;
+    NSUInteger generation = ++_networkMonitorGeneration;
     __weak typeof(self) weakSelf = self;
     nw_path_monitor_set_update_handler(_pathMonitor, ^(nw_path_t path) {
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        
-        BOOL isSatisfied = (nw_path_get_status(path) == nw_path_status_satisfied);
-        
-        if (!strongSelf->_networkWasSatisfied && isSatisfied) {
-            MULogInfo(Connection, @"Network restored.");
-            NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
-            BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
-            
-            // 网络恢复后，如果当前没有连接或连接已断开，并且启用了自动重连，则触发重连
-            if (autoReconnectEnabled && strongSelf->_connection == nil && strongSelf->_hostname != nil && !strongSelf->_isUserInitiatedDisconnect) {
-                MULogInfo(Connection, @"Triggering reconnect due to network restore...");
-                strongSelf->_retryCount = 0;
-                strongSelf->_preserveAudioSessionForReconnect = YES;
-                strongSelf->_reconnectGeneration++;
-                [strongSelf beginPerformanceConnectFlowIsReconnect:YES attempt:1 reason:@"network-restored"];
-                [strongSelf establishConnection];
-                NSDictionary *info = @{
-                    @"isReconnecting": @(YES),
-                    @"reconnectAttempt": @(1),
-                    @"reconnectMaxAttempts": @([strongSelf configuredReconnectMaxAttempts]),
-                    @"reconnectReason": NSLocalizedString(@"Network changed or temporarily unavailable", nil)
-                };
-                [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil userInfo:info];
-            }
-        }
-        
-        strongSelf->_networkWasSatisfied = isSatisfied;
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || generation != self->_networkMonitorGeneration || !self->_connectionDesired) return;
+        BOOL satisfied = nw_path_get_status(path) == nw_path_status_satisfied;
+        NSUInteger interfaces = (nw_path_uses_interface_type(path, nw_interface_type_wifi) ? 1 : 0)
+            | (nw_path_uses_interface_type(path, nw_interface_type_cellular) ? 2 : 0)
+            | (nw_path_uses_interface_type(path, nw_interface_type_wired) ? 4 : 0)
+            | (nw_path_uses_interface_type(path, nw_interface_type_other) ? 8 : 0);
+        [self handleNetworkPathSatisfied:satisfied interfaces:interfaces];
     });
-    
     nw_path_monitor_start(_pathMonitor);
 }
 
+- (void)handleNetworkPathSatisfied:(BOOL)satisfied interfaces:(NSUInteger)interfaces {
+    BOOL restored = _networkPathKnown && !_networkWasSatisfied && satisfied;
+    BOOL changed = _networkPathKnown && (_networkWasSatisfied != satisfied || _networkInterfaceMask != interfaces);
+    _networkPathKnown = YES;
+    _networkWasSatisfied = satisfied;
+    _networkInterfaceMask = interfaces;
+    if (!_connectionDesired || _waitingForCertDecision) return;
+    if (_connection) {
+        // The default route is advisory, not the state of this TLS socket.
+        // Keep even an "unsatisfied" path's existing connection until socket I/O
+        // or correlated heartbeats prove failure. Probing already runs every 5s.
+        if (changed) MULogInfo(Connection, @"Network path changed (satisfied=%@ interfaces=%lu); retaining transport pending I/O health.",
+            satisfied ? @"yes" : @"no", (unsigned long)interfaces);
+        return;
+    }
+    if (restored && !_connectionSetupInProgress) {
+        MULogInfo(Connection, @"Network restored; resuming pending connection within retry cooldown.");
+        [self scheduleReconnectAfterDelay:0.25];
+    }
+}
+
+#if DEBUG
+- (void)simulateNetworkPathSatisfied:(BOOL)satisfied interfaces:(NSUInteger)interfaces {
+    BOOL known = _networkPathKnown, wasSatisfied = _networkWasSatisfied;
+    NSUInteger previousInterfaces = _networkInterfaceMask;
+    [self handleNetworkPathSatisfied:satisfied interfaces:interfaces];
+    // Do not leave synthetic reachability in place after a local test.
+    _networkPathKnown = known;
+    _networkWasSatisfied = wasSatisfied;
+    _networkInterfaceMask = previousInterfaces;
+}
+#endif
+
 - (void) stopNetworkMonitor {
+    _networkMonitorGeneration++;
+    _networkPathKnown = NO;
     if (_pathMonitor) {
         nw_path_monitor_cancel(_pathMonitor);
         _pathMonitor = nil;
     }
 }
 
-- (void) establishConnection {
-    NSUInteger setupGeneration = 0;
-    @synchronized (self) {
-        _connectionSetupGeneration++;
-        setupGeneration = _connectionSetupGeneration;
+- (void) recoverConnectionAfterWake:(NSNotification *)notification {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self recoverConnectionAfterWake:notification]; });
+        return;
     }
+    if (!_connectionDesired || _waitingForCertDecision) return;
+    // A resumed run loop runs the transport watchdog. Do not destroy a healthy call merely on activation.
+    if (!_connection && !_connectionSetupInProgress) {
+        [self scheduleReconnectAfterDelay:0.25];
+    }
+}
 
+- (void) establishConnection {
+    if (!_connectionDesired || _isUserInitiatedDisconnect || _waitingForCertDecision
+        || _connection || _connectionSetupInProgress) return;
+    if (_networkPathKnown && !_networkWasSatisfied) {
+        MULogInfo(Connection, @"Waiting for a usable network path without consuming a retry.");
+        return;
+    }
+    _connectionSetupInProgress = YES;
+    NSUInteger setupGeneration;
+    @synchronized (self) {
+        setupGeneration = ++_connectionSetupGeneration;
+    }
+    NSString *hostname = [_hostname copy];
+    NSData *certificateRef = [_certificateRef copy];
+    NSUInteger port = _port;
     dispatch_async(_connectionSetupQueue, ^{
-        [self establishConnectionForGeneration:setupGeneration];
+        [self establishConnectionForGeneration:setupGeneration hostname:hostname port:port certificateRef:certificateRef];
     });
 }
 
@@ -430,59 +531,12 @@ static MUConnectionController *sSharedConnectionController;
     }
 }
 
-- (void) establishConnectionForGeneration:(NSUInteger)generation {
+- (void) establishConnectionForGeneration:(NSUInteger)generation hostname:(NSString *)hostname port:(NSUInteger)port certificateRef:(NSData *)certificateRef {
     @autoreleasepool {
-        if (![self isCurrentConnectionSetupGeneration:generation]) {
-            return;
-        }
-
-        NSString *hostname = nil;
-        NSString *username = nil;
-        NSString *password = nil;
-        NSData *certificateRef = nil;
-        NSUInteger port = 0;
-        @synchronized (self) {
-            if (generation != _connectionSetupGeneration) {
-                return;
-            }
-            _isUserInitiatedDisconnect = NO;
-            _waitingForCertDecision = NO;
-            hostname = [_hostname copy];
-            username = [_username copy];
-            password = [_password copy];
-            certificateRef = [_certificateRef copy];
-            port = _port;
-        }
-
-        if (!hostname || [hostname length] == 0) {
-            return;
-        }
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([self isCurrentConnectionSetupGeneration:generation]) {
-                [self startNetworkMonitor];
-            }
-        });
-
+        if (![self isCurrentConnectionSetupGeneration:generation]) return;
+        // Prepare expensive keychain material in isolation. Publish the pair atomically on the main queue.
         MKConnection *connection = [[MKConnection alloc] init];
-        [connection setDelegate:self];
-        @synchronized (self) {
-            if (generation != _connectionSetupGeneration || _isUserInitiatedDisconnect) {
-                [connection setDelegate:nil];
-                return;
-            }
-            _connection = connection;
-        }
-
-        [self applyNetworkForceTCPSetting];
-        [self applyNetworkQoSSetting];
         [connection setIgnoreSSLVerification:NO];
-
-        _serverModel = [[MKServerModel alloc] initWithConnection:connection];
-        [_serverModel addDelegate:self];
-        [self loadSavedMuteStateForUsername:username];
-        [self applyCachedMuteStateToAudio];
-
         if (certificateRef != nil) {
             NSArray *certChain = MUIdentityBackedChainForPersistentRef(certificateRef, @"server-specific");
             if (certChain && certChain.count > 0) {
@@ -518,32 +572,32 @@ static MUConnectionController *sSharedConnectionController;
             }
         }
 
-        if (![self isCurrentConnectionSetupGeneration:generation]) {
-            [connection setDelegate:nil];
-            [_serverModel removeDelegate:self];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (![self isCurrentConnectionSetupGeneration:generation] || !self->_connectionDesired
+                || self->_isUserInitiatedDisconnect) return;
+            self->_connectionSetupInProgress = NO;
+            if (self->_networkPathKnown && !self->_networkWasSatisfied) return;
+            @synchronized (self) { self->_connection = connection; }
+            self->_serverModel = [[MKServerModel alloc] initWithConnection:connection];
+            [self->_serverModel addDelegate:self];
+            [connection setDelegate:self];
+            [self applyNetworkForceTCPSetting];
+            [self applyNetworkQoSSetting];
+            [self loadSavedMuteStateForUsername:self->_username];
+            [self applyCachedMuteStateToAudio];
+            [connection connectToHost:hostname port:port];
+            NSUInteger audioGeneration;
             @synchronized (self) {
-                if (_connection == connection) {
-                    _connection = nil;
-                }
-                _serverModel = nil;
+                audioGeneration = ++self->_audioLifecycleGeneration;
             }
-            [connection disconnect];
-            return;
-        }
-
-        [connection connectToHost:hostname port:port];
-
-        NSUInteger audioGeneration = 0;
-        @synchronized (self) {
-            _audioLifecycleGeneration++;
-            audioGeneration = _audioLifecycleGeneration;
-        }
-        [self startAudioEngineAsyncForGeneration:audioGeneration];
-
+            [self startAudioEngineAsyncForGeneration:audioGeneration];
+        });
     }
 }
 
 - (void) startAudioEngineAsyncForGeneration:(NSUInteger)generation {
+    BOOL preserveAudio = _preserveAudioSessionForReconnect;
+    _preserveAudioSessionForReconnect = NO;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(250 * NSEC_PER_MSEC)), _audioLifecycleQueue, ^{
         BOOL shouldStart = NO;
         NSUInteger currentGeneration = 0;
@@ -561,20 +615,22 @@ static MUConnectionController *sSharedConnectionController;
 
         CFTimeInterval startedAt = MUMonotonicNow();
         MKAudio *audio = [MKAudio sharedAudio];
-        BOOL shouldPreserveRunningAudio = self->_preserveAudioSessionForReconnect && [audio isRunning];
+        BOOL shouldPreserveRunningAudio = preserveAudio && [audio isRunning];
         if (shouldPreserveRunningAudio) {
             MULogInfo(Connection, @"[Async] Preserving Audio Engine for reconnect; keeping voice audio session active.");
         } else {
             MULogInfo(Connection, @"[Async] Starting Audio Engine...");
             [audio restart];
         }
-        self->_preserveAudioSessionForReconnect = NO;
 #if TARGET_OS_IOS
-        if (self->_hasRestoredMuteState) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (generation != self->_audioLifecycleGeneration || !self->_connection) return;
+            if (self->_hasRestoredMuteState) {
             BOOL targetMuted = self->_restoredSelfMuted || self->_restoredSelfDeafened;
             NSString *reason = shouldPreserveRunningAudio ? @"audio_engine_preserved_restore_state" : @"audio_engine_started_restore_state";
             [MUSystemInputMuteBridge applyRestoredMute:targetMuted reason:reason];
-        }
+            }
+        });
 #endif
         CFTimeInterval elapsedMs = (MUMonotonicNow() - startedAt) * 1000.0;
         MULogDebug(Connection, @"PERF audio_engine_start_async elapsed_ms=%.2f generation=%lu",
@@ -600,19 +656,7 @@ static MUConnectionController *sSharedConnectionController;
         MULogInfo(Connection, @"[Async] Stopping Audio Engine (Release Mic)...");
         [[MKAudio sharedAudio] stop];
         
-        // 显式停用 Session，消除橙色点
-        // 这个操作涉及系统 IPC 通信，必须避开主线程
-#if TARGET_OS_IOS
-        NSError *error = nil;
-        [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&error];
-        
-        if (error) {
-            MULogWarning(Connection, @"[Async] Failed to deactivate AudioSession: %@", error.localizedDescription);
-        } else {
-            MULogDebug(Connection, @"[Async] Audio session deactivated successfully.");
-        }
-#endif
-
+        // MKAudio owns session deactivation on its serialized graph queue.
         CFTimeInterval elapsedMs = (MUMonotonicNow() - startedAt) * 1000.0;
         MULogDebug(Connection, @"PERF audio_engine_stop_async elapsed_ms=%.2f generation=%lu",
               elapsedMs,
@@ -634,64 +678,55 @@ static MUConnectionController *sSharedConnectionController;
     }
 }
 
-- (void) teardownConnection {
-    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
+- (void) discardCurrentTransport {
     @synchronized (self) {
         _connectionSetupGeneration++;
+        _connectionSetupInProgress = NO;
+        _audioLifecycleGeneration++;
     }
+    [_serverModel removeDelegate:self];
+    _serverModel = nil;
+    [_connection setDelegate:nil];
+    [_connection disconnect];
+    @synchronized (self) { _connection = nil; }
+}
+
+- (void) teardownConnection {
+    [self teardownConnectionPostingClosed:YES];
+}
+
+- (void) teardownConnectionPostingClosed:(BOOL)postClosed {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(establishConnection) object:nil];
+    _connectionDesired = NO;
+    _waitingForCertDecision = NO;
     [self stopNetworkMonitor];
     _preserveAudioSessionForReconnect = NO;
     _hasJoinedServerForCurrentSession = NO;
-
-    if ([_reconnectTimer isValid]) {
-        [_reconnectTimer invalidate];
-    }
-    _reconnectTimer = nil;
     _reconnectGeneration++;
     _pendingReconnectFailureInfo = nil;
-
 #if TARGET_OS_IOS
     [self endReconnectBackgroundTask];
 #endif
-    
-    if (_serverModel) {
-        [_serverModel removeDelegate:self];
-        _serverModel = nil;
-    }
-    
-    if (_connection) {
-        [_connection setDelegate:nil];
-        [_connection disconnect];
-        _connection = nil;
-    }
-    [_timer invalidate];
+    [self discardCurrentTransport];
+    [self hideConnectingView];
 #if TARGET_OS_IOS
     [[UNUserNotificationCenter currentNotificationCenter] setBadgeCount:0 withCompletionHandler:nil];
 #endif
-    
-    // --- 核心修复：发送关闭通知 ---
-    // AppState 收到这个通知后，会将 isConnected 设为 false，从而让界面回到首页
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionClosedNotification object:nil];
-    });
-    
-    NSUInteger audioGeneration = 0;
-    @synchronized (self) {
-        _audioLifecycleGeneration++;
-        audioGeneration = _audioLifecycleGeneration;
-    }
-    [self stopAudioEngineAsyncForGeneration:audioGeneration];
+    // Enqueue the stop before notifying observers, which may immediately start a new request.
+    [self stopAudioEngineAsyncForGeneration:_audioLifecycleGeneration];
+    if (postClosed) [self postConnectionNotification:MUConnectionClosedNotification userInfo:nil];
 }
 
 - (void) postErrorWithTitle:(NSString *)title message:(NSString *)message {
     [self logPerformanceConnectFailureWithTitle:title message:message];
-
-    NSDictionary *userInfo = @{ @"title": title, @"message": message };
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionErrorNotification object:nil userInfo:userInfo];
-        // 报错后必须 teardown，确保状态重置
-        [self teardownConnection];
-    });
+    NSUInteger request = _connectionRequestGeneration;
+    // Finish the old request before observer code can initiate another one.
+    NSDictionary *info = @{ @"title": title ?: @"", @"message": message ?: @"", @"requestGeneration": @(request) };
+    [self teardownConnectionPostingClosed:NO];
+    [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionErrorNotification object:self userInfo:info];
+    if (request == _connectionRequestGeneration && !_connectionDesired) {
+        [self postConnectionNotification:MUConnectionClosedNotification userInfo:nil];
+    }
 }
 
 - (void) postMessage:(NSString *)message type:(NSString *)type {
@@ -750,6 +785,7 @@ static MUConnectionController *sSharedConnectionController;
 #pragma mark - MKConnectionDelegate
 
 - (void) connectionOpened:(MKConnection *)conn {
+    if (conn != _connection || !_connectionDesired) return;
     _socketConnectedAt = MUMonotonicNow();
     if (_connectFlowStartedAt > 0) {
         CFTimeInterval handshakeMs = (_socketConnectedAt - _connectFlowStartedAt) * 1000.0;
@@ -797,130 +833,85 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 - (void) connection:(MKConnection *)conn closedWithError:(NSError *)err {
+    if (conn != _connection || !_connectionDesired) return;
     [self hideConnectingView];
-    
-    if (_isUserInitiatedDisconnect) {
+    if (_isUserInitiatedDisconnect || _suppressReconnectForDisconnect) {
         [self teardownConnection];
         return;
     }
-    
-    if (_waitingForCertDecision) {
-        MULogDebug(Connection, @"Ignoring closedWithError while waiting for certificate trust decision.");
-        return;
-    }
-
-    if (_suppressReconnectForDisconnect) {
-        MULogInfo(Connection, @"Reconnect suppressed for terminal disconnect reason (kick/ban).");
-        _suppressReconnectForDisconnect = NO;
-        [self teardownConnection];
-        return;
-    }
-
-    NSString *fallbackTitle = NSLocalizedString(@"Connection Failed", nil);
-    NSString *fallbackMessage = NSLocalizedString(@"The connection was closed.", nil);
-    NSString *title = [err localizedDescription] ?: fallbackTitle;
-    NSString *message = [err localizedFailureReason] ?: [err localizedDescription] ?: fallbackMessage;
-
+    if (_waitingForCertDecision) return;
+    NSString *title = NSLocalizedString(@"Connection Failed", nil);
+    NSString *message = [err localizedFailureReason] ?: [err localizedDescription] ?: NSLocalizedString(@"The connection was closed.", nil);
     if (MUErrorMatchesOSStatus(err, errSSLClosedAbort)) {
-        title = fallbackTitle;
-        message = NSLocalizedString(@"The TLS connection was closed due to an error.\n\nThe server might be temporarily rejecting your connection because you have attempted to connect too many times in a row.", nil);
-        MULogWarning(Connection, @"TLS connection closed by peer during connect. domain=%@ code=%ld host=%@:%lu",
-              [err domain] ?: @"",
-              (long)[err code],
-              _hostname ?: @"",
-              (unsigned long)_port);
+        MULogWarning(Connection, @"TLS peer closed connection. domain=%@ code=%ld", err.domain, (long)err.code);
     }
-
-    BOOL shouldUseReconnectPolicy = _hasJoinedServerForCurrentSession || _connectFlowIsReconnect || _retryCount > 0;
-    if (!shouldUseReconnectPolicy) {
-        MULogInfo(Connection, @"Initial join failed before server sync. Showing error without reconnect.");
+    id autoReconnect = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
+    if (autoReconnect && ![autoReconnect boolValue]) {
         [self postErrorWithTitle:title message:message];
         return;
     }
-
     _pendingReconnectFailureInfo = @{ @"title": title, @"message": message };
-
-    NSNumber *autoReconnectObj = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
-    BOOL autoReconnectEnabled = (autoReconnectObj == nil) ? YES : [autoReconnectObj boolValue];
-
-    if (!autoReconnectEnabled) {
-        MULogInfo(Connection, @"Auto Reconnect is disabled. Showing error immediately.");
+    NSInteger maxAttempts = [self configuredReconnectMaxAttempts];
+    BOOL offline = _networkPathKnown && !_networkWasSatisfied;
+    if (!offline && !_hasJoinedServerForCurrentSession && _retryCount >= maxAttempts) {
         [self postErrorWithTitle:title message:message];
         return;
     }
-    
-    // 连续失败达到上限后，再展示最后一次错误类型
-    NSInteger maxAttempts = [self configuredReconnectMaxAttempts];
-
-    if (_retryCount >= maxAttempts) {
-        MULogError(Connection, @"Max retries reached (%ld). Giving up.", (long)_retryCount);
-        NSDictionary *failureInfo = _pendingReconnectFailureInfo;
-        NSString *finalTitle = failureInfo[@"title"] ?: fallbackTitle;
-        NSString *finalMessage = failureInfo[@"message"] ?: fallbackMessage;
-        [self postErrorWithTitle:finalTitle message:finalMessage];
-        return; // postError 会调用 teardown
-    }
-    
-    _retryCount++;
-    NSInteger currentAttempt = _retryCount;
-    NSTimeInterval reconnectDelay = [self calculatedReconnectDelayForAttempt:currentAttempt
-                                                                baseInterval:[self configuredReconnectInterval]];
-
-    MULogWarning(Connection, @"Connection closed unexpectedly. Attempting reconnect (Attempt %ld/%ld)...", (long)currentAttempt, (long)maxAttempts);
     _preserveAudioSessionForReconnect = YES;
-    [self beginPerformanceConnectFlowIsReconnect:YES attempt:currentAttempt reason:message];
-    
-    // 通知 UI 显示 "Reconnecting..."
-    NSDictionary *info = @{
-        @"isReconnecting": @(YES),
-        @"reconnectAttempt": @(currentAttempt),
-        @"reconnectMaxAttempts": @(maxAttempts),
-        @"reconnectDelay": @(reconnectDelay),
+    _connectFlowIsReconnect = YES;
+    CFTimeInterval failureAt = MUMonotonicNow();
+    _recoveryFailureStreak = MURecoveryFailureCount(_recoveryFailureStreak, _lastJoinedAt, failureAt);
+    _lastJoinedAt = 0;
+    [self discardCurrentTransport];
+    // The configured count limits the fast retry burst. Established calls continue at a bounded rate.
+    NSTimeInterval delay = _retryCount >= maxAttempts ? 30.0
+        : [self calculatedReconnectDelayForAttempt:_retryCount + 1 baseInterval:[self configuredReconnectInterval]];
+    delay = MAX(delay, MURecoveryMinimumDelay(_recoveryFailureStreak));
+    _nextReconnectAllowedAt = failureAt + delay;
+    NSUInteger request = _connectionRequestGeneration;
+    [self postConnectionNotification:MUConnectionConnectingNotification userInfo:@{
+        @"isReconnecting": @YES, @"reconnectAttempt": @(MIN(_retryCount + 1, maxAttempts)),
+        @"reconnectMaxAttempts": @(maxAttempts), @"reconnectDelay": @(offline ? 0 : delay),
         @"reconnectReason": message
-    };
-    [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionConnectingNotification object:nil userInfo:info];
-    
-    [_serverModel removeDelegate:self];
-    _serverModel = nil;
-    [_connection setDelegate:nil];
-    [_connection disconnect];
-    _connection = nil;
-
-    MULogInfo(Connection, @"Preserving voice audio session while reconnecting to avoid background media route churn.");
-
-    MULogDebug(Connection, @"Reconnect scheduled after %.2fs (attempt %ld/%ld).", reconnectDelay, (long)currentAttempt, (long)maxAttempts);
-    [self scheduleReconnectAfterDelay:reconnectDelay];
+    }];
+    if (request != _connectionRequestGeneration || !_connectionDesired) return;
+    if (!offline) [self scheduleReconnectAfterDelay:delay];
+    else MULogInfo(Connection, @"Connection suspended until network returns; retry budget preserved.");
 }
 
 - (void) performReconnect {
-    MULogInfo(Connection, @"Performing reconnect...");
+    if (!_connectionDesired || _isUserInitiatedDisconnect || _waitingForCertDecision
+        || _connection || _connectionSetupInProgress || (_networkPathKnown && !_networkWasSatisfied)) return;
+    id autoReconnect = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkAutoReconnect"];
+    if (autoReconnect && ![autoReconnect boolValue]) {
+        [self teardownConnection];
+        return;
+    }
+    NSInteger maxAttempts = [self configuredReconnectMaxAttempts];
+    _retryCount = MIN(_retryCount + 1, maxAttempts);
+    [self beginPerformanceConnectFlowIsReconnect:YES attempt:_retryCount reason:@"automatic-recovery"];
+    NSUInteger request = _connectionRequestGeneration;
+    [self postConnectionNotification:MUConnectionConnectingNotification userInfo:@{
+        @"isReconnecting": @YES, @"reconnectAttempt": @(_retryCount), @"reconnectMaxAttempts": @(maxAttempts),
+        @"reconnectReason": _pendingReconnectFailureInfo[@"message"] ?: NSLocalizedString(@"Network changed or temporarily unavailable", nil)
+    }];
+    if (request != _connectionRequestGeneration || !_connectionDesired) return;
     [self establishConnection];
 }
 
 - (void) connection:(MKConnection*)conn unableToConnectWithError:(NSError *)err {
-    if (_waitingForCertDecision) return;
-
-    MULogWarning(Connection, @"unableToConnectWithError received. Routing into reconnect policy.");
     [self connection:conn closedWithError:err];
 }
 
 - (void) scheduleReconnectAfterDelay:(NSTimeInterval)delay {
-    [_reconnectTimer invalidate];
-    _reconnectTimer = nil;
-    _reconnectGeneration++;
-    NSUInteger generation = _reconnectGeneration;
-
+    if (!_connectionDesired || _waitingForCertDecision || _connection || _connectionSetupInProgress) return;
+    delay = MURecoveryScheduledDelay(delay, _nextReconnectAllowedAt, MUMonotonicNow());
+    NSUInteger generation = ++_reconnectGeneration;
 #if TARGET_OS_IOS
     [self beginReconnectBackgroundTask];
 #endif
-
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (generation != self->_reconnectGeneration) {
-            MULogDebug(Connection, @"Skipping stale reconnect timer. generation=%lu current=%lu",
-                       (unsigned long)generation,
-                       (unsigned long)self->_reconnectGeneration);
-            return;
-        }
+        if (generation != self->_reconnectGeneration) return;
         [self performReconnect];
     });
 }
@@ -936,6 +927,7 @@ static MUConnectionController *sSharedConnectionController;
 - (NSTimeInterval) configuredReconnectInterval {
     id value = [[NSUserDefaults standardUserDefaults] objectForKey:@"NetworkReconnectInterval"];
     NSTimeInterval interval = value ? [value doubleValue] : 1.0;
+    if (!isfinite(interval)) interval = 1.0;
     if (interval < 0.5) interval = 0.5;
     if (interval > 10.0) interval = 10.0;
     return interval;
@@ -1017,7 +1009,7 @@ static MUConnectionController *sSharedConnectionController;
 #endif
 
 - (void) connection:(MKConnection *)conn udpTransportStateChanged:(MKUDPTransportState)state {
-    (void)conn;
+    if (conn != _connection || !_connectionDesired) return;
 
     NSDictionary *info = @{
         @"state": @(state),
@@ -1025,6 +1017,7 @@ static MUConnectionController *sSharedConnectionController;
     };
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (conn != self->_connection || !self->_connectionDesired) return;
         [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionUDPTransportStatusNotification
                                                             object:nil
                                                           userInfo:info];
@@ -1034,6 +1027,7 @@ static MUConnectionController *sSharedConnectionController;
 // ... (Rest of methods: trustFailure, rejected, serverModel delegates... ALL UNCHANGED) ...
 // 请保持剩余代码与之前一致
 - (void) connection:(MKConnection *)conn trustFailureInCertificateChain:(NSArray *)chain {
+    if (conn != _connection || !_connectionDesired) return;
     MKCertificate *cert = [[conn peerCertificates] firstObject];
     NSString *serverDigest = [cert hexDigest];
     NSString *storedDigest = [MUDatabase digestForServerWithHostname:[conn hostname]
@@ -1060,6 +1054,8 @@ static MUConnectionController *sSharedConnectionController;
     NSString *notAfter  = [cert notAfter]  ? [df stringFromDate:[cert notAfter]]  : @"—";
 
     NSDictionary *info = @{
+        @"requestGeneration": @(_connectionRequestGeneration),
+        @"connection": conn,
         @"hostname":    [conn hostname] ?: @"",
         @"port":        @([conn port]),
         @"subjectName": subjectName,
@@ -1074,6 +1070,7 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 - (void) acceptCertificateTrust {
+    if (!_waitingForCertDecision || !_connectionDesired || !_connection) return;
     _waitingForCertDecision = NO;
 
     MKCertificate *cert = [_connection peerCertificates].firstObject;
@@ -1083,19 +1080,20 @@ static MUConnectionController *sSharedConnectionController;
         MULogInfo(Connection, @"User accepted certificate trust — digest stored.");
     }
 
-    [self teardownConnection];
+    [self discardCurrentTransport];
     [self establishConnection];
 }
 
 - (void) rejectCertificateTrust {
+    if (!_waitingForCertDecision || !_connectionDesired) return;
     _waitingForCertDecision = NO;
     MULogInfo(Connection, @"User rejected certificate trust.");
-    [self teardownConnection];
     [self postErrorWithTitle:NSLocalizedString(@"Connection Rejected", nil)
                      message:NSLocalizedString(@"The server's certificate was not trusted.", nil)];
 }
 
 - (void) connection:(MKConnection *)conn rejectedWithReason:(MKRejectReason)reason explanation:(NSString *)explanation {
+    if (conn != _connection || !_connectionDesired) return;
     NSString *title = NSLocalizedString(@"Connection Rejected", nil);
     NSString *msg = @"Unknown reason";
     
@@ -1108,6 +1106,13 @@ static MUConnectionController *sSharedConnectionController;
         case MKRejectReasonUsernameInUse: msg = NSLocalizedString(@"Username already in use", nil); break;
         case MKRejectReasonServerIsFull: msg = NSLocalizedString(@"Server is full", nil); break;
         case MKRejectReasonNoCertificate: msg = NSLocalizedString(@"A certificate is needed", nil); break;
+    }
+    // A previous anonymous session may survive a broken socket until the server's timeout.
+    if (_hasJoinedServerForCurrentSession && (reason == MKRejectReasonUsernameInUse || reason == MKRejectReasonServerIsFull)) {
+        NSError *error = [NSError errorWithDomain:@"MumbleServerTemporarilyUnavailable" code:reason
+                                        userInfo:@{NSLocalizedDescriptionKey: msg}];
+        [self connection:conn closedWithError:error];
+        return;
     }
     
     if (reason == MKRejectReasonUsernameInUse) {
@@ -1129,9 +1134,17 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 - (void) serverModel:(MKServerModel *)model joinedServerAsUser:(MKUser *)user withWelcomeMessage:(MKTextMessage *)welcomeMessage {
+    if (model != _serverModel || !_connectionDesired) return;
+    if (!user) {
+        [self postErrorWithTitle:NSLocalizedString(@"Connection Failed", nil)
+                        message:NSLocalizedString(@"The server did not complete authentication in time.", nil)];
+        return;
+    }
     _hasJoinedServerForCurrentSession = YES;
+    _lastJoinedAt = MUMonotonicNow();
     _retryCount = 0;
     _pendingReconnectFailureInfo = nil;
+    _reconnectGeneration++;
 #if TARGET_OS_IOS
     [self endReconnectBackgroundTask];
 #endif
@@ -1193,12 +1206,15 @@ static MUConnectionController *sSharedConnectionController;
     // 4. 隐藏连接界面并通知 SwiftUI
     [self hideConnectingViewWithCompletion:^{
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (model != self->_serverModel || !self->_connectionDesired) return;
             NSString *displayTitle = self->_displayName;
             if (!displayTitle || [displayTitle length] == 0) {
                 displayTitle = self->_hostname;
             }
             
             NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+            userInfo[@"requestGeneration"] = @(self->_connectionRequestGeneration);
+            if (self->_connection) userInfo[@"connection"] = self->_connection;
             if (displayTitle) {
                 userInfo[@"displayName"] = displayTitle;
             }
@@ -1219,6 +1235,7 @@ static MUConnectionController *sSharedConnectionController;
             [[NSNotificationCenter defaultCenter] postNotificationName:@"MUConnectionReadyForSwiftUI"
                                                                 object:self
                                                               userInfo:userInfo];
+            if (model != self->_serverModel || !self->_connectionDesired) return;
             [[NSNotificationCenter defaultCenter] postNotificationName:MUConnectionOpenedNotification
                                                                 object:self
                                                               userInfo:userInfo];
@@ -1228,12 +1245,14 @@ static MUConnectionController *sSharedConnectionController;
 
 // ... (Copy remaining serverModel delegates from previous answer) ...
 - (void) serverModel:(MKServerModel *)model userMoved:(MKUser *)user toChannel:(MKChannel *)chan fromChannel:(MKChannel *)prevChan byUser:(MKUser *)mover {
+    if (model != _serverModel || !_connectionDesired) return;
     if (user == [model connectedUser]) {
         [[NSUserDefaults standardUserDefaults] setInteger:[chan channelId] forKey:[self lastChannelKey]];
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
 }
 - (void) serverModel:(MKServerModel *)model userSelfMuteDeafenStateChanged:(MKUser *)user {
+    if (model != _serverModel || !_connectionDesired) return;
     if (user == [model connectedUser]) {
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
         [defaults setBool:[user isSelfMuted] forKey:[self muteStateKey]];
@@ -1242,6 +1261,7 @@ static MUConnectionController *sSharedConnectionController;
     }
 }
 - (void) serverModel:(MKServerModel *)model userKicked:(MKUser *)user byUser:(MKUser *)actor forReason:(NSString *)reason {
+    if (model != _serverModel || !_connectionDesired) return;
     if (user == [model connectedUser]) {
         _suppressReconnectForDisconnect = YES;
         NSString *msg = [NSString stringWithFormat:NSLocalizedString(@"Kicked by %@: %@", nil), [actor userName], reason ?: @""];
@@ -1249,6 +1269,7 @@ static MUConnectionController *sSharedConnectionController;
     }
 }
 - (void) serverModel:(MKServerModel *)model userBanned:(MKUser *)user byUser:(MKUser *)actor forReason:(NSString *)reason {
+    if (model != _serverModel || !_connectionDesired) return;
     if (user == [model connectedUser]) {
         _suppressReconnectForDisconnect = YES;
         NSString *msg = [NSString stringWithFormat:NSLocalizedString(@"Banned by %@: %@", nil), [actor userName], reason ?: @""];
@@ -1260,35 +1281,44 @@ static MUConnectionController *sSharedConnectionController;
 - (void) serverModel:(MKServerModel *)model userLeft:(MKUser *)user {}
 - (void) serverModel:(MKServerModel *)model userTalkStateChanged:(MKUser *)user {}
 - (void) serverModel:(MKServerModel *)model permissionDenied:(MKPermission)perm forUser:(MKUser *)user inChannel:(MKChannel *)channel {
+    if (model != _serverModel || !_connectionDesired) return;
     [self postMessage:NSLocalizedString(@"Permission denied", nil) type:@"error"];
 }
 - (void) serverModel:(MKServerModel *)model permissionDeniedForReason:(NSString *)reason {
+    if (model != _serverModel || !_connectionDesired) return;
     NSString *msg = reason ?: NSLocalizedString(@"Permission denied", nil);
     [self postMessage:msg type:@"error"];
 }
 - (void) serverModelInvalidChannelNameError:(MKServerModel *)model {
+    if (model != _serverModel || !_connectionDesired) return;
     [self postMessage:NSLocalizedString(@"Invalid channel name", nil) type:@"error"];
 }
 - (void) serverModelModifySuperUserError:(MKServerModel *)model {
+    if (model != _serverModel || !_connectionDesired) return;
     [self postMessage:NSLocalizedString(@"Cannot modify SuperUser", nil) type:@"error"];
 }
 - (void) serverModelTextMessageTooLongError:(MKServerModel *)model {
+    if (model != _serverModel || !_connectionDesired) return;
     [self postMessage:NSLocalizedString(@"Message too long", nil) type:@"error"];
     [[NSNotificationCenter defaultCenter] postNotificationName:@"MUMessageSendFailed"
                                                         object:nil
                                                       userInfo:@{@"reason": @"permissionDenied"}];
 }
 - (void) serverModelTemporaryChannelError:(MKServerModel *)model {
+    if (model != _serverModel || !_connectionDesired) return;
     [self postMessage:NSLocalizedString(@"Not permitted in temporary channel", nil) type:@"error"];
 }
 - (void) serverModel:(MKServerModel *)model missingCertificateErrorForUser:(MKUser *)user {
+    if (model != _serverModel || !_connectionDesired) return;
     [self postMessage:NSLocalizedString(@"Missing certificate", nil) type:@"error"];
 }
 - (void) serverModel:(MKServerModel *)model invalidUsernameErrorForName:(NSString *)name {
+    if (model != _serverModel || !_connectionDesired) return;
     NSString *msg = [NSString stringWithFormat:@"Invalid username: %@", name ?: @""];
     [self postMessage:msg type:@"error"];
 }
 - (void) serverModelChannelFullError:(MKServerModel *)model {
+    if (model != _serverModel || !_connectionDesired) return;
     [self postMessage:NSLocalizedString(@"Channel is full", nil) type:@"error"];
 }
 @end

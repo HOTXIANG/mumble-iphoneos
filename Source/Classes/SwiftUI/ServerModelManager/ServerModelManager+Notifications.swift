@@ -348,6 +348,11 @@ extension ServerModelManager {
             let userTransfer = UnsafeTransfer(value: user)
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                // MKServerModel has already removed the member from its channel.
+                // Animate that tree diff before notification/cache updates redraw it.
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+                    self.userChannelMovementRevision &+= 1
+                }
                 let safeUser = userTransfer.value
                 let userName = safeUser.userName() ?? NSLocalizedString("Unknown User", comment: "")
                 let session = safeUser.session()
@@ -770,8 +775,14 @@ extension ServerModelManager {
         MumbleLogger.connection.info("Connection Opened - Triggering Restore")
 
         let userInfo = notification.userInfo
+        guard let controller = MUConnectionController.existingShared(),
+              let openedModel = controller.serverModel,
+              let requestGeneration = (userInfo?["requestGeneration"] as? NSNumber)?.uintValue else { return }
 
-        Task { @MainActor in
+        Task { @MainActor [weak self, weak openedModel] in
+            guard let self, let openedModel,
+                  controller.connectionRequestGeneration == requestGeneration,
+                  controller.serverModel === openedModel else { return }
             // 设置服务器显示名称
             if let extractedDisplayName = userInfo?["displayName"] as? String {
                 AppState.shared.serverDisplayName = extractedDisplayName
@@ -788,33 +799,29 @@ extension ServerModelManager {
             // （ACL 扫描和初始权限同步期间，服务器会发送大量 PermissionDenied）
             self.isScanningACLs = true
 
-            Task.detached(priority: .userInitiated) {
-                // 稍微等待 UI 动画完成 (例如进入频道的 Push 动画)
-                try? await Task.sleep(nanoseconds: 600_000_000) // 0.6s
-
-                // 回到主线程执行具体的恢复逻辑
-                await MainActor.run {
+            self.pendingConnectionRestoreTask?.cancel()
+            self.pendingConnectionRestoreTask = Task { @MainActor [weak self, weak openedModel] in
+                do {
+                    try await Task.sleep(nanoseconds: 600_000_000)
+                    guard let self, let openedModel, self.isCurrentServerModel(openedModel) else { return }
                     MumbleLogger.model.info("[Async] Restoring user preferences")
                     self.restoreAllUserPreferences()
 
-                    // 初始进入时的状态同步
-                    if let user = self.serverModel?.connectedUser(), user.isSelfMuted() {
+                    if let user = openedModel.connectedUser(), user.isSelfMuted() {
                         MumbleLogger.audio.info("[Async] Initial Sync: Enforcing System Mute")
                         self.setSystemMuteFromApp(true, reason: "post_connection_initial_sync")
                     }
-                }
 
-                // 延迟 2s 后扫描频道权限（确保频道树已完全构建）
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s
-                await MainActor.run {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard self.isCurrentServerModel(openedModel) else { return }
                     MumbleLogger.model.info("[Async] Scanning channel permissions")
                     self.scanAllChannelPermissions()
-                }
 
-                // 延迟 1s 后恢复之前的监听（确保频道树和权限扫描已完成）
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s
-                await MainActor.run {
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    guard self.isCurrentServerModel(openedModel) else { return }
                     self.reRegisterListeningChannels()
+                } catch {
+                    // cleanup 或下一次 opened 已接管恢复工作。
                 }
             }
         }

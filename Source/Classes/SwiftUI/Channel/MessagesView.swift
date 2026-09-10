@@ -2447,14 +2447,20 @@ struct MessagesList: View {
                 }
                 .coordinateSpace(name: scrollCoordinateSpaceName)
                 #if os(macOS)
-                .modifier(MacServerScrollEdgeModifier())
+                .modifier(ChannelTopScrollEdgeModifier(
+                    alwaysTransparent: isSplitLayout,
+                    hasContent: !cachedRenderBlocks.isEmpty
+                ))
                 // A macOS TabView gives each tab its own framed content area.
                 // Keep compact chat rows inside that area instead of drawing
                 // over the native tab chrome; split layout keeps its existing
                 // edge-to-edge scroll rendering.
                 .scrollClipDisabled(isSplitLayout)
                 #else
-                .modifier(ChannelTopScrollEdgeModifier())
+                .modifier(ChannelTopScrollEdgeModifier(
+                    alwaysTransparent: isSplitLayout,
+                    hasContent: !cachedRenderBlocks.isEmpty
+                ))
                 .scrollClipDisabled(true)
                 #endif
                 .background(

@@ -67,7 +67,6 @@ struct MumbleApp: App {
                 #endif
                 #if os(macOS)
                 .frame(minWidth: 480, minHeight: 400)
-                .modifier(MacServerScrollEdgeModifier())
                 .background(
                     WindowMinSizeSetter(
                         minSize: MacMainWindowConfiguration.minSize,
@@ -414,17 +413,6 @@ extension Notification.Name {
     static let mumbleShowRegisteredUsers = Notification.Name("MumbleShowRegisteredUsersNotification")
 }
 
-/// 系统根据真实的标题栏遮挡区域生成背景模糊；不叠加自定义材质或遮罩。
-struct MacServerScrollEdgeModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            content.scrollEdgeEffectStyle(.soft, for: .top)
-        } else {
-            content
-        }
-    }
-}
-
 /// 通过 NSViewRepresentable 直接设置 NSWindow.minSize，确保窗口无法缩小到指定尺寸以下
 /// 同时为主窗口启用 frame autosave，避免在 SwiftUI 约束更新期间手动改 frame
 struct WindowMinSizeSetter: NSViewRepresentable {
@@ -465,9 +453,8 @@ struct WindowMinSizeSetter: NSViewRepresentable {
         window.styleMask.insert(.fullSizeContentView)
         window.isOpaque = true
         window.backgroundColor = .windowBackgroundColor
-        window.titlebarAppearsTransparent = false
-        window.titlebarSeparatorStyle = .automatic
-        window.toolbar?.showsBaselineSeparator = true
+        // SwiftUI owns titlebar transparency and separators for the current layout.
+        // Do not overwrite those settings from this window-sizing callback.
 
         // 禁用 macOS 系统状态恢复，防止隔很长时间后重新打开时系统用缓存的旧尺寸覆盖窗口
         window.isRestorable = false

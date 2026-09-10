@@ -58,14 +58,221 @@ extension Color {
 }
 #endif
 
-#if os(iOS)
-/// 让系统导航栏的滚动遮挡使用清晰边缘，并保留系统对出现时机的控制。
+/// Keep the native effect, but reveal it only when content actually passes the top edge.
 struct ChannelTopScrollEdgeModifier: ViewModifier {
+    var alwaysTransparent = false
+    var hasContent = true
+    @State private var hasContentUnderTitlebar = false
+
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.scrollEdgeEffectStyle(.hard, for: .top)
+        if #available(iOS 26.0, macOS 26.0, *) {
+            if alwaysTransparent {
+                content.scrollEdgeEffectHidden(true, for: .top)
+            } else {
+                content
+                    #if os(macOS)
+                    // Updating the style also clears AppKit's cached hard-bar backdrop.
+                    .scrollEdgeEffectStyle(hasContent && hasContentUnderTitlebar ? .hard : .soft, for: .top)
+                    #else
+                    .scrollEdgeEffectStyle(.hard, for: .top)
+                    #endif
+                    .scrollEdgeEffectHidden(!hasContent || !hasContentUnderTitlebar, for: .top)
+                    .onScrollGeometryChange(for: Bool.self) { geometry in
+                        geometry.contentSize.height > 0 &&
+                            geometry.contentOffset.y + geometry.contentInsets.top > 0.5
+                    } action: { _, overlaps in
+                        hasContentUnderTitlebar = overlaps
+                    }
+                    .preference(key: ChannelTitlebarOverlapKey.self,
+                                value: hasContent && hasContentUnderTitlebar)
+            }
         } else {
             content
+        }
+    }
+}
+
+private struct ChannelTitlebarOverlapKey: PreferenceKey {
+    static var defaultValue: Bool { false }
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
+#if os(macOS)
+/// Derive chrome from the rendered layout, rather than a later global state update.
+struct MacWindowToolbarBackgroundModifier: ViewModifier {
+    let usesPaneTitlebars: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.toolbarBackgroundVisibility(usesPaneTitlebars ? .hidden : .automatic, for: .windowToolbar)
+        } else {
+            content
+        }
+    }
+}
+
+/// Reserve the native titlebar height in each hosting controller. Only the channel
+/// pane registers a scroll-edge bar; chat uses an inset that cannot create an effect.
+struct MacPaneTitlebarModifier: ViewModifier {
+    var alwaysTransparent: Bool
+    @State private var titlebarHeight: CGFloat = 52
+    @State private var hasContentUnderTitlebar = false
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            Group {
+                if alwaysTransparent {
+                    content
+                        .safeAreaInset(edge: .top, spacing: 0) { titlebarSpace }
+                        .scrollEdgeEffectHidden(true, for: .top)
+                } else {
+                    content
+                        .safeAreaBar(edge: .top, spacing: 0) { titlebarSpace }
+                        // Keep the total inset fixed while removing the native bar's
+                        // effect region. The scroll view and its position stay intact.
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            Color.clear.frame(height: hasContentUnderTitlebar ? 0 : titlebarHeight)
+                        }
+                        .onPreferenceChange(ChannelTitlebarOverlapKey.self) { hasContentUnderTitlebar = $0 }
+                        .scrollEdgeEffectStyle(hasContentUnderTitlebar ? .hard : .soft, for: .top)
+                        .scrollEdgeEffectHidden(!hasContentUnderTitlebar, for: .top)
+                }
+            }
+            .ignoresSafeArea(.container, edges: .top)
+        } else {
+            content
+        }
+    }
+
+    private var titlebarSpace: some View {
+        // An AppKit view keeps the native bar registered even though its content
+        // is transparent. A clear SwiftUI color can be optimized into just spacing.
+        MacTitlebarHeightReader { titlebarHeight = $0 }
+            .frame(maxWidth: .infinity)
+            .frame(height: alwaysTransparent || hasContentUnderTitlebar ? titlebarHeight : 0)
+            .allowsHitTesting(false)
+    }
+}
+
+/// Measure native window chrome without intercepting pointer or toolbar events.
+private struct MacTitlebarHeightReader: NSViewRepresentable {
+    var onHeightChange: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> HeightView { HeightView() }
+
+    func updateNSView(_ view: HeightView, context: Context) {
+        view.onHeightChange = onHeightChange
+        view.measureHeight()
+    }
+
+    final class HeightView: NSView {
+        var onHeightChange: ((CGFloat) -> Void)?
+        private var measuredHeight: CGFloat = 0
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            measureHeight()
+        }
+
+        override func layout() {
+            super.layout()
+            measureHeight()
+        }
+
+        func measureHeight() {
+            guard let window, let contentView = window.contentView else { return }
+            let windowBounds = contentView.convert(contentView.bounds, to: nil)
+            let chromeHeight = window.standardWindowButton(.closeButton).map {
+                2 * (windowBounds.maxY - $0.convert($0.bounds, to: nil).midY)
+            } ?? 0
+            let height = max(windowBounds.maxY - window.contentLayoutRect.maxY, chromeHeight)
+            guard height > 0, measuredHeight != height else { return }
+            measuredHeight = height
+            DispatchQueue.main.async { [weak self] in self?.onHeightChange?(height) }
+        }
+    }
+}
+#endif
+
+#if os(iOS)
+/// Dismiss the server column after SwiftUI has installed the connected three-column layout.
+/// A visibility binding alone can be overwritten by the outgoing split's transition.
+struct IPadServerSidebarDismissal: UIViewControllerRepresentable {
+    var requestID: Int
+    var onDismiss: () -> Void
+
+    func makeUIViewController(context: Context) -> DismissalController { DismissalController() }
+
+    func updateUIViewController(_ controller: DismissalController, context: Context) {
+        controller.requestID = requestID
+        controller.onDismiss = onDismiss
+        controller.scheduleDismissal()
+    }
+
+    final class DismissalController: UIViewController {
+        var requestID = 0
+        var onDismiss: (() -> Void)?
+        private var appliedRequestID: Int?
+        private var dismissalScheduled = false
+        private var hasAppeared = false
+
+        override func loadView() {
+            view = UIView()
+            view.isUserInteractionEnabled = false
+            view.backgroundColor = .clear
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            hasAppeared = true
+            scheduleDismissal()
+        }
+
+        override func viewDidDisappear(_ animated: Bool) {
+            super.viewDidDisappear(animated)
+            hasAppeared = false
+        }
+
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            scheduleDismissal()
+        }
+
+        func scheduleDismissal() {
+            guard hasAppeared, appliedRequestID != requestID, !dismissalScheduled else { return }
+            dismissalScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.dismissalScheduled = false
+                self.dismissSidebarIfReady()
+            }
+        }
+
+        private func dismissSidebarIfReady() {
+            guard hasAppeared, appliedRequestID != requestID, viewIfLoaded?.window != nil,
+                  let split = splitViewController, split.style == .tripleColumn,
+                  !split.isCollapsed else { return }
+
+            // Wait for the incoming hierarchy to settle before changing its actual columns.
+            if let transition = split.transitionCoordinator {
+                dismissalScheduled = true
+                let registered = transition.animate(alongsideTransition: nil) { [weak self] _ in
+                    self?.dismissalScheduled = false
+                    self?.scheduleDismissal()
+                }
+                if registered { return }
+                dismissalScheduled = false
+            }
+
+            // Apply once per entry so the user can still reopen the sidebar afterwards.
+            appliedRequestID = requestID
+            onDismiss?()
+            UIView.performWithoutAnimation {
+                split.preferredDisplayMode = .oneBesideSecondary
+                split.hide(.primary)
+            }
         }
     }
 }

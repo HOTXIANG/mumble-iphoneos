@@ -52,7 +52,7 @@ class ServerModelManager: ObservableObject {
     // view observing the large ServerModelManager object during setup/cleanup.
     var isConnected: Bool = false
     @Published var isLocalAudioTestRunning: Bool = false
-    /// Drives the channel-tree transition when a user moves between channels.
+    /// Drives channel-tree transitions when a user moves between channels or leaves.
     @Published var userChannelMovementRevision: UInt = 0
     
     // --- 核心修改 1：添加 @Published 数组来存储聊天消息 ---
@@ -114,6 +114,16 @@ class ServerModelManager: ObservableObject {
     var muteStateBeforeDeafen: Bool = false
     /// 保存重连前的监听频道 ID，重连后自动重新注册
     var savedListeningChannelIds: Set<UInt> = []
+    struct ListeningSessionScope: Equatable {
+        let hostname: String
+        let port: UInt
+        let username: String
+    }
+    var savedListeningSessionScope: ListeningSessionScope?
+    var boundListeningSessionScope: ListeningSessionScope?
+    var pendingConnectionRestoreTask: Task<Void, Never>?
+    var passwordJoinSequence: UInt = 0
+    var userInitiatedJoinSequence: UInt = 0
     var serverModel: MKServerModel?
     var userIndexMap: [UInt: Int] = [:]
     var channelIndexMap: [UInt: Int] = [:]
@@ -128,6 +138,7 @@ class ServerModelManager: ObservableObject {
     var isApplyingAppDrivenSystemMute = false
     var appDrivenSystemMuteSequence: UInt = 0
     var isRequestingMicrophonePermission = false
+    var localAudioTestRequested = false
     var isLocalAudioTestStarting = false
     var localAudioTestStartSequence: UInt = 0
     var isPreservingLocalAudioTestForVADOnboardingTransition = false

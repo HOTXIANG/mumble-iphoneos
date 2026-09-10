@@ -481,3 +481,9 @@
 "Switched to external mic. Re-select Voice Isolation mode, then restart app for it to take effect." = "Switched to external mic. Re-select Voice Isolation mode, then restart app for it to take effect.";
 "You were banned" = "You were banned";
 "You were kicked" = "You were kicked";
+
+/* Voice connection recovery */
+"Voice is interrupted by the system. Waiting to resume…" = "Voice is interrupted by the system. Waiting to resume…";
+"Voice is unavailable. Check microphone access and your audio device." = "Voice is unavailable. Check microphone access and your audio device.";
+"Voice is recovering. You may not be heard or hear others yet." = "Voice is recovering. You may not be heard or hear others yet.";
+"Invalid server address or username" = "Invalid server address or username";

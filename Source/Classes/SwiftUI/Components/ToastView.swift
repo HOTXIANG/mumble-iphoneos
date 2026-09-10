@@ -22,17 +22,6 @@ struct ToastView: View {
         #endif
     }()
 
-    private let topClearance: CGFloat = {
-        #if os(macOS)
-        // The main window renders beneath its transparent titlebar. Keep
-        // in-app banners below the native toolbar instead of anchoring them
-        // to the extended content area's y = 0.
-        return 62
-        #else
-        return 8
-        #endif
-    }()
-    
     var body: some View {
         HStack(spacing: 12) {
             if toast.isChatMessageBanner {
@@ -71,7 +60,7 @@ struct ToastView: View {
         .frame(maxWidth: maxBannerWidth)
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .padding(.horizontal, 16)
-        .padding(.top, topClearance)
+        .padding(.top, 8)
     }
 
     @ViewBuilder

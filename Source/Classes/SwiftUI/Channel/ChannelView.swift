@@ -70,6 +70,7 @@ private struct MacChannelSplitSidebarRoot: View {
 
     var body: some View {
         ServerChannelView(serverManager: serverManager, isSplitLayout: true)
+            .modifier(MacPaneTitlebarModifier(alwaysTransparent: false))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .environment(\.locale, locale)
     }
@@ -82,6 +83,7 @@ private struct MacChannelSplitDetailRoot: View {
 
     var body: some View {
         MessagesView(serverManager: serverManager, isSplitLayout: true)
+            .modifier(MacPaneTitlebarModifier(alwaysTransparent: true))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .environment(\.locale, locale)
             .onAppear {
@@ -222,6 +224,9 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
     private let splitLayoutActivationPadding: CGFloat = 24
     private let rootSidebar: RootSidebar
     private let rootSplitVisibility: Binding<NavigationSplitViewVisibility>?
+    #if os(iOS)
+    @State private var sidebarDismissalRequest = 0
+    #endif
     private let leadingControls: () -> LeadingControls
     private let trailingControls: () -> TrailingControls
     @Binding private var isSplitLayoutActive: Bool
@@ -270,6 +275,9 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
                         .transition(.identity)
                 }
             }
+            #if os(macOS)
+            .modifier(MacWindowToolbarBackgroundModifier(usesPaneTitlebars: activeLayoutMode == .split))
+            #endif
             #if os(iOS)
             // A landscape iPhone can have enough physical width for two
             // columns while UIKit still reports a compact phone trait. Drive
@@ -285,6 +293,17 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
             }
             .onChange(of: geo.size.width) { _, newWidth in
                 applyChannelLayoutMode(for: sanitizedLayoutWidth(newWidth))
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let message = appState.voiceHealthMessage, !appState.isConnecting {
+                Label(message, systemImage: "waveform.badge.exclamationmark")
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(.orange.opacity(0.18))
+                    .accessibilityIdentifier("voiceHealthWarning")
             }
         }
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
@@ -364,6 +383,20 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
     #if os(iOS)
     private var channelSplitColumn: some View {
         ServerChannelView(serverManager: serverManager, isSplitLayout: true)
+            .background {
+                if let rootSplitVisibility {
+                    IPadServerSidebarDismissal(requestID: sidebarDismissalRequest) {
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            rootSplitVisibility.wrappedValue = .doubleColumn
+                        }
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .muConnectionOpened)) { _ in
+                sidebarDismissalRequest += 1
+            }
             .toolbar(.visible, for: .navigationBar)
             .navigationTitle(channelTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -382,6 +415,7 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
     private var messagesSplitColumn: some View {
         MessagesView(serverManager: serverManager, isSplitLayout: true)
             .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -763,11 +797,9 @@ struct ServerChannelView: View {
                 }
                 .padding(.horizontal, UIConstants.Spacing.paneHorizontalPadding)
             }
-            #if os(macOS)
-            .modifier(MacServerScrollEdgeModifier())
-            #else
-            .modifier(ChannelTopScrollEdgeModifier())
-            #endif
+            .modifier(ChannelTopScrollEdgeModifier(
+                hasContent: MUConnectionController.shared()?.serverModel?.rootChannel() != nil
+            ))
         }
     }
 
@@ -1459,6 +1491,7 @@ struct ChannelTreeRow: View {
                         id: user.session(),
                         in: userMovementNamespace
                     )
+                    .transition(.opacity)
                     .opacity(isInMoveMode ? 0.3 : 1.0)
                     .allowsHitTesting(!isInMoveMode)
                     .listRowSeparator(.hidden)
@@ -1474,6 +1507,7 @@ struct ChannelTreeRow: View {
                         level: level,
                         serverManager: serverManager
                     )
+                    .transition(.opacity)
                     .opacity(isInMoveMode ? 0.3 : 1.0)
                     .allowsHitTesting(!isInMoveMode)
                     .listRowSeparator(.hidden)

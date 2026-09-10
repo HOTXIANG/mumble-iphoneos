@@ -102,7 +102,7 @@ final class MUTestCommandRouter {
             return nil
 
         case "acceptCert":
-            guard AppState.shared.pendingCertTrust != nil else {
+            guard AppState.shared.pendingCertTrust?.isCurrent == true else {
                 return ["status": "no pending certificate trust"]
             }
             ctrl?.acceptCertificateTrust()
@@ -110,7 +110,7 @@ final class MUTestCommandRouter {
             return ["status": "accepted"]
 
         case "rejectCert":
-            guard AppState.shared.pendingCertTrust != nil else {
+            guard AppState.shared.pendingCertTrust?.isCurrent == true else {
                 return ["status": "no pending certificate trust"]
             }
             ctrl?.rejectCertificateTrust()
@@ -237,6 +237,13 @@ final class MUTestCommandRouter {
             MKAudio.shared()?.setForceTransmit(enabled)
             return ["forceTransmit": MKAudio.shared()?.forceTransmit() ?? enabled]
 
+        case "simulateCallbackStall":
+            guard MKAudio.shared()?.isRunning() == true else {
+                throw TestCommandError("Audio engine not active")
+            }
+            MKAudio.shared()?.simulateDeviceCallbackStallForTesting()
+            return ["status": "device callbacks stopped; engine flag preserved"]
+
         case "status":
             // Only access MKAudio when connected to avoid blocking main thread
             let connected = MUConnectionController.shared()?.isConnected() == true
@@ -245,6 +252,7 @@ final class MUTestCommandRouter {
                 let connUser = MUConnectionController.shared()?.serverModel?.connectedUser()
                 return [
                     "running": MKAudio.shared()?.isRunning() ?? false,
+                    "health": MKAudio.shared()?.healthSnapshot() ?? [:],
                     "forceTransmit": MKAudio.shared()?.forceTransmit() ?? false,
                     "selfMuted": connUser?.isSelfMuted() ?? false,
                     "selfDeafened": connUser?.isSelfDeafened() ?? false,
@@ -257,6 +265,7 @@ final class MUTestCommandRouter {
                     "selfMuted": false,
                     "selfDeafened": false,
                     "localAudioTestRunning": false,
+                    "health": ["state": "stopped", "requested": false],
                     "note": "Not connected — audio engine not initialized"
                 ] as [String: Any]
             }
@@ -1518,6 +1527,13 @@ final class MUTestCommandRouter {
 
     private func handleNetwork(_ cmd: String, _ params: [String: Any]) throws -> Any? {
         switch cmd {
+        case "injectPathUpdate":
+            guard let satisfied = params["satisfied"] as? Bool,
+                  let interfaces = intValue(params["interfaces"]), (0...15).contains(interfaces) else {
+                throw TestCommandError("Expected satisfied boolean and interfaces mask 0...15")
+            }
+            MUConnectionController.shared()?.simulateNetworkPathSatisfied(satisfied, interfaces: UInt(interfaces))
+            return ["injected": true]
         case "status":
             let logLimit = intValue(params["logLimit"]) ?? 20
             return networkSnapshot(logLimit: logLimit)
@@ -1670,6 +1686,7 @@ final class MUTestCommandRouter {
         let appState = AppState.shared
         var state: [String: Any] = [
             "isConnected": appState.isConnected,
+            "voiceHealthMessage": appState.voiceHealthMessage ?? NSNull(),
             "isConnecting": appState.isConnecting,
             "isReconnecting": appState.isReconnecting,
             "reconnectAttempt": appState.reconnectAttempt,
