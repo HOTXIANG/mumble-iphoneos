@@ -17,6 +17,9 @@ import AVFoundation
 #if os(iOS)
 import UIKit
 #endif
+#if os(iOS) && targetEnvironment(simulator)
+import ActivityKit
+#endif
 #if os(macOS)
 import AppKit
 #endif
@@ -70,6 +73,9 @@ final class MUTestCommandRouter {
         case "log":        return try handleLog(command, params, context: context)
         case "performance": return try handlePerformance(command, params)
         case "network":     return try handleNetwork(command, params)
+        #if os(iOS) && targetEnvironment(simulator)
+        case "liveActivity": return try await handleLiveActivity(command, params)
+        #endif
         case "help":       return try handleHelp(command, params)
         default:
             throw TestCommandError("Unknown domain '\(domain)'. Use help.actions for available commands")
@@ -1555,10 +1561,152 @@ final class MUTestCommandRouter {
         }
     }
 
+    #if os(iOS) && targetEnvironment(simulator)
+    // MARK: - Simulator Live Activity Fixtures
+
+    // Persist only the IDs created here so a later debug launch can clean up
+    // fixtures without ending a real server's Live Activity.
+    private var fixtureActivityIDs: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "MUTestLiveActivityIDs") ?? []) }
+        set { UserDefaults.standard.set(newValue.sorted(), forKey: "MUTestLiveActivityIDs") }
+    }
+
+    private func handleLiveActivity(_ cmd: String, _ params: [String: Any]) async throws -> Any? {
+        let fixtures = Activity<MumbleActivityAttributes>.activities.filter { fixtureActivityIDs.contains($0.id) }
+
+        switch cmd {
+        case "list":
+            return [
+                "activitiesEnabled": ActivityAuthorizationInfo().areActivitiesEnabled,
+                "activities": fixtures.map { serializeFixtureActivity($0) }
+            ] as [String: Any]
+
+        case "start":
+            try requireIdleLiveActivityFixtureApp()
+            guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+                throw TestCommandError("Live Activities are disabled in Simulator Settings")
+            }
+            let state = try liveActivityFixtureState(params)
+            let attributes = MumbleActivityAttributes(serverName: params["serverName"] as? String ?? "Mumble Preview")
+            let activity = try Activity.request(
+                attributes: attributes,
+                content: fixtureActivityContent(state, params),
+                pushType: nil
+            )
+            fixtureActivityIDs = Set(fixtures.map(\.id)).union([activity.id])
+            return serializeFixtureActivity(activity)
+
+        case "update":
+            try requireIdleLiveActivityFixtureApp()
+            guard let id = params["id"] as? String,
+                  let activity = fixtures.first(where: { $0.id == id }) else {
+                throw TestCommandError("Missing or unknown fixture 'id'; use liveActivity.list")
+            }
+            guard activity.activityState == .active || activity.activityState == .stale else {
+                throw TestCommandError("The fixture activity has ended; start a new fixture")
+            }
+            let state = try liveActivityFixtureState(params, previous: activity.content.state)
+            nonisolated(unsafe) let activityToUpdate = activity
+            await activityToUpdate.update(fixtureActivityContent(state, params))
+            return serializeFixtureActivity(activity)
+
+        case "end":
+            let targets: [Activity<MumbleActivityAttributes>]
+            if let id = params["id"] as? String {
+                guard let activity = fixtures.first(where: { $0.id == id }) else {
+                    throw TestCommandError("Unknown fixture 'id'; use liveActivity.list")
+                }
+                targets = [activity]
+            } else {
+                targets = fixtures
+            }
+            for activity in targets {
+                nonisolated(unsafe) let activityToEnd = activity
+                await activityToEnd.end(nil, dismissalPolicy: .immediate)
+            }
+            let endedIDs = Set(targets.map(\.id))
+            fixtureActivityIDs.subtract(endedIDs)
+            return ["endedIDs": endedIDs.sorted()]
+
+        default:
+            throw TestCommandError("Unknown liveActivity.\(cmd). Available: start, update, end, list")
+        }
+    }
+
+    private func requireIdleLiveActivityFixtureApp() throws {
+        guard MUConnectionController.shared()?.isConnected() != true,
+              !AppState.shared.isConnecting, !AppState.shared.isReconnecting else {
+            throw TestCommandError("Use an idle Simulator app for Live Activity fixtures")
+        }
+    }
+
+    private func liveActivityFixtureState(
+        _ params: [String: Any],
+        previous: MumbleActivityAttributes.ContentState? = nil
+    ) throws -> MumbleActivityAttributes.ContentState {
+        var state = previous ?? MumbleActivityAttributes.ContentState(
+            speakers: [], userCount: 8, channelName: "周末开黑",
+            isSelfMuted: false, isSelfDeafened: false
+        )
+        if let fixture = params["fixture"] as? String {
+            state = MumbleActivityAttributes.ContentState(
+                speakers: [], userCount: 8, channelName: "周末开黑",
+                isSelfMuted: false, isSelfDeafened: false
+            )
+            switch fixture {
+            case "listening": break
+            case "speaking": state.speakers = ["小明", "Alice", "陈同学"]
+            case "muted": state.isSelfMuted = true
+            case "deafened":
+                state.isSelfMuted = true
+                state.isSelfDeafened = true
+            case "longNames":
+                state.channelName = "这是一个很长很长的频道名称 · International Mumble Community"
+                state.speakers = ["一位名字特别特别长的发言者 Alexandra", "Christopher the Great", "小明", "Alice"]
+                state.userCount = 128
+            default:
+                throw TestCommandError("Unknown fixture. Available: listening, speaking, muted, deafened, longNames")
+            }
+        }
+        if let speakers = params["speakers"] as? [String] { state.speakers = speakers }
+        if let channelName = params["channelName"] as? String { state.channelName = channelName }
+        if let userCount = intValue(params["userCount"]) { state.userCount = max(0, userCount) }
+        if let muted = boolValue(params["isSelfMuted"]) { state.isSelfMuted = muted }
+        if let deafened = boolValue(params["isSelfDeafened"]) { state.isSelfDeafened = deafened }
+        return state
+    }
+
+    private func fixtureActivityContent(
+        _ state: MumbleActivityAttributes.ContentState, _ params: [String: Any]
+    ) -> ActivityContent<MumbleActivityAttributes.ContentState> {
+        let staleAfter = (params["staleAfter"] as? NSNumber)?.doubleValue ?? 3600
+        let relevance = (params["relevanceScore"] as? NSNumber)?.doubleValue ?? 100
+        return ActivityContent(
+            state: state,
+            staleDate: Date().addingTimeInterval(min(3600, max(0, staleAfter))),
+            relevanceScore: min(100, max(0, relevance))
+        )
+    }
+
+    private func serializeFixtureActivity(_ activity: Activity<MumbleActivityAttributes>) -> [String: Any] {
+        let state = activity.content.state
+        return [
+            "id": activity.id,
+            "serverName": activity.attributes.serverName,
+            "activityState": String(describing: activity.activityState),
+            "speakers": state.speakers,
+            "userCount": state.userCount,
+            "channelName": state.channelName,
+            "isSelfMuted": state.isSelfMuted,
+            "isSelfDeafened": state.isSelfDeafened
+        ]
+    }
+    #endif
+
     // MARK: - Help
 
     private func handleHelp(_ cmd: String, _ params: [String: Any]) throws -> Any? {
-        return [
+        var help: [String: Any] = [
             "domains": [
                 "connection": ["connect", "disconnect", "acceptCert", "rejectCert", "status"],
                 "audio": ["mute", "unmute", "deafen", "undeafen", "toggleMute", "toggleDeafen", "startTest", "stopTest", "permission", "restart", "forceTransmit", "status"],
@@ -1591,7 +1739,13 @@ final class MUTestCommandRouter {
                 "channel.listeningAdded", "channel.listeningRemoved",
                 "log.entry", "ui.changed"
             ]
-        ] as [String: Any]
+        ]
+        #if os(iOS) && targetEnvironment(simulator)
+        var domains = help["domains"] as? [String: [String]] ?? [:]
+        domains["liveActivity"] = ["start", "update", "end", "list"]
+        help["domains"] = domains
+        #endif
+        return help
     }
 
     // MARK: - Helpers

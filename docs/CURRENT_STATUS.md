@@ -1,8 +1,25 @@
 # Current Project Status
 
-Last updated: 2026-09-10
+Last updated: 2026-09-19
 
 This document is the short, current source of truth for recent audio, network, UI-performance, and automation changes. Older investigation notes are kept for history, but this file should be checked first when deciding expected behavior.
+
+## Favourite Server Ping Lifetime (2026-09-19)
+
+- The favourites page owns its ping models and stops all of them when it disappears, including rows retained by lazy lists. Refreshing an unchanged server reuses its existing model; deleting or changing an endpoint stops the previous model.
+- DNS resolution creates an inactive pinger. Only the still-current page generation may register it and start sending packets; leaving during resolution cannot start background pinging later.
+- Explicit, idempotent pinger shutdown removes the subscriber and closes the shared timer/sockets after the last subscriber. Registering the same address again must not recreate or orphan the shared timer.
+- Late replies from a removed address/generation are rejected before their timestamp can become an invalid UI latency. Delegate callbacks stay on the main queue, and stopping inside a callback is supported.
+- `run_server_pinger_tests.sh` passes 459 native checks under ASan/UBSan, including real IPv4/IPv6 loopback packets, 24 subscribers sharing an address, repeated starts/stops, weak delegates, background stop and stale replies. `run_server_ping_model_tests.sh` compiles the production Swift model and passes 7 delayed-DNS/cancellation/deinit scenarios. Both platform builds pass.
+- Real macOS UI verification (`real_app_favourite_ping_probe.py`) passed three visits on September 19: each six-second visible window received 5 loopback probes and replies; each six-second window after dismissal received 0 packets. The test monitors page state throughout, removes only its temporary favourite, verifies existing favourites are unchanged, and restores the original screen. Evidence: `Tests/Artifacts/recovery-macos/favourite-ping-lifecycle.jsonl` (`passed=true`, no cleanup errors). iOS was build-checked; this page-level packet test ran on macOS.
+
+## macOS VPIO Recovery Loop (2026-09-17)
+
+- CoreAudio device-list notifications now trigger an effective-route comparison instead of unconditional audio reconstruction. VPIO's own aggregate-device events no longer create a rebuild loop.
+- Healthy VPIO callbacks permit same-device format changes; real device/aliveness changes and HAL format changes still trigger recovery. Startup baselines preserve device changes that occur during initialization.
+- Notification checks have their own generation and a bounded coalescing delay, so they cannot cancel genuine callback-stall recovery or postpone route checks indefinitely.
+- Native policy tests (480 assertions under ASan/UBSan), callback/buffer tests, and both platform builds pass.
+- On September 18, real built-in microphone/speaker testing passed three 60-second stages using `MKVoiceProcessingDevice`: initial join, recovery from an actual stopped AudioUnit, and rejoin. Graph starts remained at 1/2/3 respectively, with no recovery loop and both callback ages below 11 ms. The original input/output/system-output devices and settings were restored and subsequently verified. This proves callback recovery, not remote acoustic quality.
 
 ## Voice and Connection Recovery (2026-09-10)
 

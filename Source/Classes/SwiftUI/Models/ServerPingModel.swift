@@ -18,8 +18,9 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
     
     nonisolated(unsafe) private var pinger: MKServerPinger?
     private var startTask: Task<Void, Never>?
-    private let hostname: String
-    private let port: UInt
+    private var pingGeneration: UUID?
+    let hostname: String
+    let port: UInt
     
     init(hostname: String, port: UInt) {
         self.hostname = hostname
@@ -29,38 +30,43 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
 
     deinit {
         startTask?.cancel()
-        pinger?.setDelegate(nil)
+        pinger?.stop()
     }
     
     func startPinging() {
-        guard !hostname.isEmpty else { return }
+        guard !hostname.isEmpty, pingGeneration == nil else { return }
         MumbleLogger.network.debug("Start pinging \(hostname):\(port)")
-        // 取消/停止之前的（如果有）
-        stopPinging()
+        let generation = UUID()
+        pingGeneration = generation
 
         // 关键：MKServerPinger 的 init 会同步 getaddrinfo，可能阻塞主线程。
         // 这里把创建挪到后台，创建完成后再回到 MainActor 绑定 delegate。
         let host = hostname
         let portString = String(port)
         startTask = Task.detached(priority: .utility) { [weak self] in
-            guard let self else { return }
+            guard !Task.isCancelled else { return }
+            // DNS 完成不等于页面仍在。先创建未启动实例，验证本轮仍有效后才发包。
+            let created = MKServerPinger(hostname: host, port: portString, startImmediately: false)
 
-            let created = MKServerPinger(hostname: host, port: portString)
-
-            await MainActor.run {
-                // 如果期间已经 stop 了，就不再安装
-                guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, self.pingGeneration == generation, !Task.isCancelled else {
+                    created?.stop()
+                    return
+                }
+                self.startTask = nil
                 created?.setDelegate(self)
                 self.pinger = created
+                created?.start()
             }
         }
     }
     
     func stopPinging() {
+        pingGeneration = nil
         MumbleLogger.network.debug("Stop pinging \(hostname):\(port)")
         startTask?.cancel()
         startTask = nil
-        pinger?.setDelegate(nil)
+        pinger?.stop()
         pinger = nil
     }
     
@@ -75,7 +81,9 @@ class ServerPingModel: NSObject, ObservableObject, MKServerPingerDelegate {
         let curUsers = res.cur_users
         let maxUsers = res.max_users
 
-        Task { @MainActor in
+        // MKServerPinger 在主队列同步通知；不要再排一个可能跨越退出/重入的 UI 任务。
+        MainActor.assumeIsolated {
+            guard self.pingGeneration != nil, self.pinger != nil else { return }
             self.updateUI(ping: pingValue, cur: curUsers, max: maxUsers)
         }
     }

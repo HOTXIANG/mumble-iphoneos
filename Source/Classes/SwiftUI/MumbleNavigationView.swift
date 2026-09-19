@@ -100,9 +100,70 @@ struct MumbleNavigationView<Content: View>: View {
     }
 }
 
-// 导航管理器 (保持不变)
+// Navigation state survives changes between compact and regular-width layouts.
 class NavigationManager: ObservableObject {
-    @Published var navigationPath: NavigationPath = NavigationPath()
+    @Published var navigationPath: [NavigationDestination] = []
+    @Published var presentsFavouriteServersSheet = false {
+        didSet {
+            if oldValue && !presentsFavouriteServersSheet {
+                isDismissingFavouriteServersSheet = true
+            }
+        }
+    }
+    private var usesTabletLayout = false
+    private var isDismissingFavouriteServersSheet = false
+    private var restoreFavouriteServersAfterDismissal = false
+    private var isFavouriteEditorPresented = false
+
+    func openFavouriteServers() {
+        guard !isDismissingFavouriteServersSheet else { return }
+        if usesTabletLayout {
+            presentsFavouriteServersSheet = true
+        } else if navigationPath.last != .swiftUI(.favouriteServerList) {
+            navigate(to: .swiftUI(.favouriteServerList))
+        }
+    }
+
+    func updateFavouriteServersLayout(usesTabletLayout: Bool) {
+        self.usesTabletLayout = usesTabletLayout
+        adaptFavouriteServersPresentation()
+    }
+
+    func setFavouriteEditorPresented(_ isPresented: Bool) {
+        isFavouriteEditorPresented = isPresented
+        if !isPresented {
+            adaptFavouriteServersPresentation()
+        }
+    }
+
+    private func adaptFavouriteServersPresentation() {
+        // Keep an active editor (including its unsaved fields) attached until
+        // its dismissal completes. Rapid pose changes use the latest layout.
+        guard !isFavouriteEditorPresented, !isDismissingFavouriteServersSheet else { return }
+        if usesTabletLayout, navigationPath.last == .swiftUI(.favouriteServerList) {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                navigationPath.removeLast()
+                presentsFavouriteServersSheet = true
+            }
+        } else if !usesTabletLayout, presentsFavouriteServersSheet {
+            restoreFavouriteServersAfterDismissal = true
+            presentsFavouriteServersSheet = false
+        }
+    }
+
+    func favouriteServersSheetDidDismiss() {
+        isDismissingFavouriteServersSheet = false
+        guard restoreFavouriteServersAfterDismissal else { return }
+        restoreFavouriteServersAfterDismissal = false
+        openFavouriteServers()
+    }
+
+    func dismissFavouriteServersSheet() {
+        restoreFavouriteServersAfterDismissal = false
+        presentsFavouriteServersSheet = false
+    }
     
     func navigate(to destination: NavigationDestination) {
         navigationPath.append(destination)
@@ -115,7 +176,7 @@ class NavigationManager: ObservableObject {
     }
     
     func goToRoot() {
-        navigationPath = NavigationPath()
+        navigationPath = []
     }
 }
 

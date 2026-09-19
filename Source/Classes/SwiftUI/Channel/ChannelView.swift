@@ -209,6 +209,7 @@ private struct MacLockedChannelSplitView: NSViewControllerRepresentable {
 #endif
 
 struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: View>: View {
+    @Environment(\.usesTabletLayout) private var usesTabletLayout
     @ObservedObject var serverManager: ServerModelManager
     @StateObject private var appState = AppState.shared
     @StateObject private var languageManager = AppLanguageManager.shared
@@ -489,7 +490,7 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
 
     private var preferredChatWidth: CGFloat {
         #if os(iOS)
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if !usesTabletLayout {
             return min(maxChatWidth, max(minChatWidth, preferredServerListWidth))
         }
         #endif
@@ -498,7 +499,7 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
 
     private var preferredServerListMinimumWidth: CGFloat {
         #if os(iOS)
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if !usesTabletLayout {
             return preferredServerListWidth
         }
         #endif
@@ -507,7 +508,7 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
 
     private var preferredServerListMaximumWidth: CGFloat {
         #if os(iOS)
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if !usesTabletLayout {
             return preferredServerListWidth
         }
         #endif
@@ -529,7 +530,7 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
         let safeTotalWidth = sanitizedLayoutWidth(totalWidth)
         let maximumAvailableWidth = max(minServerListWidth, safeTotalWidth - minChatWidth)
         #if os(iOS)
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if !usesTabletLayout {
             return min(
                 max(minServerListWidth, (safeTotalWidth - splitDividerAllowance) / 2),
                 maximumAvailableWidth,

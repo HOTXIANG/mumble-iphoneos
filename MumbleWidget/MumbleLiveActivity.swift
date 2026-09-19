@@ -2,8 +2,6 @@
 //  MumbleLiveActivity.swift
 //  MumbleWidget
 //
-//  Created by 王梓田 on 1/3/26.
-//
 
 #if os(iOS) && !targetEnvironment(macCatalyst)
 import WidgetKit
@@ -13,195 +11,430 @@ import ActivityKit
 struct MumbleLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: MumbleActivityAttributes.self) { context in
-            // ==============================
-            // 1. 锁屏 / 通知中心 UI (保持不变)
-            // ==============================
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Image(systemName: "waveform.circle.fill")
-                        .foregroundColor(.accentColor)
-                    Text(context.attributes.serverName)
-                        .font(.caption)
-                        .bold()
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Label("\(context.state.userCount)", systemImage: "person.2.fill")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                
-                Divider().background(Color.gray.opacity(0.3))
-                
-                if context.state.speakers.isEmpty {
-                    HStack {
-                        Text(context.state.channelName)
-                            .font(.headline)
-                        Spacer()
-                        Text("No one is speaking")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.vertical, 4)
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Speaking now:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        // 锁屏界面空间足够，依然显示名单
-                        ForEach(context.state.speakers, id: \.self) { speaker in
-                            HStack {
-                                Image(systemName: "mic.fill")
-                                    .foregroundColor(.green)
-                                    .font(.caption)
-                                Text(speaker)
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                Spacer()
-                                WaveformView(color: .green)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding()
-            .activityBackgroundTint(Color.black.opacity(0.85))
-            .activitySystemActionForegroundColor(Color.white)
-
+            LiveActivityLockScreenView(
+                serverName: context.attributes.serverName,
+                state: context.state,
+                isStale: context.isStale
+            )
+            .activityBackgroundTint(LiveActivityStyle.background)
+            .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
-            // ==============================
-            // 2. 灵动岛 UI (Dynamic Island)
-            // ==============================
             DynamicIsland {
-                // --- 展开模式 (Expanded) ---
-                // 长按展开时，依然显示详细列表，因为这里空间足够且用户主动查看
-                DynamicIslandExpandedRegion(.leading) {
-                    Text(context.state.channelName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.leading, 8)
+                DynamicIslandExpandedRegion(.leading, priority: 1) {
+                    LiveActivityServerLabel(serverName: context.attributes.serverName)
+                        .padding(.leading, 4)
+                        .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 }
-                
-                DynamicIslandExpandedRegion(.trailing) {
-                    HStack {
-                        StatusIconView(isMuted: context.state.isSelfMuted, isDeafened: context.state.isSelfDeafened)
-                        Text(context.attributes.serverName)
-                            .font(.caption2)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.trailing, 8)
+                DynamicIslandExpandedRegion(.trailing, priority: 2) {
+                    LiveActivityAudioBadge(state: context.state, isStale: context.isStale)
+                        .padding(.trailing, 4)
+                        .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 }
-                
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if context.state.speakers.isEmpty {
-                            HStack {
-                                Text("No active speakers")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                Spacer()
-                            }
-                        } else {
-                            ForEach(Array(context.state.speakers.prefix(3)), id: \.self) { speaker in
-                                HStack {
-                                    Image(systemName: "mic.fill")
-                                        .foregroundColor(.green)
-                                    Text(speaker)
-                                        .bold()
-                                    Spacer()
-                                    WaveformView(color: .green)
-                                }
-                            }
-                            if context.state.speakers.count > 3 {
-                                Text("+ \(context.state.speakers.count - 3) others")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
+                    LiveActivityDetails(state: context.state, isStale: context.isStale)
+                        .padding(.horizontal, 4)
+                        .padding(.top, 6)
+                        .padding(.bottom, 4)
+                        .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 }
-                
             } compactLeading: {
-                // --- 紧凑模式左侧 (Compact Leading) ---
-                // 始终显示自我状态：闭麦/拒听/开麦
-                StatusIconView(isMuted: context.state.isSelfMuted, isDeafened: context.state.isSelfDeafened)
-                    .padding(.leading, 4)
-                
+                LiveActivityAudioIcon(state: context.state, isStale: context.isStale)
+                    .font(.system(size: 14, weight: .semibold))
             } compactTrailing: {
-                // --- 紧凑模式右侧 (Compact Trailing) ---
-                // ✅ 修改点：不再显示用户名，只显示数字
-                
-                if context.state.speakers.isEmpty {
-                    // 无人说话：显示灰色频道总人数
-                    Text("\(context.state.userCount)")
-                        .font(.caption2)
-                        .monospacedDigit()
-                        .foregroundColor(.gray)
-                } else {
-                    // 有人说话 (无论几人)：显示绿色数字
-                    HStack(spacing: 2) {
-                        Text("\(context.state.speakers.count)")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .monospacedDigit()
-                    }
-                    .foregroundColor(.green)
-                    .contentTransition(.numericText()) // 数字变化的过渡动画
-                }
-                
+                LiveActivityCompactIndicator(state: context.state, isStale: context.isStale)
             } minimal: {
-                // --- 极简模式 (Minimal) ---
-                if !context.state.speakers.isEmpty {
-                    // 有人说话：显示绿色数字
-                    Text("\(context.state.speakers.count)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
-                        .contentTransition(.numericText())
-                } else {
-                    // 无人说话：显示自我状态图标
-                    StatusIconView(isMuted: context.state.isSelfMuted, isDeafened: context.state.isSelfDeafened, size: 10)
-                }
+                LiveActivityMinimalIndicator(state: context.state, isStale: context.isStale)
             }
+            .keylineTint(LiveActivityStyle.speaking)
         }
     }
 }
 
-// 辅助视图保持不变
-struct StatusIconView: View {
-    let isMuted: Bool
-    let isDeafened: Bool
-    var size: CGFloat = 14
-    
+// MARK: - Shared presentation
+
+private enum LiveActivityStyle {
+    static let background = Color(red: 0.065, green: 0.05, blue: 0.10)
+    // Lift the icon's violet (#6155F5) for legibility on the island's black surface.
+    static let speaking = Color(red: 0.69, green: 0.62, blue: 1.0)
+    static let secondary = Color.white.opacity(0.65)
+}
+
+private struct LiveActivityAudioStatus {
+    let state: MumbleActivityAttributes.ContentState
+    let isStale: Bool
+
+    var symbol: String {
+        if isStale { return "clock.arrow.circlepath" }
+        if state.isSelfDeafened { return "speaker.slash.fill" }
+        if state.isSelfMuted { return "mic.slash.fill" }
+        return "mic.fill"
+    }
+
+    var title: LocalizedStringKey {
+        if isStale { return "Waiting for updates" }
+        if state.isSelfDeafened { return "Deafened" }
+        if state.isSelfMuted { return "Muted" }
+        return "Microphone on"
+    }
+
+    var color: Color {
+        if isStale { return .orange }
+        if state.isSelfDeafened { return Color(red: 1, green: 0.48, blue: 0.46) }
+        if state.isSelfMuted { return Color(red: 1, green: 0.76, blue: 0.38) }
+        return LiveActivityStyle.speaking
+    }
+}
+
+private struct LiveActivityAudioIcon: View {
+    let state: MumbleActivityAttributes.ContentState
+    let isStale: Bool
+
+    var body: some View {
+        let status = LiveActivityAudioStatus(state: state, isStale: isStale)
+        Image(systemName: status.symbol)
+            .foregroundStyle(status.color)
+            .accessibilityLabel(Text(status.title, tableName: "LiveActivity"))
+    }
+}
+
+private struct LiveActivityAudioBadge: View {
+    let state: MumbleActivityAttributes.ContentState
+    let isStale: Bool
+
+    var body: some View {
+        let status = LiveActivityAudioStatus(state: state, isStale: isStale)
+        Label {
+            Text(status.title, tableName: "LiveActivity")
+        } icon: {
+            Image(systemName: status.symbol)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(status.color)
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(status.color.opacity(0.12), in: Capsule())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct LiveActivityServerLabel: View {
+    let serverName: String
+
+    var body: some View {
+        Label {
+            Text(verbatim: serverName)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        } icon: {
+            Image(systemName: "waveform.circle.fill")
+                .foregroundStyle(LiveActivityStyle.speaking)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(LiveActivityStyle.secondary)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct LiveActivityLockScreenView: View {
+    let serverName: String
+    let state: MumbleActivityAttributes.ContentState
+    var isStale = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                LiveActivityServerLabel(serverName: serverName)
+                Spacer(minLength: 4)
+                LiveActivityAudioBadge(state: state, isStale: isStale)
+                    .layoutPriority(1)
+            }
+            LiveActivityDetails(state: state, isStale: isStale)
+        }
+        .padding(16)
+        .foregroundStyle(.white)
+        // Live Activity banners have a limited height; VoiceOver retains full names.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+    }
+}
+
+private struct LiveActivityDetails: View {
+    let state: MumbleActivityAttributes.ContentState
+    let isStale: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Group {
+                    if state.channelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Channel", tableName: "LiveActivity")
+                    } else {
+                        Text(verbatim: state.channelName)
+                    }
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if !isStale {
+                    Label {
+                        Text(max(0, state.userCount), format: .number)
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                    } icon: {
+                        Image(systemName: "person.2.fill")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(LiveActivityStyle.secondary)
+                    .fixedSize()
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(
+                        "\(max(0, state.userCount)) in channel", tableName: "LiveActivity"
+                    ))
+                }
+            }
+            LiveActivitySpeakerSummary(state: state, isStale: isStale)
+        }
+    }
+}
+
+private struct LiveActivitySpeakerSummary: View {
+    let state: MumbleActivityAttributes.ContentState
+    let isStale: Bool
+    @Environment(\.locale) private var locale
+
+    private var isSpeaking: Bool {
+        !isStale && !state.isSelfDeafened && !state.speakers.isEmpty
+    }
+    private var tint: Color {
+        if isStale { return .orange }
+        return isSpeaking ? LiveActivityStyle.speaking : LiveActivityStyle.secondary
+    }
+    private var title: LocalizedStringKey {
+        if isStale { return "Waiting for updates" }
+        if isSpeaking { return "Speaking now" }
+        return state.isSelfDeafened ? "Audio paused" : "Listening"
+    }
+    private var idleMessage: LocalizedStringKey {
+        if isStale { return "Open Mumble to refresh" }
+        return state.isSelfDeafened ? "Microphone and sound are off" : "No one is speaking"
+    }
+
     var body: some View {
         Group {
-            if isDeafened {
-                Image(systemName: "speaker.slash.fill")
-                    .foregroundColor(.red)
-            } else if isMuted {
-                Image(systemName: "mic.slash.fill")
-                    .foregroundColor(.orange)
+            if isSpeaking && state.speakers.count > 1 {
+                ViewThatFits(in: .horizontal) {
+                    summaryRow(visibleSpeakerCount: 2, truncateNames: false)
+                    summaryRow(visibleSpeakerCount: 1, truncateNames: true)
+                }
             } else {
-                Image(systemName: "mic.fill")
-                    .foregroundColor(.gray)
+                summaryRow(visibleSpeakerCount: 1, truncateNames: true)
             }
         }
-        .font(.system(size: size))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(tint.opacity(isSpeaking ? 0.09 : 0.06), in: RoundedRectangle(cornerRadius: 13))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func summaryRow(visibleSpeakerCount: Int, truncateNames: Bool) -> some View {
+        HStack(spacing: 10) {
+            Group {
+                if isSpeaking {
+                    LiveActivityWaveform()
+                } else {
+                    Image(systemName: isStale ? "clock.arrow.circlepath" :
+                        (state.isSelfDeafened ? "speaker.slash.fill" : "headphones"))
+                        .font(.system(size: 18, weight: .medium))
+                }
+            }
+            .foregroundStyle(tint)
+            .frame(width: 26)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title, tableName: "LiveActivity")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(tint)
+                if isSpeaking {
+                    // Fall back to one name before the second name disappears into truncation.
+                    Text(verbatim: state.speakers.prefix(visibleSpeakerCount).formatted(.list(type: .and, width: .narrow).locale(locale)))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: !truncateNames, vertical: false)
+                } else {
+                    Text(idleMessage, tableName: "LiveActivity")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isSpeaking && state.speakers.count > visibleSpeakerCount {
+                Text("+\(state.speakers.count - visibleSpeakerCount)")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(tint)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+                    .background(tint.opacity(0.12), in: Capsule())
+                    .fixedSize()
+                    .accessibilityLabel(Text(
+                        "\(state.speakers.count - visibleSpeakerCount) more speakers", tableName: "LiveActivity"
+                    ))
+            }
+        }
     }
 }
 
-struct WaveformView: View {
-    var color: Color
+private struct LiveActivityMinimalIndicator: View {
+    let state: MumbleActivityAttributes.ContentState
+    let isStale: Bool
+
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(0..<4) { _ in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(color)
-                    .frame(width: 3, height: .random(in: 8...16))
+        Group {
+            // Keep mute/deafen visible even while other people are speaking.
+            if !isStale && !state.isSelfMuted && !state.isSelfDeafened && !state.speakers.isEmpty {
+                LiveActivityWaveform()
+                    .foregroundStyle(LiveActivityStyle.speaking)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("\(state.speakers.count) speaking", tableName: "LiveActivity"))
+            } else {
+                LiveActivityAudioIcon(state: state, isStale: isStale)
+                    .font(.system(size: 14, weight: .semibold))
             }
         }
+        // Match the attached and detached islands, including when audio state changes.
+        .frame(width: 24, height: 24)
     }
 }
+
+private struct LiveActivityCompactIndicator: View {
+    let state: MumbleActivityAttributes.ContentState
+    let isStale: Bool
+
+    private var isSpeaking: Bool { !state.isSelfDeafened && !state.speakers.isEmpty }
+    private var count: Int { isSpeaking ? state.speakers.count : max(0, state.userCount) }
+
+    var body: some View {
+        Group {
+            if isStale {
+                Image(systemName: "ellipsis")
+                    .foregroundStyle(LiveActivityStyle.secondary)
+                    .accessibilityLabel(Text("Waiting for updates", tableName: "LiveActivity"))
+            } else {
+                HStack(spacing: 3) {
+                    if isSpeaking {
+                        LiveActivityWaveform(compact: true)
+                    }
+                    Text(count > 99 ? "99+" : count.formatted())
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                }
+                .foregroundStyle(isSpeaking ? LiveActivityStyle.speaking : LiveActivityStyle.secondary)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(isSpeaking
+                    ? Text("\(count) speaking", tableName: "LiveActivity")
+                    : Text("\(count) in channel", tableName: "LiveActivity"))
+            }
+        }
+        .frame(minWidth: 20)
+    }
+}
+
+private struct LiveActivityWaveform: View {
+    var compact = false
+
+    var body: some View {
+        // A stable speaking indicator, not a randomly changing audio level.
+        HStack(spacing: 2) {
+            ForEach(Array([0.4, 0.75, 1.0, 0.6, 0.35].enumerated()), id: \.offset) { _, height in
+                Capsule()
+                    .frame(width: compact ? 2 : 3, height: (compact ? 13 : 22) * height)
+            }
+        }
+        .frame(height: compact ? 14 : 24)
+    }
+}
+
+// MARK: - Deterministic system previews
+
+#if DEBUG
+private extension MumbleActivityAttributes {
+    static var preview: Self { Self(serverName: "Mumble · Night Owls") }
+}
+
+private extension MumbleActivityAttributes.ContentState {
+    static var listening: Self {
+        Self(speakers: [], userCount: 8, channelName: "The Lounge", isSelfMuted: false, isSelfDeafened: false)
+    }
+    static var speaking: Self {
+        Self(speakers: ["Alex", "Morgan", "Sam", "Taylor"], userCount: 12,
+             channelName: "The Lounge", isSelfMuted: false, isSelfDeafened: false)
+    }
+    static var muted: Self {
+        Self(speakers: ["小林", "正在分享旅行见闻的朋友", "Alex"], userCount: 128,
+             channelName: "周末闲聊 · 一起分享最近的生活和音乐", isSelfMuted: true, isSelfDeafened: false)
+    }
+    static var deafened: Self {
+        Self(speakers: [], userCount: 8, channelName: "The Lounge", isSelfMuted: true, isSelfDeafened: true)
+    }
+    static var deafenedWhileSpeaking: Self {
+        Self(speakers: ["Alex", "Morgan"], userCount: 8,
+             channelName: "The Lounge", isSelfMuted: true, isSelfDeafened: true)
+    }
+}
+
+#Preview("Lock Screen", as: .content, using: MumbleActivityAttributes.preview) {
+    MumbleLiveActivity()
+} contentStates: {
+    MumbleActivityAttributes.ContentState.listening
+    MumbleActivityAttributes.ContentState.speaking
+    MumbleActivityAttributes.ContentState.muted
+    MumbleActivityAttributes.ContentState.deafened
+    MumbleActivityAttributes.ContentState.deafenedWhileSpeaking
+}
+
+#Preview("Expanded", as: .dynamicIsland(.expanded), using: MumbleActivityAttributes.preview) {
+    MumbleLiveActivity()
+} contentStates: {
+    MumbleActivityAttributes.ContentState.speaking
+    MumbleActivityAttributes.ContentState.muted
+    MumbleActivityAttributes.ContentState.deafened
+    MumbleActivityAttributes.ContentState.deafenedWhileSpeaking
+}
+
+#Preview("Compact", as: .dynamicIsland(.compact), using: MumbleActivityAttributes.preview) {
+    MumbleLiveActivity()
+} contentStates: {
+    MumbleActivityAttributes.ContentState.listening
+    MumbleActivityAttributes.ContentState.speaking
+    MumbleActivityAttributes.ContentState.muted
+    MumbleActivityAttributes.ContentState.deafenedWhileSpeaking
+}
+
+#Preview("Minimal", as: .dynamicIsland(.minimal), using: MumbleActivityAttributes.preview) {
+    MumbleLiveActivity()
+} contentStates: {
+    MumbleActivityAttributes.ContentState.speaking
+    MumbleActivityAttributes.ContentState.muted
+    MumbleActivityAttributes.ContentState.deafened
+    MumbleActivityAttributes.ContentState.deafenedWhileSpeaking
+}
+
+#Preview("Stale · Long names") {
+    LiveActivityLockScreenView(
+        serverName: "Mumble · A very long community server name",
+        state: .muted,
+        isStale: true
+    )
+    .background(LiveActivityStyle.background, in: RoundedRectangle(cornerRadius: 22))
+    .frame(width: 320)
+    .environment(\.locale, Locale(identifier: "zh-Hans"))
+}
+#endif
 #endif

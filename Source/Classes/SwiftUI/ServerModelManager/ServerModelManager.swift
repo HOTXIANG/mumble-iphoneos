@@ -131,6 +131,12 @@ class ServerModelManager: ObservableObject {
     var lastKnownChannelIdByUserSession: [UInt: UInt] = [:]
     #if os(iOS)
     var liveActivity: Activity<MumbleActivityAttributes>?
+    var liveActivitySessionScope: ListeningSessionScope?
+    var lastLiveActivityContentState: MumbleActivityAttributes.ContentState?
+    var pendingLiveActivityContent: (state: MumbleActivityAttributes.ContentState, forceRefresh: Bool)?
+    var pendingLiveActivityUpdateTask: Task<Void, Never>?
+    var liveActivityUpdateGeneration: UInt = 0
+    var liveActivitiesBeingEnded: Set<String> = []
     #endif
     var keepAliveTimer: Timer?
     let systemMuteManager = SystemMuteManager()
@@ -228,6 +234,12 @@ class ServerModelManager: ObservableObject {
 
         Task.detached(priority: .utility) {
             for activity in Activity<MumbleActivityAttributes>.activities {
+                #if DEBUG && targetEnvironment(simulator)
+                // Idle simulator fixtures must survive returning to the app for
+                // visual checks; the debug fixture commands manage their cleanup.
+                let fixtureIDs = UserDefaults.standard.stringArray(forKey: "MUTestLiveActivityIDs") ?? []
+                guard !fixtureIDs.contains(activity.id) else { continue }
+                #endif
                 MumbleLogger.general.info("Ending stale Live Activity after disconnected launch: \(activity.id)")
                 await activity.end(nil, dismissalPolicy: .immediate)
             }

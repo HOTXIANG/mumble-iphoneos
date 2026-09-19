@@ -31,7 +31,7 @@ struct FavouriteServerListNavigationConfig: NavigationConfigurable {
 
 struct FavouriteServerRowView: View {
     let server: MUFavouriteServer
-    @StateObject private var pingModel: ServerPingModel
+    @ObservedObject var pingModel: ServerPingModel
     @ObservedObject var certModel = CertificateModel.shared
     @Environment(\.colorScheme) private var colorScheme
 
@@ -58,11 +58,6 @@ struct FavouriteServerRowView: View {
     private let pingFontSize: CGFloat = 14
     private let usersFontSize: CGFloat = 13
     #endif
-    
-    init(server: MUFavouriteServer) {
-        self.server = server
-        _pingModel = StateObject(wrappedValue: ServerPingModel(hostname: server.hostName, port: UInt(server.port)))
-    }
     
     var body: some View {
         HStack(spacing: rowHStackSpacing) {
@@ -151,13 +146,6 @@ struct FavouriteServerRowView: View {
         #else
         .modifier(ClearGlassModifier(cornerRadius: rowCornerRadius))
         #endif
-        .onAppear {
-            // startPinging 内部已异步化（不会阻塞主线程）
-            pingModel.startPinging()
-        }
-        .onDisappear {
-            pingModel.stopPinging()
-        }
     }
 }
 
@@ -165,6 +153,41 @@ struct FavouriteServerRowView: View {
 @MainActor
 class FavouriteServerListViewModel: ObservableObject {
     @Published var servers: [MUFavouriteServer] = []
+    private(set) var pingModels: [NSInteger: ServerPingModel] = [:]
+    private var isPinging = false
+
+    func startPinging() {
+        isPinging = true
+        pingModels.values.forEach { $0.startPinging() }
+    }
+
+    func stopPinging() {
+        isPinging = false
+        pingModels.values.forEach { $0.stopPinging() }
+    }
+
+    private func updateServers(_ servers: [MUFavouriteServer]) {
+        var nextModels: [NSInteger: ServerPingModel] = [:]
+        for server in servers {
+            let host = server.hostName ?? ""
+            let port = UInt(server.port)
+            let existing = pingModels[server.primaryKey]
+            if let existing, existing.hostname == host, existing.port == port {
+                nextModels[server.primaryKey] = existing
+            } else {
+                existing?.stopPinging()
+                nextModels[server.primaryKey] = ServerPingModel(hostname: host, port: port)
+            }
+        }
+        for (id, model) in pingModels where nextModels[id] == nil {
+            model.stopPinging()
+        }
+        pingModels = nextModels
+        if isPinging {
+            pingModels.values.forEach { $0.startPinging() }
+        }
+        self.servers = servers
+    }
     
     func loadServers() {
         let result = MUDatabase.fetchVisibleFavourites()
@@ -205,10 +228,10 @@ class FavouriteServerListViewModel: ObservableObject {
                 ($0.displayName ?? "").localizedCaseInsensitiveCompare($1.displayName ?? "") == .orderedAscending
             }
             MumbleLogger.database.debug("FavouriteServers: loaded \(sorted.count) visible servers from database")
-            self.servers = sorted
+            updateServers(sorted)
         } else {
             MumbleLogger.database.warning("FavouriteServers: fetchVisibleFavourites returned nil")
-            self.servers = []
+            updateServers([])
         }
     }
 }
@@ -239,19 +262,20 @@ struct FavouriteServerListContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
-        .task {
-            MumbleLogger.ui.verbose("FavouriteServers: .task fired")
-            viewModel.loadServers()
-        }
         .onAppear {
             MumbleLogger.ui.verbose("FavouriteServers: .onAppear fired")
             viewModel.loadServers()
+            viewModel.startPinging()
             if !didRefreshCertificates {
                 didRefreshCertificates = true
                 DispatchQueue.main.async {
                     CertificateModel.shared.refreshCertificates()
                 }
             }
+        }
+        .onDisappear {
+            // 页面统一停止，不能依赖 LazyVStack/List 是否及时释放每一行。
+            viewModel.stopPinging()
         }
         .onChange(of: refreshTrigger) { _, _ in
             viewModel.loadServers()
@@ -294,30 +318,32 @@ struct FavouriteServerListContentView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(viewModel.servers, id: \.primaryKey) { server in
-                    FavouriteServerRowView(server: server)
-                        .contentShape(Rectangle())
-                        .onTapGesture { connectToServer(server) }
-                        .contextMenu {
-                            Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
-                            Button("Edit", systemImage: "pencil") { editServer(server) }
+                    if let pingModel = viewModel.pingModels[server.primaryKey] {
+                        FavouriteServerRowView(server: server, pingModel: pingModel)
+                            .contentShape(Rectangle())
+                            .onTapGesture { connectToServer(server) }
+                            .contextMenu {
+                                Button("Connect", systemImage: "bolt.fill") { connectToServer(server) }
+                                Button("Edit", systemImage: "pencil") { editServer(server) }
 
-                            if isServerPinned(server) {
-                                Button("Remove from Widget", systemImage: "minus.square") {
-                                    unpinFromWidget(server)
+                                if isServerPinned(server) {
+                                    Button("Remove from Widget", systemImage: "minus.square") {
+                                        unpinFromWidget(server)
+                                    }
+                                } else {
+                                    Button("Add to Widget", systemImage: "plus.square.on.square") {
+                                        pinToWidget(server)
+                                    }
                                 }
-                            } else {
-                                Button("Add to Widget", systemImage: "plus.square.on.square") {
-                                    pinToWidget(server)
+
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    self.serverToDelete = server
+                                    self.showingDeleteAlert = true
                                 }
                             }
-
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                self.serverToDelete = server
-                                self.showingDeleteAlert = true
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                    }
                 }
             }
         }
@@ -344,7 +370,9 @@ struct FavouriteServerListContentView: View {
                         self.showingDeleteAlert = true
                     }
                 } label: {
-                    FavouriteServerRowView(server: server)
+                    if let pingModel = viewModel.pingModels[server.primaryKey] {
+                        FavouriteServerRowView(server: server, pingModel: pingModel)
+                    }
                 }
             }
             .listRowBackground(Color.clear)
@@ -524,6 +552,7 @@ struct FavouriteServerListView: MumbleContentView {
         }
         .onChange(of: showingNewSheet) { _, isPresented in
             if isPresented {
+                navigationManager.setFavouriteEditorPresented(true)
                 appState.setAutomationPresentedSheet("favouriteNew")
             } else {
                 appState.clearAutomationPresentedSheet(ifMatches: "favouriteNew")
@@ -531,6 +560,7 @@ struct FavouriteServerListView: MumbleContentView {
         }
         .onChange(of: serverToEdit?.id) { _, newValue in
             if newValue != nil {
+                navigationManager.setFavouriteEditorPresented(true)
                 appState.setAutomationPresentedSheet("favouriteEdit")
             } else {
                 appState.clearAutomationPresentedSheet(ifMatches: "favouriteEdit")
@@ -540,6 +570,7 @@ struct FavouriteServerListView: MumbleContentView {
         .sheet(isPresented: $showingNewSheet, onDismiss: {
             // Sheet 完全关闭后再刷新列表，避免 macOS 上 SwiftUI 在 sheet 动画期间不传播状态
             refreshTrigger = UUID()
+            navigationManager.setFavouriteEditorPresented(false)
         }) {
             NavigationStack {
                 FavouriteServerEditView(server: nil) { savedServer in
@@ -551,6 +582,7 @@ struct FavouriteServerListView: MumbleContentView {
         // 编辑收藏 —— 使用 .sheet(item:) 保证 server 一定非 nil
         .sheet(item: $serverToEdit, onDismiss: {
             refreshTrigger = UUID()
+            navigationManager.setFavouriteEditorPresented(false)
         }) { editable in
             NavigationStack {
                 FavouriteServerEditView(server: editable.server) { savedServer in

@@ -8,6 +8,19 @@
 import Foundation
 import SwiftUI
 
+// Resolve this at the app root: a split-view column or sheet can report a
+// compact size class even when the surrounding window uses the tablet layout.
+private struct UsesTabletLayoutKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var usesTabletLayout: Bool {
+        get { self[UsesTabletLayoutKey.self] }
+        set { self[UsesTabletLayoutKey.self] = newValue }
+    }
+}
+
 #if canImport(UIKit)
 import UIKit
 public typealias PlatformImage = UIImage

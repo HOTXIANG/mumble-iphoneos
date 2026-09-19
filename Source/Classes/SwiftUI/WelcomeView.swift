@@ -39,6 +39,7 @@ struct WelcomeNavigationConfig: NavigationConfigurable {
 struct WelcomeContentView: View {
     @EnvironmentObject var navigationManager: NavigationManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.usesTabletLayout) private var usesTabletLayout
     #if os(iOS)
         @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
@@ -47,7 +48,6 @@ struct WelcomeContentView: View {
     @ObservedObject private var appState = AppState.shared
 
     @State private var favouriteServers: [MUFavouriteServer] = []
-    @State private var showFavouritesSheet = false
 
     #if os(macOS)
         private let logoSize: CGFloat = 130
@@ -87,7 +87,7 @@ struct WelcomeContentView: View {
 
     private var isLandscapePhone: Bool {
         #if os(iOS)
-            UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass == .compact
+            !usesTabletLayout && verticalSizeClass == .compact
         #else
             false
         #endif
@@ -166,17 +166,7 @@ struct WelcomeContentView: View {
 
                 VStack(spacing: 0) {
 
-                    Button(action: {
-                        #if os(iOS)
-                            if UIDevice.current.userInterfaceIdiom == .phone {
-                                navigationManager.navigate(to: .swiftUI(.favouriteServerList))
-                            } else {
-                                showFavouritesSheet = true
-                            }
-                        #else
-                            showFavouritesSheet = true
-                        #endif
-                    }) {
+                    Button(action: openFavouriteServers) {
                         ViewThatFits(in: .horizontal) {
                             // 宽度足够时：完整显示星星 + 文字 + 箭头
                             HStack(spacing: 16) {
@@ -331,41 +321,19 @@ struct WelcomeContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .muAutomationOpenUI)) { notification in
             guard let target = notification.userInfo?["target"] as? String else { return }
             guard target == "favouriteList" else { return }
-            #if os(iOS)
-            if UIDevice.current.userInterfaceIdiom == .phone {
-                navigationManager.navigate(to: .swiftUI(.favouriteServerList))
-            } else {
-                showFavouritesSheet = true
-            }
-            #else
-            showFavouritesSheet = true
-            #endif
+            openFavouriteServers()
         }
         .onReceive(NotificationCenter.default.publisher(for: .muAutomationDismissUI)) { notification in
             let target = notification.userInfo?["target"] as? String
             guard target == nil || target == "favouriteList" else { return }
-            showFavouritesSheet = false
-        }
-        .onChange(of: showFavouritesSheet) { _, isPresented in
-            if isPresented {
-                appState.setAutomationPresentedSheet("favouriteList")
-            } else {
-                appState.clearAutomationPresentedSheet(ifMatches: "favouriteList")
-            }
-        }
-        .sheet(isPresented: $showFavouritesSheet) {
-            NavigationStack {
-                FavouriteServerListView(isModalPresentation: true)
-                    .environmentObject(navigationManager)
-            }
-            #if os(macOS)
-            .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 550)
-            #elseif os(iOS)
-            .presentationDetents([.large])
-            #endif
+            navigationManager.dismissFavouriteServersSheet()
         }
     }
     
+    private func openFavouriteServers() {
+        navigationManager.openFavouriteServers()
+    }
+
     private func connectTo(hostname: String, port: Int, username: String, displayName: String, password overridePassword: String? = nil) {
         AppState.shared.serverDisplayName = hostname
         PlatformImpactFeedback(style: .medium).impactOccurred()
@@ -1004,6 +972,21 @@ private final class MacAppRootSplitRuntime: ObservableObject {
 struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
+
+    private var usesTabletLayout: Bool {
+        #if os(iOS)
+        // Duo's inner display is regular in both dimensions. Keep the short
+        // landscape phone layout, and preserve iPad's native compact adaptation.
+        UIDevice.current.userInterfaceIdiom == .pad
+            || (horizontalSizeClass == .regular && verticalSizeClass == .regular)
+        #else
+        true
+        #endif
+    }
     
     @StateObject private var serverManager: ServerModelManager
     @StateObject private var languageManager = AppLanguageManager.shared
@@ -1043,7 +1026,10 @@ struct AppRootView: View {
     var body: some View {
         // NavigationSplitView 在窄屏自动折叠，在 iPad 与横屏 iPhone
         // 有足够空间时使用系统原生并排分栏。
-        adaptiveSplitLayout
+        navigationLayout
+        #if os(iOS)
+        .environment(\.usesTabletLayout, usesTabletLayout)
+        #endif
         .environment(\.locale, Locale(identifier: languageManager.localeIdentifier))
         .preferredColorScheme(selectedAppColorScheme.preferredColorScheme)
         .environmentObject(serverManager)
@@ -1339,16 +1325,47 @@ struct AppRootView: View {
     }
     
     // MARK: - Adaptive Native Split View Layout
+
+    private var navigationLayout: some View {
+        adaptiveSplitLayout
+        .onChange(of: usesTabletLayout, initial: true) { _, usesTabletLayout in
+            sidebarNavigationManager.updateFavouriteServersLayout(usesTabletLayout: usesTabletLayout)
+        }
+        .onChange(of: sidebarNavigationManager.presentsFavouriteServersSheet) { _, isPresented in
+            if isPresented {
+                appState.setAutomationPresentedSheet("favouriteList")
+            } else {
+                appState.clearAutomationPresentedSheet(ifMatches: "favouriteList")
+            }
+        }
+        .sheet(isPresented: $sidebarNavigationManager.presentsFavouriteServersSheet, onDismiss: {
+            sidebarNavigationManager.favouriteServersSheetDidDismiss()
+        }) {
+            NavigationStack {
+                FavouriteServerListView(isModalPresentation: true)
+                    .environmentObject(sidebarNavigationManager)
+            }
+            #if os(macOS)
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 550)
+            #else
+            .presentationDetents([.large])
+            #endif
+        }
+    }
     
     private var adaptiveSplitLayout: some View {
         GeometryReader { geo in
             Group {
                 #if os(iOS)
-                if UIDevice.current.userInterfaceIdiom == .phone {
-                    phoneRootLayout
-                } else if appState.isConnected {
-                    iPadConnectedRootLayout
+                if appState.isConnected {
+                    if usesTabletLayout {
+                        iPadConnectedRootLayout
+                    } else {
+                        phoneRootLayout
+                    }
                 } else {
+                    // Keep one navigation hierarchy while Duo opens/closes so
+                    // the welcome page, navigation path and sheets stay alive.
                     splitLayout
                 }
                 #else
