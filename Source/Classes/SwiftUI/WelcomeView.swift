@@ -93,8 +93,11 @@ struct WelcomeContentView: View {
         #endif
     }
 
-    private var welcomeLayout: AnyLayout {
-        if isLandscapePhone {
+    private func welcomeLayout(availableWidth: CGFloat) -> AnyLayout {
+        // A landscape phone can already be showing this view inside a narrow
+        // split-view sidebar. Only arrange its content side by side when this
+        // view itself has room for two 300-point sections.
+        if isLandscapePhone && availableWidth >= 600 {
             return AnyLayout(HStackLayout(alignment: .top, spacing: 0))
         }
         return AnyLayout(VStackLayout(spacing: 0))
@@ -129,7 +132,14 @@ struct WelcomeContentView: View {
     }
 
     var body: some View {
-        welcomeLayout {
+        GeometryReader { geometry in
+            welcomeContent(availableWidth: geometry.size.width)
+        }
+    }
+
+    private func welcomeContent(availableWidth: CGFloat) -> some View {
+        let layout = welcomeLayout(availableWidth: availableWidth)
+        return layout {
             VStack(spacing: 0) {
                 ZStack {
                     if colorScheme == .dark {
@@ -969,6 +979,18 @@ private final class MacAppRootSplitRuntime: ObservableObject {
 }
 #endif
 
+private enum ConnectionAlert: Identifiable {
+    case error(AppError)
+    case certificateTrust(CertTrustInfo)
+
+    var id: UUID {
+        switch self {
+        case .error(let error): return error.id
+        case .certificateTrust(let info): return info.id
+        }
+    }
+}
+
 struct AppRootView: View {
     @ObservedObject private var appState = AppState.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -987,12 +1009,47 @@ struct AppRootView: View {
         true
         #endif
     }
+
+    private var usesFavouriteServersSheet: Bool {
+        #if os(iOS)
+        // Landscape phones use a sheet without opting into the tablet's
+        // channel/sidebar layout. Resolve this from the root window traits.
+        usesTabletLayout || verticalSizeClass == .compact
+        #else
+        true
+        #endif
+    }
     
     @StateObject private var serverManager: ServerModelManager
     @StateObject private var languageManager = AppLanguageManager.shared
     @AppStorage("AppColorScheme") private var appColorSchemeRawValue: String = AppColorSchemeOption.system.rawValue
     @AppStorage("HasCompletedVADOnboarding") private var hasCompletedVADOnboarding: Bool = false
     @State private var showVADOnboarding = false
+
+    private var connectionAlert: Binding<ConnectionAlert?> {
+        let alert: ConnectionAlert?
+        if let info = appState.pendingCertTrust {
+            alert = .certificateTrust(info)
+        } else {
+            alert = appState.activeError.map(ConnectionAlert.error)
+        }
+        return Binding(
+            get: { alert },
+            set: { newValue in
+                guard case .none = newValue else { return }
+                // Dismissing certificate trust can synchronously produce an error.
+                // Only clear the item belonging to the dismissed presentation.
+                switch alert {
+                case .error(let error) where appState.activeError?.id == error.id:
+                    appState.activeError = nil
+                case .certificateTrust(let info) where appState.pendingCertTrust?.id == info.id:
+                    appState.pendingCertTrust = nil
+                default:
+                    break
+                }
+            }
+        )
+    }
     
     // 原生分栏的侧边栏与详情分别维护导航状态。
     @StateObject private var sidebarNavigationManager = NavigationManager()
@@ -1239,37 +1296,39 @@ struct AppRootView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: appState.activeMacImagePreview != nil)
         #endif
-        .alert(item: $appState.activeError) { error in
-            Alert(title: Text(error.title), message: Text(error.message), dismissButton: .default(Text("OK")))
-        }
-        .alert(item: $appState.pendingCertTrust) { info in
-            let title = info.isChanged
-                ? NSLocalizedString("Certificate Changed", comment: "")
-                : NSLocalizedString("Untrusted Certificate", comment: "")
-            let body = """
-            \(info.hostname):\(info.port)
+        .alert(item: connectionAlert) { alert in
+            switch alert {
+            case .error(let error):
+                return Alert(title: Text(error.title), message: Text(error.message), dismissButton: .default(Text("OK")))
+            case .certificateTrust(let info):
+                let title = info.isChanged
+                    ? NSLocalizedString("Certificate Changed", comment: "")
+                    : NSLocalizedString("Untrusted Certificate", comment: "")
+                let body = """
+                \(info.hostname):\(info.port)
 
-            \(NSLocalizedString("Subject", comment: "")): \(info.subjectName)
-            \(NSLocalizedString("Issuer", comment: "")): \(info.issuerName)
-            \(NSLocalizedString("Valid", comment: "")): \(info.notBefore) – \(info.notAfter)
+                \(NSLocalizedString("Subject", comment: "")): \(info.subjectName)
+                \(NSLocalizedString("Issuer", comment: "")): \(info.issuerName)
+                \(NSLocalizedString("Valid", comment: "")): \(info.notBefore) – \(info.notAfter)
 
-            SHA1: \(info.fingerprint)
-            """
-            return Alert(
-                title: Text(title),
-                message: Text(body),
-                primaryButton: .default(Text(NSLocalizedString("Trust", comment: ""))) {
-                    guard info.isCurrent else { return }
-                    MUConnectionController.shared()?.acceptCertificateTrust()
-                },
-                secondaryButton: .cancel {
-                    InteractionFeedback.cancel()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                SHA1: \(info.fingerprint)
+                """
+                return Alert(
+                    title: Text(title),
+                    message: Text(body),
+                    primaryButton: .default(Text(NSLocalizedString("Trust", comment: ""))) {
                         guard info.isCurrent else { return }
-                        MUConnectionController.shared()?.rejectCertificateTrust()
+                        MUConnectionController.shared()?.acceptCertificateTrust()
+                    },
+                    secondaryButton: .cancel {
+                        InteractionFeedback.cancel()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            guard info.isCurrent else { return }
+                            MUConnectionController.shared()?.rejectCertificateTrust()
+                        }
                     }
-                }
-            )
+                )
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .mumbleShowVADTutorialAgain)) { _ in
             // Delay to avoid racing with settings-sheet onDismiss stopAudioTest().
@@ -1328,8 +1387,8 @@ struct AppRootView: View {
 
     private var navigationLayout: some View {
         adaptiveSplitLayout
-        .onChange(of: usesTabletLayout, initial: true) { _, usesTabletLayout in
-            sidebarNavigationManager.updateFavouriteServersLayout(usesTabletLayout: usesTabletLayout)
+        .onChange(of: usesFavouriteServersSheet, initial: true) { _, usesSheet in
+            sidebarNavigationManager.updateFavouriteServersLayout(usesSheet: usesSheet)
         }
         .onChange(of: sidebarNavigationManager.presentsFavouriteServersSheet) { _, isPresented in
             if isPresented {
@@ -1349,6 +1408,7 @@ struct AppRootView: View {
             .frame(minWidth: 500, idealWidth: 600, minHeight: 450, idealHeight: 550)
             #else
             .presentationDetents([.large])
+            .presentationCompactAdaptation(.sheet)
             #endif
         }
     }

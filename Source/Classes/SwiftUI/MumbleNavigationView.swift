@@ -110,22 +110,22 @@ class NavigationManager: ObservableObject {
             }
         }
     }
-    private var usesTabletLayout = false
+    private var usesFavouriteServersSheet = false
     private var isDismissingFavouriteServersSheet = false
     private var restoreFavouriteServersAfterDismissal = false
     private var isFavouriteEditorPresented = false
 
     func openFavouriteServers() {
         guard !isDismissingFavouriteServersSheet else { return }
-        if usesTabletLayout {
+        if usesFavouriteServersSheet {
             presentsFavouriteServersSheet = true
         } else if navigationPath.last != .swiftUI(.favouriteServerList) {
             navigate(to: .swiftUI(.favouriteServerList))
         }
     }
 
-    func updateFavouriteServersLayout(usesTabletLayout: Bool) {
-        self.usesTabletLayout = usesTabletLayout
+    func updateFavouriteServersLayout(usesSheet: Bool) {
+        self.usesFavouriteServersSheet = usesSheet
         adaptFavouriteServersPresentation()
     }
 
@@ -140,14 +140,14 @@ class NavigationManager: ObservableObject {
         // Keep an active editor (including its unsaved fields) attached until
         // its dismissal completes. Rapid pose changes use the latest layout.
         guard !isFavouriteEditorPresented, !isDismissingFavouriteServersSheet else { return }
-        if usesTabletLayout, navigationPath.last == .swiftUI(.favouriteServerList) {
+        if usesFavouriteServersSheet, navigationPath.last == .swiftUI(.favouriteServerList) {
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
                 navigationPath.removeLast()
                 presentsFavouriteServersSheet = true
             }
-        } else if !usesTabletLayout, presentsFavouriteServersSheet {
+        } else if !usesFavouriteServersSheet, presentsFavouriteServersSheet {
             restoreFavouriteServersAfterDismissal = true
             presentsFavouriteServersSheet = false
         }

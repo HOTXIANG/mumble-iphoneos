@@ -121,7 +121,7 @@ Network → Opus/Speex Decoder → MKAudioOutputUser (float*, per-user)
 
 实现规则：
 
-- `MKAudio.sharedAudio` 不在单例创建时配置 `AVAudioSession`。
+- `MKAudio.sharedAudio` 初始化时仅预设 `Ambient` / `Default` 空闲分类（隐式混音），且必须在创建插件机架之前完成；不得激活音频会话或配置 `PlayAndRecord` / `VoiceChat`。避免保留系统默认独占分类而在启动期间打断其他 App 的音乐。
 - `MKAudio.stop()` 在 iOS 上必须回到 `Ambient` / `Default` 并 deactivate session。
 - `MUApplicationDelegate` 只根据真实活动连接决定前后台恢复音频，不根据过期 `_connectionActive` 状态恢复。
 - `ServerModelManager.startAudioTest()` 同时检查 `isLocalAudioTestRunning` 和真实 `MKAudio.isRunning()`。

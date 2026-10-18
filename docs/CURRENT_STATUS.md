@@ -1,8 +1,17 @@
 # Current Project Status
 
-Last updated: 2026-09-19
+Last updated: 2026-09-20
 
 This document is the short, current source of truth for recent audio, network, UI-performance, and automation changes. Older investigation notes are kept for history, but this file should be checked first when deciding expected behavior.
+
+## iOS Idle Launch and Background Music (2026-09-20)
+
+- `MKAudio` presets `Ambient` / `Default` before constructing any audio racks. Initialization only sets the category; it neither activates the session nor requests microphone input. This removes the cold-launch window in which system-default `SoloAmbient` could interrupt another app if a framework implicitly activated audio.
+- Ambient mixes implicitly, so idle configuration passes category options `0`. Apple only supports explicitly setting `MixWithOthers` for playback, play-and-record and multiroute categories: [Apple mixing rules](https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions-swift.struct/mixwithothers).
+- Actual calls/local microphone tests still configure and activate the existing `PlayAndRecord` / `VoiceChat` session when requested. Stopping returns to the same noninterrupting idle category.
+- Debug `audio.status` reports real engine/health state even when disconnected, plus iOS category, mode, mixing/ducking flags and other-audio presence. It no longer fabricates a stopped engine based on connection state.
+- The idle probe validates its untouched launch snapshot before any cleanup can reset the category. Foreground/background probes also require Ambient/Default with mixing, no ducking and no pending audio-running request. Twelve fixture tests and the existing eleven-scenario probe self-test pass, as do iOS-device and macOS Debug builds.
+- Physical iPhone playback continuity has not yet been verified. Persisted plugins use offline rendering, so their engine startup alone does not prove hardware activation. First-run VAD onboarding intentionally starts a microphone preview and remains a separate path from the ordinary idle welcome screen.
 
 ## Favourite Server Ping Lifetime (2026-09-19)
 
@@ -46,7 +55,7 @@ Microphone and VoiceChat mode are intentionally active only in these cases:
 
 Important lifecycle details:
 
-- `MKAudio.sharedAudio` no longer configures `AVAudioSession` during singleton creation.
+- `MKAudio.sharedAudio` presets only the inactive Ambient/Default category during singleton creation, before rack initialization. It does not activate a session or enter recording/VoiceChat mode.
 - When audio is stopped on iOS, the session is reset to `Ambient` / `Default` and deactivated.
 - `MUApplicationDelegate` only restarts/stops background audio based on a real active server connection, not stale connection flags.
 - `ServerModelManager.startAudioTest()` checks both logical local-test state and the real `MKAudio.isRunning()` state.

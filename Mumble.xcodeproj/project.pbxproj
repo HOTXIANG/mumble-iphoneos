@@ -125,6 +125,8 @@
 		F2E9CC0C2F07D00600464F79 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC0A2F07D00000464F79 /* AboutView.swift */; };
 		F2ECCD992F3D283100AEA117 /* HandoffManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ECCD982F3D283100AEA117 /* HandoffManager.swift */; };
 		F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56722E0F711A00D76B49 /* MessagesView.swift */; };
+		F5A100012FA1000100AABBCC /* MessageBodyTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A100022FA1000100AABBCC /* MessageBodyTextView.swift */; };
+		F5A100032FA1000100AABBCC /* IOSMessageTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A100042FA1000100AABBCC /* IOSMessageTextView.swift */; };
 		F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */; };
 		F2FF567C2E0F711A00D76B49 /* ChannelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56712E0F711A00D76B49 /* ChannelView.swift */; };
 		F2FF567E2E0F711A00D76B49 /* ChannelDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */; };
@@ -415,6 +417,8 @@
 		F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelDataModels.swift; sourceTree = "<group>"; };
 		F2FF56712E0F711A00D76B49 /* ChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelView.swift; sourceTree = "<group>"; };
 		F2FF56722E0F711A00D76B49 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
+		F5A100022FA1000100AABBCC /* MessageBodyTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBodyTextView.swift; sourceTree = "<group>"; };
+		F5A100042FA1000100AABBCC /* IOSMessageTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSMessageTextView.swift; sourceTree = "<group>"; };
 		F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelManager.swift; sourceTree = "<group>"; };
 		F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelNotificationManager.swift; sourceTree = "<group>"; };
 		F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelListView.swift; sourceTree = "<group>"; };
@@ -839,6 +843,8 @@
 				F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */,
 				F2FF56712E0F711A00D76B49 /* ChannelView.swift */,
 				F2FF56722E0F711A00D76B49 /* MessagesView.swift */,
+				F5A100022FA1000100AABBCC /* MessageBodyTextView.swift */,
+				F5A100042FA1000100AABBCC /* IOSMessageTextView.swift */,
 				F2DF9A402F656321009D5C87 /* AccessTokensView.swift */,
 				F2DF9A372F656319009D5C87 /* BanListView.swift */,
 				F2DF9A422F65632C009D5C87 /* RegisteredUserListView.swift */,
@@ -1124,6 +1130,8 @@
 				28F79CA9147AB62B0003B8BA /* MUNotificationController.m in Sources */,
 				28F08362147F263C00DC126F /* MUAudioBarView.m in Sources */,
 				F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */,
+				F5A100012FA1000100AABBCC /* MessageBodyTextView.swift in Sources */,
+				F5A100032FA1000100AABBCC /* IOSMessageTextView.swift in Sources */,
 				F28C6B332EE87C4C00DE9CD2 /* LanDiscoveryModel.swift in Sources */,
 				F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */,
 				F2FF567C2E0F711A00D76B49 /* ChannelView.swift in Sources */,
@@ -1260,7 +1268,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
@@ -1295,7 +1303,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1333,7 +1341,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1364,7 +1372,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1414,7 +1422,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1445,7 +1453,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1495,7 +1503,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1526,7 +1534,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1621,7 +1629,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1659,7 +1667,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1722,7 +1730,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1754,7 +1762,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1816,7 +1824,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1848,7 +1856,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1910,7 +1918,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600000;
+				CURRENT_PROJECT_VERSION = 600600200;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1942,7 +1950,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.0;
+				MARKETING_VERSION = 6.6.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (

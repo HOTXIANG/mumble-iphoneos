@@ -251,30 +251,31 @@ final class MUTestCommandRouter {
             return ["status": "device callbacks stopped; engine flag preserved"]
 
         case "status":
-            // Only access MKAudio when connected to avoid blocking main thread
-            let connected = MUConnectionController.shared()?.isConnected() == true
+            // Read the engine even while disconnected: synthesizing "stopped"
+            // here concealed accidental microphone/session activation at launch.
+            let audio = MKAudio.shared()
             let localAudioTestRunning = serverManager?.isLocalAudioTestRunning ?? false
-            if connected || localAudioTestRunning {
-                let connUser = MUConnectionController.shared()?.serverModel?.connectedUser()
-                return [
-                    "running": MKAudio.shared()?.isRunning() ?? false,
-                    "health": MKAudio.shared()?.healthSnapshot() ?? [:],
-                    "forceTransmit": MKAudio.shared()?.forceTransmit() ?? false,
-                    "selfMuted": connUser?.isSelfMuted() ?? false,
-                    "selfDeafened": connUser?.isSelfDeafened() ?? false,
-                    "localAudioTestRunning": localAudioTestRunning
-                ] as [String: Any]
-            } else {
-                return [
-                    "running": false,
-                    "forceTransmit": false,
-                    "selfMuted": false,
-                    "selfDeafened": false,
-                    "localAudioTestRunning": false,
-                    "health": ["state": "stopped", "requested": false],
-                    "note": "Not connected — audio engine not initialized"
-                ] as [String: Any]
-            }
+            let connUser = MUConnectionController.shared()?.serverModel?.connectedUser()
+            var status: [String: Any] = [
+                "running": audio?.isRunning() ?? false,
+                "health": audio?.healthSnapshot() ?? [:],
+                "forceTransmit": audio?.forceTransmit() ?? false,
+                "selfMuted": connUser?.isSelfMuted() ?? false,
+                "selfDeafened": connUser?.isSelfDeafened() ?? false,
+                "localAudioTestRunning": localAudioTestRunning
+            ]
+            #if os(iOS)
+            let session = AVAudioSession.sharedInstance()
+            status["audioSession"] = [
+                "category": session.category.rawValue,
+                "mode": session.mode.rawValue,
+                "categoryOptions": session.categoryOptions.rawValue,
+                "mixesWithOthers": session.category == .ambient || session.categoryOptions.contains(.mixWithOthers),
+                "ducksOthers": session.categoryOptions.contains(.duckOthers),
+                "otherAudioPlaying": session.isOtherAudioPlaying
+            ]
+            #endif
+            return status
 
         default:
             throw TestCommandError("Unknown audio.\(cmd). Available: mute, unmute, deafen, undeafen, toggleMute, toggleDeafen, startTest, stopTest, permission, restart, forceTransmit, status")

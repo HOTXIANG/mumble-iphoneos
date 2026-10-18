@@ -415,10 +415,8 @@ class ProbeRunner:
         audio = self._data_for("audio.status")
         connected = bool(connection.get("connected")) if isinstance(connection, dict) else False
         connecting = bool(connection.get("isConnecting")) if isinstance(connection, dict) else False
-        audio_running = bool(audio.get("running")) if isinstance(audio, dict) else False
-        local_test = bool(audio.get("localAudioTestRunning")) if isinstance(audio, dict) else False
         self._assert(not connected and not connecting, "idle-welcome starts without an active connection")
-        self._assert(not audio_running and not local_test, "idle-welcome does not start microphone or local audio test")
+        self.assert_idle_audio(audio, "idle-welcome first snapshot does not start microphone or local audio test")
 
     def assert_audio_running(self, audio: dict[str, Any], description: str) -> None:
         running = bool(audio.get("running")) if isinstance(audio, dict) else False
@@ -426,9 +424,22 @@ class ProbeRunner:
         self._assert(running and local_test, description)
 
     def assert_audio_stopped(self, audio: dict[str, Any], description: str) -> None:
-        running = bool(audio.get("running")) if isinstance(audio, dict) else False
-        local_test = bool(audio.get("localAudioTestRunning")) if isinstance(audio, dict) else False
-        self._assert(not running and not local_test, description)
+        self._assert(audio_stopped(audio), description)
+
+    def assert_idle_audio(self, audio: dict[str, Any], description: str) -> None:
+        self.assert_audio_stopped(audio, description)
+        # macOS and older debug builds do not expose an iOS audio session.
+        if "audioSession" not in audio:
+            return
+        session = audio.get("audioSession")
+        session = session if isinstance(session, dict) else {}
+        self._assert(
+            session.get("category") == "AVAudioSessionCategoryAmbient"
+            and session.get("mode") == "AVAudioSessionModeDefault"
+            and session.get("mixesWithOthers") is True
+            and session.get("ducksOthers") is False,
+            f"{description}: idle session preserves other audio with Ambient/Default, mixing and no ducking",
+        )
 
     def wait_for_data(
         self,
@@ -598,7 +609,9 @@ def audio_running(data: dict[str, Any]) -> bool:
 
 
 def audio_stopped(data: dict[str, Any]) -> bool:
-    return not bool(data.get("running")) and not bool(data.get("localAudioTestRunning"))
+    health = data.get("health", {})
+    requested = bool(health.get("requested")) if isinstance(health, dict) else False
+    return not bool(data.get("running")) and not bool(data.get("localAudioTestRunning")) and not requested
 
 
 def microphone_permission_allows_audio(data: dict[str, Any]) -> bool:
@@ -698,25 +711,28 @@ def run_scenario(args: argparse.Namespace, runner: ProbeRunner, run_id: str) -> 
     try:
         for command in scenario_commands(args.scenario, run_id):
             runner.command(command.action, command.params)
-        runner.reset_for_scenario()
 
         if args.scenario == "idle-welcome":
+            # Validate the untouched launch snapshot before cleanup can stop audio
+            # or replace the initial audio-session category with the idle one.
             runner.assert_idle_welcome()
+            runner.reset_for_scenario()
             return
 
+        runner.reset_for_scenario()
         runner.assert_baseline()
 
         if args.scenario == "lifecycle-idle-audio":
             runner.command("ui.root", alias="ui.root.lifecycleIdle")
             before_audio = response_data(runner.command("audio.status", alias="audio.beforeLifecycleIdle"))
-            runner.assert_audio_stopped(before_audio, "lifecycle-idle-audio starts without audio running")
+            runner.assert_idle_audio(before_audio, "lifecycle-idle-audio starts without audio running")
             runner.command(
                 "app.simulateLifecycle",
                 {"phase": "willResignActive"},
                 alias="app.simulateLifecycle.willResignActive",
             )
             background_audio = response_data(runner.command("audio.status", alias="audio.afterWillResignActive"))
-            runner.assert_audio_stopped(
+            runner.assert_idle_audio(
                 background_audio,
                 "lifecycle-idle-audio keeps audio stopped after background transition",
             )
@@ -726,7 +742,7 @@ def run_scenario(args: argparse.Namespace, runner: ProbeRunner, run_id: str) -> 
                 alias="app.simulateLifecycle.didBecomeActive",
             )
             foreground_audio = response_data(runner.command("audio.status", alias="audio.afterDidBecomeActive"))
-            runner.assert_audio_stopped(
+            runner.assert_idle_audio(
                 foreground_audio,
                 "lifecycle-idle-audio keeps audio stopped after foreground transition",
             )

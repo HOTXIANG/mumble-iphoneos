@@ -2813,49 +2813,6 @@ private struct NotificationMessageView: View, Equatable {
     }
 }
 
-private let messageLinkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-
-private func makeMessageBodyAttributedString(
-    text: String
-) -> AttributedString {
-    var attributedText = AttributedString(text)
-    let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
-
-    messageLinkDetector?.enumerateMatches(in: text, options: [], range: fullRange) { result, _, _ in
-        guard let result,
-              let url = result.url,
-              let stringRange = Range(result.range, in: text),
-              let attributedRange = Range(stringRange, in: attributedText) else { return }
-        attributedText[attributedRange].link = url
-        attributedText[attributedRange].foregroundColor = .pink
-        attributedText[attributedRange].underlineStyle = .single
-    }
-
-    return attributedText
-}
-
-private struct MessageBodyTextView: View {
-    let text: String
-    let isSentBySelf: Bool
-
-    private var attributedText: AttributedString {
-        makeMessageBodyAttributedString(text: text)
-    }
-    
-    var body: some View {
-        Text(attributedText)
-            #if os(macOS)
-            .font(.system(size: 13))
-            #else
-            .font(.system(size: 17))
-            #endif
-            .foregroundStyle(isSentBySelf ? Color.white : Color.primary)
-            .tint(.pink)
-            .fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
-    }
-}
-
 private struct SenderStickyHeaderView: View {
     let title: String
     let isSentBySelf: Bool

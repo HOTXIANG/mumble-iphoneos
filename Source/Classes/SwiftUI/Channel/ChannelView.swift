@@ -695,6 +695,71 @@ struct ChannelView<RootSidebar: View, LeadingControls: View, TrailingControls: V
 
 // MARK: - 2. Channel List Implementation
 
+#if os(macOS)
+private struct MacChannelScrollIndicatorStyle: NSViewRepresentable {
+    func makeNSView(context: Context) -> StyleView { StyleView() }
+
+    func updateNSView(_ view: StyleView, context: Context) {
+        view.scheduleConfiguration()
+    }
+
+    final class StyleView: NSView {
+        private var configurationScheduled = false
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(scheduleConfiguration),
+                name: NSScroller.preferredScrollerStyleDidChangeNotification,
+                object: nil
+            )
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            scheduleConfiguration()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            scheduleConfiguration()
+        }
+
+        override func layout() {
+            super.layout()
+            scheduleConfiguration()
+        }
+
+        @objc func scheduleConfiguration() {
+            guard !configurationScheduled else { return }
+            configurationScheduled = true
+            // 等 SwiftUI 完成视图挂载及系统样式更新，再局部设置频道栏。
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.configurationScheduled = false
+                guard let scrollView = self.enclosingScrollView else { return }
+                if scrollView.scrollerStyle != .overlay {
+                    // 隐藏滚动条时仍保留当前的原生悬浮滚动配置。
+                    scrollView.scrollerStyle = .overlay
+                }
+                if scrollView.verticalScroller?.controlSize != .small {
+                    scrollView.verticalScroller?.controlSize = .small
+                }
+            }
+        }
+    }
+}
+#endif
+
 struct ServerChannelView: View {
     @ObservedObject var serverManager: ServerModelManager
     let isSplitLayout: Bool
@@ -790,14 +855,18 @@ struct ServerChannelView: View {
 
     private var channelContent: some View {
         ZStack {
-            ScrollView(showsIndicators: false) {
+            ScrollView {
                 LazyVStack(alignment: .leading, spacing: kRowSpacing) {
                     Color.clear.frame(height: isSplitLayout ? kSplitScrollTopContentInset : 10)
                     channelTreeContent
                     Color.clear.frame(height: 80)
                 }
                 .padding(.horizontal, UIConstants.Spacing.paneHorizontalPadding)
+                #if os(macOS)
+                .background(MacChannelScrollIndicatorStyle())
+                #endif
             }
+            .scrollIndicators(.never)
             .modifier(ChannelTopScrollEdgeModifier(
                 hasContent: MUConnectionController.shared()?.serverModel?.rootChannel() != nil
             ))
