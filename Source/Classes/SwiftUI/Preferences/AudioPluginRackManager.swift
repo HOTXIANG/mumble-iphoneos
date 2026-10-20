@@ -982,7 +982,7 @@ final class AudioPluginRackManager: ObservableObject {
         schedulePluginChainPersistence()
     }
 
-    private func snapshotAllPluginParameters() {
+    func snapshotAllPluginParameters() {
         var didChange = false
         for (trackKey, chain) in pluginChainByTrack {
             for plugin in chain {
@@ -990,7 +990,7 @@ final class AudioPluginRackManager: ObservableObject {
                 var captured: [String: Float] = [:]
 
                 if let unit = loadedAudioUnits[loadedKey] {
-                    for param in unit.auAudioUnit.parameterTree?.allParameters ?? [] {
+                    for param in unit.auAudioUnit.parameterTree?.allParameters ?? [] where param.flags.contains(.flag_IsWritable) {
                         captured[String(param.address)] = param.value
                     }
                 }

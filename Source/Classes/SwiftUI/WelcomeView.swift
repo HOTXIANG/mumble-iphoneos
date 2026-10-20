@@ -1034,7 +1034,12 @@ struct AppRootView: View {
             alert = appState.activeError.map(ConnectionAlert.error)
         }
         return Binding(
-            get: { alert },
+            get: {
+                if let info = appState.pendingCertTrust {
+                    return .certificateTrust(info)
+                }
+                return appState.activeError.map(ConnectionAlert.error)
+            },
             set: { newValue in
                 guard case .none = newValue else { return }
                 // Dismissing certificate trust can synchronously produce an error.

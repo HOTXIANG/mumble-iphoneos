@@ -49,6 +49,7 @@ extern NSString *MUCertificateTrustFailureNotification;
 @property (nonatomic, readonly) dispatch_queue_t audioLifecycleQueue;
 #if DEBUG
 - (void)simulateNetworkPathSatisfied:(BOOL)satisfied interfaces:(NSUInteger)interfaces;
+- (void)setClientIdentityUnavailableForTesting:(BOOL)unavailable;
 #endif
 
 @end

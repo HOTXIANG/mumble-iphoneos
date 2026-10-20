@@ -5,5 +5,8 @@
 
 @interface MUApplicationDelegate : NSObject <UIApplicationDelegate>
 - (void) reloadPreferences;
+- (void)applicationDidBecomeActive:(UIApplication *)application;
+- (void)applicationWillResignActive:(UIApplication *)application;
+- (void)applicationDidEnterBackground:(UIApplication *)application;
 @end
 #endif // TARGET_OS_IOS

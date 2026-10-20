@@ -6,6 +6,7 @@
 #import "MUConnectionRecoveryPolicy.h"
 #import "MUCertificateController.h"
 #import "MUCertificateChainBuilder.h"
+#import "MUCertificateBackgroundAccess.h"
 #import "MUDatabase.h"
 #import "Mumble-Swift.h"
 
@@ -121,6 +122,11 @@ static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
     NSString                   *_username;
     NSString                   *_password;
     NSData                     *_certificateRef;
+    NSArray                    *_sessionCertificateChain;
+    BOOL                        _sessionIdentityResolved;
+#if DEBUG
+    BOOL                        _clientIdentityUnavailableForTesting;
+#endif
     NSString                   *_displayName;
     
     BOOL            _isUserInitiatedDisconnect;
@@ -161,7 +167,7 @@ static BOOL MUErrorMatchesOSStatus(NSError *error, OSStatus status) {
 }
 - (void) establishConnection;
 - (void)handleNetworkPathSatisfied:(BOOL)satisfied interfaces:(NSUInteger)interfaces;
-- (void) establishConnectionForGeneration:(NSUInteger)generation hostname:(NSString *)hostname port:(NSUInteger)port certificateRef:(NSData *)certificateRef;
+- (void) establishConnectionForGeneration:(NSUInteger)generation hostname:(NSString *)hostname port:(NSUInteger)port certificateRef:(NSData *)certificateRef certificateChain:(NSArray *)certificateChain identityResolved:(BOOL)identityResolved;
 - (BOOL) isCurrentConnectionSetupGeneration:(NSUInteger)generation;
 - (void) teardownConnection;
 - (void) teardownConnectionPostingClosed:(BOOL)postClosed;
@@ -240,6 +246,8 @@ static MUConnectionController *sSharedConnectionController;
 #if TARGET_OS_IOS
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(recoverConnectionAfterWake:)
                                                      name:UIApplicationDidBecomeActiveNotification object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(recoverConnectionAfterWake:)
+                                                     name:UIApplicationProtectedDataDidBecomeAvailable object:nil];
 #else
         [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self selector:@selector(recoverConnectionAfterWake:)
                                                                   name:NSWorkspaceDidWakeNotification object:nil];
@@ -299,6 +307,8 @@ static MUConnectionController *sSharedConnectionController;
     _username = [userName copy];
     _password = [password copy];
     _certificateRef = [certRef copy];
+    _sessionCertificateChain = nil;
+    _sessionIdentityResolved = NO;
     _displayName = [displayName copy];
     _connectionRequestGeneration++;
     _connectionDesired = YES;
@@ -473,6 +483,10 @@ static MUConnectionController *sSharedConnectionController;
 }
 
 #if DEBUG
+- (void)setClientIdentityUnavailableForTesting:(BOOL)unavailable {
+    @synchronized (self) { _clientIdentityUnavailableForTesting = unavailable; }
+}
+
 - (void)simulateNetworkPathSatisfied:(BOOL)satisfied interfaces:(NSUInteger)interfaces {
     BOOL known = _networkPathKnown, wasSatisfied = _networkWasSatisfied;
     NSUInteger previousInterfaces = _networkInterfaceMask;
@@ -518,10 +532,13 @@ static MUConnectionController *sSharedConnectionController;
         setupGeneration = ++_connectionSetupGeneration;
     }
     NSString *hostname = [_hostname copy];
-    NSData *certificateRef = [_certificateRef copy];
+    NSData *certificateRef = [_certificateRef copy] ?: [[[NSUserDefaults standardUserDefaults] dataForKey:@"DefaultCertificate"] copy];
+    NSArray *certificateChain = _sessionCertificateChain;
+    BOOL identityResolved = _sessionIdentityResolved;
     NSUInteger port = _port;
     dispatch_async(_connectionSetupQueue, ^{
-        [self establishConnectionForGeneration:setupGeneration hostname:hostname port:port certificateRef:certificateRef];
+        [self establishConnectionForGeneration:setupGeneration hostname:hostname port:port certificateRef:certificateRef
+                              certificateChain:certificateChain identityResolved:identityResolved];
     });
 }
 
@@ -531,52 +548,55 @@ static MUConnectionController *sSharedConnectionController;
     }
 }
 
-- (void) establishConnectionForGeneration:(NSUInteger)generation hostname:(NSString *)hostname port:(NSUInteger)port certificateRef:(NSData *)certificateRef {
+- (void) establishConnectionForGeneration:(NSUInteger)generation hostname:(NSString *)hostname port:(NSUInteger)port certificateRef:(NSData *)certificateRef certificateChain:(NSArray *)certificateChain identityResolved:(BOOL)identityResolved {
     @autoreleasepool {
         if (![self isCurrentConnectionSetupGeneration:generation]) return;
         // Prepare expensive keychain material in isolation. Publish the pair atomically on the main queue.
         MKConnection *connection = [[MKConnection alloc] init];
         [connection setIgnoreSSLVerification:NO];
-        if (certificateRef != nil) {
-            NSArray *certChain = MUIdentityBackedChainForPersistentRef(certificateRef, @"server-specific");
-            if (certChain && certChain.count > 0) {
-                [connection setCertificateChain:certChain];
-                MULogInfo(Connection, @"Using server-specific certificate for connection. (chain length: %lu)", (unsigned long)certChain.count);
-            } else {
-                MULogWarning(Connection, @"Failed to resolve server-specific cert identity (%lu bytes). Falling back...", (unsigned long)certificateRef.length);
-                NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
-                if (globalCert) {
-                    NSArray *fallbackChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
-                    if (fallbackChain && fallbackChain.count > 0) {
-                        [connection setCertificateChain:fallbackChain];
-                        MULogInfo(Connection, @"Fell back to global default certificate.");
-                    } else {
-                        MULogWarning(Connection, @"Global default certificate is unusable for client auth. Connecting anonymously.");
+        NSArray *resolvedChain = certificateChain;
+        if (!identityResolved && certificateRef) {
+            BOOL canResolveIdentity = YES;
+#if DEBUG
+            @synchronized (self) { canResolveIdentity = !_clientIdentityUnavailableForTesting; }
+#endif
+            if (canResolveIdentity) {
+                resolvedChain = MUIdentityBackedChainForPersistentRef(certificateRef, @"selected-client");
+            }
+            if (!resolvedChain) {
+                MULogWarning(Connection, @"Selected client identity is unavailable; refusing to substitute another identity.");
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (![self isCurrentConnectionSetupGeneration:generation] || !self->_connectionDesired) return;
+                    self->_connectionSetupInProgress = NO;
+#if TARGET_OS_IOS
+                    if (![[UIApplication sharedApplication] isProtectedDataAvailable]) {
+                        MULogInfo(Connection, @"Waiting for protected data before resolving client identity.");
+                        return;
                     }
-                } else {
-                    MULogInfo(Connection, @"No fallback certificate available. Connecting anonymously.");
-                }
+#endif
+                    [self postErrorWithTitle:NSLocalizedString(@"Connection Failed", nil)
+                                    message:NSLocalizedString(@"The selected client certificate is unavailable. Unlock your device and check your certificate settings.", nil)];
+                });
+                return;
             }
-        } else {
-            NSData *globalCert = [[NSUserDefaults standardUserDefaults] objectForKey:@"DefaultCertificate"];
-            if (globalCert) {
-                NSArray *certChain = MUIdentityBackedChainForPersistentRef(globalCert, @"global-default");
-                if (certChain && certChain.count > 0) {
-                    [connection setCertificateChain:certChain];
-                    MULogInfo(Connection, @"Using global default certificate.");
-                } else {
-                    MULogWarning(Connection, @"Global default certificate is unusable for client auth. Connecting anonymously.");
-                }
-            } else {
-                MULogInfo(Connection, @"Connecting anonymously (No certificate).");
-            }
+#if TARGET_OS_IOS
+            OSStatus accessStatus = MUPrepareClientIdentityForBackgroundUse((__bridge SecIdentityRef)resolvedChain.firstObject);
+            if (accessStatus != errSecSuccess)
+                MULogWarning(Connection, @"Could not prepare client identity for background authentication: %d", (int)accessStatus);
+#endif
         }
+        [connection setCertificateChain:resolvedChain];
+        MULogInfo(Connection, @"Client identity %@ (chain length: %lu).",
+                  identityResolved ? @"preserved for reconnect" : @"resolved for session", (unsigned long)resolvedChain.count);
 
         dispatch_async(dispatch_get_main_queue(), ^{
             if (![self isCurrentConnectionSetupGeneration:generation] || !self->_connectionDesired
                 || self->_isUserInitiatedDisconnect) return;
             self->_connectionSetupInProgress = NO;
             if (self->_networkPathKnown && !self->_networkWasSatisfied) return;
+            // Keep the exact identity, including anonymous sessions, across socket replacements.
+            self->_sessionCertificateChain = [resolvedChain copy];
+            self->_sessionIdentityResolved = YES;
             @synchronized (self) { self->_connection = connection; }
             self->_serverModel = [[MKServerModel alloc] initWithConnection:connection];
             [self->_serverModel addDelegate:self];
@@ -702,6 +722,8 @@ static MUConnectionController *sSharedConnectionController;
     [self stopNetworkMonitor];
     _preserveAudioSessionForReconnect = NO;
     _hasJoinedServerForCurrentSession = NO;
+    _sessionCertificateChain = nil;
+    _sessionIdentityResolved = NO;
     _reconnectGeneration++;
     _pendingReconnectFailureInfo = nil;
 #if TARGET_OS_IOS

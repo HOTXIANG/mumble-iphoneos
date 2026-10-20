@@ -469,8 +469,7 @@ static NSString *MURestartSignatureFromDefaults(NSUserDefaults *defaults) {
 - (BOOL) hasActiveServerConnection {
     MUConnectionController *connectionController = [MUConnectionController sharedController];
     return _connectionActive
-        && [connectionController isConnected]
-        && [connectionController serverModel] != nil;
+        && [connectionController hasConnectionIntent];
 }
 
 - (BOOL) audioShouldBeRunning:(MKAudio *)audio {

@@ -125,8 +125,6 @@
 		F2E9CC0C2F07D00600464F79 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E9CC0A2F07D00000464F79 /* AboutView.swift */; };
 		F2ECCD992F3D283100AEA117 /* HandoffManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ECCD982F3D283100AEA117 /* HandoffManager.swift */; };
 		F2FF56782E0F711A00D76B49 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56722E0F711A00D76B49 /* MessagesView.swift */; };
-		F5A100012FA1000100AABBCC /* MessageBodyTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A100022FA1000100AABBCC /* MessageBodyTextView.swift */; };
-		F5A100032FA1000100AABBCC /* IOSMessageTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A100042FA1000100AABBCC /* IOSMessageTextView.swift */; };
 		F2FF56792E0F711A00D76B49 /* ServerModelNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */; };
 		F2FF567C2E0F711A00D76B49 /* ChannelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56712E0F711A00D76B49 /* ChannelView.swift */; };
 		F2FF567E2E0F711A00D76B49 /* ChannelDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */; };
@@ -134,12 +132,15 @@
 		F2FF568A2E0F81EE00D76B49 /* ChannelListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */; };
 		F2LOG00002000000009AF31D /* LogSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2LOG00001000000009AF31D /* LogSettingsView.swift */; };
 		F3A4B5C42F90800100ABC001 /* ServerModelManager+Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A4B5C42F90800100ABC002 /* ServerModelManager+Entry.swift */; };
+		F3C4A1012FE7000100AABBCC /* AudioPluginChainPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C4A1022FE7000100AABBCC /* AudioPluginChainPresets.swift */; };
 		F4A5B6C42F90900100ABC001 /* ChannelACLModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C42F90900100ABC002 /* ChannelACLModels.swift */; };
 		F4A5B6C52F90900100ABC001 /* ChannelACLRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C52F90900100ABC002 /* ChannelACLRows.swift */; };
 		F4A5B6C62F90900100ABC001 /* ChannelACLEditViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C62F90900100ABC002 /* ChannelACLEditViews.swift */; };
 		F4D1A0B12FA1000100AABBCC /* PreferencesView+iOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D1A0B32FA1000100AABBCC /* PreferencesView+iOS.swift */; };
 		F4D1A0B22FA1000100AABBCC /* PreferencesView+macOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D1A0B42FA1000100AABBCC /* PreferencesView+macOS.swift */; };
 		F4D1A0B52FA1000100AABBCC /* PreferencesView+SharedViews+iOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D1A0B62FA1000100AABBCC /* PreferencesView+SharedViews+iOS.swift */; };
+		F5A100012FA1000100AABBCC /* MessageBodyTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A100022FA1000100AABBCC /* MessageBodyTextView.swift */; };
+		F5A100032FA1000100AABBCC /* IOSMessageTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A100042FA1000100AABBCC /* IOSMessageTextView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -417,20 +418,21 @@
 		F2FF566F2E0F711A00D76B49 /* ChannelDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelDataModels.swift; sourceTree = "<group>"; };
 		F2FF56712E0F711A00D76B49 /* ChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelView.swift; sourceTree = "<group>"; };
 		F2FF56722E0F711A00D76B49 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
-		F5A100022FA1000100AABBCC /* MessageBodyTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBodyTextView.swift; sourceTree = "<group>"; };
-		F5A100042FA1000100AABBCC /* IOSMessageTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSMessageTextView.swift; sourceTree = "<group>"; };
 		F2FF56742E0F711A00D76B49 /* ServerModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelManager.swift; sourceTree = "<group>"; };
 		F2FF56752E0F711A00D76B49 /* ServerModelNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModelNotificationManager.swift; sourceTree = "<group>"; };
 		F2FF56892E0F81EE00D76B49 /* ChannelListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelListView.swift; sourceTree = "<group>"; };
 		F2LOG00001000000009AF31D /* LogSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSettingsView.swift; sourceTree = "<group>"; };
 		F3A100112F9A000100AABBCC /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = SOURCE_ROOT; };
 		F3A4B5C42F90800100ABC002 /* ServerModelManager+Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ServerModelManager+Entry.swift"; sourceTree = "<group>"; };
+		F3C4A1022FE7000100AABBCC /* AudioPluginChainPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPluginChainPresets.swift; sourceTree = "<group>"; };
 		F4A5B6C42F90900100ABC002 /* ChannelACLModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelACLModels.swift; sourceTree = "<group>"; };
 		F4A5B6C52F90900100ABC002 /* ChannelACLRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelACLRows.swift; sourceTree = "<group>"; };
 		F4A5B6C62F90900100ABC002 /* ChannelACLEditViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelACLEditViews.swift; sourceTree = "<group>"; };
 		F4D1A0B32FA1000100AABBCC /* PreferencesView+iOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+iOS.swift"; sourceTree = "<group>"; };
 		F4D1A0B42FA1000100AABBCC /* PreferencesView+macOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+macOS.swift"; sourceTree = "<group>"; };
 		F4D1A0B62FA1000100AABBCC /* PreferencesView+SharedViews+iOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PreferencesView+SharedViews+iOS.swift"; sourceTree = "<group>"; };
+		F5A100022FA1000100AABBCC /* MessageBodyTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBodyTextView.swift; sourceTree = "<group>"; };
+		F5A100042FA1000100AABBCC /* IOSMessageTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSMessageTextView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -705,6 +707,7 @@
 				D1E2F3A52F90400100ABC002 /* AudioBarView.swift */,
 				F2DF9D682F672C15009D5C87 /* AudioPluginMixerView.swift */,
 				F2DF9D702F673000009D5C87 /* AudioPluginRackManager.swift */,
+				F3C4A1022FE7000100AABBCC /* AudioPluginChainPresets.swift */,
 				D1E2F3A42F90400100ABC002 /* HandoffProfilePicker.swift */,
 				F28C6AEE2EE6E54D00DE9CD2 /* PreferencesView.swift */,
 				F4D1A0B32FA1000100AABBCC /* PreferencesView+iOS.swift */,
@@ -1200,6 +1203,7 @@
 				28F9E1BF15EBDF2400D52001 /* MURemoteControlServer.m in Sources */,
 				F2DF9D692F672C15009D5C87 /* AudioPluginMixerView.swift in Sources */,
 				F2DF9D712F673000009D5C87 /* AudioPluginRackManager.swift in Sources */,
+				F3C4A1012FE7000100AABBCC /* AudioPluginChainPresets.swift in Sources */,
 				F28C6AE52EE6AA9B00DE9CD2 /* MUTextMessageProcessor.m in Sources */,
 				F28C6AFB2EE7010300DE9CD2 /* PTTButton.swift in Sources */,
 				F28C6AF42EE6F74500DE9CD2 /* AudioMeterModel.swift in Sources */,
@@ -1268,7 +1272,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEFINES_MODULE = YES;
@@ -1303,7 +1307,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1341,7 +1345,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1372,7 +1376,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1422,7 +1426,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1453,7 +1457,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1503,7 +1507,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
@@ -1534,7 +1538,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++14";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.hotxiang.Mumble;
@@ -1629,7 +1633,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1667,7 +1671,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1730,7 +1734,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1762,7 +1766,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1824,7 +1828,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1856,7 +1860,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
@@ -1918,7 +1922,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 600600200;
+				CURRENT_PROJECT_VERSION = 600700000;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 5Q255DK223;
@@ -1950,7 +1954,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 6.6.2;
+				MARKETING_VERSION = 6.7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				"OTHER_LDFLAGS[sdk=macosx*]" = (

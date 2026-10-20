@@ -1,0 +1,34 @@
+{
+  "exportedAt" : "2025-10-20T16:00:00Z",
+  "name" : "Original microphone chain",
+  "plugins" : [
+    {
+      "autoLoad" : false,
+      "bypassed" : true,
+      "identifier" : "au:1635083896:1684237680:1634758764:Legacy Compressor",
+      "name" : "Legacy Compressor",
+      "savedParameterValues" : {
+        "0" : -12,
+        "42" : 0.25
+      },
+      "sidechainSourceKey" : "masterBus2",
+      "source" : "audioUnit",
+      "stageGain" : 0.75,
+      "subtitle" : "Apple"
+    },
+    {
+      "autoLoad" : true,
+      "bypassed" : false,
+      "identifier" : "/Library/Audio/Plug-Ins/Components/Legacy.component",
+      "name" : "Legacy Local Effect",
+      "savedParameterValues" : {},
+      "source" : "filesystem",
+      "stageGain" : 1,
+      "subtitle" : "Local"
+    }
+  ],
+  "slotCount" : 16,
+  "sourceTrackKey" : "input",
+  "sourceTrackTitle" : "Microphone Input",
+  "version" : 1
+}

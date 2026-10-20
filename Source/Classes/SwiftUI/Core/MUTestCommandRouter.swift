@@ -1534,6 +1534,12 @@ final class MUTestCommandRouter {
 
     private func handleNetwork(_ cmd: String, _ params: [String: Any]) throws -> Any? {
         switch cmd {
+        case "injectClientIdentityUnavailable":
+            guard let unavailable = params["unavailable"] as? Bool else {
+                throw TestCommandError("Missing 'unavailable'")
+            }
+            MUConnectionController.shared()?.setClientIdentityUnavailableForTesting(unavailable)
+            return ["injected": true]
         case "injectPathUpdate":
             guard let satisfied = params["satisfied"] as? Bool,
                   let interfaces = intValue(params["interfaces"]), (0...15).contains(interfaces) else {
@@ -1724,7 +1730,7 @@ final class MUTestCommandRouter {
                 "certificate": ["list", "generate", "delete", "import", "export", "currentSession"],
                 "log": ["setLevel", "setEnabled", "getConfig", "setGlobalEnabled", "setFilePersistence", "recent", "clearRecent", "marker", "stream", "streamStatus", "files", "export", "reset"],
                 "performance": ["status", "reset", "start", "stop"],
-                "network": ["status", "injectUDPStatus"],
+                "network": ["status", "injectUDPStatus", "injectPathUpdate", "injectClientIdentityUnavailable"],
                 "help": ["actions"]
             ],
             "protocol": [

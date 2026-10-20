@@ -75,6 +75,17 @@ xcodebuild -target Mumble -destination 'platform=macOS' build
 
 > 提示: 如首次构建遇到第三方库相关问题，请确认子模块已完整同步。
 
+### macOS DMG 分发
+
+完成 Developer ID 证书和 Apple 公证凭据的一次性配置后，运行：
+
+```bash
+./package_and_notarize_dmg.sh --check
+./package_and_notarize_dmg.sh
+```
+
+脚本从当前源码生成支持 Apple 芯片与 Intel 的签名、公证 DMG，用户可拖拽到 Applications 安装。产物默认位于 `build/distribution/`，最低系统版本为 macOS 14.6。准备步骤、选项及排错见 [macOS 分发说明](docs/MACOS_DISTRIBUTION.md)。
+
 ### 开发说明
 
 - 最新开发状态请先看 `docs/CURRENT_STATUS.md`。该文档记录当前音频生命周期、Opus 默认策略、连接性能优化、弱网模式删除状态和验证结果。
@@ -169,6 +180,10 @@ xcodebuild -target Mumble -destination 'platform=macOS' build
 ```
 
 > Tip: If you hit third-party build issues on first build, verify submodules are fully synced.
+
+### macOS DMG Distribution
+
+After setting up Developer ID signing and notarization credentials, run `./package_and_notarize_dmg.sh --check`, then `./package_and_notarize_dmg.sh`. This builds the current source into a signed, notarized Universal DMG with an Applications shortcut. Output is saved in `build/distribution/`; macOS 14.6 or later is required. See the [distribution guide](docs/MACOS_DISTRIBUTION.md) for setup and troubleshooting.
 
 ### Development Notes
 

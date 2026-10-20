@@ -25,55 +25,6 @@ private struct PluginEditorParameterSnapshot: Identifiable, Hashable {
     var value: Float
 }
 
-private struct TrackChainPresetPlugin: Codable, Hashable {
-    let name: String
-    let subtitle: String
-    let source: PluginSource
-    let identifier: String
-    let bypassed: Bool
-    let stageGain: Float
-    let autoLoad: Bool
-    let savedParameterValues: [String: Float]
-    let sidechainSourceKey: String?
-
-    init(plugin: TrackPlugin) {
-        name = plugin.name
-        subtitle = plugin.subtitle
-        source = plugin.source
-        identifier = plugin.identifier
-        bypassed = plugin.bypassed
-        stageGain = plugin.stageGain
-        autoLoad = plugin.autoLoad
-        savedParameterValues = plugin.savedParameterValues
-        sidechainSourceKey = plugin.sidechainSourceKey
-    }
-
-    func makeTrackPlugin() -> TrackPlugin {
-        TrackPlugin(
-            id: UUID().uuidString,
-            name: name,
-            subtitle: subtitle,
-            source: source,
-            identifier: identifier,
-            bypassed: bypassed,
-            stageGain: stageGain,
-            autoLoad: autoLoad,
-            savedParameterValues: savedParameterValues,
-            sidechainSourceKey: sidechainSourceKey
-        )
-    }
-}
-
-private struct TrackChainPresetFile: Codable, Hashable {
-    let version: Int
-    let exportedAt: Date
-    let name: String
-    let sourceTrackKey: String
-    let sourceTrackTitle: String
-    let slotCount: Int
-    let plugins: [TrackChainPresetPlugin]
-}
-
 private struct TrackChainPresetDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.json] }
 
@@ -256,77 +207,6 @@ private struct MixerColorSchemeModifier: ViewModifier {
 }
 #endif
 
-// MARK: - Shared Types
-
-enum PluginSource: String, Codable {
-    case audioUnit
-    case filesystem
-}
-
-struct TrackPlugin: Identifiable, Codable, Hashable {
-    let id: String
-    var name: String
-    var subtitle: String
-    var source: PluginSource
-    var identifier: String
-    var bypassed: Bool
-    var stageGain: Float
-    var autoLoad: Bool
-    var savedParameterValues: [String: Float]
-    var sidechainSourceKey: String?  // NEW — nil means no sidechain
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case name
-        case subtitle
-        case source
-        case identifier
-        case bypassed
-        case stageGain
-        case autoLoad
-        case savedParameterValues
-        case sidechainSourceKey
-    }
-
-    init(
-        id: String,
-        name: String,
-        subtitle: String,
-        source: PluginSource,
-        identifier: String,
-        bypassed: Bool = false,
-        stageGain: Float = 1.0,
-        autoLoad: Bool = true,
-        savedParameterValues: [String: Float] = [:],
-        sidechainSourceKey: String? = nil
-    ) {
-        self.id = id
-        self.name = name
-        self.subtitle = subtitle
-        self.source = source
-        self.identifier = identifier
-        self.bypassed = bypassed
-        self.stageGain = stageGain
-        self.autoLoad = autoLoad
-        self.savedParameterValues = savedParameterValues
-        self.sidechainSourceKey = sidechainSourceKey
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        name = try container.decode(String.self, forKey: .name)
-        subtitle = try container.decode(String.self, forKey: .subtitle)
-        source = try container.decode(PluginSource.self, forKey: .source)
-        identifier = try container.decode(String.self, forKey: .identifier)
-        bypassed = try container.decodeIfPresent(Bool.self, forKey: .bypassed) ?? false
-        stageGain = try container.decodeIfPresent(Float.self, forKey: .stageGain) ?? 1.0
-        autoLoad = try container.decodeIfPresent(Bool.self, forKey: .autoLoad) ?? true
-        savedParameterValues = try container.decodeIfPresent([String: Float].self, forKey: .savedParameterValues) ?? [:]
-        sidechainSourceKey = try container.decodeIfPresent(String.self, forKey: .sidechainSourceKey)
-    }
-}
-
 struct AudioPluginMixerView: View {
     private let defaultInsertSlots: Int = 8
     private let maxInsertSlots: Int = 100
@@ -421,6 +301,7 @@ struct AudioPluginMixerView: View {
     @AppStorage("AudioPluginTrackChainsV1") private var pluginTrackChainsData: String = ""
     @AppStorage("AudioPluginSlotCountsV1") private var pluginSlotCountsData: String = ""
     @AppStorage("AudioPluginPresetsV1") private var pluginPresetsData: String = ""
+    @AppStorage("AudioPluginChainPresetsV1") private var chainPresetsData: String = ""
     @AppStorage("AudioPluginHostBufferFrames") private var pluginHostBufferFrames: Int = 256
     @AppStorage("AudioPluginCategoryOverridesV1") private var pluginCategoryOverridesData: String = ""
     @AppStorage("AudioPluginCustomCategoriesV1") private var pluginCustomCategoriesData: String = ""
@@ -461,6 +342,11 @@ struct AudioPluginMixerView: View {
     @State private var showingTrackPresetExporter: Bool = false
     @State private var trackPresetExportDocument: TrackChainPresetDocument? = nil
     @State private var trackPresetExportFilename: String = "mumble-track-preset"
+    @State private var showingChainPresetSaveDialog: Bool = false
+    @State private var chainPresetNameInput: String = ""
+    @State private var isApplyingChainPreset: Bool = false
+    @State private var previousChainByTrack: [String: AudioPluginChainPreset] = [:]
+    @State private var selectedChainPresetIDByTrack: [String: String] = [:]
     @State private var pluginCategoryOverrides: [String: String] = [:]
     @State private var customPluginCategories: [String] = []
     @State private var customCategoryInput: String = ""
@@ -508,11 +394,20 @@ struct AudioPluginMixerView: View {
                 defaultFilename: trackPresetExportFilename,
                 onCompletion: handleTrackPresetExportResult
             )
+            .alert(NSLocalizedString("Save Chain Preset", comment: ""), isPresented: $showingChainPresetSaveDialog) {
+                TextField(NSLocalizedString("Preset Name", comment: ""), text: $chainPresetNameInput)
+                Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) { }
+                Button(NSLocalizedString("Save", comment: "")) { saveCurrentChainPreset() }
+                    .disabled(chainPresetNameInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } message: {
+                Text(NSLocalizedString("Save this chain's order, parameters, bypass and mix settings for quick switching.", comment: ""))
+            }
     }
 
     /// body 拆分：核心 onAppear / onReceive / onChange（减轻 type-checker 压力）
     private var mixerBodyCore: some View {
         mixerContentView
+        .disabled(isApplyingChainPreset)
         .onAppear { performOnAppear() }
         .onDisappear { performOnDisappear() }
         .modifier(MixerLiveTrackRefreshModifier(
@@ -568,35 +463,30 @@ struct AudioPluginMixerView: View {
     @discardableResult
     private func syncLoadedStateFromSharedRackManager() -> Bool {
         let manager = AudioPluginRackManager.shared
-        let adoptedLiveProcessorState = !manager.loadedAudioUnits.isEmpty
+        let remoteUserChains = remoteUserPluginChains(from: pluginChainByTrack)
+        let remotePluginIDs = Set(remoteUserChains.values.flatMap { $0.map(\.id) })
+        let remoteUnits = loadedAudioUnits.filter { $0.key.hasPrefix("remoteUser:") }
+        let remoteParameters = parameterStateByPlugin.filter { remotePluginIDs.contains($0.key) }
+        let remoteErrors = lastLoadErrorByPlugin.filter { remotePluginIDs.contains($0.key) }
+        let adoptedLiveProcessorState = !manager.loadedAudioUnits.isEmpty || !remoteUnits.isEmpty
 
-        if !manager.pluginChainByTrack.isEmpty {
-            let remoteUserChains = remoteUserPluginChains(from: pluginChainByTrack)
-            pluginChainByTrack = manager.pluginChainByTrack
-            for (key, chain) in remoteUserChains {
-                pluginChainByTrack[key] = chain
-            }
-        }
+        pluginChainByTrack = manager.pluginChainByTrack.merging(remoteUserChains) { _, local in local }
         trackSendRoutesBySource = manager.trackSendRoutesBySource
-        if !manager.loadedAudioUnits.isEmpty {
-            loadedAudioUnits = manager.loadedAudioUnits
-        }
-        if !manager.lastLoadErrorByPlugin.isEmpty {
-            lastLoadErrorByPlugin = manager.lastLoadErrorByPlugin
-        }
-        if !manager.parameterStateByPlugin.isEmpty {
-            parameterStateByPlugin = manager.parameterStateByPlugin.mapValues { infos in
-                infos.map {
-                    RuntimeParameter(
-                        id: $0.id,
-                        name: $0.name,
-                        minValue: $0.minValue,
-                        maxValue: $0.maxValue,
-                        value: $0.value
-                    )
-                }
+        // A microphone preset replaces only shared rack state; keep remote-user instances alive.
+        loadedAudioUnits = manager.loadedAudioUnits.merging(remoteUnits) { _, local in local }
+        lastLoadErrorByPlugin = manager.lastLoadErrorByPlugin.merging(remoteErrors) { _, local in local }
+        let sharedParameters = manager.parameterStateByPlugin.mapValues { infos in
+            infos.map {
+                RuntimeParameter(
+                    id: $0.id,
+                    name: $0.name,
+                    minValue: $0.minValue,
+                    maxValue: $0.maxValue,
+                    value: $0.value
+                )
             }
         }
+        parameterStateByPlugin = sharedParameters.merging(remoteParameters) { _, local in local }
         normalizePluginSlotCountsPersistingIfNeeded()
         return adoptedLiveProcessorState
     }
@@ -1207,36 +1097,17 @@ struct AudioPluginMixerView: View {
                 Text(NSLocalizedString("Plugin Chain", comment: ""))
                     .font(.headline)
                 Spacer(minLength: 0)
-                if compact {
-                    Button {
-                        showingTrackPresetImporter = true
-                    } label: {
-                        Image(systemName: "square.and.arrow.down")
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        prepareTrackPresetExport()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.bordered)
-                } else {
-                    Button {
-                        showingTrackPresetImporter = true
-                    } label: {
-                        Label(NSLocalizedString("Import Track Preset", comment: ""), systemImage: "square.and.arrow.down")
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        prepareTrackPresetExport()
-                    } label: {
-                        Label(NSLocalizedString("Export Track Preset", comment: ""), systemImage: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.bordered)
+                if isApplyingChainPreset {
+                    ProgressView().controlSize(.small)
                 }
+                chainPresetMenu
             }
+            Text(matchingChainPreset?.name ?? NSLocalizedString(
+                selectedTrackChain.isEmpty ? "No Effects" : "Custom Chain", comment: ""
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
             if sharedRackManager.isSafeModeActive {
                 Text(
                     NSLocalizedString(
@@ -1273,6 +1144,179 @@ struct AudioPluginMixerView: View {
         }
         .padding(compact ? 10 : 14)
         .modifier(MixerTranslucentPanelModifier(cornerRadius: 12))
+    }
+
+    private var savedChainPresets: [AudioPluginChainPreset] {
+        guard let data = chainPresetsData.data(using: .utf8),
+              let presets = try? JSONDecoder().decode([AudioPluginChainPreset].self, from: data) else { return [] }
+        return presets
+    }
+
+    private var matchingChainPreset: AudioPluginChainPreset? {
+        matchingChainPreset(for: selectedTrackKey)
+    }
+
+    private func matchingChainPreset(for trackKey: String) -> AudioPluginChainPreset? {
+        let chain = pluginChainByTrack[trackKey] ?? []
+        if let selectedID = selectedChainPresetIDByTrack[trackKey],
+           let selected = savedChainPresets.first(where: { $0.id == selectedID && $0.matches(chain) }) {
+            return selected
+        }
+        return savedChainPresets.first { $0.matches(chain) }
+    }
+
+    private var chainPresetOperationBlocked: Bool {
+        isApplyingChainPreset || isLoadingPersistedPlugins || !loadingPluginIDs.isEmpty
+            || !sharedRackManager.loadingPluginIDs.isEmpty
+    }
+
+    private var chainPresetMenu: some View {
+        Menu {
+            Section(NSLocalizedString("Saved Chain Presets", comment: "")) {
+                if savedChainPresets.isEmpty {
+                    Text(NSLocalizedString("No Saved Presets", comment: ""))
+                } else {
+                    ForEach(savedChainPresets) { preset in
+                        savedChainPresetButton(preset)
+                    }
+                }
+            }
+
+            Section {
+                Button {
+                    chainPresetNameInput = matchingChainPreset?.name ?? ""
+                    showingChainPresetSaveDialog = true
+                } label: {
+                    Label(NSLocalizedString("Save Chain Preset", comment: ""), systemImage: "plus.circle")
+                }
+                .accessibilityIdentifier("mixer.chainPreset.save")
+
+                Button {
+                    showingTrackPresetImporter = true
+                } label: {
+                    Label(NSLocalizedString("Import Track Preset", comment: ""), systemImage: "square.and.arrow.down")
+                }
+                .accessibilityIdentifier("mixer.chainPreset.import")
+
+                Button {
+                    prepareTrackPresetExport()
+                } label: {
+                    Label(NSLocalizedString("Export Track Preset", comment: ""), systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("mixer.chainPreset.export")
+            }
+
+            if let previous = previousChainByTrack[selectedTrackKey] {
+                Button {
+                    applyChainPreset(previous)
+                } label: {
+                    Label(NSLocalizedString("Restore Previous Chain", comment: ""), systemImage: "arrow.uturn.backward")
+                }
+                .accessibilityIdentifier("mixer.chainPreset.restore")
+                .disabled(sharedRackManager.isSafeModeActive)
+            }
+
+            if !savedChainPresets.isEmpty {
+                Menu(NSLocalizedString("Delete Saved Preset", comment: "")) {
+                    ForEach(savedChainPresets) { preset in
+                        Button(preset.name, role: .destructive) { deleteChainPreset(preset) }
+                    }
+                }
+            }
+        } label: {
+            Label(NSLocalizedString("Chain Presets", comment: ""), systemImage: "slider.horizontal.3")
+                .font(.subheadline)
+                .lineLimit(1)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("mixer.chainPreset.menu")
+        .disabled(chainPresetOperationBlocked)
+    }
+
+    private func savedChainPresetButton(_ preset: AudioPluginChainPreset) -> some View {
+        let selected = matchingChainPreset?.id == preset.id
+        let available = preset.isAvailable(in: Set(installedAudioUnits.map(\.id)))
+        return Button {
+            applyChainPreset(preset)
+        } label: {
+            if selected {
+                Label(preset.name, systemImage: "checkmark")
+            } else {
+                Text(preset.name)
+            }
+        }
+        .accessibilityIdentifier("mixer.chainPreset.\(preset.id)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityHint(available ? preset.name : NSLocalizedString("A required Audio Unit is not installed.", comment: ""))
+        .help(available ? preset.name : NSLocalizedString("A required Audio Unit is not installed.", comment: ""))
+        .disabled(!available || sharedRackManager.isSafeModeActive)
+    }
+
+    private func persistChainPresets(_ presets: [AudioPluginChainPreset]) {
+        guard let data = try? JSONEncoder().encode(presets),
+              let string = String(data: data, encoding: .utf8) else { return }
+        chainPresetsData = string
+    }
+
+    private func saveCurrentChainPreset() {
+        let name = chainPresetNameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !chainPresetOperationBlocked else { return }
+        var preset = snapshotCurrentChainPreset()
+        preset.name = name
+        let saved = storeChainPreset(preset)
+        selectedChainPresetIDByTrack[selectedTrackKey] = saved.id
+        pluginOperationMessage = String(format: NSLocalizedString("Saved chain preset '%@'", comment: ""), saved.name)
+    }
+
+    private func storeChainPreset(_ preset: AudioPluginChainPreset, reuseMatching: Bool = false) -> AudioPluginChainPreset {
+        var presets = savedChainPresets
+        if reuseMatching, let existing = presets.first(where: {
+            $0.name.localizedCaseInsensitiveCompare(preset.name) == .orderedSame
+                && $0.slotCount == preset.slotCount && $0.matches(preset.plugins)
+        }) {
+            return existing
+        }
+        let stored = AudioPluginChainPreset(
+            id: UUID().uuidString,
+            name: AudioPluginChainPreset.uniqueName(preset.name, existing: presets),
+            slotCount: preset.slotCount, plugins: preset.plugins
+        )
+        presets.append(stored)
+        persistChainPresets(presets)
+        return stored
+    }
+
+    private func deleteChainPreset(_ preset: AudioPluginChainPreset) {
+        persistChainPresets(savedChainPresets.filter { $0.id != preset.id })
+        pluginOperationMessage = String(format: NSLocalizedString("Deleted chain preset '%@'", comment: ""), preset.name)
+    }
+
+    private func applyChainPreset(_ preset: AudioPluginChainPreset) {
+        let trackKey = selectedTrackKey
+        Task { @MainActor in
+            await activateChainPreset(preset, trackKey: trackKey)
+        }
+    }
+
+    private func activateChainPreset(_ preset: AudioPluginChainPreset, trackKey: String) async {
+        guard !chainPresetOperationBlocked, !sharedRackManager.isSafeModeActive else { return }
+        snapshotAllPluginParameters()
+        let currentPreset = matchingChainPreset(for: trackKey)
+        previousChainByTrack[trackKey] = AudioPluginChainPreset(
+            id: currentPreset?.id ?? UUID().uuidString,
+            name: currentPreset?.name ?? trackLabel(forTrackKey: trackKey),
+            slotCount: normalizedSlotCount(for: trackKey, requested: slotCountByTrack[trackKey]),
+            plugins: pluginChainByTrack[trackKey] ?? []
+        )
+        isApplyingChainPreset = true
+        defer { isApplyingChainPreset = false }
+        await replaceTrackChain(trackKey: trackKey, with: preset.makePlugins(), slotCount: preset.slotCount)
+        selectedChainPresetIDByTrack[trackKey] = preset.id
+        let failed = (pluginChainByTrack[trackKey] ?? []).contains { lastLoadErrorByPlugin[$0.id] != nil }
+        pluginOperationMessage = String(format: NSLocalizedString(
+            failed ? "Chain preset '%@' has plugins that failed to load. Check the slots below." : "Applied chain preset '%@'",
+            comment: ""
+        ), preset.name)
     }
 
     // MARK: - Wide Plugin Slot (macOS / iPad 横屏)
@@ -1974,23 +2018,22 @@ struct AudioPluginMixerView: View {
         return filtered.isEmpty ? "mumble-track-preset" : filtered
     }
 
-    private func makeCurrentTrackPresetFile() -> TrackChainPresetFile {
+    private func snapshotCurrentChainPreset() -> AudioPluginChainPreset {
         snapshotAllPluginParameters()
-        return TrackChainPresetFile(
-            version: 1,
-            exportedAt: Date(),
-            name: trackTitle(selectedTrack),
-            sourceTrackKey: selectedTrackKey,
-            sourceTrackTitle: trackTitle(selectedTrack),
+        return AudioPluginChainPreset(
+            id: UUID().uuidString,
+            name: matchingChainPreset?.name ?? trackTitle(selectedTrack),
             slotCount: selectedTrackSlotCount,
-            plugins: selectedTrackChain.map(TrackChainPresetPlugin.init(plugin:))
+            plugins: selectedTrackChain
         )
     }
 
     private func prepareTrackPresetExport() {
-        let preset = makeCurrentTrackPresetFile()
+        let preset = snapshotCurrentChainPreset().makeFile(
+            sourceTrackKey: selectedTrackKey, sourceTrackTitle: trackTitle(selectedTrack)
+        )
         trackPresetExportDocument = TrackChainPresetDocument(preset: preset)
-        trackPresetExportFilename = sanitizedPresetFilename(from: "\(preset.sourceTrackTitle)-track-preset.mumbletrackpreset")
+        trackPresetExportFilename = sanitizedPresetFilename(from: "\(preset.name).mumbletrackpreset")
         showingTrackPresetExporter = true
     }
 
@@ -2030,8 +2073,9 @@ struct AudioPluginMixerView: View {
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
                 let preset = try decoder.decode(TrackChainPresetFile.self, from: data)
+                let trackKey = selectedTrackKey
                 Task {
-                    await importTrackPreset(preset)
+                    await importTrackPreset(preset, trackKey: trackKey)
                 }
             } catch {
                 pluginOperationMessage = String(
@@ -2065,37 +2109,40 @@ struct AudioPluginMixerView: View {
         rebuildProcessorState(for: trackKey)
     }
 
-    private func importTrackPreset(_ preset: TrackChainPresetFile) async {
-        let importedPlugins = preset.plugins.map { $0.makeTrackPlugin() }
-        let trackKey = selectedTrackKey
-
+    private func replaceTrackChain(trackKey: String, with plugins: [TrackPlugin], slotCount: Int) async {
         if isSharedManagedTrack(trackKey) {
-            for plugin in selectedTrackChain {
+            for plugin in pluginChainByTrack[trackKey] ?? [] {
                 closePluginEditorIfNeeded(for: plugin, trackKey: trackKey)
                 clearPluginEditorCache(for: plugin, trackKey: trackKey)
+                // The shared manager owns these instances; remove stale editor snapshots too.
+                loadedAudioUnits.removeValue(forKey: loadedAudioUnitKey(trackKey: trackKey, pluginID: plugin.id))
+                parameterStateByPlugin.removeValue(forKey: plugin.id)
+                lastLoadErrorByPlugin.removeValue(forKey: plugin.id)
             }
-            await AudioPluginRackManager.shared.replaceTrackChain(trackKey: trackKey, with: importedPlugins)
-            await MainActor.run {
-                updateSlotCount(preset.slotCount, for: trackKey)
-                refreshSharedManagedTrackState()
-                pluginOperationMessage = String(
-                    format: NSLocalizedString("Imported track preset '%@'", comment: ""),
-                    preset.name
-                )
-            }
-            return
+            await AudioPluginRackManager.shared.replaceTrackChain(trackKey: trackKey, with: plugins)
+            refreshSharedManagedTrackState()
+        } else {
+            await replaceLocalTrackChain(trackKey: trackKey, with: plugins)
         }
+        snapshotAllPluginParameters()
+        updateSlotCount(slotCount, for: trackKey)
+    }
 
-        await MainActor.run {
-            updateSlotCount(preset.slotCount, for: trackKey)
+    private func importTrackPreset(_ preset: TrackChainPresetFile, trackKey: String) async {
+        guard !chainPresetOperationBlocked else { return }
+        var imported = AudioPluginChainPreset(file: preset)
+        if !sharedRackManager.isSafeModeActive {
+            await activateChainPreset(imported, trackKey: trackKey)
+            imported.plugins = pluginChainByTrack[trackKey] ?? imported.plugins
+            imported.slotCount = normalizedSlotCount(for: trackKey, requested: slotCountByTrack[trackKey])
         }
-        await replaceLocalTrackChain(trackKey: trackKey, with: importedPlugins)
-        await MainActor.run {
-            pluginOperationMessage = String(
-                format: NSLocalizedString("Imported track preset '%@'", comment: ""),
-                preset.name
-            )
-        }
+        let saved = storeChainPreset(imported, reuseMatching: true)
+        selectedChainPresetIDByTrack[trackKey] = saved.id
+        let failed = (pluginChainByTrack[trackKey] ?? []).contains { lastLoadErrorByPlugin[$0.id] != nil }
+        pluginOperationMessage = String(format: NSLocalizedString(
+            failed ? "Chain preset '%@' has plugins that failed to load. Check the slots below." : "Imported track preset '%@'",
+            comment: ""
+        ), saved.name)
     }
 
     private var selectedPlugin: TrackPlugin? {
@@ -3529,6 +3576,11 @@ struct AudioPluginMixerView: View {
     /// 从所有已加载的 AU 实例中抓取当前参数值，写入 savedParameterValues 并持久化。
     /// 用于捕获通过原生插件 UI 修改的参数（这些参数不经过 setParameterValue 回调）。
     private func snapshotAllPluginParameters() {
+        // Shared tracks must be captured by their owner before persistence or a rack refresh.
+        sharedRackManager.snapshotAllPluginParameters()
+        for (trackKey, chain) in sharedRackManager.pluginChainByTrack where isSharedManagedTrack(trackKey) {
+            pluginChainByTrack[trackKey] = chain
+        }
         var didChange = false
         for (trackKey, chain) in pluginChainByTrack {
             for plugin in chain {
@@ -3536,7 +3588,7 @@ struct AudioPluginMixerView: View {
                 var captured: [String: Float] = [:]
 
                 if let unit = loadedAudioUnits[loadedKey] {
-                    for param in unit.auAudioUnit.parameterTree?.allParameters ?? [] {
+                    for param in unit.auAudioUnit.parameterTree?.allParameters ?? [] where param.flags.contains(.flag_IsWritable) {
                         captured[String(param.address)] = param.value
                     }
                 }

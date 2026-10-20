@@ -487,3 +487,21 @@
 "Voice is unavailable. Check microphone access and your audio device." = "Voice is unavailable. Check microphone access and your audio device.";
 "Voice is recovering. You may not be heard or hear others yet." = "Voice is recovering. You may not be heard or hear others yet.";
 "Invalid server address or username" = "Invalid server address or username";
+
+/* Mixer chain presets */
+"Save Chain Preset" = "Save Chain Preset";
+"Preset Name" = "Preset Name";
+"Save this chain's order, parameters, bypass and mix settings for quick switching." = "Save this chain's order, parameters, bypass and mix settings for quick switching.";
+"Chain Presets" = "Chain Presets";
+"Saved Chain Presets" = "Saved Chain Presets";
+"No Saved Presets" = "No Saved Presets";
+"Delete Saved Preset" = "Delete Saved Preset";
+"Restore Previous Chain" = "Restore Previous Chain";
+"A required Audio Unit is not installed." = "A required Audio Unit is not installed.";
+"Saved chain preset '%@'" = "Saved chain preset '%@'";
+"Deleted chain preset '%@'" = "Deleted chain preset '%@'";
+"Applied chain preset '%@'" = "Applied chain preset '%@'";
+"Chain preset '%@' has plugins that failed to load. Check the slots below." = "Chain preset '%@' has plugins that failed to load. Check the slots below.";
+"No Effects" = "No Effects";
+"Custom Chain" = "Custom Chain";
+"Untitled Preset" = "Untitled Preset";

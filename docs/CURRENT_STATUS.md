@@ -1,8 +1,23 @@
 # Current Project Status
 
-Last updated: 2026-09-20
+Last updated: 2026-10-20
 
 This document is the short, current source of truth for recent audio, network, UI-performance, and automation changes. Older investigation notes are kept for history, but this file should be checked first when deciding expected behavior.
+
+## iOS Background Reconnect Identity (2026-10-20)
+
+- Automatic socket replacement preserves the exact client identity chain selected for that connection request, including intentionally anonymous sessions. It no longer re-reads the keychain and silently falls back to a different certificate or anonymous authentication. Manual disconnect/server changes clear the cache.
+- An unavailable configured certificate prevents a new transport from authenticating anonymously. While iOS protected data is unavailable, setup waits for protected-data availability/activation instead of sending credentials under another identity.
+- For the selected iOS identity only, ordinary WhenUnlocked key/certificate items are prepared for AfterFirstUnlock background use. Device-only binding, passcode-only accessibility and explicit access-control restrictions are preserved. See [Apple's accessibility guidance](https://developer.apple.com/documentation/security/restricting-keychain-item-accessibility).
+- A previously joined call retains audio ownership while its connection intent remains active, including retry backoff. Foreground/background lifecycle callbacks no longer stop the voice engine just because the replacement socket has not joined yet.
+- Graph teardown for recovery and failed activation retries retain the requested iOS audio session instead of temporarily deactivating it or returning to Ambient. Explicit stop still deactivates/reset the session. Transient system-mute notifications from an unhealthy/rebuilding graph cannot replace the app's saved mute state.
+- SwiftUI scene transitions now forward the call lifecycle to the existing application delegate, including the real background watchdog entry. Active/inactive forwarding is guarded by connection intent so idle launch and first-run VAD/local previews keep their existing behavior.
+- The root connection-alert binding reads live state, so programmatically resolved certificate prompts do not remain visible during recovery.
+- iOS Simulator and macOS Debug builds pass. Native certificate-policy tests under ASan/UBSan, transport tests, audio-health tests and the seven ConnectionAsync scenarios pass. A signed iOS Simulator test with a real loopback TLS server verifies stable client certificate fingerprints across an outage despite injected identity-read failures, unchanged voice mode/mixing/audio graph, and local failure for a fresh request whose identity cannot be read.
+- With a separate looping AVAudioPlayer app, 56 playback samples contained 18 distinct playback positions and zero interruptions during background reconnect; three TLS attempts used one certificate and the call graph start count stayed at one. Evidence: `Tests/Artifacts/recovery-ios/background-reconnect/`. Interface notifications are injected and transport outages are real loopback failures; physical acceptance is recorded separately below.
+- Physical iPhone 17 Pro Max / iOS 27.0.1 acceptance passed without debugger attachment or screen mirroring: music on 5G while locked for one minute, locked 5G-to-Wi-Fi for one minute, then locked Wi-Fi-to-5G for one minute, without foregrounding Mumble. The user confirmed normal music throughout. The 5m27s accepted window has 160 samples, two actual automatic rejoins, unchanged client identity/mute, no certificate/authentication errors or trust prompts, one graph start, continuous VoiceChat/PlayAndRecord with mixing and no ducking, and callback ages below 21 ms. Evidence: `Tests/Artifacts/recovery-ios/physical-background-reconnect/{unmirrored-session.jsonl,summary.json}`. Original Force TCP was preserved; this is not separate UDP, Bluetooth, other-OS or remote acoustic acceptance. Temporary mute/log settings were restored and the final signed build installed.
+- Device Hub screen sharing introduced an Oneness/VirtualAudioDevice_Default route during preliminary runs, with playback/suspension interference. Those mirrored runs are excluded from physical acceptance. The native session-recovery regression compiles the production teardown method under ASan/UBSan and passes 200 rebuilds plus explicit-stop checks; final signed iOS-device and macOS Debug builds pass.
+- The existing iOS heartbeat probe also passes: live downlink does not conceal missing replies (failure detected in 30.27 seconds), automatic recovery rejoins, and a second failure waits 16.17 seconds rather than bypassing the 15-second cooldown. Joined callback-stall recovery, unfinished TLS timeout, repeated setup cancellation and genuine authentication rejection remain functional.
 
 ## iOS Idle Launch and Background Music (2026-09-20)
 
@@ -40,7 +55,7 @@ See [VOICE_RECOVERY.md](VOICE_RECOVERY.md) for behavior, thresholds, reproducibl
 - Offline waiting preserves retry capacity. Consecutive automatic failures wait at least 5/15/30/60/120/300 seconds; brief successful joins do not reset backoff, and path restoration cannot bypass cooldown. A session healthy for 60 seconds resets this failure streak on its next failure.
 - Connection generations and model identity checks isolate cancellation, certificate prompts, deferred registration, listening-channel restoration, and old transport callbacks.
 - Local test and call audio lifecycle actions share one serial queue; obsolete permission callbacks cannot reopen the microphone.
-- iOS and macOS integration builds, native fault tests, and macOS loopback/device recovery tests pass. Real iOS background and hardware transition acceptance remains outstanding.
+- iOS and macOS integration builds, native fault tests, and macOS loopback/device recovery tests pass. iOS lock-screen music plus actual 5G/Wi-Fi background reconnect acceptance passed on the device above; other hardware/OS matrices remain outstanding.
 
 ## Audio Lifecycle
 

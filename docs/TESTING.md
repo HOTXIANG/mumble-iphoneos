@@ -179,6 +179,16 @@ Mumble 内嵌了一个 WebSocket 测试服务器（`MUTestServer`），仅在 `D
 
 ## 最小可用 Agent 脚本
 
+### iOS 后台音频与切网专项
+
+恢复拆图必须保留仍被请求的语音会话，明确停止才释放：`sh Tests/recovery_review/run_audio_session_recovery_tests.sh`。该入口直接编译生产 teardown 方法，以替身统计硬件/会话调用，ASan/UBSan 下检查 200 次重建、缓冲清理和两种 explicit-stop 通知语义。证书后台访问规则入口为 `sh Tests/recovery_review/run_certificate_background_tests.sh`。
+
+真机验收不要开启 Device Hub 屏幕镜像或附加调试器。镜像可能引入 Oneness/VirtualAudioDevice_Default 路由，干扰背景播放和挂起行为。通过 USB 隧道访问 Debug WebSocket，读取实际 `state.get`、`audio.status`、`network.status`、`user.self`，并记录真实生命周期状态。用户播放音乐后，在 5G 锁屏一分钟，再从锁屏控制中心切到 Wi-Fi 一分钟、切回 5G 一分钟，不打开 Mumble；每阶段由用户确认音乐是否正常。不要用注入路径通知或模拟委托回调替代实际操作。
+
+同时检查身份链/用户身份、认证错误与证书弹窗、闭麦、VoiceChat/PlayAndRecord、mixing/ducking、音频图启动计数、回调年龄及采样缺口。结束后明确断开测试连接，恢复原闭麦/VAD/网络/日志设置，再安装最终版本并验证空闲音频停止。2026-10-20 的真机通过记录及边界见 [VOICE_RECOVERY.md](VOICE_RECOVERY.md#真机锁屏与切网验收)，证据在 `Tests/Artifacts/recovery-ios/physical-background-reconnect/`。
+
+### 通用 Probe Runner
+
 仓库内置了一个无第三方依赖的标准 smoke/probe runner：
 
 ```bash
@@ -632,6 +642,8 @@ websocat ws://localhost:54296
 | `connection.rejectCert` | 无 | 拒绝待确认的服务器证书 |
 | `connection.status` | 无 | 获取连接状态 |
 | `network.status` | `logLimit`(20) | 获取连接/重连状态、UDP transport、UDP ping、包统计、最近 Network 日志和 Connection/Network/Certificate timeline |
+| `network.injectClientIdentityUnavailable` | `unavailable`(Bool) | 仅 Debug：模拟无法从钥匙串读取客户端身份，验证自动重连复用会话身份且新连接不会退回匿名；测试后必须恢复 `false` |
+| `network.injectPathUpdate` | `satisfied`(Bool), `interfaces`(0...15) | 仅 Debug：注入接口/可达性提示后恢复真实路径状态；用于确认健康传输不会因为路径通知被主动拆除 |
 | `network.injectUDPStatus` | `state`(必需) | Debug 自动化用：投递 `unknown` / `unavailable` / `available` / `stalled` / `recovering` UDP 状态通知，用于验证状态 UI、toast 和事件流 |
 
 ```bash

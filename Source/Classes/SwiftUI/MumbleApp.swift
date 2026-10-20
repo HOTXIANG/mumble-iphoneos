@@ -157,12 +157,24 @@ struct MumbleApp: App {
             case .active:
                 audioPluginRackManager.markAppActive()
                 #if os(iOS)
+                if MUConnectionController.existingShared()?.hasConnectionIntent == true {
+                    appDelegate.applicationDidBecomeActive(UIApplication.shared)
+                }
                 LiveActivityCleanup.endAllActivitiesIfDisconnected()
                 #endif
             case .inactive:
                 audioPluginRackManager.markAppInactive()
+                #if os(iOS)
+                if MUConnectionController.existingShared()?.hasConnectionIntent == true {
+                    appDelegate.applicationWillResignActive(UIApplication.shared)
+                }
+                #endif
             case .background:
                 audioPluginRackManager.markAppBackgrounded()
+                #if os(iOS)
+                // Scene-based apps do not receive the legacy background delegate callback.
+                appDelegate.applicationDidEnterBackground(UIApplication.shared)
+                #endif
             @unknown default:
                 break
             }

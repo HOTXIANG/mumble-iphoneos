@@ -39,6 +39,16 @@ extension ServerModelManager {
                 return
             }
 
+            #if os(iOS)
+            // Recreating an AudioUnit can publish a temporary unmuted state.
+            // Only a healthy graph may turn a hardware gesture into app state.
+            if let health = MKAudio.shared()?.healthSnapshot(), health["state"] as? String != "healthy" {
+                MumbleLogger.audio.debug("Ignoring system mute notification while the audio graph is recovering.")
+                self.syncCurrentAppMuteStateToSystem(reason: "audio_graph_recovery")
+                return
+            }
+            #endif
+
             // 只有当 Mumble 内部状态不一致时才更新
             if user.isSelfMuted() != isSystemMuted {
                 MumbleLogger.audio.info("Sync: System(\(isSystemMuted)) -> App")

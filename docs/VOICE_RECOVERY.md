@@ -1,6 +1,6 @@
 # 语音与连接恢复
 
-更新：2026-09-19
+更新：2026-10-20
 
 本轮目标是发现并恢复“连接仍在，但采集、播放或网络往返已经失效”。连接成功只在服务器完成加入后成立；音频健康要求采集和播放回调均持续完成，网络健康要求收到与本次探测匹配的心跳回复。
 
@@ -25,6 +25,46 @@
 手机反馈进入服务器几秒后提示 `network changed` 并循环重连。上一轮路径监听把接口集合变化或默认路径暂时不可用直接转成连接错误，这会主动拆掉仍可使用的连接；仅有本地心跳失联测试未覆盖该路径。现已移除这个破坏性判断，保留实际传输健康检测，并增加上述自动重连限速，降低频繁登录触发服务器临时封禁的风险。服务器的具体封禁规则不同，客户端限速不能撤销已有封禁。
 
 回归入口：`python3 Tests/recovery_review/real_app_heartbeat_probe.py --path-updates --retry-cooldown`。它在本地 TLS 会话上注入 15 次接口变化/暂时无路径，检查会话没有重新登录；随后停止真实心跳回复验证仍可重连，再主动关闭短暂重连后的会话，检查第二次恢复至少等待 15 秒。不会连接用户的服务器。
+
+## iOS 后台重连的证书与音频会话（2026-10-20）
+
+本次截图中的 `Wrong User Password / Wrong certificate or password for existing user` 对应服务器身份认证拒绝。原实现每次重连都会重新查询客户端证书，查询失败后会尝试其他证书或匿名认证；后台钥匙串暂时不可读时，这会改变已注册用户的身份。现在在一次连接请求内保留实际使用的身份链，自动重连直接复用，手动断开或切换服务器后清除。选定证书不可读的新请求不会发送匿名认证；iOS 受保护数据不可用时等待解锁通知恢复准备工作。
+
+仅为实际选中的普通客户端证书和私钥准备后台访问：`WhenUnlocked` 对应 `AfterFirstUnlock`，`WhenUnlockedThisDeviceOnly` 对应 `AfterFirstUnlockThisDeviceOnly`。不改写明确的访问控制或仅密码设备限制，也不批量修改钥匙串。后台访问规则参考 [Apple 文档](https://developer.apple.com/documentation/security/restricting-keychain-item-accessibility)。
+
+已加入的通话在重连等待期间继续持有音频；前后台生命周期判断同时检查真实连接意图，不会因暂时没有服务器模型而关闭语音模式。证书/错误弹窗的绑定同步读取最新状态，避免异步确认后残留过期提示。
+
+音频设备图恢复/启动失败重试也继续持有请求中的音频会话，不再临时 deactivate 或切回 Ambient；用户明确停止时仍正常释放。设备图不健康时，AudioUnit 重建产生的临时系统开麦通知不会覆盖应用的闭麦意图。SwiftUI 的真实 scenePhase 变化接入现有前后台委托及后台音频看门狗；active/inactive 转发仅用于有连接意图的场景，不改变首次 VAD、本地预览或普通空闲欢迎页的行为。
+
+回归入口：
+
+```sh
+sh Tests/recovery_review/run_certificate_background_tests.sh
+sh Tests/recovery_review/run_audio_session_recovery_tests.sh
+python3 Tests/recovery_review/real_app_background_reconnect_probe.py \
+  --simulator SIMULATOR_UUID --import-dir APP_DATA_CONTAINER/Documents \
+  --output /tmp/background-reconnect.jsonl
+```
+
+使用空闲的 Debug 模拟器安装，需已有麦克风授权，以及带正确 application-identifier/keychain-access-groups 的模拟器签名；无钥匙串 entitlement 的无签名包会在导入临时测试身份时返回 `-34018`。测试只连接本地 TLS 端点，导入唯一命名的临时证书并创建临时收藏，结束后删除测试身份/收藏、关闭故障注入并恢复自动重连设置。最近连接和测试端点的证书摘要会保留在测试安装中。
+
+测试覆盖 15 次接口/可达性提示、真实套接字断开与恢复、钥匙串读取失败注入、前后台委托回调、音频引擎启动次数及新请求不能借用上次会话身份。可选 `--interactive --playback-heartbeat FILE` 与独立后台播放器配合。2026-10-20 的 iOS 模拟器组合实测中，56 个播放器样本含 18 个不同播放位置、中断次数均为零，重连三次 TLS 握手使用相同证书，通话音频图启动次数始终为 1。证据保存在 `Tests/Artifacts/recovery-ios/background-reconnect/`。这不替代真机锁屏钥匙串及真实 Wi-Fi/蜂窝切换验收。
+
+### 真机锁屏与切网验收
+
+2026-10-20 在 USB 连接的 iPhone 17 Pro Max（iOS 27.0.1）完成实际操作，无调试器、无屏幕镜像、无网络或生命周期故障注入。通话保持 VAD 和闭麦，保留原有 Force TCP 设置。
+
+| 操作 | 结果 |
+| --- | --- |
+| 音乐播放，5G 锁屏约 60 秒 | 后台通话继续运行，用户确认音乐正常。 |
+| 锁屏控制中心开启 Wi-Fi，保持锁屏约 60 秒 | 自动重新加入，用户未打开 Mumble，确认音乐正常。 |
+| 锁屏控制中心关闭 Wi-Fi 回到 5G，保持锁屏约 60 秒 | 再次自动重新加入，用户未打开 Mumble，确认音乐正常。 |
+
+验收窗口为 20:11:45 至 20:17:12（UTC+8），160 个采样、两次真实重连，采样无缺口。客户端身份保持一致，重连复用长度为 2 的客户端身份链；没有认证/证书错误或待确认信任弹窗。闭麦一直保持，音频图启动次数始终为 1，分类/模式持续为 PlayAndRecord/VoiceChat，mixing=true、ducking=false，输入/输出回调最大年龄分别为 20.13/19.77 ms。音乐连续性来自用户实际听感确认与会话状态，未在真机上测量播放器中断计数。
+
+证据：`Tests/Artifacts/recovery-ios/physical-background-reconnect/unmirrored-session.jsonl`、`summary.json`。前期 Device Hub 镜像引入 Oneness/VirtualAudioDevice_Default 路由，并伴随音乐暂停/进程挂起，不能作为未镜像真机验收结果；上述窗口已关闭镜像。结束后用户恢复 Wi-Fi/解锁，测试连接断开、临时闭麦和日志持久化恢复原值，安装最终签名版本。此结果覆盖本机型/系统及 TCP/TLS 重连，不代表已验收 UDP、蓝牙或远端收听质量。
+
+新增 session-recovery 原生回归直接编译生产 teardown 方法，ASan/UBSan 下 200 次恢复拆图均不释放仍被请求的会话，明确停止仍释放会话并保留原通知语义。音频健康与证书策略回归、最终 iOS 真机和 macOS Debug 构建均通过。
 
 ## macOS 内置设备回声消除恢复循环（2026-09-17）
 
@@ -90,6 +130,6 @@ python3 Tests/recovery_review/real_app_heartbeat_probe.py --audio
 
 ## 验证边界
 
-不能承诺任意条件下零中断。iOS 真机锁屏/长期后台、电话打断、蓝牙插拔、Wi-Fi 与蜂窝实际切换及多用户真实语音往返仍需要设备验收；构建和 macOS 回环测试不替代这些验收。
+不能承诺任意条件下零中断。上述 iOS 真机锁屏与 Wi-Fi/蜂窝实际切换已通过限定矩阵验收；更长期后台、其他系统/机型、电话打断、蓝牙插拔、UDP 及多用户真实语音往返仍需要设备验收，构建和回环测试不替代这些验收。
 
 客户端回调与服务器心跳能证明本地音频处理和网络往返在前进，不能证明另一位用户的扬声器确实发声，也不能证明远端服务内部一定正确转发每个语音包。系统暂停或终止进程、权限被拒、服务器持续离线、硬件故障，以及第三方音频插件或设备停止函数永久阻塞，不能靠这些恢复逻辑保证即时恢复。
