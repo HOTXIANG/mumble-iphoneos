@@ -231,7 +231,8 @@ class HandoffManager: NSObject, ObservableObject {
         } else {
             updatedInfo.removeValue(forKey: "channelName")
         }
-        activity.addUserInfoEntries(from: updatedInfo as! [String : Any])
+        // addUserInfoEntries 只合并不删除，被移除的 key 会残留，需整体替换 userInfo
+        activity.userInfo = updatedInfo
         activity.needsSave = true
 
         MumbleLogger.connection.debug("Handoff: Updated channel → \(channelName ?? "nil") (id: \(channelId ?? -1))")
@@ -253,7 +254,8 @@ class HandoffManager: NSObject, ObservableObject {
         } else {
             updatedInfo.removeValue(forKey: "userAudioSettings")
         }
-        activity.addUserInfoEntries(from: updatedInfo as! [String : Any])
+        // 同上：整体替换，确保 userAudioSettings 被清空时不会残留旧值
+        activity.userInfo = updatedInfo
         activity.needsSave = true
     }
     
